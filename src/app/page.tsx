@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const merchants = [
   { name: "Northstar Home", domain: "northstar-home.myshopify.com", plan: "Growth", usage: "74%", recoveries: "1,284", messages: "8,942", status: "Healthy" },
   { name: "Atelier Nia", domain: "atelier-nia.myshopify.com", plan: "Pro", usage: "46%", recoveries: "963", messages: "6,410", status: "Healthy" },
@@ -17,7 +19,7 @@ export default function Home() {
   return (
     <div className="admin-shell">
       <aside className="sidebar">
-        <div className="brand-lockup"><span className="brand-symbol">M</span><span>moda<span className="brand-accent">.</span></span></div>
+        <div className="brand-lockup"><Image src="/moda-interact-logo.jpg" alt="Moda Interact" width={115} height={30} priority /><span className="brand-lockup-text">Admin</span></div>
         <div className="sidebar-label">Platform console</div>
         <nav className="main-nav" aria-label="Main navigation">
           <a className="nav-item active" href="#overview"><span className="nav-icon">+</span>Overview</a>

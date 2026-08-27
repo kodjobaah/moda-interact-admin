@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Moda Interact Admin",
   description: "Platform operations console for Moda Interact",
+  icons: {
+    icon: "/moda-interact-favicon.png",
+    apple: "/moda-interact-favicon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
