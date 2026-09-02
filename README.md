@@ -124,7 +124,11 @@ https://admin-test.example.com/api/auth/callback/google
 environment-provided. `DEPLOYMENT_ENVIRONMENT_NAME`, `AUTH_URL`, and
 `AUTH_GOOGLE_ID` identify the non-secret deployment configuration. The public
 `/health`, `/ready`, and `/api/health/*` endpoints return only bounded health
-data and do not require Admin authentication.
+data and do not require Admin authentication. `/health` is a dependency-free
+liveness check returning `200` with `{"status":"ok"}`. `/ready` performs a
+bounded, non-mutating PostgreSQL `SELECT 1` check and returns `200` with
+`{"status":"ready"}` when available or `503` with
+`{"status":"unavailable"}` when unavailable or timed out.
 
 Provision an allow-listed administrator after the database migration is
 deployed:

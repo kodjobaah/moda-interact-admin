@@ -298,6 +298,7 @@ test('identity, revocation, mutation, session, and route contracts are wired', a
 test('public infrastructure routes are bounded and remain outside auth guards', async () => {
   const healthSource = await readFile(sourcePath('src/app/health/route.ts'), 'utf8');
   const readySource = await readFile(sourcePath('src/app/ready/route.ts'), 'utf8');
+  const readinessSource = await readFile(sourcePath('src/lib/health/readiness.ts'), 'utf8');
   const databaseHealthSource = await readFile(
     sourcePath('src/app/api/health/database/route.ts'),
     'utf8',
@@ -307,7 +308,10 @@ test('public infrastructure routes are bounded and remain outside auth guards', 
   assert.doesNotMatch(readySource, /requirePlatformAdmin/);
   assert.doesNotMatch(databaseHealthSource, /requirePlatformAdmin/);
   assert.match(healthSource, /status: 'ok'/);
-  assert.match(readySource, /status: 'ready'/);
+  assert.match(readinessSource, /status: 'ready'/);
+  assert.match(readinessSource, /status: 'unavailable'/);
+  assert.match(readinessSource, /POSTGRES_READINESS_TIMEOUT_MS/);
+  assert.match(readinessSource, /DatabasePing = \(\) => Promise<unknown>/);
   assert.match(databaseHealthSource, /database: 'ok'/);
 });
 
