@@ -1,100 +1,121 @@
 # Moda Interact Admin
 
-Moda Interact Admin is the internal platform administration console for the
-Moda Interact platform. It provides a cross-merchant view of platform activity,
-including usage, recovery performance, messaging volume and operational health.
+Internal Next.js administration console for Moda Interact. This implementation converts the supplied `ui-admin` mock-up into reusable React components and connects the screens to the shared Prisma/PostgreSQL data model.
 
-The admin console is separate from the Shopify merchant application. The
-merchant app is scoped to an individual shop, while this application is intended
-for authorised platform administrators who need visibility across multiple
-shops.
+## What is implemented
 
-## Project summary
+- Next.js App Router + TypeScript + Tailwind CSS
+- server-side Prisma queries; the browser does not query PostgreSQL directly
+- tenant directory with server-side brand/domain search
+- paginated tenant list
+- live KPI counts for active shops and currently active checkout recoveries
+- expandable tenant administration panel
+- server action for changing a shop status and recovery delay
+- Recovery Logs drill-down: tenant → customer → checkout recovery
+- paginated customer and recovery lists
+- recovery detail drawer with Conversation, Cart Details and Lifecycle tabs
+- paginated WhatsApp conversation messages
+- observability page using the supplied Grafana dashboard visual
+- reusable UI/data components under `src/components/admin` and `src/lib/admin`
 
-The project is built with Next.js App Router, TypeScript and Tailwind CSS. Its
-main responsibilities are:
+The navigation/drill-down behaviour follows the interaction pattern demonstrated in the supplied Loom recording: list views remain the entry point, selecting a record reveals progressively more detail, and the current context is kept in URL query parameters so server-rendered pages remain shareable and reload-safe.
 
-- platform-wide usage and billing visibility
-- merchant activity and recovery reporting
-- messaging and queue health monitoring
-- internal support and investigation workflows
-- secure server-side access to the shared PostgreSQL database
-
-The application consumes the canonical Prisma schema through the nested
-`moda-interact-database` submodule. Prisma migrations remain owned and managed
-by that database project.
-
-## Current status
-
-The project is an early walking skeleton. The admin layout, dashboard views,
-Prisma setup and database health endpoint are in place. Dashboard values are
-currently representative data; authenticated platform-admin access and live
-cross-merchant queries are the next implementation stage.
-
-## Architecture
+## Component structure
 
 ```text
-Platform administrator
-		  |
-		  v
-moda-interact-admin (Next.js)
-		  |
-		  v
-Server-side Prisma queries
-		  |
-		  v
-PostgreSQL
+src/
+├── app/
+│   ├── actions/
+│   │   └── tenant.ts
+│   ├── observability/
+│   │   └── page.tsx
+│   ├── error.tsx
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── loading.tsx
+│   └── page.tsx
+├── components/admin/
+│   ├── admin-shell.tsx
+│   ├── customer-table.tsx
+│   ├── empty-state.tsx
+│   ├── icons.tsx
+│   ├── kpi-card.tsx
+│   ├── observability-panel.tsx
+│   ├── pagination.tsx
+│   ├── recovery-drawer.tsx
+│   ├── recovery-logs.tsx
+│   ├── recovery-table.tsx
+│   ├── search-input.tsx
+│   ├── sidebar.tsx
+│   ├── status-badge.tsx
+│   ├── tenant-administration.tsx
+│   ├── tenant-detail-panel.tsx
+│   └── tenant-table.tsx
+└── lib/admin/
+    ├── data.ts
+    ├── format.ts
+    ├── query.ts
+    └── types.ts
 ```
 
-## Deployed application
+## Prisma data used by the screens
 
-[https://moda-interact-admin.vercel.app/](https://moda-interact-admin.vercel.app/)
+The admin UI uses the supplied ERD and queries these models server-side:
 
-## Getting Started
+- `Shop`, `ShopBrand`, `ShopSettings`
+- `Subscription`, `BillingPlan`
+- `Customer`, `CustomerPhone`
+- `CheckoutRecovery`, `CheckoutRecoveryStatusHistory`
+- `Conversation`, `ConversationMessage`
 
-First, run the development server:
+The supplied ERD includes `ShopSettings.recoveryDelayMinutes`; the Prisma schema in the uploaded project did not yet contain it, so this project adds that field plus migration `20260830143000_add_recovery_delay_minutes` to keep the code and supplied ERD aligned.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-Copy the environment template and set the database connection:
+## Running locally
 
 ```bash
 cp .env.example .env.local
 ```
 
-Generate Prisma Client from the shared schema:
+Set `DATABASE_URL` to the shared Moda Interact PostgreSQL database. If the shared database does not already contain the ERD field `ShopSettings.recoveryDelayMinutes`, apply the included database migration using the database project's normal migration flow:
 
 ```bash
+cd database
+npm install
+npm run migrate:deploy
+cd ..
+```
+
+Then install and run the admin application:
+
+```bash
+npm install
 npm run prisma:generate
+npm run dev
 ```
 
-The database connectivity check is available at:
+Open `http://localhost:3000`.
 
-```text
-/api/health/database
+## Validation
+
+```bash
+npm run prisma:validate
+npm run lint
+npm run build
 ```
 
-## Learn More
+`next build` runs Prisma Client generation first via the existing `build` script.
 
-To learn more about Next.js, take a look at the following resources:
+## Pagination query parameters
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The app uses URL-driven server-side pagination so pages can be refreshed or shared without losing context:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `page` – tenant directory
+- `customerPage` – customers for the selected tenant
+- `recoveryPage` – recoveries for the selected customer
+- `messagePage` – messages in the recovery drawer
 
-## Deploy on Vercel
+Search is server-side as well (`q` for tenants and `customerSearch` for customers).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Production access control
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This conversion focuses on the supplied admin UI, Prisma data access and navigation. The uploaded project did not include an administrator authentication/authorisation layer. Before exposing the console publicly, protect the routes and the `updateTenantAction` Server Action with the platform-admin authentication mechanism used by your deployment.

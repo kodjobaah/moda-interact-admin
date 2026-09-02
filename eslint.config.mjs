@@ -1,6 +1,7 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { defineConfig, globalIgnores } from 'eslint/config';
+import nextVitals from 'eslint-config-next/core-web-vitals';
+import nextTs from 'eslint-config-next/typescript';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -8,11 +9,15 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+    // Focused observability preload/bootstrap tests are plain Node scripts.
+    'tests/**',
   ]),
+  // Turns off all rules that are unnecessary or might conflict with Prettier
+  eslintConfigPrettier,
 ]);
 
 export default eslintConfig;

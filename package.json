@@ -5,12 +5,16 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run prisma:generate && next build --webpack",
-    "start": "next start",
+    "start": "node --import ./observability.mjs ./node_modules/next/dist/bin/next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test tests/observability/",
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma"
   },
   "dependencies": {
+    "@modainteract/moda-interact-shared": "0.4.0",
     "@prisma/client": "^6.19.3",
     "next": "16.3.3",
     "react": "19.2.8",
@@ -23,6 +27,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5"
