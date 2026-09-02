@@ -1,4 +1,5 @@
 import { AdminShell } from '@/components/admin/admin-shell';
+import { requirePlatformAdminPage } from '@/lib/auth/platform-admin';
 import { KpiCard } from '@/components/admin/kpi-card';
 import {
   RecoveryDrawer,
@@ -38,6 +39,7 @@ type PageProps = {
 };
 
 export default async function Home({ searchParams }: PageProps) {
+  await requirePlatformAdminPage();
   const rawParams = await searchParams;
   const params = paramsToRecord(rawParams);
   const search = cleanSearch(rawParams.q);

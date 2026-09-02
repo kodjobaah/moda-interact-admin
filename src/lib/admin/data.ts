@@ -3,6 +3,7 @@ import {
   Prisma,
   type ConversationMessage,
 } from '@prisma/client';
+import { requirePlatformAdminRead } from '@/lib/auth/platform-admin';
 import { prisma } from '@/lib/prisma';
 import type {
   CustomerListItem,
@@ -140,6 +141,7 @@ export async function getTenantDirectory(input: {
   pageSize: number;
   search: string;
 }): Promise<{ tenants: PageResult<TenantListItem>; kpis: PlatformKpis }> {
+  await requirePlatformAdminRead();
   const { page, pageSize, search } = input;
   const where: Prisma.ShopWhereInput = search
     ? {
@@ -210,6 +212,7 @@ export async function getTenantDirectory(input: {
 export async function getTenantDetail(
   shopId: string,
 ): Promise<TenantDetail | null> {
+  await requirePlatformAdminRead();
   const row = await prisma.shop.findUnique({
     where: { id: shopId },
     select: {
@@ -265,6 +268,7 @@ export async function getTenantCustomers(input: {
   pageSize: number;
   search: string;
 }): Promise<PageResult<CustomerListItem>> {
+  await requirePlatformAdminRead();
   const { shopId, page, pageSize, search } = input;
   const terms = search.split(/\s+/).filter(Boolean);
   const where: Prisma.CustomerWhereInput = {
@@ -333,6 +337,7 @@ export async function getCustomerRecoveries(input: {
   customer: CustomerListItem | null;
   recoveries: PageResult<RecoveryListItem>;
 }> {
+  await requirePlatformAdminRead();
   const { shopId, customerId, page, pageSize } = input;
 
   const customer = await prisma.customer.findFirst({
@@ -407,6 +412,7 @@ export async function getRecoveryDetail(input: {
   messagePage: number;
   messagePageSize: number;
 }): Promise<RecoveryDetail | null> {
+  await requirePlatformAdminRead();
   const { shopId, recoveryId, messagePage, messagePageSize } = input;
   const recovery = await prisma.checkoutRecovery.findFirst({
     where: { id: recoveryId, shopId },
