@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { requirePlatformAdminMutation } from '@/lib/auth/platform-admin';
 import { logAdminSecurityEvent } from '@/lib/auth/audit';
 import { prisma } from '@/lib/prisma';
+import { runProtectedTenantAction } from '@/lib/auth/tenant-action';
 
 function safeReturnTo(value: FormDataEntryValue | null): string {
   if (
@@ -19,7 +20,10 @@ function safeReturnTo(value: FormDataEntryValue | null): string {
 }
 
 export async function updateTenantAction(formData: FormData) {
-  await requirePlatformAdminMutation();
+  return runProtectedTenantAction(
+    formData,
+    requirePlatformAdminMutation,
+    async (formData) => {
 
   const shopId = formData.get('shopId');
   const rawStatus = formData.get('status');
@@ -83,5 +87,7 @@ export async function updateTenantAction(formData: FormData) {
   revalidatePath('/');
   redirect(
     returnTo.includes('?') ? `${returnTo}&saved=1` : `${returnTo}?saved=1`,
+  );
+    },
   );
 }

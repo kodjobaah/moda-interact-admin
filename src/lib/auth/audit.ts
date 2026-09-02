@@ -1,6 +1,6 @@
 import { createLogger } from '@modainteract/moda-interact-shared/logging';
 
-import { resolveDeploymentEnvironmentName } from '@/lib/auth/environment';
+import { resolveDeploymentEnvironmentName } from './environment.ts';
 
 const logger = createLogger({
   serviceNamespace: 'moda-interact',

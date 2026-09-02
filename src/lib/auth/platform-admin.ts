@@ -1,14 +1,28 @@
 import type { PlatformAdminRole } from '@prisma/client';
 import { cache } from 'react';
-import { redirect } from 'next/navigation';
 
-import { auth } from '@/auth';
-import { logAdminSecurityEvent } from '@/lib/auth/audit';
+import { logAdminSecurityEvent } from './audit.ts';
 import {
   assertPlatformAdminAuthConfiguration,
   isDevelopmentAuthBypass,
-} from '@/lib/auth/environment';
-import { prisma } from '@/lib/prisma';
+} from './environment.ts';
+import { isAuthorizedPlatformAdmin } from './security-policy.ts';
+
+export type PlatformAdminSession = {
+  email?: string;
+  providerSubject?: string;
+};
+
+export type PlatformAdminResolverDependencies = {
+  getSession: () => Promise<PlatformAdminSession | null>;
+  findByEmail: (email: string) => Promise<{
+    id: string;
+    role: PlatformAdminRole;
+    active: boolean;
+    provider: string;
+    providerSubject: string | null;
+  } | null>;
+};
 
 export type PlatformAdminPrincipal = {
   id: string;
@@ -29,8 +43,9 @@ const DEVELOPMENT_PRINCIPAL: PlatformAdminPrincipal = {
   developmentBypass: true,
 };
 
-const resolvePlatformAdminPrincipal = cache(
-  async (): Promise<PlatformAdminPrincipal | null> => {
+export async function resolvePlatformAdminPrincipal(
+  dependencies: PlatformAdminResolverDependencies,
+): Promise<PlatformAdminPrincipal | null> {
     if (isDevelopmentAuthBypass()) {
       logAdminSecurityEvent('admin.auth.development_bypass', {
         action: 'authenticate',
@@ -42,36 +57,62 @@ const resolvePlatformAdminPrincipal = cache(
 
     assertPlatformAdminAuthConfiguration();
 
-    const session = await auth();
-    const email = session?.user?.email?.trim().toLowerCase();
-    if (!email) return null;
+    const user = await dependencies.getSession();
+    const email = user?.email?.trim().toLowerCase();
+    const providerSubject = user?.providerSubject;
+    if (!email || !providerSubject) return null;
 
-    const admin = await prisma.platformAdmin.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        role: true,
-        active: true,
-      },
-    });
+    const admin = await dependencies.findByEmail(email);
 
-    if (!admin?.active) return null;
+    if (!admin || !isAuthorizedPlatformAdmin(admin, providerSubject)) return null;
 
     return {
       id: admin.id,
       role: admin.role,
       developmentBypass: false,
     };
-  },
+}
+
+const resolvePlatformAdminPrincipalCached = cache(() =>
+  resolvePlatformAdminPrincipal({
+    getSession: async () => {
+      const { auth } = await import('../../auth');
+      const session = await auth();
+      return session?.user
+        ? {
+            email: session.user.email ?? undefined,
+            providerSubject: (session.user as typeof session.user & { providerSubject?: string })
+              .providerSubject,
+          }
+        : null;
+    },
+    findByEmail: async (email) => {
+      const { prisma } = await import('../prisma');
+      return prisma.platformAdmin.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          role: true,
+          active: true,
+          provider: true,
+          providerSubject: true,
+        },
+      });
+    },
+  }),
 );
 
 export async function getPlatformAdminPrincipal(): Promise<PlatformAdminPrincipal | null> {
-  return resolvePlatformAdminPrincipal();
+  return resolvePlatformAdminPrincipalCached();
 }
 
 export async function requirePlatformAdminPage(): Promise<PlatformAdminPrincipal> {
   const principal = await getPlatformAdminPrincipal();
-  if (!principal) redirect('/login');
+  if (!principal) {
+    const { redirect } = await import('next/navigation');
+    redirect('/login');
+    throw new PlatformAdminUnauthorizedError();
+  }
   return principal;
 }
 

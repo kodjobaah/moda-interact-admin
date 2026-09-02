@@ -107,11 +107,24 @@ cp .env.example .env.local
 
 Test and production require `AUTH_SECRET`, `AUTH_GOOGLE_ID`,
 `AUTH_GOOGLE_SECRET`, `AUTH_URL`, and `DEPLOYMENT_ENVIRONMENT_NAME`. Register
-the Google callback URL as:
+separate Google OAuth credentials, secrets, Admin hosts, and callback URLs for
+test and production. The production callback URL is:
 
 ```text
 https://admin.modainteract.com/api/auth/callback/google
 ```
+
+The test callback must use the test Admin host, for example:
+
+```text
+https://admin-test.example.com/api/auth/callback/google
+```
+
+`AUTH_SECRET`, `AUTH_GOOGLE_SECRET`, and `DATABASE_URL` are secrets and remain
+environment-provided. `DEPLOYMENT_ENVIRONMENT_NAME`, `AUTH_URL`, and
+`AUTH_GOOGLE_ID` identify the non-secret deployment configuration. The public
+`/health`, `/ready`, and `/api/health/*` endpoints return only bounded health
+data and do not require Admin authentication.
 
 Provision an allow-listed administrator after the database migration is
 deployed:

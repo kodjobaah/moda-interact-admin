@@ -9,7 +9,7 @@
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --test tests/observability/*.test.mjs",
+    "test": "node --test tests/observability/*.test.mjs tests/security/*.test.mjs",
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
     "admin:provision": "node scripts/provision-platform-admin.mjs"
