@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 
 import { assertPlatformAdminAuthConfiguration } from '@/lib/auth/environment';
+import { logAdminSecurityEvent } from '@/lib/auth/audit';
 import { prisma } from '@/lib/prisma';
 
 type GoogleProfile = {
@@ -87,8 +88,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ account, profile }) {
       assertPlatformAdminAuthConfiguration();
 
-      if (account?.provider !== 'google') return false;
-      return authoriseGoogleProfile(profile);
+      if (account?.provider !== 'google') {
+        logAdminSecurityEvent('admin.auth.login_denied', {
+          outcome: 'denied',
+          reasonCode: 'unsupported_provider',
+        });
+        return false;
+      }
+
+      const allowed = await authoriseGoogleProfile(profile);
+      logAdminSecurityEvent(
+        allowed ? 'admin.auth.login_allowed' : 'admin.auth.login_denied',
+        {
+          outcome: allowed ? 'allowed' : 'denied',
+          reasonCode: allowed ? undefined : 'platform_admin_not_authorized',
+        },
+      );
+      return allowed;
     },
   },
 });

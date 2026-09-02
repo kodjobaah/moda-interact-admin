@@ -1,4 +1,5 @@
 import { signOut } from '@/auth';
+import { logAdminSecurityEvent } from '@/lib/auth/audit';
 import { isDevelopmentAuthBypass } from '@/lib/auth/environment';
 
 export function LogoutForm() {
@@ -12,6 +13,10 @@ export function LogoutForm() {
 
   async function logout() {
     'use server';
+    logAdminSecurityEvent('admin.auth.logout', {
+      action: 'logout',
+      outcome: 'succeeded',
+    });
     await signOut({ redirectTo: '/login' });
   }
 

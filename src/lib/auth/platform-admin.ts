@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
+import { logAdminSecurityEvent } from '@/lib/auth/audit';
 import {
   assertPlatformAdminAuthConfiguration,
   isDevelopmentAuthBypass,
@@ -30,7 +31,14 @@ const DEVELOPMENT_PRINCIPAL: PlatformAdminPrincipal = {
 
 const resolvePlatformAdminPrincipal = cache(
   async (): Promise<PlatformAdminPrincipal | null> => {
-    if (isDevelopmentAuthBypass()) return DEVELOPMENT_PRINCIPAL;
+    if (isDevelopmentAuthBypass()) {
+      logAdminSecurityEvent('admin.auth.development_bypass', {
+        action: 'authenticate',
+        outcome: 'allowed',
+        developmentBypass: true,
+      });
+      return DEVELOPMENT_PRINCIPAL;
+    }
 
     assertPlatformAdminAuthConfiguration();
 
@@ -70,7 +78,13 @@ export async function requirePlatformAdminPage(): Promise<PlatformAdminPrincipal
 function requirePrincipal(
   principal: PlatformAdminPrincipal | null,
 ): PlatformAdminPrincipal {
-  if (!principal) throw new PlatformAdminUnauthorizedError();
+  if (!principal) {
+    logAdminSecurityEvent('admin.authorization.denied', {
+      outcome: 'denied',
+      reasonCode: 'platform_admin_required',
+    });
+    throw new PlatformAdminUnauthorizedError();
+  }
   return principal;
 }
 
