@@ -3,6 +3,7 @@
 import { ShopStatus } from '@prisma/client';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { requirePlatformAdminMutation } from '@/lib/auth/platform-admin';
 import { prisma } from '@/lib/prisma';
 
 function safeReturnTo(value: FormDataEntryValue | null): string {
@@ -17,6 +18,8 @@ function safeReturnTo(value: FormDataEntryValue | null): string {
 }
 
 export async function updateTenantAction(formData: FormData) {
+  await requirePlatformAdminMutation();
+
   const shopId = formData.get('shopId');
   const rawStatus = formData.get('status');
   const rawDelay = formData.get('recoveryDelayMinutes');
