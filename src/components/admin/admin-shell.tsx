@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Sidebar } from './sidebar';
 import { SearchInput } from './search-input';
+import { LogoutForm } from './logout-form';
 
 export function AdminShell({
   active,
@@ -18,6 +19,9 @@ export function AdminShell({
         <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-8">
           <div className="w-full max-w-2xl">
             <SearchInput defaultValue={search} />
+          </div>
+          <div className="ml-4 w-40 shrink-0">
+            <LogoutForm />
           </div>
         </header>
         {children}

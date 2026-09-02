@@ -95,6 +95,35 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Platform-admin authentication
+
+Local development uses the synthetic `SUPER_ADMIN` principal only when
+`DEPLOYMENT_ENVIRONMENT_NAME=development` and `NODE_ENV` is not `production`.
+Copy the environment template for local development:
+
+```bash
+cp .env.example .env.local
+```
+
+Test and production require `AUTH_SECRET`, `AUTH_GOOGLE_ID`,
+`AUTH_GOOGLE_SECRET`, `AUTH_URL`, and `DEPLOYMENT_ENVIRONMENT_NAME`. Register
+the Google callback URL as:
+
+```text
+https://admin.modainteract.com/api/auth/callback/google
+```
+
+Provision an allow-listed administrator after the database migration is
+deployed:
+
+```bash
+npm run admin:provision -- --email admin@example.com --role SUPER_ADMIN
+npm run admin:provision -- --email admin@example.com --disable
+```
+
+The provisioning command stores only administrator metadata. It does not store
+passwords or OAuth credentials.
+
 ## Validation
 
 ```bash
@@ -118,4 +147,6 @@ Search is server-side as well (`q` for tenants and `customerSearch` for customer
 
 ## Production access control
 
-This conversion focuses on the supplied admin UI, Prisma data access and navigation. The uploaded project did not include an administrator authentication/authorisation layer. Before exposing the console publicly, protect the routes and the `updateTenantAction` Server Action with the platform-admin authentication mechanism used by your deployment.
+Google authentication is restricted to active, pre-provisioned `PlatformAdmin`
+records. Full page and privileged mutation coverage remains part of the
+follow-up `ADMIN-005` and `ADMIN-006` tasks.
