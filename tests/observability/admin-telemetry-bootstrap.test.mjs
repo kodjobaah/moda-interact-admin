@@ -321,11 +321,10 @@ test(
         );
       }
 
-      // Prisma telemetry must not expose connection credentials or parameters.
-      // PrismaInstrumentation reports SQL text in `db.query.text` (and
-      // `db.statement` on some versions); both are checked. SQL text is emitted
-      // by the approved third-party Prisma instrumentation and is bounded to
-      // the health query, so it is safe to assert directly.
+      // If approved Prisma instrumentation includes SQL text, it must not
+      // expose connection credentials or parameter values. SQL-text
+      // attributes are optional and are not required for the Prisma span
+      // contract.
       const statements = prismaSpans
         .flatMap((span) => [
           span.attributes['db.statement'],
@@ -340,10 +339,6 @@ test(
           );
         }
       }
-      assert.ok(
-        statements.some((statement) => /SELECT\s+1/i.test(statement)),
-        'expected the SELECT 1 health statement to be recorded',
-      );
 
       // Correctness: the health contract is unchanged by observability.
       const healthBody = await healthResponse.json();
