@@ -141,6 +141,32 @@ npm run admin:provision -- --email admin@example.com --disable
 The provisioning command stores only administrator metadata. It does not store
 passwords or OAuth credentials.
 
+## Grafana observability access
+
+`/observability` is available only to authorised platform administrators. It
+provides external links to the private Grafana Cloud workspace; Grafana keeps
+its own authentication session and no Grafana credentials are sent to the
+browser.
+
+Render test and production services must set these non-secret variables
+independently, using destinations belonging to the matching environment:
+
+```text
+DEPLOYMENT_ENVIRONMENT_NAME=test|production
+GRAFANA_BASE_URL=https://<environment-stack>.grafana.net
+GRAFANA_PLATFORM_DASHBOARD_URL=https://<environment-stack>.grafana.net/d/<dashboard>
+GRAFANA_LOGS_URL=https://<environment-stack>.grafana.net/explore
+GRAFANA_TRACES_URL=https://<environment-stack>.grafana.net/explore
+GRAFANA_METRICS_URL=https://<environment-stack>.grafana.net/explore
+```
+
+The Logs, Traces, and Metrics destinations are optional. Values are rendered
+only after HTTPS URL validation; HTTP is accepted only for localhost or
+127.0.0.1 in development. Missing or invalid destinations produce an
+unavailable state without affecting other Admin functionality. Do not put
+tokens, passwords, cookies, authorization headers, or other Grafana secrets in
+these variables.
+
 ## Validation
 
 ```bash
