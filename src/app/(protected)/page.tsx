@@ -1,12 +1,15 @@
 import { AdminShell } from '@/components/admin/admin-shell';
 import { requirePlatformAdminPage } from '@/lib/auth/platform-admin';
 import { KpiCard } from '@/components/admin/kpi-card';
-import { QueueMonitor } from '@/components/admin/queue-monitor';
 import {
   RecoveryDrawer,
   type DrawerTab,
 } from '@/components/admin/recovery-drawer';
 import { TenantTable } from '@/components/admin/tenant-table';
+import {
+  QueueMonitorUnavailableError,
+  readQueueOverviewSnapshot,
+} from '@/lib/admin/queue-monitor';
 import {
   getCustomerRecoveries,
   getRecoveryDetail,
@@ -66,6 +69,13 @@ export default async function Home({ searchParams }: PageProps) {
     search,
   });
 
+  let queueOverview = null;
+  try {
+    queueOverview = await readQueueOverviewSnapshot();
+  } catch (error) {
+    if (!(error instanceof QueueMonitorUnavailableError)) throw error;
+  }
+
   const selectedTenant = tenantId ? await getTenantDetail(tenantId) : null;
 
   let customers: PageResult<CustomerListItem> | null = null;
@@ -117,7 +127,7 @@ export default async function Home({ searchParams }: PageProps) {
         </div>
 
         <section
-          className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4"
+          className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6"
           aria-label="Platform summary"
         >
           <KpiCard
@@ -129,9 +139,20 @@ export default async function Home({ searchParams }: PageProps) {
             value={directory.kpis.activeRecoveries.toLocaleString('en-GB')}
             accent
           />
+          {(queueOverview?.queues ?? [
+            { queueName: 'checkout-events', label: 'Checkout Events', active: null },
+            { queueName: 'order-events', label: 'Order Events', active: null },
+            { queueName: 'pending-recovery-candidates', label: 'Pending Recoveries', active: null },
+            { queueName: 'whatsapp-events', label: 'WhatsApp Events', active: null },
+          ]).map((queue) => (
+            <KpiCard
+              key={queue.queueName}
+              label={queue.label}
+              value={queue.active === null ? 'Unavailable' : queue.active.toLocaleString('en-GB')}
+              status={queue.active === null}
+            />
+          ))}
         </section>
-
-        <QueueMonitor />
 
         <TenantTable
           tenants={directory.tenants}

@@ -1,33 +1,34 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { ReactNode, SVGProps } from "react";
 
 export type IconName =
-  | 'users'
-  | 'chart'
-  | 'search'
-  | 'chevron-right'
-  | 'chevron-down'
-  | 'arrow-left'
-  | 'arrow-right'
-  | 'close'
-  | 'message'
-  | 'cart'
-  | 'timeline'
-  | 'box'
-  | 'external';
+  | "users"
+  | "chart"
+  | "shield"
+  | "search"
+  | "chevron-right"
+  | "chevron-down"
+  | "arrow-left"
+  | "arrow-right"
+  | "close"
+  | "message"
+  | "cart"
+  | "timeline"
+  | "box"
+  | "external";
 
 export function Icon({
   name,
-  className = 'h-4 w-4',
+  className = "h-4 w-4",
   ...props
 }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const common = {
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
     strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
   };
 
   const paths: Record<IconName, ReactNode> = {
@@ -44,21 +45,27 @@ export function Icon({
         <path d="m7 16 4-5 4 3 5-7" />
       </>
     ),
+    shield: (
+      <>
+        <path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z" />
+        <path d="m9 12 2 2 4-4" />
+      </>
+    ),
     search: (
       <>
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
       </>
     ),
-    'chevron-right': <path d="m9 18 6-6-6-6" />,
-    'chevron-down': <path d="m6 9 6 6 6-6" />,
-    'arrow-left': (
+    "chevron-right": <path d="m9 18 6-6-6-6" />,
+    "chevron-down": <path d="m6 9 6 6 6-6" />,
+    "arrow-left": (
       <>
         <path d="M19 12H5" />
         <path d="m12 19-7-7 7-7" />
       </>
     ),
-    'arrow-right': (
+    "arrow-right": (
       <>
         <path d="M5 12h14" />
         <path d="m12 5 7 7-7 7" />

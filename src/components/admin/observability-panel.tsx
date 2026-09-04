@@ -1,5 +1,6 @@
 import { Icon } from './icons';
 import type { GrafanaNavigation } from '@/lib/observability/grafana';
+import Link from 'next/link';
 
 function environmentLabel(environment: string) {
   return environment.charAt(0).toUpperCase() + environment.slice(1);
@@ -77,6 +78,24 @@ export function ObservabilityPanel({ navigation }: { navigation: GrafanaNavigati
             ) : null}
           </div>
         )}
+
+        <div className="mt-6 rounded-xl border border-[var(--brand-200)] bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-950">Shopify Queues</h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                Inspect read-only queue activity and refresh diagnostics.
+              </p>
+            </div>
+            <Icon name="chart" className="h-5 w-5 shrink-0 text-[var(--brand-700)]" />
+          </div>
+          <Link
+            href="/observability/queues"
+            className="mt-5 inline-flex rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-900)]"
+          >
+            Open Shopify Queues
+          </Link>
+        </div>
 
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 text-sm leading-6 text-gray-600">
           Operational telemetry remains private and Grafana authentication is
