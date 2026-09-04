@@ -95,8 +95,8 @@ function createQueue(queueName: string, redisUrl: string): QueueReader {
     connection: {
       url: redisUrl,
       lazyConnect: true,
-      enableOfflineQueue: false,
-      maxRetriesPerRequest: 1,
+      enableOfflineQueue: true,
+      maxRetriesPerRequest: null,
       connectTimeout: QUEUE_OPERATION_TIMEOUT_MS,
       commandTimeout: QUEUE_OPERATION_TIMEOUT_MS,
     },
@@ -107,8 +107,8 @@ function createQueue(queueName: string, redisUrl: string): QueueReader {
 function createRedis(redisUrl: string): RedisReader {
   return new Redis(redisUrl, {
     lazyConnect: true,
-    enableOfflineQueue: false,
-    maxRetriesPerRequest: 1,
+    enableOfflineQueue: true,
+    maxRetriesPerRequest: null,
     connectTimeout: QUEUE_OPERATION_TIMEOUT_MS,
     commandTimeout: QUEUE_OPERATION_TIMEOUT_MS,
   });

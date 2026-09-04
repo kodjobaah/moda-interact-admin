@@ -98,3 +98,25 @@ test('queue API authorizes before accessing the Redis snapshot reader', async ()
   assert.match(routeSource, /status: 503/);
   assert.doesNotMatch(routeSource, /REDIS_URL|connectionString|stack/);
 });
+
+test('refresh preference defaults safely and restores valid browser-local values', async () => {
+  const originalWindow = globalThis.window;
+  const module = await import(`${sourcePath('src/components/admin/queue-monitor-refresh.ts')}?refresh-test=${Date.now()}`);
+  const values = new Map();
+
+  globalThis.window = {
+    localStorage: {
+      getItem: (key) => values.get(key) ?? null,
+    },
+  };
+  assert.equal(module.getInitialRefreshMs(), 5_000);
+
+  values.set('moda-admin.queue-monitor.refresh-ms', '0');
+  assert.equal(module.getInitialRefreshMs(), 0);
+  values.set('moda-admin.queue-monitor.refresh-ms', '2000');
+  assert.equal(module.getInitialRefreshMs(), 2_000);
+  values.set('moda-admin.queue-monitor.refresh-ms', 'invalid');
+  assert.equal(module.getInitialRefreshMs(), 5_000);
+
+  globalThis.window = originalWindow;
+});

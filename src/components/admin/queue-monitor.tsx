@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import {
+  getInitialRefreshMs,
+  isRefreshValue,
+  REFRESH_OPTIONS,
+  STORAGE_KEY,
+} from './queue-monitor-refresh';
+
 type QueueMonitorSnapshot = {
   observedAt: string;
   queues: Array<{
@@ -17,27 +24,6 @@ type QueueMonitorSnapshot = {
     lastActivity: { event: string; observedAt: string } | null;
   }>;
 };
-
-const REFRESH_OPTIONS = [
-  { label: 'Paused', value: 0 },
-  { label: '2 seconds', value: 2_000 },
-  { label: '5 seconds', value: 5_000 },
-  { label: '10 seconds', value: 10_000 },
-  { label: '30 seconds', value: 30_000 },
-  { label: '60 seconds', value: 60_000 },
-] as const;
-const DEFAULT_REFRESH_MS = 5_000;
-const STORAGE_KEY = 'moda-admin.queue-monitor.refresh-ms';
-
-function isRefreshValue(value: number): value is (typeof REFRESH_OPTIONS)[number]['value'] {
-  return REFRESH_OPTIONS.some((option) => option.value === value);
-}
-
-function getInitialRefreshMs() {
-  if (typeof window === 'undefined') return DEFAULT_REFRESH_MS;
-  const stored = Number(window.localStorage.getItem(STORAGE_KEY));
-  return isRefreshValue(stored) ? stored : DEFAULT_REFRESH_MS;
-}
 
 function formatTime(value: string | null) {
   if (!value) return 'None observed';
