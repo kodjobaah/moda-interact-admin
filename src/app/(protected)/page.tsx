@@ -1,6 +1,7 @@
 import { AdminShell } from '@/components/admin/admin-shell';
 import { requirePlatformAdminPage } from '@/lib/auth/platform-admin';
 import { KpiCard } from '@/components/admin/kpi-card';
+import { QueueMonitor } from '@/components/admin/queue-monitor';
 import {
   RecoveryDrawer,
   type DrawerTab,
@@ -129,6 +130,8 @@ export default async function Home({ searchParams }: PageProps) {
             accent
           />
         </section>
+
+        <QueueMonitor />
 
         <TenantTable
           tenants={directory.tenants}
