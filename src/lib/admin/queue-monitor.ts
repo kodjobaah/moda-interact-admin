@@ -71,6 +71,7 @@ export type QueueJobDetail = {
   name: string;
   status: QueueJobStatus;
   shop: string | null;
+  attribution: QueueJobAttribution;
   attemptsMade: number;
   timestamp: string | null;
   processedOn: string | null;
@@ -80,7 +81,7 @@ export type QueueJobDetail = {
   data: unknown;
 };
 
-export type QueueJobStatus = 'failed' | 'active';
+export type QueueJobStatus = 'failed' | 'active' | 'waiting' | 'delayed';
 export type QueueJobDirection = 'asc' | 'desc';
 
 export type QueueJobSummary = {
@@ -89,14 +90,18 @@ export type QueueJobSummary = {
   name: string;
   status: QueueJobStatus;
   shop: string | null;
+  attribution: QueueJobAttribution;
   attemptsMade: number;
   eventAt: string | null;
   failedReason: string;
 };
 
+export type QueueJobAttribution = 'known' | 'unresolved' | 'orphan';
+
 export type QueueJobFacets = {
   shops: Array<{ value: string; label: string }>;
   hasOrphans: boolean;
+  hasUnresolved: boolean;
   scanTruncated: boolean;
 };
 
@@ -118,6 +123,7 @@ export type QueueJobSnapshot = {
 export type QueueMonitorDefinition = {
   queueName: string;
   jobNames: string[];
+  supportedJobNames?: string[];
 };
 
 export type QueueOverviewDefinition = {
@@ -199,6 +205,7 @@ type QueueJob = {
   attemptsMade: number;
   data?: unknown;
   timestamp?: number;
+  delay?: number;
   processedOn?: number;
   finishedOn?: number;
   failedReason?: string;
@@ -238,6 +245,7 @@ const queueDefinitions: QueueMonitorDefinition[] = [
   {
     queueName: 'pending-recovery-candidates',
     jobNames: ['Pending recovery candidates'],
+    supportedJobNames: ['evaluate-pending-recovery'],
   },
   {
     queueName: 'whatsapp-events',
@@ -459,6 +467,10 @@ function normalizeShopValue(value: unknown): string | null {
   return normalized;
 }
 
+function isWhatsAppQueue(queueName: string) {
+  return queueName === 'whatsapp-events';
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -471,11 +483,32 @@ export function extractQueueJobShop(
   const isShopifyQueue =
     queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_EVENTS.queueName ||
     queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.ORDER_EVENTS.queueName;
-  if (!isShopifyQueue || !isRecord(data) || !isRecord(data.tenant)) return null;
+  if (!isRecord(data)) return null;
 
-  const supportedJobNames = getQueueDefinition(queueName)?.jobNames ?? [];
+  const definition = getQueueDefinition(queueName);
+  const supportedJobNames = definition?.supportedJobNames ?? definition?.jobNames ?? [];
   if (!supportedJobNames.includes(jobName)) return null;
-  return normalizeShopValue(data.tenant.shopDomain);
+  if (isShopifyQueue) {
+    if (!isRecord(data.tenant)) return null;
+    return normalizeShopValue(data.tenant.shopDomain);
+  }
+  if (queueName === 'pending-recovery-candidates') {
+    return normalizeShopValue(data.shopDomain);
+  }
+  return null;
+}
+
+function classifyQueueJob(
+  queueName: string,
+  jobName: string,
+  data: unknown,
+): { shop: string | null; attribution: QueueJobAttribution } {
+  const shop = extractQueueJobShop(queueName, jobName, data);
+  if (shop) return { shop, attribution: 'known' };
+  return {
+    shop: null,
+    attribution: isWhatsAppQueue(queueName) ? 'unresolved' : 'orphan',
+  };
 }
 
 function parseFailedJobSort(value: string | undefined): FailedJobSort {
@@ -492,7 +525,7 @@ function parseFailedJobDirection(value: string | undefined): FailedJobDirection 
 
 function parseQueueJobStatus(value: string | undefined): QueueJobStatus {
   if (value === undefined || value === 'failed') return 'failed';
-  if (value === 'active') return 'active';
+  if (value === 'active' || value === 'waiting' || value === 'delayed') return value;
   throw new InvalidQueueJobQueryError();
 }
 
@@ -509,7 +542,7 @@ function parseQueueJobDirection(value: string | undefined): QueueJobDirection {
 
 function parseQueueJobShop(value: string | undefined): string {
   if (value === undefined || value === '*') return '*';
-  if (value === '__orphan__') return value;
+  if (value === '__orphan__' || value === '__unresolved__') return value;
   const normalized = normalizeShopValue(value);
   if (!normalized) throw new InvalidQueueJobQueryError();
   return normalized;
@@ -535,7 +568,13 @@ function queueJobEventAt(job: QueueJob, status: QueueJobStatus) {
       ?? normalizeTimestamp(job.processedOn)
       ?? normalizeTimestamp(job.timestamp);
   }
-  return normalizeTimestamp(job.processedOn) ?? normalizeTimestamp(job.timestamp);
+  if (status === 'active') {
+    return normalizeTimestamp(job.processedOn) ?? normalizeTimestamp(job.timestamp);
+  }
+  if (status === 'delayed') {
+    return normalizeTimestamp((job.timestamp ?? 0) + Math.max(job.delay ?? 0, 0));
+  }
+  return normalizeTimestamp(job.timestamp);
 }
 
 function toQueueJobSummary(
@@ -543,22 +582,24 @@ function toQueueJobSummary(
   status: QueueJobStatus,
   job: QueueJob,
 ): QueueJobSummary {
+  const attribution = classifyQueueJob(queueName, job.name, job.data);
   return {
     id: job.id ?? '',
     queueName,
     name: job.name,
     status,
-    shop: extractQueueJobShop(queueName, job.name, job.data),
+    ...attribution,
     attemptsMade: job.attemptsMade,
     eventAt: queueJobEventAt(job, status),
     failedReason: status === 'failed' ? job.failedReason ?? '' : '',
   };
 }
 
-function matchesQueueJobShop(shop: string | null, filter: string) {
+function matchesQueueJobShop(job: QueueJobSummary, filter: string) {
   if (filter === '*') return true;
-  if (filter === '__orphan__') return shop === null;
-  return shop === filter;
+  if (filter === '__orphan__') return job.attribution === 'orphan';
+  if (filter === '__unresolved__') return job.attribution === 'unresolved';
+  return job.shop === filter;
 }
 
 function compareQueueJobs(left: QueueJobSummary, right: QueueJobSummary, direction: QueueJobDirection) {
@@ -576,7 +617,8 @@ function buildQueueJobFacets(
     .map((value) => ({ value, label: value }));
   return {
     shops,
-    hasOrphans: summaries.some((job) => job.shop === null),
+    hasOrphans: summaries.some((job) => job.attribution === 'orphan'),
+    hasUnresolved: summaries.some((job) => job.attribution === 'unresolved'),
     scanTruncated,
   };
 }
@@ -669,20 +711,27 @@ export async function readQueueJobSnapshot(
     if (!queue) throw new QueueMonitorUnavailableError();
     await withTimeout(queue.waitUntilReady());
 
-    const otherStatus: QueueJobStatus = status === 'failed' ? 'active' : 'failed';
-    const [selectedScan, facetScan] = await withTimeout(Promise.all([
+    const otherStatuses = (['failed', 'active', 'waiting', 'delayed'] as QueueJobStatus[])
+      .filter((candidate) => candidate !== status);
+    const [selectedScan, ...facetScans] = await withTimeout(Promise.all([
       queue.getJobs(status, 0, MAX_QUEUE_JOB_SCAN - 1, false),
-      queue.getJobs(otherStatus, 0, MAX_QUEUE_JOB_SCAN - 1, false),
+      ...otherStatuses.map((candidate) =>
+        queue.getJobs(candidate, 0, MAX_QUEUE_JOB_SCAN - 1, false),
+      ),
     ]));
     const selectedSummaries = selectedScan.map((job) =>
       toQueueJobSummary(definition.queueName, status, job),
     );
     const facetSummaries = [
       ...selectedSummaries,
-      ...facetScan.map((job) => toQueueJobSummary(definition.queueName, otherStatus, job)),
+      ...facetScans.flatMap((jobs, index) =>
+        jobs.map((job) =>
+          toQueueJobSummary(definition.queueName, otherStatuses[index], job),
+        ),
+      ),
     ];
     const filtered = selectedSummaries
-      .filter((job) => matchesQueueJobShop(job.shop, shop))
+      .filter((job) => matchesQueueJobShop(job, shop))
       .sort((left, right) => compareQueueJobs(left, right, direction));
     const start = (page - 1) * limit;
     const end = start + limit;
@@ -698,7 +747,8 @@ export async function readQueueJobSnapshot(
       jobs: filtered.slice(start, end),
       facets: buildQueueJobFacets(
         facetSummaries,
-        selectedScan.length >= MAX_QUEUE_JOB_SCAN || facetScan.length >= MAX_QUEUE_JOB_SCAN,
+        selectedScan.length >= MAX_QUEUE_JOB_SCAN ||
+          facetScans.some((jobs) => jobs.length >= MAX_QUEUE_JOB_SCAN),
       ),
       hasPrevious: page > 1,
       hasNext: listScanTruncated || end < filtered.length,
@@ -739,12 +789,13 @@ export async function readQueueJobDetail(
     ]));
     if (!job || state !== status) throw new QueueJobNotFoundError();
 
+    const attribution = classifyQueueJob(definition.queueName, job.name, job.data);
     return {
       id: job.id ?? jobId,
       queueName: definition.queueName,
       name: job.name,
       status,
-      shop: extractQueueJobShop(definition.queueName, job.name, job.data),
+      ...attribution,
       attemptsMade: job.attemptsMade,
       timestamp: normalizeTimestamp(job.timestamp),
       processedOn: normalizeTimestamp(job.processedOn),

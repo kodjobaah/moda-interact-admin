@@ -22,8 +22,11 @@ test("sidebar exposes the approved nested Observability navigation", async () =>
 
   assert.match(sidebarSource, /href="\/"/);
   assert.match(sidebarSource, /Tenant Directory/);
-  assert.match(sidebarSource, /href="\/observability"/);
-  assert.match(sidebarSource, /Overview/);
+  assert.match(
+    sidebarSource,
+    /href="\/observability\/queues"\s+aria-current=\{observabilityActive \? "page" : undefined\}/,
+  );
+  assert.doesNotMatch(sidebarSource, /Overview/);
   assert.match(sidebarSource, /href="\/observability\/queues"/);
   assert.match(sidebarSource, /Shopify Queues/);
   assert.match(sidebarSource, /Grafana/);
@@ -33,6 +36,7 @@ test("sidebar exposes the approved nested Observability navigation", async () =>
     /active === ["']observability["'] \|\| active === ["']queues["']/,
   );
   assert.match(queuePageSource, /<AdminShell active="queues">/);
+  assert.doesNotMatch(queuePageSource, /href="\/observability"/);
 });
 
 test("sidebar uses a stable desktop rail and bottom administrator treatment", async () => {

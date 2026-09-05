@@ -117,6 +117,6 @@ test('Shopify Queues has a protected route and the Tenant Directory no longer mo
   assert.match(queuePageSource, /QueueMonitor/);
   assert.doesNotMatch(tenantPageSource, /components\/admin\/queue-monitor/);
   assert.doesNotMatch(tenantPageSource, /<QueueMonitor/);
-  assert.match(panelSource, /\/observability\/queues/);
-  assert.match(panelSource, /Shopify Queues/);
+  assert.doesNotMatch(panelSource, /Shopify Queues/);
+  assert.doesNotMatch(panelSource, /Open Shopify Queues/);
 });

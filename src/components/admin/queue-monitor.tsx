@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 
 import {
   getInitialRefreshMs,
@@ -10,8 +9,8 @@ import {
   STORAGE_KEY,
 } from "./queue-monitor-refresh";
 
-type QueueJobStatus = "failed" | "active";
-type QueueJobShop = "*" | "__orphan__" | string;
+type QueueJobStatus = "failed" | "active" | "waiting" | "delayed";
+type QueueJobShop = "*" | "__orphan__" | "__unresolved__" | string;
 type QueueJobDirection = "asc" | "desc";
 
 type QueueMonitorSnapshot = {
@@ -37,12 +36,17 @@ type QueueJobSnapshot = {
   page: number;
   limit: number;
   direction: QueueJobDirection;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  knownTotal: number | null;
+  scanTruncated: boolean;
   jobs: Array<{
     id: string;
     queueName: string;
     name: string;
     status: QueueJobStatus;
     shop: string | null;
+    attribution: "known" | "unresolved" | "orphan";
     attemptsMade: number;
     eventAt: string | null;
     failedReason: string;
@@ -50,6 +54,7 @@ type QueueJobSnapshot = {
   facets: {
     shops: Array<{ value: string; label: string }>;
     hasOrphans: boolean;
+    hasUnresolved: boolean;
   };
 };
 
@@ -59,6 +64,7 @@ type FailedJobDetail = {
   name: string;
   status: QueueJobStatus;
   shop: string | null;
+  attribution: "known" | "unresolved" | "orphan";
   attemptsMade: number;
   timestamp: string | null;
   processedOn: string | null;
@@ -139,6 +145,8 @@ export function QueueMonitor() {
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [queueJobs, setQueueJobs] = useState<QueueJobSnapshot | null>(null);
+  const [showAllJobs, setShowAllJobs] = useState(false);
+  const [queueJobPage, setQueueJobPage] = useState(1);
   const [queueJobShop, setQueueJobShop] = useState<QueueJobShop>("*");
   const [queueJobStatus, setQueueJobStatus] =
     useState<QueueJobStatus>("failed");
@@ -197,6 +205,8 @@ export function QueueMonitor() {
     jobDetailRequestRef.current?.abort();
     setSelectedQueueName(queueName);
     setQueueJobs(null);
+    setShowAllJobs(false);
+    setQueueJobPage(1);
     setQueueJobsError(null);
     setSelectedJobId(null);
     setJobDetail(null);
@@ -272,7 +282,8 @@ export function QueueMonitor() {
       queue: selectedQueueName,
       status: queueJobStatus,
       shop: queueJobShop,
-      limit: "5",
+      page: String(queueJobPage),
+      limit: showAllJobs ? "10" : "5",
       direction: queueJobDirection,
     });
 
@@ -314,6 +325,8 @@ export function QueueMonitor() {
     queueJobShop,
     queueJobStatus,
     queueJobDirection,
+    queueJobPage,
+    showAllJobs,
     queueJobsRefreshKey,
   ]);
 
@@ -656,17 +669,18 @@ export function QueueMonitor() {
                       </>
                     ) : null;
                   })()}
+                  {!selectedJobId ? <>
                   <div className="mt-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end lg:flex-col">
                     <div>
                       <h4
                         id="failed-job-browser-title"
                         className="font-semibold text-gray-900"
                       >
-                        Recent {queueJobStatus} jobs
+                        {showAllJobs ? "All queue jobs" : "Recent jobs"}
                       </h4>
                       <p className="mt-1 text-sm text-gray-600">
                         {queueJobs
-                          ? `${queueJobs.jobs.length} shown`
+                          ? `${queueJobs.jobs.length} shown${showAllJobs && queueJobs.scanTruncated ? " from a bounded scan" : ""}`
                           : "Read-only queue diagnostics"}
                       </p>
                     </div>
@@ -682,6 +696,7 @@ export function QueueMonitor() {
                           onChange={(event) => {
                             prepareQueueJobsLoad();
                             setQueueJobShop(event.target.value);
+                            setQueueJobPage(1);
                             setSelectedJobId(null);
                             setJobDetail(null);
                           }}
@@ -691,6 +706,7 @@ export function QueueMonitor() {
                             <option key={shop.value} value={shop.value}>{shop.label}</option>
                           ))}
                           {queueJobs?.facets.hasOrphans ? <option value="__orphan__">Orphan / No shop</option> : null}
+                          {queueJobs?.facets.hasUnresolved ? <option value="__unresolved__">Unresolved</option> : null}
                         </select>
                       </label>
                       <label className="text-sm text-gray-600">
@@ -704,12 +720,15 @@ export function QueueMonitor() {
                           onChange={(event) => {
                             prepareQueueJobsLoad();
                             setQueueJobStatus(event.target.value as QueueJobStatus);
+                            setQueueJobPage(1);
                             setSelectedJobId(null);
                             setJobDetail(null);
                           }}
                         >
                           <option value="failed">Failed</option>
                           <option value="active">Active</option>
+                          <option value="waiting">Waiting</option>
+                          <option value="delayed">Delayed</option>
                         </select>
                       </label>
                       <label className="text-sm text-gray-600">
@@ -721,6 +740,7 @@ export function QueueMonitor() {
                           onChange={(event) => {
                             prepareQueueJobsLoad();
                             setQueueJobDirection(event.target.value as QueueJobDirection);
+                            setQueueJobPage(1);
                           }}
                         >
                           <option value="desc">Descending</option>
@@ -738,23 +758,23 @@ export function QueueMonitor() {
                     </div>
                   </div>
 
-                  {queueJobsLoading ? (
+                  {!selectedJobId && queueJobsLoading ? (
                     <p className="mt-4 text-sm text-gray-500" role="status">
                       Loading queue jobs...
                     </p>
-                  ) : queueJobsError ? (
+                  ) : !selectedJobId && queueJobsError ? (
                     <p className="mt-4 text-sm text-amber-700" role="status">
                       {queueJobsError}
                     </p>
-                  ) : queueJobs && queueJobs.jobs.length === 0 ? (
+                  ) : !selectedJobId && queueJobs && queueJobs.jobs.length === 0 ? (
                     <p className="mt-4 rounded-md border border-dashed border-gray-300 bg-white p-5 text-sm text-gray-500">
                       No {queueJobStatus} jobs were found for this queue.
                     </p>
-                  ) : queueJobs ? (
+                  ) : !selectedJobId && queueJobs ? (
                     <div className="mt-4 overflow-x-auto rounded-md border border-gray-200 bg-white">
                       <table className="min-w-[900px] w-full text-left text-sm">
                         <caption className="sr-only">
-                          Recent {queueJobStatus} jobs for {selectedQueueName}
+                          Recent jobs for {selectedQueueName}
                         </caption>
                         <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                           <tr>
@@ -766,7 +786,13 @@ export function QueueMonitor() {
                               Job name
                             </th>
                             <th className="px-4 py-3 font-medium" scope="col">
-                              {queueJobStatus === "failed" ? "Failed at" : "Started / processed at"}
+                              {queueJobStatus === "failed"
+                                ? "Failed at"
+                                : queueJobStatus === "active"
+                                  ? "Started / processed at"
+                                  : queueJobStatus === "waiting"
+                                    ? "Queued at"
+                                    : "Scheduled at"}
                             </th>
                             <th
                               className="px-4 py-3 text-right font-medium"
@@ -803,7 +829,9 @@ export function QueueMonitor() {
                                   {job.id}
                                 </button>
                               </td>
-                              <td className="px-4 py-3 text-gray-700">{job.shop ?? "Orphan / No shop"}</td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {job.shop ?? (job.attribution === "unresolved" ? "Unresolved" : "Orphan / No shop")}
+                              </td>
                               <td className="px-4 py-3 text-gray-700">
                                 {job.name}
                               </td>
@@ -815,10 +843,12 @@ export function QueueMonitor() {
                               </td>
                               <td
                                 className="max-w-72 px-4 py-3 text-gray-600"
-                                title={job.failedReason || "Active job"}
+                                title={job.failedReason || `${queueJobStatus} job`}
                               >
                                 <span className="block max-w-72 truncate">
-                                  {queueJobStatus === "failed" ? job.failedReason || "No reason recorded" : "Active"}
+                                  {queueJobStatus === "failed"
+                                    ? job.failedReason || "No reason recorded"
+                                    : queueJobStatus[0].toUpperCase() + queueJobStatus.slice(1)}
                                 </span>
                               </td>
                             </tr>
@@ -828,27 +858,70 @@ export function QueueMonitor() {
                     </div>
                   ) : null}
 
-                  <div className="mt-4">
-                    <Link
+                  {showAllJobs && queueJobs && (queueJobs.hasPrevious || queueJobs.hasNext || queueJobs.knownTotal !== null) ? (
+                    <nav className="mt-4 flex flex-wrap items-center justify-between gap-3" aria-label="Queue job pages">
+                      <button
+                        type="button"
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!queueJobs.hasPrevious || queueJobsLoading}
+                        onClick={() => setQueueJobPage((page) => Math.max(1, page - 1))}
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-gray-600" aria-live="polite">
+                        Page {queueJobs.page}{queueJobs.knownTotal !== null ? ` of ${Math.max(1, Math.ceil(queueJobs.knownTotal / queueJobs.limit))}` : " of more"}
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!queueJobs.hasNext || queueJobsLoading}
+                        onClick={() => setQueueJobPage((page) => page + 1)}
+                      >
+                        Next
+                      </button>
+                    </nav>
+                  ) : null}
+
+                  {!showAllJobs ? <div className="mt-4">
+                    <button
+                      type="button"
                       className="text-sm font-medium text-[var(--brand-700)] hover:text-[var(--brand-900)]"
-                      href={`/observability/queues?queue=${encodeURIComponent(selectedQueueName)}&status=failed`}
+                      onClick={() => {
+                        setShowAllJobs(true);
+                        setQueueJobPage(1);
+                        setSelectedJobId(null);
+                        setJobDetail(null);
+                      }}
                     >
-                      View all failed jobs
-                    </Link>
-                  </div>
+                      View all jobs
+                    </button>
+                  </div> : null}
+                  </> : null}
 
                   {selectedJobId ? (
                     <section
                       className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4"
                       aria-labelledby="failed-job-detail-title"
                     >
+                      <button
+                        type="button"
+                        className="mb-4 text-sm font-medium text-[var(--brand-700)] hover:text-[var(--brand-900)]"
+                        onClick={() => {
+                          setSelectedJobId(null);
+                          setJobDetail(null);
+                          setJobDetailError(null);
+                          setJobDetailLoading(false);
+                        }}
+                      >
+                        Back to {showAllJobs ? "all jobs" : "recent jobs"}
+                      </button>
                       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                         <div>
                           <h4
                             id="failed-job-detail-title"
                             className="font-semibold text-gray-900"
                           >
-                            Failed job details
+                            Queue job details
                           </h4>
                           <p className="mt-1 text-sm text-gray-600">
                             Selected job:{" "}
@@ -862,7 +935,7 @@ export function QueueMonitor() {
 
                       {jobDetailLoading ? (
                         <p className="mt-4 text-sm text-gray-500" role="status">
-                          Loading failed job details...
+                          Loading queue job details...
                         </p>
                       ) : jobDetailError ? (
                         <p
@@ -878,6 +951,13 @@ export function QueueMonitor() {
                               ["Queue", jobDetail.queueName],
                               ["Job name", jobDetail.name],
                               ["Status", jobDetail.status],
+                              [
+                                "Shop",
+                                jobDetail.shop ??
+                                  (jobDetail.attribution === "unresolved"
+                                    ? "Unresolved"
+                                    : "Orphan / No shop"),
+                              ],
                               ["Attempts made", String(jobDetail.attemptsMade)],
                               ["Created", formatDateTime(jobDetail.timestamp)],
                               [
@@ -900,7 +980,7 @@ export function QueueMonitor() {
                             ))}
                           </dl>
 
-                          <div className="mt-5 border-t border-gray-200 pt-5">
+                          {jobDetail.status === "failed" ? <div className="mt-5 border-t border-gray-200 pt-5">
                             <div className="flex items-center justify-between gap-3">
                               <h5 className="text-sm font-semibold text-gray-900">
                                 Failed reason
@@ -915,7 +995,7 @@ export function QueueMonitor() {
                             <p className="mt-2 whitespace-pre-wrap break-words rounded-md bg-amber-50 p-4 text-sm text-amber-900">
                               {jobDetail.failedReason || "No reason recorded"}
                             </p>
-                          </div>
+                          </div> : null}
 
                           <div className="mt-5 border-t border-gray-200 pt-5">
                             <div className="flex items-center justify-between gap-3">

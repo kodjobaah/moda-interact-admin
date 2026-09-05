@@ -54,7 +54,7 @@ export function Sidebar({
         </Link>
         <div>
           <Link
-            href="/observability"
+            href="/observability/queues"
             aria-current={observabilityActive ? "page" : undefined}
             className={`${base} ${observabilityActive ? selected : idle}`}
           >
@@ -64,12 +64,6 @@ export function Sidebar({
           </Link>
           {observabilityActive ? (
             <div className="ml-8 mt-1 space-y-1 border-l border-[var(--brand-300)] pl-3">
-              <Link
-                href="/observability"
-                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "observability" ? selected : idle}`}
-              >
-                Overview
-              </Link>
               <Link
                 href="/observability/queues"
                 aria-current={active === "queues" ? "page" : undefined}

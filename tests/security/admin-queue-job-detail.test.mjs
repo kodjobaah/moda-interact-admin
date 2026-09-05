@@ -48,6 +48,7 @@ test('normalizes active detail with the same shop projection as list rows', asyn
     name: 'checkout-created',
     status: 'active',
     shop: 'alpha.myshopify.com',
+    attribution: 'known',
     attemptsMade: 2,
     timestamp: '2024-03-09T16:00:00.000Z',
     processedOn: '2024-03-09T16:00:01.000Z',
@@ -79,7 +80,46 @@ test('keeps failed detail inspectable through the generic reader', async () => {
   assert.equal(detail.status, 'failed');
   assert.equal(detail.shop, 'beta.myshopify.com');
   assert.equal(detail.failedReason, 'order failed');
+  assert.equal(detail.attribution, 'known');
   assert.deepEqual(detail.stacktrace, ['Error: order failed']);
+});
+
+test('normalizes waiting and delayed detail only for their current states', async () => {
+  const { QueueJobNotFoundError, readQueueJobDetail } = await importQueueMonitor();
+  const waitingOptions = {
+    redisUrl: 'redis://waiting-detail-jobs.test.invalid',
+    queueName: 'pending-recovery-candidates',
+    jobId: 'waiting-123',
+    queueFactory: queueFactory({
+      id: 'waiting-123',
+      name: 'Pending recovery candidates',
+      attemptsMade: 0,
+      timestamp: 1710000000000,
+      data: {},
+    }, 'waiting'),
+  };
+  const waiting = await readQueueJobDetail({ ...waitingOptions, status: 'waiting' });
+  assert.equal(waiting.status, 'waiting');
+  assert.equal(waiting.failedReason, '');
+  await assert.rejects(readQueueJobDetail({ ...waitingOptions, status: 'delayed' }), QueueJobNotFoundError);
+
+  const delayedOptions = {
+    ...waitingOptions,
+    redisUrl: 'redis://delayed-detail-jobs.test.invalid',
+    jobId: 'delayed-123',
+    queueFactory: queueFactory({
+      id: 'delayed-123',
+      name: 'Pending recovery candidates',
+      attemptsMade: 0,
+      timestamp: 1710000000000,
+      delay: 5000,
+      data: {},
+    }, 'delayed'),
+  };
+  const delayed = await readQueueJobDetail({ ...delayedOptions, status: 'delayed' });
+  assert.equal(delayed.status, 'delayed');
+  assert.equal(delayed.attribution, 'orphan');
+  await assert.rejects(readQueueJobDetail({ ...delayedOptions, status: 'waiting' }), QueueJobNotFoundError);
 });
 
 test('returns safe not-found for state races and rejects unsupported status', async () => {
@@ -92,7 +132,7 @@ test('returns safe not-found for state races and rejects unsupported status', as
   };
 
   await assert.rejects(readQueueJobDetail({ ...options, status: 'failed' }), QueueJobNotFoundError);
-  await assert.rejects(readQueueJobDetail({ ...options, status: 'waiting' }), InvalidQueueJobQueryError);
+  await assert.rejects(readQueueJobDetail({ ...options, status: 'paused' }), InvalidQueueJobQueryError);
   await assert.rejects(readQueueJobDetail({ ...options }), InvalidQueueJobQueryError);
 });
 

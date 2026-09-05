@@ -288,12 +288,13 @@ test('detailed queue monitor presents a compact four-queue table with read-only 
   assert.doesNotMatch(componentSource, /retry|requeue|delete|pause|resume/);
 });
 
-test('queue monitor renders a bounded active/failed job summary without mutation actions', async () => {
+test('queue monitor renders a bounded four-state job summary without mutation actions', async () => {
   const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
   assert.match(componentSource, /\/api\/admin\/queues\/jobs\?/);
   assert.match(componentSource, /queueJobStatus/);
   assert.match(componentSource, /queueJobDirection/);
-  assert.match(componentSource, /limit: "5"/);
+  assert.match(componentSource, /limit: showAllJobs \? "10" : "5"/);
+  assert.match(componentSource, /page: String\(queueJobPage\)/);
   for (const heading of ['Job ID', 'Shop', 'Job name', 'Attempts']) {
     assert.match(componentSource, new RegExp(`>\\s*${heading}\\s*<`));
   }
@@ -301,7 +302,12 @@ test('queue monitor renders a bounded active/failed job summary without mutation
   assert.match(componentSource, /No \{queueJobStatus\} jobs were found/);
   assert.match(componentSource, /Queue jobs are unavailable/);
   assert.match(componentSource, /Orphan \/ No shop/);
-  assert.match(componentSource, /View all failed jobs/);
+  assert.match(componentSource, /View all jobs/);
+  assert.match(componentSource, /Previous/);
+  assert.match(componentSource, /Next/);
+  for (const status of ['failed', 'active', 'waiting', 'delayed']) {
+    assert.match(componentSource, new RegExp(`value="${status}"`));
+  }
   assert.match(componentSource, /setSelectedJobId/);
   assert.doesNotMatch(componentSource, /retry|requeue|delete|pause|resume/);
 });

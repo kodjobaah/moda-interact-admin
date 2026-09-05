@@ -17,7 +17,7 @@ test('selected queue rows load the protected normalized detail endpoint', async 
   assert.match(componentSource, /status: queueJobStatus/);
   assert.match(componentSource, /selectedQueueName/);
   assert.match(componentSource, /selectedJobId/);
-  assert.match(componentSource, /Loading failed job details/);
+  assert.match(componentSource, /Loading queue job details/);
   assert.match(componentSource, /Selected queue job is no longer available/);
 });
 

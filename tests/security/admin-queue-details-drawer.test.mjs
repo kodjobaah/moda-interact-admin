@@ -77,9 +77,28 @@ test("queue drawer uses the bounded Shop, Status, Direction filter contract", as
   assert.match(source, /\/api\/admin\/queues\/jobs\?/);
   assert.match(source, /status: queueJobStatus/);
   assert.match(source, /shop: queueJobShop/);
-  assert.match(source, /limit: "5"/);
-  assert.match(source, /href=\{`\/observability\/queues\?queue=/);
-  assert.match(source, /View all failed jobs/);
+  assert.match(source, /limit: showAllJobs \? "10" : "5"/);
+  assert.match(source, /setShowAllJobs\(true\)/);
+  assert.match(source, /Page \{queueJobs\.page\}/);
+  assert.match(source, /disabled=\{!queueJobs\.hasPrevious/);
+  assert.match(source, /disabled=\{!queueJobs\.hasNext/);
+  assert.match(source, /Back to \{showAllJobs \? "all jobs" : "recent jobs"\}/);
+  assert.match(source, /View all jobs/);
+  assert.match(source, /<option value="waiting">Waiting<\/option>/);
+  assert.match(source, /<option value="delayed">Delayed<\/option>/);
+  assert.doesNotMatch(source, /View all failed jobs/);
   assert.match(source, /Orphan \/ No shop/);
   assert.match(source, /Worker online/);
+});
+
+test("queue drawer keeps the full browser paginated and state-safe", async () => {
+  const source = await readFile(componentPath, "utf8");
+
+  assert.match(source, /setQueueJobPage\(1\)/);
+  assert.match(source, /setQueueJobPage\(\(page\) => Math\.max\(1, page - 1\)\)/);
+  assert.match(source, /setQueueJobPage\(\(page\) => page \+ 1\)/);
+  assert.match(source, /knownTotal !== null/);
+  assert.match(source, /scanTruncated/);
+  assert.match(source, /Back to \{showAllJobs \? "all jobs" : "recent jobs"\}/);
+  assert.match(source, /setJobDetailError\(null\)/);
 });

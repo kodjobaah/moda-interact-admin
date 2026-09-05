@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { AdminShell } from "@/components/admin/admin-shell";
 import { QueueMonitor } from "@/components/admin/queue-monitor";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
@@ -12,13 +10,7 @@ export default async function ShopifyQueuesPage() {
       <div className="flex-1 overflow-auto bg-gray-50 p-5 sm:p-8">
         <div className="mx-auto max-w-6xl">
           <div className="mb-6">
-            <Link
-              href="/observability"
-              className="text-sm font-medium text-[var(--brand-700)] hover:text-[var(--brand-900)]"
-            >
-              Observability
-            </Link>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-950">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-950">
               Shopify Queues
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
