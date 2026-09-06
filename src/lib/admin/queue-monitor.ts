@@ -1,6 +1,10 @@
 import { Queue, type JobType } from 'bullmq';
 import Redis from 'ioredis';
 
+import {
+  MERCHANT_COMMUNICATIONS_JOB_NAMES,
+  MERCHANT_COMMUNICATIONS_QUEUE_NAME,
+} from '@modainteract/moda-interact-shared/merchant-communications';
 import { SHOPIFY_WEBHOOK_QUEUE_CONTRACTS } from '@modainteract/moda-interact-shared/shopify';
 
 const QUEUE_OPERATION_TIMEOUT_MS = 2_500;
@@ -251,6 +255,10 @@ const queueDefinitions: QueueMonitorDefinition[] = [
     queueName: 'whatsapp-events',
     jobNames: ['whatsapp-events'],
   },
+  {
+    queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
+    jobNames: Object.values(MERCHANT_COMMUNICATIONS_JOB_NAMES),
+  },
 ];
 
 const queueOverviewDefinitions: QueueOverviewDefinition[] = [
@@ -269,6 +277,10 @@ const queueOverviewDefinitions: QueueOverviewDefinition[] = [
   {
     queueName: 'whatsapp-events',
     labelKey: 'queue.whatsappEvents',
+  },
+  {
+    queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
+    labelKey: 'queue.merchantCommunications',
   },
 ];
 

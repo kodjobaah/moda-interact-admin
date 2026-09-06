@@ -62,6 +62,7 @@ export function adminQueueLabel(queueName: string): string {
     "order-events": "queue.orderEvents",
     "pending-recovery-candidates": "queue.pendingRecoveries",
     "whatsapp-events": "queue.whatsappEvents",
+    "merchant-communications": "queue.merchantCommunications",
   };
   return keys[queueName] ? adminI18n.t(keys[queueName]) : queueName;
 }
@@ -70,6 +71,11 @@ export function adminQueueJobLabel(jobName: string): string {
   const keys: Record<string, string> = {
     "evaluate-pending-recovery": "queue.pendingRecoveryCandidates",
     "whatsapp-events": "queue.whatsappEventsJob",
+    "translation-dispatch": "queue.translationDispatchJob",
+    "translation-batch-submit": "queue.translationBatchSubmitJob",
+    "translation-batch-poll": "queue.translationBatchPollJob",
+    "translation-batch-results": "queue.translationBatchResultsJob",
+    "translation-reconcile": "queue.translationReconcileJob",
     "Pending recovery candidates": "queue.pendingRecoveryCandidates",
     "WhatsApp events": "queue.whatsappEventsJob",
   };

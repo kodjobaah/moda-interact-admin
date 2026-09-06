@@ -34,6 +34,16 @@ test('uses the canonical Shopify contracts and observed queues for detailed read
       queueName: 'whatsapp-events',
       jobNames: ['whatsapp-events'],
     },
+    {
+      queueName: 'merchant-communications',
+      jobNames: [
+        'translation-dispatch',
+        'translation-batch-submit',
+        'translation-batch-poll',
+        'translation-batch-results',
+        'translation-reconcile',
+      ],
+    },
   ]);
 });
 
@@ -71,7 +81,7 @@ test('maps bounded queue state and latest activity without payload data', async 
     now: () => new Date('2026-09-04T16:00:00.000Z'),
   });
 
-  assert.equal(queueCalls.length, 4);
+  assert.equal(queueCalls.length, 5);
   assert.deepEqual(snapshot, {
     observedAt: '2026-09-04T16:00:00.000Z',
     queues: [
@@ -96,6 +106,18 @@ test('maps bounded queue state and latest activity without payload data', async 
       {
         queueName: 'whatsapp-events',
         jobNames: ['whatsapp-events'],
+        counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
+        lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
+      },
+      {
+        queueName: 'merchant-communications',
+        jobNames: [
+          'translation-dispatch',
+          'translation-batch-submit',
+          'translation-batch-poll',
+          'translation-batch-results',
+          'translation-reconcile',
+        ],
         counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
         lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
       },
@@ -181,17 +203,18 @@ test('failed detailed readers are recreated for a later healthy refresh', async 
     redisFactory,
   });
 
-  assert.equal(snapshot.queues.length, 4);
-  assert.equal(factoryCalls, 8);
+  assert.equal(snapshot.queues.length, 5);
+  assert.equal(factoryCalls, 10);
 });
 
-test('queue overview reads active counts for the four observed queues only', async () => {
+test('queue overview reads active counts for the five observed queues only', async () => {
   const { getQueueOverviewDefinitions, readQueueOverviewSnapshot } = await importQueueMonitor();
   assert.deepEqual(getQueueOverviewDefinitions(), [
     { queueName: 'checkout-events', labelKey: 'queue.checkoutEvents' },
     { queueName: 'order-events', labelKey: 'queue.orderEvents' },
     { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries' },
     { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents' },
+    { queueName: 'merchant-communications', labelKey: 'queue.merchantCommunications' },
   ]);
 
   const calls = [];
@@ -215,6 +238,7 @@ test('queue overview reads active counts for the four observed queues only', asy
     ['order-events', 'active'],
     ['pending-recovery-candidates', 'active'],
     ['whatsapp-events', 'active'],
+    ['merchant-communications', 'active'],
   ]);
   assert.deepEqual(snapshot, {
     observedAt: '2026-09-04T16:00:00.000Z',
@@ -223,6 +247,7 @@ test('queue overview reads active counts for the four observed queues only', asy
       { queueName: 'order-events', labelKey: 'queue.orderEvents', active: 12 },
       { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries', active: 27 },
       { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents', active: 15 },
+      { queueName: 'merchant-communications', labelKey: 'queue.merchantCommunications', active: 23 },
     ],
   });
   assert.equal('failed' in snapshot.queues[0], false);
@@ -246,7 +271,7 @@ test('queue overview waits for cold readers before requesting active counts', as
     }),
   });
 
-  for (const queueName of ['checkout-events', 'order-events', 'pending-recovery-candidates', 'whatsapp-events']) {
+  for (const queueName of ['checkout-events', 'order-events', 'pending-recovery-candidates', 'whatsapp-events', 'merchant-communications']) {
     assert.ok(events.indexOf(`ready:${queueName}`) < events.indexOf(`count:${queueName}`));
   }
 });
@@ -273,7 +298,7 @@ test('Tenant Directory keeps queue unavailability isolated from tenant data', as
   assert.match(pageSource, /getTenantDirectory/);
 });
 
-test('detailed queue monitor presents a compact four-queue table with read-only selection', async () => {
+test('detailed queue monitor presents a compact five-queue table with read-only selection', async () => {
   const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
   assert.match(componentSource, /<table/);
   for (const key of ['queue', 'jobLabel', 'workers', 'lastRedisActivity']) {
@@ -349,6 +374,8 @@ test('queue display labels remain catalogue-owned at the UI boundary', async () 
   assert.doesNotMatch(source, /Pending recovery candidates|WhatsApp events/);
   assert.match(source, /evaluate-pending-recovery/);
   assert.match(source, /whatsapp-events/);
+  assert.match(source, /merchant-communications/);
+  assert.match(source, /MERCHANT_COMMUNICATIONS_JOB_NAMES/);
   assert.match(
     componentSource,
     /\{queue\.jobNames\.map\(adminQueueJobLabel\)\.join\(", "\)\}/,

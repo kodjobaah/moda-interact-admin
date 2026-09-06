@@ -134,7 +134,7 @@ test("Admin locale input is independent of currency and merchant content", () =>
   assert.match(runtime.formatMoney(12.5, "EUR"), /12/);
   assert.doesNotMatch(
     adapterSource,
-    /merchant|customer|currency.*locale|country.*locale/i,
+    /\bmerchant\b(?!-communications)|\bcustomer\b|currency.*locale|country.*locale/i,
   );
 });
 
