@@ -329,3 +329,127 @@ test('enforces global reconciliation authorization and durability', () => {
   assert.equal(result.superAdminAllowed, true);
   assert.equal(result.platformAdminAllowed, false);
 });
+
+test('lists only pending threads with bounded filters and safe owner summaries', () => {
+  const result = runBehaviorScript(`
+    import { getPendingMerchantSupportThreads } from ${JSON.stringify(moduleUrl)};
+    const queries = [];
+    const database = {
+      $queryRaw: async (query) => {
+        queries.push(query);
+        if (query.sql.includes('COUNT(*)')) return [{ count: 2n }];
+        return [{
+          id: 'thread-1',
+          shopId: 'shop-1',
+          domain: 'one.example',
+          assignedPlatformAdminId: 'admin-2',
+          lastMerchantMessageAt: null,
+          ownerId: 'admin-2',
+          ownerDisplayName: 'Other Admin',
+          ownerEmail: 'other@example.com',
+        }];
+      },
+    };
+    const page = await getPendingMerchantSupportThreads({
+      page: 1,
+      pageSize: 999,
+      filter: 'assigned-to-others',
+      search: 'one.example',
+      database,
+    });
+    console.log(JSON.stringify({
+      pageSize: page.pageSize,
+      totalItems: page.totalItems,
+      item: page.items[0],
+      queryValues: queries.flatMap((query) => query.values),
+    }));
+  `);
+
+  assert.equal(result.pageSize, 50);
+  assert.equal(result.totalItems, 2);
+  assert.deepEqual(result.item.owner, {
+    id: 'admin-2',
+    displayName: 'Other Admin',
+    email: 'other@example.com',
+  });
+  assert.equal('originalBody' in result.item, false);
+  assert.ok(result.queryValues.includes('development-platform-admin'));
+});
+
+test('compare-and-set ownership has one winner and reloads the losing owner', () => {
+  const result = runBehaviorScript(`
+    import {
+      adminCanRelease,
+      adminCanSend,
+      releaseMerchantSupportThreadOwnership,
+      reassignMerchantSupportThreadOwnership,
+      takeMerchantSupportThreadOwnership,
+    } from ${JSON.stringify(moduleUrl)};
+    let available = true;
+    const owner = {
+      ownerId: 'development-platform-admin',
+      ownerDisplayName: 'Current Admin',
+      ownerEmail: 'current@example.com',
+    };
+    const database = {
+      $transaction: async (callback) => callback({
+        $executeRaw: async () => {
+          if (!available) return 0;
+          available = false;
+          return 1;
+        },
+        $queryRaw: async () => [owner],
+      }),
+      $executeRaw: async () => 1,
+    };
+    const winners = await Promise.all([
+      takeMerchantSupportThreadOwnership('thread-1', database),
+      takeMerchantSupportThreadOwnership('thread-1', database),
+    ]);
+    let reassigned = null;
+    const reassignDatabase = {
+      $transaction: async (callback) => callback({
+        $queryRaw: async () => [{ id: 'admin-2', displayName: 'Admin Two', email: 'two@example.com' }],
+        $executeRaw: async () => 1,
+      }),
+    };
+    reassigned = await reassignMerchantSupportThreadOwnership({
+      threadId: 'thread-1',
+      targetPlatformAdminId: 'admin-2',
+      database: reassignDatabase,
+    });
+    await releaseMerchantSupportThreadOwnership('thread-1', database);
+    console.log(JSON.stringify({
+      claims: winners.map((entry) => entry.claimed),
+      loserOwner: winners.find((entry) => !entry.claimed).owner,
+      reassigned,
+      ordinaryReleaseOther: adminCanRelease(
+        { id: 'admin-1', role: 'ADMIN', developmentBypass: false },
+        'admin-2',
+      ),
+      superReleaseOther: adminCanRelease(
+        { id: 'super', role: 'SUPER_ADMIN', developmentBypass: false },
+        'admin-2',
+      ),
+      superSendOther: adminCanSend(
+        { id: 'super', role: 'SUPER_ADMIN', developmentBypass: false },
+        'admin-2',
+      ),
+    }));
+  `);
+
+  assert.deepEqual(result.claims.sort(), [false, true]);
+  assert.deepEqual(result.loserOwner, {
+    id: 'development-platform-admin',
+    displayName: 'Current Admin',
+    email: 'current@example.com',
+  });
+  assert.deepEqual(result.reassigned, {
+    id: 'admin-2',
+    displayName: 'Admin Two',
+    email: 'two@example.com',
+  });
+  assert.equal(result.ordinaryReleaseOther, false);
+  assert.equal(result.superReleaseOther, true);
+  assert.equal(result.superSendOther, false);
+});

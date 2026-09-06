@@ -60,6 +60,7 @@ type TransactionClient = {
 
 type DatabaseClient = {
   $transaction<T>(callback: (transaction: TransactionClient) => Promise<T>): Promise<T>;
+  $queryRaw<T>(query: Prisma.Sql): Promise<T>;
   $executeRaw(query: Prisma.Sql): Promise<number>;
 };
 
@@ -159,6 +160,226 @@ export type MerchantSupportThreadDetail = {
   thread: ThreadRow;
   messages: MessageRow[];
 };
+
+export type PendingSupportFilter =
+  | 'all'
+  | 'unassigned'
+  | 'assigned-to-me'
+  | 'assigned-to-others';
+
+export type SupportOwnerSummary = {
+  id: string;
+  displayName: string | null;
+  email: string;
+};
+
+export type PendingSupportThreadSummary = {
+  id: string;
+  shopId: string;
+  domain: string;
+  assignedPlatformAdminId: string | null;
+  owner: SupportOwnerSummary | null;
+  needsAdminResponse: true;
+  lastMerchantMessageAt: Date | null;
+};
+
+type PendingSupportQueryResult = {
+  items: PendingSupportThreadSummary[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+type OwnershipResult = {
+  claimed: boolean;
+  owner: SupportOwnerSummary | null;
+};
+
+function pendingFilterSql(
+  filter: PendingSupportFilter,
+  principalId: string,
+): Prisma.Sql {
+  if (filter === 'unassigned') {
+    return Prisma.sql`t."assignedPlatformAdminId" IS NULL`;
+  }
+  if (filter === 'assigned-to-me') {
+    return Prisma.sql`t."assignedPlatformAdminId" = ${principalId}`;
+  }
+  if (filter === 'assigned-to-others') {
+    return Prisma.sql`t."assignedPlatformAdminId" IS NOT NULL AND t."assignedPlatformAdminId" <> ${principalId}`;
+  }
+  return Prisma.sql`TRUE`;
+}
+
+function ownerSelectSql(): Prisma.Sql {
+  return Prisma.sql`
+    a."id" AS "ownerId",
+    a."displayName" AS "ownerDisplayName",
+    a."email" AS "ownerEmail"
+  `;
+}
+
+function ownerFromRow(row: {
+  ownerId: string | null;
+  ownerDisplayName: string | null;
+  ownerEmail: string | null;
+}): SupportOwnerSummary | null {
+  if (!row.ownerId || !row.ownerEmail) return null;
+  return {
+    id: row.ownerId,
+    displayName: row.ownerDisplayName,
+    email: row.ownerEmail,
+  };
+}
+
+async function readOwner(
+  transaction: TransactionClient,
+  threadId: string,
+): Promise<SupportOwnerSummary | null> {
+  const rows = await transaction.$queryRaw<[
+    { ownerId: string | null; ownerDisplayName: string | null; ownerEmail: string | null }
+  ]>(Prisma.sql`
+    SELECT a."id" AS "ownerId", a."displayName" AS "ownerDisplayName", a."email" AS "ownerEmail"
+    FROM "support"."MerchantSupportThread" t
+    LEFT JOIN "public"."PlatformAdmin" a ON a."id" = t."assignedPlatformAdminId"
+    WHERE t."id" = ${threadId}
+  `);
+  return rows[0] ? ownerFromRow(rows[0]) : null;
+}
+
+export async function getPendingMerchantSupportThreads(input: {
+  page: number;
+  pageSize: number;
+  filter?: PendingSupportFilter;
+  search?: string;
+  database?: DatabaseClient;
+}): Promise<PendingSupportQueryResult> {
+  const principal = await requirePlatformAdminRead();
+  const client = input.database ?? (prisma as unknown as DatabaseClient);
+  const safePage = pageNumber(input.page);
+  const safePageSize = pageSize(input.pageSize);
+  const filter = input.filter ?? 'all';
+  const search = input.search?.trim().slice(0, 120) ?? '';
+  const pattern = `%${search}%`;
+  const pendingFilter = pendingFilterSql(filter, principal.id);
+  const where = Prisma.sql`
+    t."needsAdminResponse" = true
+    AND ${pendingFilter}
+    AND (${search} = '' OR s."domain" ILIKE ${pattern})
+  `;
+  const rows = await client.$queryRaw<
+    Array<{
+      id: string;
+      shopId: string;
+      domain: string;
+      assignedPlatformAdminId: string | null;
+      lastMerchantMessageAt: Date | null;
+      ownerId: string | null;
+      ownerDisplayName: string | null;
+      ownerEmail: string | null;
+    }>
+  >(Prisma.sql`
+    SELECT t."id", t."shopId", s."domain", t."assignedPlatformAdminId",
+      t."lastMerchantMessageAt", ${ownerSelectSql()}
+    FROM "support"."MerchantSupportThread" t
+    INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
+    LEFT JOIN "public"."PlatformAdmin" a ON a."id" = t."assignedPlatformAdminId"
+    WHERE ${where}
+    ORDER BY t."lastMerchantMessageAt" DESC NULLS LAST, t."id" ASC
+    LIMIT ${safePageSize} OFFSET ${(safePage - 1) * safePageSize}
+  `);
+  const [{ count }] = await client.$queryRaw<[{ count: bigint }]>(Prisma.sql`
+    SELECT COUNT(*)::bigint AS "count"
+    FROM "support"."MerchantSupportThread" t
+    INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
+    WHERE ${where}
+  `);
+  const totalItems = Number(count);
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      shopId: row.shopId,
+      domain: row.domain,
+      assignedPlatformAdminId: row.assignedPlatformAdminId,
+      owner: ownerFromRow(row),
+      needsAdminResponse: true,
+      lastMerchantMessageAt: row.lastMerchantMessageAt,
+    })),
+    page: safePage,
+    pageSize: safePageSize,
+    totalItems,
+    totalPages: Math.max(1, Math.ceil(totalItems / safePageSize)),
+  };
+}
+
+export async function takeMerchantSupportThreadOwnership(
+  threadId: string,
+  database?: DatabaseClient,
+): Promise<OwnershipResult> {
+  const principal = await requirePlatformAdminMutation();
+  const client = database ?? (prisma as unknown as DatabaseClient);
+  return client.$transaction(async (transaction) => {
+    const claimed = await transaction.$executeRaw(Prisma.sql`
+      UPDATE "support"."MerchantSupportThread"
+      SET "assignedPlatformAdminId" = ${principal.id}, "assignedAt" = NOW(), "updatedAt" = NOW()
+      WHERE "id" = ${threadId} AND "assignedPlatformAdminId" IS NULL
+    `);
+    const owner = await readOwner(transaction, threadId);
+    if (!owner) throw new Error('Support thread not found.');
+    return { claimed: claimed === 1, owner };
+  });
+}
+
+export async function releaseMerchantSupportThreadOwnership(
+  threadId: string,
+  database?: DatabaseClient,
+): Promise<void> {
+  const principal = await requirePlatformAdminMutation();
+  const client = database ?? (prisma as unknown as DatabaseClient);
+  const released = await client.$executeRaw(Prisma.sql`
+    UPDATE "support"."MerchantSupportThread"
+    SET "assignedPlatformAdminId" = NULL, "assignedAt" = NULL, "updatedAt" = NOW()
+    WHERE "id" = ${threadId}
+      AND (${adminCanRelease(principal, null)} OR "assignedPlatformAdminId" = ${principal.id})
+  `);
+  if (released !== 1) {
+    throw new Error('Only the assigned platform administrator or a SUPER_ADMIN may release ownership.');
+  }
+}
+
+export async function reassignMerchantSupportThreadOwnership(input: {
+  threadId: string;
+  targetPlatformAdminId: string;
+  database?: DatabaseClient;
+}): Promise<SupportOwnerSummary> {
+  const principal = await requirePlatformAdminMutation();
+  if (principal.role !== 'SUPER_ADMIN') {
+    throw new Error('SUPER_ADMIN access is required.');
+  }
+  const client = input.database ?? (prisma as unknown as DatabaseClient);
+  return client.$transaction(async (transaction) => {
+    const target = await transaction.$queryRaw<[
+      { id: string; displayName: string | null; email: string } 
+    ]>(Prisma.sql`
+      SELECT "id", "displayName", "email"
+      FROM "public"."PlatformAdmin"
+      WHERE "id" = ${input.targetPlatformAdminId} AND "active" = true
+    `);
+    if (!target[0]) throw new Error('An active platform administrator is required.');
+    const updated = await transaction.$executeRaw(Prisma.sql`
+      UPDATE "support"."MerchantSupportThread"
+      SET "assignedPlatformAdminId" = ${input.targetPlatformAdminId}, "assignedAt" = NOW(), "updatedAt" = NOW()
+      WHERE "id" = ${input.threadId}
+    `);
+    if (updated !== 1) throw new Error('Support thread not found.');
+    return {
+      id: target[0].id,
+      displayName: target[0].displayName,
+      email: target[0].email,
+    };
+  });
+}
 
 export async function getMerchantSupportThreads(input: {
   page: number;
@@ -462,6 +683,13 @@ export async function requestAdditionalTranslation(input: {
 
 export function adminCanSend(principal: PlatformAdminPrincipal, ownerId: string | null): boolean {
   return principal.id === ownerId;
+}
+
+export function adminCanRelease(
+  principal: PlatformAdminPrincipal,
+  ownerId: string | null,
+): boolean {
+  return principal.role === 'SUPER_ADMIN' || principal.id === ownerId;
 }
 
 export function adminCanRequestGlobalReconciliation(

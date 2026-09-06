@@ -2,9 +2,12 @@
 
 import {
   composeAdministrativeMessage,
+  releaseMerchantSupportThreadOwnership,
+  reassignMerchantSupportThreadOwnership,
   requestAdditionalTranslation,
   requestFailedTranslationReconciliation,
   requestFailedTranslationsReconciliation,
+  takeMerchantSupportThreadOwnership,
 } from '@/lib/admin/merchant-support';
 
 export async function composeAdministrativeMessageAction(input: {
@@ -29,4 +32,23 @@ export async function requestAdditionalTranslationAction(input: {
 
 export async function requestFailedTranslationsReconciliationAction() {
   return requestFailedTranslationsReconciliation({});
+}
+
+export async function takeMerchantSupportThreadOwnershipAction(input: {
+  threadId: string;
+}) {
+  return takeMerchantSupportThreadOwnership(input.threadId);
+}
+
+export async function releaseMerchantSupportThreadOwnershipAction(input: {
+  threadId: string;
+}) {
+  return releaseMerchantSupportThreadOwnership(input.threadId);
+}
+
+export async function reassignMerchantSupportThreadOwnershipAction(input: {
+  threadId: string;
+  targetPlatformAdminId: string;
+}) {
+  return reassignMerchantSupportThreadOwnership(input);
 }
