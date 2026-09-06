@@ -56,7 +56,7 @@ test("Admin validates and consumes the published Shared ICU runtime", () => {
   assert.doesNotMatch(adapterSource, /IntlMessageFormat/);
   assert.equal(
     packageJson.dependencies["@modainteract/moda-interact-shared"],
-    "0.6.3",
+    "0.7.0",
   );
 });
 

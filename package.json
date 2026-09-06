@@ -15,7 +15,7 @@
     "admin:provision": "node scripts/provision-platform-admin.mjs"
   },
   "dependencies": {
-    "@modainteract/moda-interact-shared": "0.6.3",
+    "@modainteract/moda-interact-shared": "0.7.1",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "ioredis": "^6.0.0",
