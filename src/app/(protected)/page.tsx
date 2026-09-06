@@ -22,6 +22,7 @@ import type {
   PageResult,
   RecoveryListItem,
 } from '@/lib/admin/types';
+import { adminI18n, adminQueueLabel } from '@/i18n';
 import {
   cleanSearch,
   firstParam,
@@ -119,36 +120,36 @@ export default async function Home({ searchParams }: PageProps) {
       <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[var(--brand-900)]">
-            Tenant Directory
+            {adminI18n.t('nav.tenantDirectory')}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage merchants and investigate abandoned-cart recovery activity.
+            {adminI18n.t('tenant.directoryDescription')}
           </p>
         </div>
 
         <section
           className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6"
-          aria-label="Platform summary"
+          aria-label={adminI18n.t('tenant.platformSummary')}
         >
           <KpiCard
-            label="Active Tenants"
-            value={directory.kpis.activeTenants.toLocaleString('en-GB')}
+            label={adminI18n.t('tenant.activeTenants')}
+            value={adminI18n.formatNumber(directory.kpis.activeTenants)}
           />
           <KpiCard
-            label="Active Recoveries (Now)"
-            value={directory.kpis.activeRecoveries.toLocaleString('en-GB')}
+            label={adminI18n.t('tenant.activeRecoveries')}
+            value={adminI18n.formatNumber(directory.kpis.activeRecoveries)}
             accent
           />
           {(queueOverview?.queues ?? [
-            { queueName: 'checkout-events', label: 'Checkout Events', active: null },
-            { queueName: 'order-events', label: 'Order Events', active: null },
-            { queueName: 'pending-recovery-candidates', label: 'Pending Recoveries', active: null },
-            { queueName: 'whatsapp-events', label: 'WhatsApp Events', active: null },
+            { queueName: 'checkout-events', labelKey: 'queue.checkoutEvents', active: null },
+            { queueName: 'order-events', labelKey: 'queue.orderEvents', active: null },
+            { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries', active: null },
+            { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents', active: null },
           ]).map((queue) => (
             <KpiCard
               key={queue.queueName}
-              label={queue.label}
-              value={queue.active === null ? 'Unavailable' : queue.active.toLocaleString('en-GB')}
+              label={adminQueueLabel(queue.queueName)}
+              value={queue.active === null ? adminI18n.t('empty.unavailable') : adminI18n.formatNumber(queue.active)}
               status={queue.active === null}
             />
           ))}

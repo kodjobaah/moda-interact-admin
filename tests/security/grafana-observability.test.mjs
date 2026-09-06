@@ -39,10 +39,10 @@ test('Grafana navigation accepts isolated HTTPS destinations and labels environm
   assert.equal(navigation.environment, 'production');
   assert.equal(navigation.configured, true);
   assert.deepEqual(
-    navigation.links.map(({ label, href }) => ({ label, href })),
+    navigation.links.map(({ labelKey, href }) => ({ labelKey, href })),
     [
-      { label: 'Platform dashboard', href: 'https://production.grafana.net/d/platform' },
-      { label: 'Logs', href: 'https://production.grafana.net/explore/logs' },
+      { labelKey: 'observability.dashboard', href: 'https://production.grafana.net/d/platform' },
+      { labelKey: 'observability.logs', href: 'https://production.grafana.net/explore/logs' },
     ],
   );
 });
@@ -57,7 +57,7 @@ test('Grafana navigation rejects unsafe, malformed, credentialed, and unknown-en
   });
 
   assert.equal(navigation.configured, true);
-  assert.deepEqual(navigation.links.map(({ label }) => label), ['Metrics']);
+  assert.deepEqual(navigation.links.map(({ labelKey }) => labelKey), ['observability.metrics']);
 
   const unknown = await loadNavigation('preview', {
     GRAFANA_BASE_URL: 'https://grafana.net',

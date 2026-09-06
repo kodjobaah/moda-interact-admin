@@ -2,13 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "./icons";
 import { LogoutForm } from "./logout-form";
-
-function roleLabel(role: string) {
-  return role
-    .toLowerCase()
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
+import { adminI18n, adminRoleLabel } from "@/i18n";
 
 export function Sidebar({
   active,
@@ -43,14 +37,14 @@ export function Sidebar({
       </div>
       <nav
         className="flex-1 space-y-2 px-3 py-6"
-        aria-label="Administration navigation"
+        aria-label={adminI18n.t("nav.administration")}
       >
         <Link
           href="/"
           className={`${base} ${active === "tenants" ? selected : idle}`}
         >
           <Icon name="users" className="h-5 w-5 text-[var(--brand-700)]" />
-          Tenant Directory
+          {adminI18n.t("nav.tenantDirectory")}
         </Link>
         <div>
           <Link
@@ -59,7 +53,7 @@ export function Sidebar({
             className={`${base} ${observabilityActive ? selected : idle}`}
           >
             <Icon name="chart" className="h-5 w-5 text-[var(--brand-600)]" />
-            <span className="flex-1">Observability</span>
+            <span className="flex-1">{adminI18n.t("nav.observability")}</span>
             <Icon name="chevron-down" className="h-4 w-4" />
           </Link>
           {observabilityActive ? (
@@ -69,7 +63,7 @@ export function Sidebar({
                 aria-current={active === "queues" ? "page" : undefined}
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "queues" ? selected : idle}`}
               >
-                Shopify Queues
+                {adminI18n.t("nav.shopifyQueues")}
               </Link>
               <a
                 href={grafanaHref}
@@ -81,7 +75,7 @@ export function Sidebar({
                 }
                 className={`${base} !rounded-md px-3 py-2 text-sm ${idle}`}
               >
-                Grafana
+                {adminI18n.t("nav.grafana")}
               </a>
             </div>
           ) : null}
@@ -94,10 +88,10 @@ export function Sidebar({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-[var(--brand-900)]">
-              Administrator
+              {adminI18n.t("nav.administrator")}
             </p>
             <p className="truncate text-xs text-[var(--brand-700)]">
-              {roleLabel(administratorRole)}
+              {adminRoleLabel(administratorRole)}
             </p>
           </div>
           <Icon

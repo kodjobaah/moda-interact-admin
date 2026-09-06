@@ -21,15 +21,15 @@ test("sidebar exposes the approved nested Observability navigation", async () =>
   );
 
   assert.match(sidebarSource, /href="\/"/);
-  assert.match(sidebarSource, /Tenant Directory/);
+  assert.match(sidebarSource, /nav\.tenantDirectory/);
   assert.match(
     sidebarSource,
     /href="\/observability\/queues"\s+aria-current=\{observabilityActive \? "page" : undefined\}/,
   );
   assert.doesNotMatch(sidebarSource, /Overview/);
   assert.match(sidebarSource, /href="\/observability\/queues"/);
-  assert.match(sidebarSource, /Shopify Queues/);
-  assert.match(sidebarSource, /Grafana/);
+  assert.match(sidebarSource, /nav\.shopifyQueues/);
+  assert.match(sidebarSource, /nav\.grafana/);
   assert.match(sidebarSource, /active === ["']queues["']/);
   assert.match(
     sidebarSource,
@@ -45,7 +45,7 @@ test("sidebar uses a stable desktop rail and bottom administrator treatment", as
 
   assert.match(sidebarSource, /w-60 shrink-0/);
   assert.match(sidebarSource, /administratorRole/);
-  assert.match(sidebarSource, /roleLabel/);
+  assert.match(sidebarSource, /adminRoleLabel/);
   assert.match(sidebarSource, /border-t border-\[var\(--brand-200\)\]/);
   assert.match(sidebarSource, /<LogoutForm \/>/);
   assert.match(shellSource, /getPlatformAdminPrincipal/);

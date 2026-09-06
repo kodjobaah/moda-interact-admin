@@ -1,16 +1,18 @@
-import { tenantName } from '@/lib/admin/format';
-import { withParamUpdates } from '@/lib/admin/query';
+import { tenantName } from "@/lib/admin/format";
+import { withParamUpdates } from "@/lib/admin/query";
 import type {
   CustomerListItem,
   PageResult,
   RecoveryListItem,
   TenantDetail,
   TenantListItem,
-} from '@/lib/admin/types';
-import { EmptyState } from './empty-state';
-import { Pagination } from './pagination';
-import { TenantDetailPanel } from './tenant-detail-panel';
-import { TenantRow } from './tenant-row';
+} from "@/lib/admin/types";
+import { EmptyState } from "./empty-state";
+import { translateAdminText } from "@/i18n";
+import { adminI18n } from "@/i18n";
+import { Pagination } from "./pagination";
+import { TenantDetailPanel } from "./tenant-detail-panel";
+import { TenantRow } from "./tenant-row";
 
 export function TenantTable({
   tenants,
@@ -26,7 +28,7 @@ export function TenantTable({
 }: {
   tenants: PageResult<TenantListItem>;
   selectedTenant: TenantDetail | null;
-  tab: 'admin' | 'logs';
+  tab: "admin" | "logs";
   customers: PageResult<CustomerListItem> | null;
   customerSearch: string;
   selectedCustomer: CustomerListItem | null;
@@ -43,13 +45,13 @@ export function TenantTable({
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Tenant Details
+                  {adminI18n.t("tenant.details")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Status
+                  {adminI18n.t("tenant.status")}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Billing Plan
+                  {adminI18n.t("tenant.billingPlan")}
                 </th>
               </tr>
             </thead>
@@ -58,7 +60,7 @@ export function TenantTable({
                 const name = tenantName(tenant.brandName, tenant.domain);
                 const selected = selectedTenant?.id === tenant.id;
                 const href = selected
-                  ? withParamUpdates('/', params, {
+                  ? withParamUpdates("/", params, {
                       tenant: null,
                       tab: null,
                       customerSearch: null,
@@ -70,9 +72,9 @@ export function TenantTable({
                       messagePage: null,
                       saved: null,
                     })
-                  : withParamUpdates('/', params, {
+                  : withParamUpdates("/", params, {
                       tenant: tenant.id,
-                      tab: 'admin',
+                      tab: "admin",
                       customerSearch: null,
                       customerPage: null,
                       customerId: null,
@@ -113,8 +115,8 @@ export function TenantTable({
         </div>
       ) : (
         <div className="p-6">
-          <EmptyState title="No tenants found">
-            No shop matched the current search.
+          <EmptyState title="empty.noTenants">
+            {translateAdminText("empty.noShopMatched")}
           </EmptyState>
         </div>
       )}
@@ -125,18 +127,18 @@ export function TenantTable({
         totalPages={tenants.totalPages}
         totalItems={tenants.totalItems}
         pageParam="page"
-        label="tenants"
+        countKey="pagination.tenants"
         resetParams={[
-          'tenant',
-          'tab',
-          'customerSearch',
-          'customerPage',
-          'customerId',
-          'recoveryPage',
-          'recoveryId',
-          'drawerTab',
-          'messagePage',
-          'saved',
+          "tenant",
+          "tab",
+          "customerSearch",
+          "customerPage",
+          "customerId",
+          "recoveryPage",
+          "recoveryId",
+          "drawerTab",
+          "messagePage",
+          "saved",
         ]}
       />
     </div>

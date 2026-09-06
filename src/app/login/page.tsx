@@ -7,6 +7,7 @@ import {
   isDevelopmentAuthBypass,
 } from '@/lib/auth/environment';
 import { getPlatformAdminPrincipal } from '@/lib/auth/platform-admin';
+import { adminI18n } from '@/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,16 +47,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           />
           <div>
             <p className="text-sm font-medium text-[var(--brand-700)]">Moda Interact</p>
-            <h1 className="text-xl font-bold text-[var(--brand-900)]">Platform Admin</h1>
+            <h1 className="text-xl font-bold text-[var(--brand-900)]">{adminI18n.t('auth.platformAdmin')}</h1>
           </div>
         </div>
         <p className="mt-6 text-sm leading-6 text-gray-600">
-          Sign in with an authorised Google account. A valid Google account alone
-          does not grant platform administration access.
+          {adminI18n.t('auth.loginDescription')}
         </p>
         {error ? (
           <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            This Google account is not authorised for Moda platform administration.
+            {adminI18n.t('auth.unauthorized')}
           </div>
         ) : null}
         <form action={signInWithGoogle} className="mt-6">
@@ -63,11 +63,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             type="submit"
             className="flex w-full items-center justify-center rounded-lg bg-[var(--brand-900)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--brand-800)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] focus:ring-offset-2"
           >
-            Continue with Google
+            {adminI18n.t('auth.continueGoogle')}
           </button>
         </form>
         <p className="mt-6 text-xs leading-5 text-gray-500">
-          Access is restricted to active Moda platform administrators.
+          {adminI18n.t('auth.restricted')}
         </p>
       </section>
     </main>

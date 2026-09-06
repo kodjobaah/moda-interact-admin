@@ -1,23 +1,24 @@
-import { signOut } from '@/auth';
-import { logAdminSecurityEvent } from '@/lib/auth/audit';
-import { isDevelopmentAuthBypass } from '@/lib/auth/environment';
+import { signOut } from "@/auth";
+import { logAdminSecurityEvent } from "@/lib/auth/audit";
+import { isDevelopmentAuthBypass } from "@/lib/auth/environment";
+import { adminI18n } from "@/i18n";
 
 export function LogoutForm() {
   if (isDevelopmentAuthBypass()) {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-        Development mode · authentication bypassed
+        {adminI18n.t("auth.developmentBypass")}
       </div>
     );
   }
 
   async function logout() {
-    'use server';
-    logAdminSecurityEvent('admin.auth.logout', {
-      action: 'logout',
-      outcome: 'succeeded',
+    "use server";
+    logAdminSecurityEvent("admin.auth.logout", {
+      action: "logout",
+      outcome: "succeeded",
     });
-    await signOut({ redirectTo: '/login' });
+    await signOut({ redirectTo: "/login" });
   }
 
   return (
@@ -26,7 +27,7 @@ export function LogoutForm() {
         type="submit"
         className="w-full rounded-lg border border-[var(--brand-300)] bg-white px-3 py-2 text-left text-sm font-medium text-[var(--brand-900)] hover:bg-[var(--brand-50)]"
       >
-        Sign out
+        {adminI18n.t("auth.signOut")}
       </button>
     </form>
   );

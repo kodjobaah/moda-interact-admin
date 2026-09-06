@@ -1,10 +1,12 @@
-import Link from 'next/link';
-import { customerName } from '@/lib/admin/format';
-import { withParamUpdates } from '@/lib/admin/query';
-import type { PageResult, CustomerListItem } from '@/lib/admin/types';
-import { EmptyState } from './empty-state';
-import { Icon } from './icons';
-import { Pagination } from './pagination';
+import Link from "next/link";
+import { customerName } from "@/lib/admin/format";
+import { withParamUpdates } from "@/lib/admin/query";
+import type { PageResult, CustomerListItem } from "@/lib/admin/types";
+import { EmptyState } from "./empty-state";
+import { translateAdminText } from "@/i18n";
+import { Icon } from "./icons";
+import { Pagination } from "./pagination";
+import { adminI18n } from "@/i18n";
 
 export function CustomerTable({
   customers,
@@ -23,14 +25,14 @@ export function CustomerTable({
             .filter(
               ([key]) =>
                 ![
-                  'customerSearch',
-                  'customerPage',
-                  'customerId',
-                  'recoveryPage',
-                  'recoveryId',
-                  'drawerTab',
-                  'messagePage',
-                  'saved',
+                  "customerSearch",
+                  "customerPage",
+                  "customerId",
+                  "recoveryPage",
+                  "recoveryId",
+                  "drawerTab",
+                  "messagePage",
+                  "saved",
                 ].includes(key),
             )
             .map(([key, value]) => (
@@ -45,7 +47,7 @@ export function CustomerTable({
             name="customerSearch"
             defaultValue={search}
             className="w-full rounded-md border border-gray-300 py-1.5 pr-4 pl-9 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]"
-            placeholder="Search customer by name, email, or phone..."
+            placeholder={adminI18n.t("search.customerPlaceholder")}
           />
         </form>
       </div>
@@ -55,19 +57,19 @@ export function CustomerTable({
             <thead>
               <tr>
                 <th className="pb-2 text-left text-xs font-medium text-gray-500">
-                  Customer Name
+                  {adminI18n.t("customer.name")}
                 </th>
                 <th className="pb-2 text-left text-xs font-medium text-gray-500">
-                  Contact
+                  {adminI18n.t("customer.contact")}
                 </th>
                 <th className="pb-2 text-right text-xs font-medium text-gray-500">
-                  Abandoned Carts
+                  {adminI18n.t("customer.abandonedCarts")}
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {customers.items.map((customer) => {
-                const href = withParamUpdates('/', params, {
+                const href = withParamUpdates("/", params, {
                   customerId: customer.id,
                   recoveryPage: 1,
                   recoveryId: null,
@@ -90,8 +92,8 @@ export function CustomerTable({
                     </td>
                     <td className="py-3 pr-3 text-sm text-gray-500">
                       <Link href={href} className="block">
-                        <span className="block">{customer.email ?? '—'}</span>
-                        <span className="block">{customer.phone ?? '—'}</span>
+                        <span className="block">{customer.email ?? "—"}</span>
+                        <span className="block">{customer.phone ?? "—"}</span>
                       </Link>
                     </td>
                     <td className="py-3 text-right text-sm text-gray-700">
@@ -105,8 +107,8 @@ export function CustomerTable({
             </tbody>
           </table>
         ) : (
-          <EmptyState title="No customers found">
-            Try another customer search or wait for recovery activity.
+          <EmptyState title="empty.noCustomers">
+            {translateAdminText("empty.noCustomerActivity")}
           </EmptyState>
         )}
       </div>
@@ -117,13 +119,13 @@ export function CustomerTable({
         totalPages={customers.totalPages}
         totalItems={customers.totalItems}
         pageParam="customerPage"
-        label="customers"
+        countKey="pagination.customers"
         resetParams={[
-          'customerId',
-          'recoveryPage',
-          'recoveryId',
-          'drawerTab',
-          'messagePage',
+          "customerId",
+          "recoveryPage",
+          "recoveryId",
+          "drawerTab",
+          "messagePage",
         ]}
       />
     </div>

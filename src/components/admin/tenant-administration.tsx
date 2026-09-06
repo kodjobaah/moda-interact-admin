@@ -1,6 +1,7 @@
 import { updateTenantAction } from '@/app/actions/tenant';
 import { formatDateTime } from '@/lib/admin/format';
 import type { TenantDetail } from '@/lib/admin/types';
+import { adminI18n, adminStatusLabel } from '@/i18n';
 
 export function TenantAdministration({
   tenant,
@@ -15,7 +16,7 @@ export function TenantAdministration({
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <h4 className="mb-3 text-xs font-bold tracking-wider text-gray-400 uppercase">
-          Shopify Lifecycle &amp; Status
+          {adminI18n.t('tenant.lifecycleStatus')}
         </h4>
         <form action={updateTenantAction} className="space-y-4">
           <input type="hidden" name="shopId" value={tenant.id} />
@@ -25,7 +26,7 @@ export function TenantAdministration({
               className="mb-1 block text-xs font-medium text-gray-600"
               htmlFor={`status-${tenant.id}`}
             >
-              Shop Status
+              {adminI18n.t('tenant.shopStatus')}
             </label>
             <select
               id={`status-${tenant.id}`}
@@ -33,14 +34,14 @@ export function TenantAdministration({
               defaultValue={tenant.status}
               className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]"
             >
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="SUSPENDED">SUSPENDED</option>
+              <option value="ACTIVE">{adminStatusLabel('ACTIVE')}</option>
+              <option value="SUSPENDED">{adminStatusLabel('SUSPENDED')}</option>
             </select>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <span className="block text-xs font-medium text-gray-500">
-                Installed At
+                {adminI18n.t('tenant.installedAt')}
               </span>
               <p className="mt-0.5 text-sm font-medium text-gray-900">
                 {formatDateTime(tenant.installedAt)}
@@ -48,7 +49,7 @@ export function TenantAdministration({
             </div>
             <div>
               <span className="block text-xs font-medium text-gray-500">
-                Uninstalled At
+                {adminI18n.t('tenant.uninstalledAt')}
               </span>
               <p className="mt-0.5 text-sm font-medium text-gray-900">
                 {formatDateTime(tenant.uninstalledAt)}
@@ -60,7 +61,7 @@ export function TenantAdministration({
               className="mb-1 block text-xs font-medium text-gray-600"
               htmlFor={`delay-${tenant.id}`}
             >
-              Recovery Delay (Minutes)
+              {adminI18n.t('tenant.recoveryDelay')}
             </label>
             <input
               id={`delay-${tenant.id}`}
@@ -74,13 +75,13 @@ export function TenantAdministration({
           </div>
           <div className="flex items-center justify-between border-t border-gray-100 pt-3">
             <span className="text-xs text-green-700" aria-live="polite">
-              {saved ? 'Changes saved successfully.' : ''}
+              {saved ? adminI18n.t('tenant.saved') : ''}
             </span>
             <button
               type="submit"
               className="rounded-md bg-[var(--brand-700)] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--brand-800)]"
             >
-              Save Changes
+              {adminI18n.t('tenant.save')}
             </button>
           </div>
         </form>
@@ -88,26 +89,26 @@ export function TenantAdministration({
 
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <h4 className="mb-3 text-xs font-bold tracking-wider text-gray-400 uppercase">
-          Billing &amp; Onboarding
+          {adminI18n.t('tenant.billingOnboarding')}
         </h4>
         <dl className="grid gap-4 sm:grid-cols-2">
           <div>
-            <dt className="text-xs font-medium text-gray-500">Plan</dt>
+            <dt className="text-xs font-medium text-gray-500">{adminI18n.t('tenant.plan')}</dt>
             <dd className="mt-1 text-sm font-semibold text-gray-900">
-              {tenant.planName ?? tenant.planHandle ?? 'No plan'}
+              {tenant.planName ?? tenant.planHandle ?? adminI18n.t('tenant.noPlan')}
             </dd>
           </div>
           <div>
             <dt className="text-xs font-medium text-gray-500">
-              Subscription Status
+              {adminI18n.t('tenant.subscriptionStatus')}
             </dt>
             <dd className="mt-1 text-sm font-semibold text-gray-900">
-              {tenant.subscriptionStatus ?? '—'}
+              {adminStatusLabel(tenant.subscriptionStatus)}
             </dd>
           </div>
           <div>
             <dt className="text-xs font-medium text-gray-500">
-              Current Period Start
+              {adminI18n.t('tenant.currentPeriodStart')}
             </dt>
             <dd className="mt-1 text-sm font-semibold text-gray-900">
               {formatDateTime(tenant.currentPeriodStart)}
@@ -115,16 +116,16 @@ export function TenantAdministration({
           </div>
           <div>
             <dt className="text-xs font-medium text-gray-500">
-              Current Period End
+              {adminI18n.t('tenant.currentPeriodEnd')}
             </dt>
             <dd className="mt-1 text-sm font-semibold text-gray-900">
               {formatDateTime(tenant.currentPeriodEnd)}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-gray-500">Onboarding</dt>
+            <dt className="text-xs font-medium text-gray-500">{adminI18n.t('tenant.onboarding')}</dt>
             <dd className="mt-1 text-sm font-semibold text-gray-900">
-              {tenant.onboardingCompleted ? 'Completed' : 'Incomplete'}
+              {adminI18n.t(tenant.onboardingCompleted ? 'tenant.completed' : 'tenant.incomplete')}
             </dd>
           </div>
         </dl>

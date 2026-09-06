@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { adminI18n, adminQueueJobLabel, adminStatusLabel } from "@/i18n";
 
 import {
   getInitialRefreshMs,
@@ -90,13 +91,17 @@ function clampDrawerWidth(width: number, maximum: number) {
 }
 
 function formatTime(value: string | null) {
-  if (!value) return "None observed";
-  return new Date(value).toLocaleTimeString("en-GB");
+  if (!value) return adminI18n.t("empty.noneObserved");
+  return adminI18n.formatDateTime(value, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function formatDateTime(value: string | null) {
-  if (!value) return "Not recorded";
-  return new Date(value).toLocaleString("en-GB", {
+  if (!value) return adminI18n.t("empty.notRecorded");
+  return adminI18n.formatDateTime(value, {
     dateStyle: "medium",
     timeStyle: "medium",
   });
@@ -106,7 +111,7 @@ function formatJobData(data: unknown) {
   try {
     return JSON.stringify(data, null, 2) ?? "null";
   } catch {
-    return "Payload could not be formatted.";
+    return adminI18n.t("format.payloadError");
   }
 }
 
@@ -128,9 +133,9 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       type="button"
       className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
       onClick={() => void copyValue()}
-      aria-label={`Copy ${label}`}
+      aria-label={adminI18n.t("queue.copyLabel", { label })}
     >
-      {copied ? "Copied" : "Copy"}
+      {copied ? adminI18n.t("queue.copied") : adminI18n.t("queue.copy")}
     </button>
   );
 }
@@ -233,7 +238,7 @@ export function QueueMonitor() {
         cache: "no-store",
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error("Queue data unavailable");
+      if (!response.ok) throw new Error(adminI18n.t("empty.unavailable"));
       const nextSnapshot = (await response.json()) as QueueMonitorSnapshot;
       setSnapshot(nextSnapshot);
       setError(null);
@@ -243,7 +248,7 @@ export function QueueMonitor() {
         fetchError instanceof DOMException && fetchError.name === "AbortError"
       )) {
         setError(
-          "Queue data is unavailable. The last successful snapshot is shown when available.",
+            adminI18n.t("queue.dataUnavailable"),
         );
       }
     } finally {
@@ -292,7 +297,7 @@ export function QueueMonitor() {
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Queue jobs unavailable");
+        if (!response.ok) throw new Error(adminI18n.t("empty.unavailable"));
         return (await response.json()) as QueueJobSnapshot;
       })
       .then((nextQueueJobs) => {
@@ -307,7 +312,7 @@ export function QueueMonitor() {
           fetchError instanceof DOMException && fetchError.name === "AbortError"
         )) {
           setQueueJobsError(
-            "Queue jobs are unavailable. Try refreshing this queue.",
+            adminI18n.t("queue.jobsUnavailable"),
           );
           setQueueJobs(null);
         }
@@ -351,9 +356,9 @@ export function QueueMonitor() {
     })
       .then(async (response) => {
         if (response.status === 404)
-          throw new Error("Selected queue job is no longer available.");
+          throw new Error(adminI18n.t("queue.jobGone"));
         if (!response.ok)
-          throw new Error("Selected queue job details are unavailable.");
+          throw new Error(adminI18n.t("queue.jobDetailsUnavailable"));
         return (await response.json()) as FailedJobDetail;
       })
       .then((nextDetail) => {
@@ -368,7 +373,7 @@ export function QueueMonitor() {
           setJobDetailError(
             fetchError instanceof Error
               ? fetchError.message
-              : "Selected queue job details are unavailable.",
+              : adminI18n.t("queue.jobDetailsUnavailable"),
           );
         }
       })
@@ -393,16 +398,15 @@ export function QueueMonitor() {
             id="queue-monitor-title"
             className="text-lg font-semibold text-[var(--brand-900)]"
           >
-            Shopify Queue Activity
+            {adminI18n.t("nav.shopifyQueues")}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Read-only operational view. Completed jobs may disappear immediately
-            after processing.
+            {adminI18n.t("queue.readOnlyView")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm text-gray-600" htmlFor="queue-refresh-rate">
-            Refresh
+            {adminI18n.t("queue.refresh")}
           </label>
           <select
             id="queue-refresh-rate"
@@ -415,7 +419,9 @@ export function QueueMonitor() {
           >
             {REFRESH_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {!("count" in option)
+                  ? adminI18n.t(option.labelKey)
+                  : adminI18n.t(option.labelKey, { count: option.count })}
               </option>
             ))}
           </select>
@@ -425,7 +431,7 @@ export function QueueMonitor() {
             onClick={() => void refresh()}
             disabled={loading}
           >
-            Refresh now
+            {adminI18n.t("queue.refreshNow")}
           </button>
         </div>
       </div>
@@ -436,8 +442,8 @@ export function QueueMonitor() {
       >
         {error ??
           (snapshot
-            ? `Last updated: ${formatTime(snapshot.observedAt)}`
-            : "Loading queue data...")}
+            ? adminI18n.t("queue.lastUpdated", { time: formatTime(snapshot.observedAt) })
+            : adminI18n.t("queue.loadingData"))}
       </p>
 
       {snapshot ? (
@@ -446,48 +452,48 @@ export function QueueMonitor() {
             <div className="min-w-0 overflow-x-auto rounded-lg border border-gray-200">
               <table className="min-w-[960px] w-full text-left text-sm">
                 <caption className="sr-only">
-                  Shopify queue operational summary
+                  {adminI18n.t("queue.summary")}
                 </caption>
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-4 py-3 font-medium" scope="col">
-                      Queue
+                      {adminI18n.t("queue.queue")}
                     </th>
                     <th className="px-4 py-3 font-medium" scope="col">
-                      Job label
+                      {adminI18n.t("queue.jobLabel")}
                     </th>
                     <th
                       className="px-4 py-3 text-right font-medium"
                       scope="col"
                     >
-                      Waiting
+                      {adminI18n.t("status.waiting")}
                     </th>
                     <th
                       className="px-4 py-3 text-right font-medium"
                       scope="col"
                     >
-                      Active
+                      {adminI18n.t("status.active")}
                     </th>
                     <th
                       className="px-4 py-3 text-right font-medium"
                       scope="col"
                     >
-                      Delayed
+                      {adminI18n.t("status.delayed")}
                     </th>
                     <th
                       className="px-4 py-3 text-right font-medium"
                       scope="col"
                     >
-                      Failed
+                      {adminI18n.t("status.failed")}
                     </th>
                     <th
                       className="px-4 py-3 text-right font-medium"
                       scope="col"
                     >
-                      Workers
+                      {adminI18n.t("queue.workers")}
                     </th>
                     <th className="px-4 py-3 font-medium" scope="col">
-                      Last Redis activity
+                      {adminI18n.t("queue.lastRedisActivity")}
                     </th>
                   </tr>
                 </thead>
@@ -508,14 +514,14 @@ export function QueueMonitor() {
                         <button
                           type="button"
                           className="font-semibold text-[var(--brand-900)] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-700)]"
-                          aria-label={`Open ${queue.queueName} queue details`}
+                          aria-label={adminI18n.t("queue.openDetails", { queueName: queue.queueName })}
                           onClick={() => selectQueue(queue.queueName)}
                         >
                           {queue.queueName}
                         </button>
                       </th>
                       <td className="max-w-56 px-4 py-4 text-gray-600">
-                        {queue.jobNames.join(", ")}
+                        {queue.jobNames.map(adminQueueJobLabel).join(", ")}
                       </td>
                       <td className="px-4 py-4 text-right text-gray-700">
                         {queue.counts.waiting}
@@ -533,8 +539,10 @@ export function QueueMonitor() {
                         {queue.counts.workers}
                       </td>
                       <td className="whitespace-nowrap px-4 py-4 text-gray-600">
-                        {queue.lastActivity?.event ?? "None observed"} at{" "}
-                        {formatTime(queue.lastActivity?.observedAt ?? null)}
+                        {adminI18n.t("queue.eventAt", {
+                          event: queue.lastActivity?.event ?? adminI18n.t("empty.noneObserved"),
+                          time: formatTime(queue.lastActivity?.observedAt ?? null),
+                        })}
                       </td>
                     </tr>
                   ))}
@@ -552,7 +560,7 @@ export function QueueMonitor() {
                   className="absolute inset-y-0 left-0 z-10 hidden w-3 -translate-x-1/2 cursor-col-resize items-center justify-center md:flex"
                   role="separator"
                   tabIndex={0}
-                  aria-label="Resize queue details panel"
+                  aria-label={adminI18n.t("queue.resizeDetails")}
                   aria-orientation="vertical"
                   onPointerDown={(event) => {
                     event.preventDefault();
@@ -594,7 +602,7 @@ export function QueueMonitor() {
                       id="queue-details-title"
                       className="text-lg font-semibold text-gray-950"
                     >
-                      Queue details
+                      {adminI18n.t("queue.details")}
                     </h3>
                     <p className="mt-1 text-sm text-gray-600">
                       <span className="font-medium text-[var(--brand-900)]">
@@ -606,15 +614,15 @@ export function QueueMonitor() {
                     <button
                       type="button"
                       className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                      aria-label="Maximize queue details"
+                      aria-label={adminI18n.t("queue.maximizeDetails")}
                       onClick={() => setDrawerWidth(null)}
                     >
-                      Maximize
+                      {adminI18n.t("queue.maximize")}
                     </button>
                     <button
                       type="button"
                       className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                      aria-label="Close queue details"
+                      aria-label={adminI18n.t("queue.closeDetails")}
                       onClick={() => {
                         setSelectedQueueName(null);
                         setDrawerWidth(null);
@@ -636,11 +644,11 @@ export function QueueMonitor() {
                       <>
                         <div className="grid gap-3 sm:grid-cols-5">
                           {[
-                            ["Waiting", selectedQueue.counts.waiting],
-                            ["Active", selectedQueue.counts.active],
-                            ["Delayed", selectedQueue.counts.delayed],
-                            ["Failed", selectedQueue.counts.failed],
-                            ["Workers", selectedQueue.counts.workers],
+                            [adminI18n.t("status.waiting"), selectedQueue.counts.waiting],
+                            [adminI18n.t("status.active"), selectedQueue.counts.active],
+                            [adminI18n.t("status.delayed"), selectedQueue.counts.delayed],
+                            [adminI18n.t("status.failed"), selectedQueue.counts.failed],
+                            [adminI18n.t("queue.workers"), selectedQueue.counts.workers],
                           ].map(([label, value]) => (
                             <div key={label} className="rounded-md border border-gray-200 bg-gray-50 p-3">
                               <dt className="text-xs uppercase tracking-wide text-gray-500">{label}</dt>
@@ -651,19 +659,19 @@ export function QueueMonitor() {
                         <div className="mt-5 rounded-md border border-gray-200 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <h4 className="font-semibold text-gray-900">Queue information</h4>
+                              <h4 className="font-semibold text-gray-900">{adminI18n.t("queue.information")}</h4>
                               <p className="mt-1 text-sm text-gray-600">
-                                {selectedQueue.jobNames.join(", ")}
+                                {selectedQueue.jobNames.map(adminQueueJobLabel).join(", ")}
                               </p>
                             </div>
                             <span className={`rounded-full px-2 py-1 text-xs font-medium ${selectedQueue.counts.workers > 0 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}`}>
-                              {selectedQueue.counts.workers > 0 ? "Worker online" : "No workers online"}
+                              {selectedQueue.counts.workers > 0 ? adminI18n.t("queue.workerOnline") : adminI18n.t("queue.noWorkersOnline")}
                             </span>
                           </div>
                           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                            <div><dt className="text-gray-500">Queue name</dt><dd className="mt-1 font-medium text-gray-900">{selectedQueue.queueName}</dd></div>
-                            <div><dt className="text-gray-500">Last Redis activity</dt><dd className="mt-1 text-gray-900">{selectedQueue.lastActivity ? `${selectedQueue.lastActivity.event} at ${formatTime(selectedQueue.lastActivity.observedAt)}` : "None observed"}</dd></div>
-                            <div><dt className="text-gray-500">Last snapshot</dt><dd className="mt-1 text-gray-900">{formatTime(snapshot.observedAt)}</dd></div>
+                            <div><dt className="text-gray-500">{adminI18n.t("queue.queueName")}</dt><dd className="mt-1 font-medium text-gray-900">{selectedQueue.queueName}</dd></div>
+                            <div><dt className="text-gray-500">{adminI18n.t("queue.lastRedisActivity")}</dt><dd className="mt-1 text-gray-900">{selectedQueue.lastActivity ? adminI18n.t("queue.eventAt", { event: selectedQueue.lastActivity.event, time: formatTime(selectedQueue.lastActivity.observedAt) }) : adminI18n.t("empty.noneObserved")}</dd></div>
+                            <div><dt className="text-gray-500">{adminI18n.t("queue.lastSnapshot")}</dt><dd className="mt-1 text-gray-900">{formatTime(snapshot.observedAt)}</dd></div>
                           </dl>
                         </div>
                       </>
@@ -676,21 +684,23 @@ export function QueueMonitor() {
                         id="failed-job-browser-title"
                         className="font-semibold text-gray-900"
                       >
-                        {showAllJobs ? "All queue jobs" : "Recent jobs"}
+                        {showAllJobs ? adminI18n.t("queue.allJobs") : adminI18n.t("queue.recentJobs")}
                       </h4>
                       <p className="mt-1 text-sm text-gray-600">
                         {queueJobs
-                          ? `${queueJobs.jobs.length} shown${showAllJobs && queueJobs.scanTruncated ? " from a bounded scan" : ""}`
-                          : "Read-only queue diagnostics"}
+                          ? showAllJobs && queueJobs.scanTruncated
+                            ? adminI18n.t("queue.shownBounded", { count: queueJobs.jobs.length })
+                            : adminI18n.t("queue.shown", { count: queueJobs.jobs.length })
+                          : adminI18n.t("queue.readOnlyDiagnostics")}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-end gap-3">
                       <label className="text-sm text-gray-600">
                         <span className="block text-xs uppercase tracking-wide text-gray-500">
-                          Shop
+                          {adminI18n.t("queue.shop")}
                         </span>
                         <select
-                          aria-label="Shop"
+                          aria-label={adminI18n.t("queue.shop")}
                           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
                           value={queueJobShop}
                           onChange={(event) => {
@@ -701,20 +711,20 @@ export function QueueMonitor() {
                             setJobDetail(null);
                           }}
                         >
-                          <option value="*">All shops</option>
+                          <option value="*">{adminI18n.t("queue.allShops")}</option>
                           {queueJobs?.facets.shops.map((shop) => (
                             <option key={shop.value} value={shop.value}>{shop.label}</option>
                           ))}
-                          {queueJobs?.facets.hasOrphans ? <option value="__orphan__">Orphan / No shop</option> : null}
-                          {queueJobs?.facets.hasUnresolved ? <option value="__unresolved__">Unresolved</option> : null}
+                          {queueJobs?.facets.hasOrphans ? <option value="__orphan__">{adminI18n.t("queue.orphanShop")}</option> : null}
+                          {queueJobs?.facets.hasUnresolved ? <option value="__unresolved__">{adminI18n.t("queue.unresolved")}</option> : null}
                         </select>
                       </label>
                       <label className="text-sm text-gray-600">
                         <span className="block text-xs uppercase tracking-wide text-gray-500">
-                          Status
+                          {adminI18n.t("queue.status")}
                         </span>
                         <select
-                          aria-label="Status"
+                          aria-label={adminI18n.t("queue.status")}
                           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
                           value={queueJobStatus}
                           onChange={(event) => {
@@ -725,16 +735,16 @@ export function QueueMonitor() {
                             setJobDetail(null);
                           }}
                         >
-                          <option value="failed">Failed</option>
-                          <option value="active">Active</option>
-                          <option value="waiting">Waiting</option>
-                          <option value="delayed">Delayed</option>
+                          <option value="failed">{adminStatusLabel("failed")}</option>
+                          <option value="active">{adminStatusLabel("active")}</option>
+                          <option value="waiting">{adminStatusLabel("waiting")}</option>
+                          <option value="delayed">{adminStatusLabel("delayed")}</option>
                         </select>
                       </label>
                       <label className="text-sm text-gray-600">
-                        <span className="block text-xs uppercase tracking-wide text-gray-500">Direction</span>
+                        <span className="block text-xs uppercase tracking-wide text-gray-500">{adminI18n.t("queue.direction")}</span>
                         <select
-                          aria-label="Direction"
+                          aria-label={adminI18n.t("queue.direction")}
                           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
                           value={queueJobDirection}
                           onChange={(event) => {
@@ -743,8 +753,8 @@ export function QueueMonitor() {
                             setQueueJobPage(1);
                           }}
                         >
-                          <option value="desc">Descending</option>
-                          <option value="asc">Ascending</option>
+                          <option value="desc">{adminI18n.t("queue.descending")}</option>
+                          <option value="asc">{adminI18n.t("queue.ascending")}</option>
                         </select>
                       </label>
                       <button
@@ -753,14 +763,14 @@ export function QueueMonitor() {
                         onClick={refreshQueueJobs}
                         disabled={queueJobsLoading}
                       >
-                        Refresh jobs
+                        {adminI18n.t("queue.refreshJobs")}
                       </button>
                     </div>
                   </div>
 
                   {!selectedJobId && queueJobsLoading ? (
                     <p className="mt-4 text-sm text-gray-500" role="status">
-                      Loading queue jobs...
+                      {adminI18n.t("queue.loadingJobs")}
                     </p>
                   ) : !selectedJobId && queueJobsError ? (
                     <p className="mt-4 text-sm text-amber-700" role="status">
@@ -768,39 +778,39 @@ export function QueueMonitor() {
                     </p>
                   ) : !selectedJobId && queueJobs && queueJobs.jobs.length === 0 ? (
                     <p className="mt-4 rounded-md border border-dashed border-gray-300 bg-white p-5 text-sm text-gray-500">
-                      No {queueJobStatus} jobs were found for this queue.
+                      {adminI18n.t("queue.jobStatusEmpty", { status: adminStatusLabel(queueJobStatus) })}
                     </p>
                   ) : !selectedJobId && queueJobs ? (
                     <div className="mt-4 overflow-x-auto rounded-md border border-gray-200 bg-white">
                       <table className="min-w-[900px] w-full text-left text-sm">
                         <caption className="sr-only">
-                          Recent jobs for {selectedQueueName}
+                          {adminI18n.t("queue.recentJobsFor", { queueName: selectedQueueName })}
                         </caption>
                         <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                           <tr>
                             <th className="px-4 py-3 font-medium" scope="col">
-                              Job ID
+                              {adminI18n.t("queue.jobId")}
                             </th>
-                            <th className="px-4 py-3 font-medium" scope="col">Shop</th>
+                            <th className="px-4 py-3 font-medium" scope="col">{adminI18n.t("queue.shop")}</th>
                             <th className="px-4 py-3 font-medium" scope="col">
-                              Job name
+                              {adminI18n.t("queue.jobName")}
                             </th>
                             <th className="px-4 py-3 font-medium" scope="col">
                               {queueJobStatus === "failed"
-                                ? "Failed at"
+                                ? adminI18n.t("queue.failedAt")
                                 : queueJobStatus === "active"
-                                  ? "Started / processed at"
+                                  ? adminI18n.t("queue.startedProcessedAt")
                                   : queueJobStatus === "waiting"
-                                    ? "Queued at"
-                                    : "Scheduled at"}
+                                    ? adminI18n.t("queue.queuedAt")
+                                    : adminI18n.t("queue.scheduledAt")}
                             </th>
                             <th
                               className="px-4 py-3 text-right font-medium"
                               scope="col"
                             >
-                              Attempts
+                              {adminI18n.t("queue.attempts")}
                             </th>
-                            <th className="px-4 py-3 font-medium" scope="col">{queueJobStatus === "failed" ? "Reason" : "Status"}</th>
+                            <th className="px-4 py-3 font-medium" scope="col">{queueJobStatus === "failed" ? adminI18n.t("queue.reason") : adminI18n.t("queue.status")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -830,7 +840,7 @@ export function QueueMonitor() {
                                 </button>
                               </td>
                               <td className="px-4 py-3 text-gray-700">
-                                {job.shop ?? (job.attribution === "unresolved" ? "Unresolved" : "Orphan / No shop")}
+                                {job.shop ?? (job.attribution === "unresolved" ? adminI18n.t("queue.unresolved") : adminI18n.t("queue.orphanShop"))}
                               </td>
                               <td className="px-4 py-3 text-gray-700">
                                 {job.name}
@@ -843,12 +853,12 @@ export function QueueMonitor() {
                               </td>
                               <td
                                 className="max-w-72 px-4 py-3 text-gray-600"
-                                title={job.failedReason || `${queueJobStatus} job`}
+                                title={job.failedReason || adminI18n.t("queue.statusJob", { status: adminStatusLabel(queueJobStatus) })}
                               >
                                 <span className="block max-w-72 truncate">
                                   {queueJobStatus === "failed"
-                                    ? job.failedReason || "No reason recorded"
-                                    : queueJobStatus[0].toUpperCase() + queueJobStatus.slice(1)}
+                                    ? job.failedReason || adminI18n.t("empty.noReason")
+                                    : adminStatusLabel(queueJobStatus)}
                                 </span>
                               </td>
                             </tr>
@@ -859,17 +869,19 @@ export function QueueMonitor() {
                   ) : null}
 
                   {showAllJobs && queueJobs && (queueJobs.hasPrevious || queueJobs.hasNext || queueJobs.knownTotal !== null) ? (
-                    <nav className="mt-4 flex flex-wrap items-center justify-between gap-3" aria-label="Queue job pages">
+                    <nav className="mt-4 flex flex-wrap items-center justify-between gap-3" aria-label={adminI18n.t("pagination.queuePages")}>
                       <button
                         type="button"
                         className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!queueJobs.hasPrevious || queueJobsLoading}
                         onClick={() => setQueueJobPage((page) => Math.max(1, page - 1))}
                       >
-                        Previous
+                        {adminI18n.t("pagination.previous")}
                       </button>
                       <span className="text-sm text-gray-600" aria-live="polite">
-                        Page {queueJobs.page}{queueJobs.knownTotal !== null ? ` of ${Math.max(1, Math.ceil(queueJobs.knownTotal / queueJobs.limit))}` : " of more"}
+                        {queueJobs.knownTotal !== null
+                          ? adminI18n.t("pagination.page", { page: queueJobs.page, totalPages: Math.max(1, Math.ceil(queueJobs.knownTotal / queueJobs.limit)) })
+                          : adminI18n.t("pagination.pageOfMore", { page: queueJobs.page })}
                       </span>
                       <button
                         type="button"
@@ -877,7 +889,7 @@ export function QueueMonitor() {
                         disabled={!queueJobs.hasNext || queueJobsLoading}
                         onClick={() => setQueueJobPage((page) => page + 1)}
                       >
-                        Next
+                        {adminI18n.t("pagination.next")}
                       </button>
                     </nav>
                   ) : null}
@@ -893,7 +905,7 @@ export function QueueMonitor() {
                         setJobDetail(null);
                       }}
                     >
-                      View all jobs
+                      {adminI18n.t("queue.viewAllJobs")}
                     </button>
                   </div> : null}
                   </> : null}
@@ -913,7 +925,7 @@ export function QueueMonitor() {
                           setJobDetailLoading(false);
                         }}
                       >
-                        Back to {showAllJobs ? "all jobs" : "recent jobs"}
+                        {adminI18n.t("queue.backTo", { target: showAllJobs ? adminI18n.t("queue.allJobs") : adminI18n.t("queue.recentJobs") })}
                       </button>
                       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                         <div>
@@ -921,21 +933,18 @@ export function QueueMonitor() {
                             id="failed-job-detail-title"
                             className="font-semibold text-gray-900"
                           >
-                            Queue job details
+                            {adminI18n.t("queue.jobDetails")}
                           </h4>
                           <p className="mt-1 text-sm text-gray-600">
-                            Selected job:{" "}
-                            <span className="font-medium text-gray-900">
-                              {selectedJobId}
-                            </span>
+                            {adminI18n.t("queue.selectedJob", { jobId: selectedJobId })}
                           </p>
                         </div>
-                        <CopyButton value={selectedJobId} label="job ID" />
+                        <CopyButton value={selectedJobId} label={adminI18n.t("queue.jobId")} />
                       </div>
 
                       {jobDetailLoading ? (
                         <p className="mt-4 text-sm text-gray-500" role="status">
-                          Loading queue job details...
+                          {adminI18n.t("queue.loadingJobDetails")}
                         </p>
                       ) : jobDetailError ? (
                         <p
@@ -948,24 +957,24 @@ export function QueueMonitor() {
                         <>
                           <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             {[
-                              ["Queue", jobDetail.queueName],
-                              ["Job name", jobDetail.name],
-                              ["Status", jobDetail.status],
+                              [adminI18n.t("queue.queue"), jobDetail.queueName],
+                              [adminI18n.t("queue.jobName"), jobDetail.name],
+                              [adminI18n.t("queue.status"), adminStatusLabel(jobDetail.status)],
                               [
-                                "Shop",
+                                adminI18n.t("queue.shop"),
                                 jobDetail.shop ??
                                   (jobDetail.attribution === "unresolved"
-                                    ? "Unresolved"
-                                    : "Orphan / No shop"),
-                              ],
-                              ["Attempts made", String(jobDetail.attemptsMade)],
-                              ["Created", formatDateTime(jobDetail.timestamp)],
+                                    ? adminI18n.t("queue.unresolved")
+                                    : adminI18n.t("queue.orphanShop")),
+                                  ],
+                                  [adminI18n.t("queue.attemptsMade"), String(jobDetail.attemptsMade)],
+                                  [adminI18n.t("queue.created"), formatDateTime(jobDetail.timestamp)],
                               [
-                                "Processed at",
+                                adminI18n.t("queue.processedAt"),
                                 formatDateTime(jobDetail.processedOn),
                               ],
                               [
-                                "Finished at",
+                                adminI18n.t("queue.finishedAt"),
                                 formatDateTime(jobDetail.finishedOn),
                               ],
                             ].map(([label, value]) => (
@@ -983,45 +992,45 @@ export function QueueMonitor() {
                           {jobDetail.status === "failed" ? <div className="mt-5 border-t border-gray-200 pt-5">
                             <div className="flex items-center justify-between gap-3">
                               <h5 className="text-sm font-semibold text-gray-900">
-                                Failed reason
+                                {adminI18n.t("queue.failedReason")}
                               </h5>
                               <CopyButton
                                 value={
-                                  jobDetail.failedReason || "No reason recorded"
+                                  jobDetail.failedReason || adminI18n.t("empty.noReason")
                                 }
-                                label="failed reason"
+                                label={adminI18n.t("queue.failedReason")}
                               />
                             </div>
                             <p className="mt-2 whitespace-pre-wrap break-words rounded-md bg-amber-50 p-4 text-sm text-amber-900">
-                              {jobDetail.failedReason || "No reason recorded"}
+                              {jobDetail.failedReason || adminI18n.t("empty.noReason")}
                             </p>
                           </div> : null}
 
                           <div className="mt-5 border-t border-gray-200 pt-5">
                             <div className="flex items-center justify-between gap-3">
                               <h5 className="text-sm font-semibold text-gray-900">
-                                Stack trace
+                                {adminI18n.t("queue.stackTrace")}
                               </h5>
                               <CopyButton
                                 value={jobDetail.stacktrace.join("\n")}
-                                label="stack trace"
+                                label={adminI18n.t("queue.stackTrace")}
                               />
                             </div>
                             <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-gray-950 p-4 text-xs leading-5 text-gray-100">
                               {jobDetail.stacktrace.length > 0
                                 ? jobDetail.stacktrace.join("\n")
-                                : "No stack trace recorded"}
+                                : adminI18n.t("empty.noStackTrace")}
                             </pre>
                           </div>
 
                           <div className="mt-5 border-t border-gray-200 pt-5">
                             <div className="flex items-center justify-between gap-3">
                               <h5 className="text-sm font-semibold text-gray-900">
-                                Payload / job data
+                                {adminI18n.t("queue.payloadData")}
                               </h5>
                               <CopyButton
                                 value={formatJobData(jobDetail.data)}
-                                label="job data"
+                                label={adminI18n.t("queue.payloadData")}
                               />
                             </div>
                             <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-gray-50 p-4 text-xs leading-5 text-gray-800">
@@ -1040,8 +1049,8 @@ export function QueueMonitor() {
       ) : (
         <p className="mt-5 rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500">
           {loading
-            ? "Waiting for the first queue snapshot..."
-            : "No queue snapshot is available."}
+            ? adminI18n.t("empty.waitingQueueSnapshot")
+            : adminI18n.t("empty.noQueueSnapshot")}
         </p>
       )}
     </section>

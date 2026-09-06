@@ -24,15 +24,15 @@ test("queue details uses a full-workspace fixed overlay with resizing controls",
   );
   assert.match(source, /data-testid="queue-details-drawer"/);
   assert.match(source, /min-h-0 flex-1 overflow-y-auto p-5/);
-  assert.match(source, /aria-label="Resize queue details panel"/);
+  assert.match(source, /queue\.resizeDetails/);
   assert.match(source, /event.key === "ArrowLeft"/);
   assert.match(source, /event.key === "ArrowRight"/);
   assert.match(source, /event.key === "Home"/);
   assert.match(source, /event.key === "End"/);
-  assert.match(source, /aria-label="Maximize queue details"/);
+  assert.match(source, /queue\.maximizeDetails/);
   assert.match(source, /setDrawerWidth\(null\)/);
-  assert.match(source, /Queue details/);
-  assert.match(source, /aria-label="Close queue details"/);
+  assert.match(source, /queue\.details/);
+  assert.match(source, /queue\.closeDetails/);
   assert.match(
     source,
     /onClick=\{\(\) => \{[\s\S]*setSelectedQueueName\(null\)[\s\S]*\}\}/,
@@ -42,7 +42,7 @@ test("queue details uses a full-workspace fixed overlay with resizing controls",
 test("closing the drawer does not clear queue or failed-job data", async () => {
   const source = await readFile(componentPath, "utf8");
   const closeHandler = source.match(
-    /aria-label="Close queue details"[\s\S]{0,300}?onClick=\{\(\) => \{([\s\S]*?)\}\}/,
+    /queue\.closeDetails[\s\S]{0,300}?onClick=\{\(\) => \{([\s\S]*?)\}\}/,
   );
 
   assert.ok(closeHandler, "expected a queue details close handler");
@@ -62,7 +62,7 @@ test("queue names switch diagnostics without resetting an open drawer", async ()
   );
 
   assert.ok(selectQueue, "expected a queue selection handler");
-  assert.match(source, /aria-label=\{`Open \$\{queue\.queueName\} queue details`\}/);
+  assert.match(source, /queue\.openDetails/);
   assert.doesNotMatch(source, />View details<|>Details<\/span>/);
   assert.match(selectQueue[1], /if \(!selectedQueueName\) setDrawerWidth\(null\)/);
   assert.match(selectQueue[1], /setQueueJobs\(null\)/);
@@ -79,16 +79,16 @@ test("queue drawer uses the bounded Shop, Status, Direction filter contract", as
   assert.match(source, /shop: queueJobShop/);
   assert.match(source, /limit: showAllJobs \? "10" : "5"/);
   assert.match(source, /setShowAllJobs\(true\)/);
-  assert.match(source, /Page \{queueJobs\.page\}/);
+  assert.match(source, /pagination\.page/);
   assert.match(source, /disabled=\{!queueJobs\.hasPrevious/);
   assert.match(source, /disabled=\{!queueJobs\.hasNext/);
-  assert.match(source, /Back to \{showAllJobs \? "all jobs" : "recent jobs"\}/);
-  assert.match(source, /View all jobs/);
-  assert.match(source, /<option value="waiting">Waiting<\/option>/);
-  assert.match(source, /<option value="delayed">Delayed<\/option>/);
+  assert.match(source, /queue\.backTo/);
+  assert.match(source, /queue\.viewAllJobs/);
+  assert.match(source, /adminStatusLabel\("waiting"\)/);
+  assert.match(source, /adminStatusLabel\("delayed"\)/);
   assert.doesNotMatch(source, /View all failed jobs/);
-  assert.match(source, /Orphan \/ No shop/);
-  assert.match(source, /Worker online/);
+  assert.match(source, /queue\.orphanShop/);
+  assert.match(source, /queue\.workerOnline/);
 });
 
 test("queue drawer keeps the full browser paginated and state-safe", async () => {
@@ -99,6 +99,6 @@ test("queue drawer keeps the full browser paginated and state-safe", async () =>
   assert.match(source, /setQueueJobPage\(\(page\) => page \+ 1\)/);
   assert.match(source, /knownTotal !== null/);
   assert.match(source, /scanTruncated/);
-  assert.match(source, /Back to \{showAllJobs \? "all jobs" : "recent jobs"\}/);
+  assert.match(source, /queue\.backTo/);
   assert.match(source, /setJobDetailError\(null\)/);
 });

@@ -8,6 +8,7 @@ import { RecoveryConversationTab } from './recovery-conversation-tab';
 import { RecoveryDrawerTabLink } from './recovery-drawer-tab-link';
 import { RecoveryLifecycleTab } from './recovery-lifecycle-tab';
 import { StatusBadge } from './status-badge';
+import { adminI18n } from '@/i18n';
 
 export type DrawerTab = 'conversation' | 'cart' | 'lifecycle';
 
@@ -30,24 +31,24 @@ export function RecoveryDrawer({
     <>
       <Link
         href={closeHref}
-        aria-label="Close recovery details"
+        aria-label={adminI18n.t('recovery.closeDetails')}
         className="fixed inset-0 z-40 bg-gray-900/30"
       />
       <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[470px] flex-col border-l border-gray-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-gray-200 bg-gray-50 px-6 py-5">
           <div>
             <h2 className="text-lg font-bold text-gray-900">
-              Customer Details
+              {adminI18n.t('recovery.details')}
             </h2>
             <p className="mt-1 text-xs text-gray-500">
-              {recovery.customer?.name ?? 'Unknown customer'} ·{' '}
+              {recovery.customer?.name ?? adminI18n.t('recovery.unknownCustomer')} ·{' '}
               {recovery.customer?.phone ??
                 recovery.customer?.email ??
-                'No contact'}
+                adminI18n.t('recovery.noContact')}
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-4">
               <span className="text-2xl font-bold text-gray-900">
-                {formatMoney(recovery.totalPrice, recovery.currency ?? 'GBP')}
+                {formatMoney(recovery.totalPrice, recovery.currency)}
               </span>
               <StatusBadge value={recovery.outcome ?? recovery.status} />
             </div>
@@ -55,7 +56,7 @@ export function RecoveryDrawer({
           <Link
             href={closeHref}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500 transition hover:bg-gray-300 hover:text-gray-700"
-            aria-label="Close"
+            aria-label={adminI18n.t('recovery.close')}
           >
             <Icon name="close" className="h-4 w-4" />
           </Link>
@@ -63,22 +64,22 @@ export function RecoveryDrawer({
 
         <nav
           className="flex gap-5 border-b border-gray-200 px-6"
-          aria-label="Recovery detail tabs"
+          aria-label={adminI18n.t('recovery.tabs')}
         >
           <RecoveryDrawerTabLink
-            label="Conversation"
+            label={adminI18n.t('recovery.conversation')}
             value="conversation"
             current={tab}
             params={params}
           />
           <RecoveryDrawerTabLink
-            label={`Cart Details (${recovery.lineItems.length})`}
+            label={adminI18n.t('recovery.cartDetails', { count: recovery.lineItems.length })}
             value="cart"
             current={tab}
             params={params}
           />
           <RecoveryDrawerTabLink
-            label="Lifecycle"
+            label={adminI18n.t('recovery.lifecycle')}
             value="lifecycle"
             current={tab}
             params={params}

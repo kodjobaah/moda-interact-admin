@@ -4,6 +4,7 @@ import { initials } from '@/lib/admin/format';
 import type { TenantListItem } from '@/lib/admin/types';
 import { Icon } from './icons';
 import { StatusBadge } from './status-badge';
+import { adminI18n } from '@/i18n';
 
 export function TenantRow({
   tenant,
@@ -45,7 +46,7 @@ export function TenantRow({
         </td>
         <td className="px-6 py-4 text-sm text-gray-700">
           <Link href={href} className="block">
-            {tenant.planName ?? tenant.planHandle ?? 'No plan'}
+            {tenant.planName ?? tenant.planHandle ?? adminI18n.t('tenant.noPlan')}
           </Link>
         </td>
       </tr>

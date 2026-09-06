@@ -1,10 +1,10 @@
 export const REFRESH_OPTIONS = [
-  { label: 'Paused', value: 0 },
-  { label: '2 seconds', value: 2_000 },
-  { label: '5 seconds', value: 5_000 },
-  { label: '10 seconds', value: 10_000 },
-  { label: '30 seconds', value: 30_000 },
-  { label: '60 seconds', value: 60_000 },
+  { labelKey: 'queue.refreshPaused', value: 0 },
+  { labelKey: 'queue.refreshSeconds', value: 2_000, count: 2 },
+  { labelKey: 'queue.refreshSeconds', value: 5_000, count: 5 },
+  { labelKey: 'queue.refreshSeconds', value: 10_000, count: 10 },
+  { labelKey: 'queue.refreshSeconds', value: 30_000, count: 30 },
+  { labelKey: 'queue.refreshSeconds', value: 60_000, count: 60 },
 ] as const;
 
 export const DEFAULT_REFRESH_MS = 5_000;

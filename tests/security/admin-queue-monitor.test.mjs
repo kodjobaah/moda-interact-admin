@@ -28,11 +28,11 @@ test('uses the canonical Shopify contracts and observed queues for detailed read
     },
     {
       queueName: 'pending-recovery-candidates',
-      jobNames: ['Pending recovery candidates'],
+      jobNames: ['evaluate-pending-recovery'],
     },
     {
       queueName: 'whatsapp-events',
-      jobNames: ['WhatsApp events'],
+      jobNames: ['whatsapp-events'],
     },
   ]);
 });
@@ -89,13 +89,13 @@ test('maps bounded queue state and latest activity without payload data', async 
       },
       {
         queueName: 'pending-recovery-candidates',
-        jobNames: ['Pending recovery candidates'],
+        jobNames: ['evaluate-pending-recovery'],
         counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
         lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
       },
       {
         queueName: 'whatsapp-events',
-        jobNames: ['WhatsApp events'],
+        jobNames: ['whatsapp-events'],
         counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
         lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
       },
@@ -188,10 +188,10 @@ test('failed detailed readers are recreated for a later healthy refresh', async 
 test('queue overview reads active counts for the four observed queues only', async () => {
   const { getQueueOverviewDefinitions, readQueueOverviewSnapshot } = await importQueueMonitor();
   assert.deepEqual(getQueueOverviewDefinitions(), [
-    { queueName: 'checkout-events', label: 'Checkout Events' },
-    { queueName: 'order-events', label: 'Order Events' },
-    { queueName: 'pending-recovery-candidates', label: 'Pending Recoveries' },
-    { queueName: 'whatsapp-events', label: 'WhatsApp Events' },
+    { queueName: 'checkout-events', labelKey: 'queue.checkoutEvents' },
+    { queueName: 'order-events', labelKey: 'queue.orderEvents' },
+    { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries' },
+    { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents' },
   ]);
 
   const calls = [];
@@ -219,10 +219,10 @@ test('queue overview reads active counts for the four observed queues only', asy
   assert.deepEqual(snapshot, {
     observedAt: '2026-09-04T16:00:00.000Z',
     queues: [
-      { queueName: 'checkout-events', label: 'Checkout Events', active: 15 },
-      { queueName: 'order-events', label: 'Order Events', active: 12 },
-      { queueName: 'pending-recovery-candidates', label: 'Pending Recoveries', active: 27 },
-      { queueName: 'whatsapp-events', label: 'WhatsApp Events', active: 15 },
+      { queueName: 'checkout-events', labelKey: 'queue.checkoutEvents', active: 15 },
+      { queueName: 'order-events', labelKey: 'queue.orderEvents', active: 12 },
+      { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries', active: 27 },
+      { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents', active: 15 },
     ],
   });
   assert.equal('failed' in snapshot.queues[0], false);
@@ -276,13 +276,13 @@ test('Tenant Directory keeps queue unavailability isolated from tenant data', as
 test('detailed queue monitor presents a compact four-queue table with read-only selection', async () => {
   const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
   assert.match(componentSource, /<table/);
-  for (const heading of ['Queue', 'Job label', 'Waiting', 'Active', 'Delayed', 'Failed', 'Workers', 'Last Redis activity']) {
-    assert.match(componentSource, new RegExp(`>\\s*${heading}\\s*<`));
+  for (const key of ['queue', 'jobLabel', 'workers', 'lastRedisActivity']) {
+    assert.match(componentSource, new RegExp(`queue\\.${key}`));
   }
-  assert.match(
-    componentSource,
-    /aria-label=\{`Open \$\{queue\.queueName\} queue details`\}/,
-  );
+  for (const key of ['waiting', 'active', 'delayed', 'failed']) {
+    assert.match(componentSource, new RegExp(`status\\.${key}`));
+  }
+  assert.match(componentSource, /queue\.openDetails/);
   assert.doesNotMatch(componentSource, /View details|>Details<\/span>/);
   assert.match(componentSource, /setSelectedQueueName/);
   assert.doesNotMatch(componentSource, /retry|requeue|delete|pause|resume/);
@@ -295,16 +295,16 @@ test('queue monitor renders a bounded four-state job summary without mutation ac
   assert.match(componentSource, /queueJobDirection/);
   assert.match(componentSource, /limit: showAllJobs \? "10" : "5"/);
   assert.match(componentSource, /page: String\(queueJobPage\)/);
-  for (const heading of ['Job ID', 'Shop', 'Job name', 'Attempts']) {
-    assert.match(componentSource, new RegExp(`>\\s*${heading}\\s*<`));
+  for (const key of ['jobId', 'shop', 'jobName', 'attempts']) {
+    assert.match(componentSource, new RegExp(`queue\\.${key}`));
   }
-  assert.match(componentSource, /Started \/ processed at/);
-  assert.match(componentSource, /No \{queueJobStatus\} jobs were found/);
-  assert.match(componentSource, /Queue jobs are unavailable/);
-  assert.match(componentSource, /Orphan \/ No shop/);
-  assert.match(componentSource, /View all jobs/);
-  assert.match(componentSource, /Previous/);
-  assert.match(componentSource, /Next/);
+  assert.match(componentSource, /queue\.startedProcessedAt/);
+  assert.match(componentSource, /queue\.jobStatusEmpty/);
+  assert.match(componentSource, /queue\.jobsUnavailable/);
+  assert.match(componentSource, /queue\.orphanShop/);
+  assert.match(componentSource, /queue\.viewAllJobs/);
+  assert.match(componentSource, /pagination\.previous/);
+  assert.match(componentSource, /pagination\.next/);
   for (const status of ['failed', 'active', 'waiting', 'delayed']) {
     assert.match(componentSource, new RegExp(`value="${status}"`));
   }
@@ -340,4 +340,21 @@ test('refresh preference defaults safely and restores valid browser-local values
   assert.equal(module.getInitialRefreshMs(), 5_000);
 
   globalThis.window = originalWindow;
+});
+
+test('queue display labels remain catalogue-owned at the UI boundary', async () => {
+  const source = await readFile(sourcePath('src/lib/admin/queue-monitor.ts'), 'utf8');
+  const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
+
+  assert.doesNotMatch(source, /Pending recovery candidates|WhatsApp events/);
+  assert.match(source, /evaluate-pending-recovery/);
+  assert.match(source, /whatsapp-events/);
+  assert.match(
+    componentSource,
+    /\{queue\.jobNames\.map\(adminQueueJobLabel\)\.join\(", "\)\}/,
+  );
+  assert.match(
+    componentSource,
+    /\{selectedQueue\.jobNames\.map\(adminQueueJobLabel\)\.join\(", "\)\}/,
+  );
 });

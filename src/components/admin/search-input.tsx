@@ -1,10 +1,11 @@
-import { Icon } from './icons';
+import { Icon } from "./icons";
+import { adminI18n } from "@/i18n";
 
-export function SearchInput({ defaultValue = '' }: { defaultValue?: string }) {
+export function SearchInput({ defaultValue = "" }: { defaultValue?: string }) {
   return (
     <form action="/" method="get" className="w-full">
       <label className="sr-only" htmlFor="global-tenant-search">
-        Search tenants
+        {adminI18n.t("search.tenantsLabel")}
       </label>
       <div className="relative">
         <Icon
@@ -17,7 +18,7 @@ export function SearchInput({ defaultValue = '' }: { defaultValue?: string }) {
           type="search"
           defaultValue={defaultValue}
           className="w-full rounded-lg border border-gray-300 bg-white py-2 pr-4 pl-10 text-sm transition outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]"
-          placeholder="Search tenants by brand name or domain..."
+          placeholder={adminI18n.t("search.tenantsPlaceholder")}
         />
       </div>
     </form>

@@ -8,6 +8,7 @@ import type {
 } from '@/lib/admin/types';
 import { RecoveryLogs } from './recovery-logs';
 import { TenantAdministration } from './tenant-administration';
+import { adminI18n } from '@/i18n';
 
 export function TenantDetailPanel({
   tenant,
@@ -58,13 +59,13 @@ export function TenantDetailPanel({
           href={adminHref}
           className={tab === 'admin' ? activeClass : idleClass}
         >
-          Administration
+          {adminI18n.t('tenant.administration')}
         </Link>
         <Link
           href={logsHref}
           className={tab === 'logs' ? activeClass : idleClass}
         >
-          Recovery Logs
+          {adminI18n.t('tenant.recoveryLogs')}
         </Link>
       </div>
       {tab === 'admin' ? (

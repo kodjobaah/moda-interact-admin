@@ -1,13 +1,14 @@
-import { formatMoney } from '@/lib/admin/format';
-import type { RecoveryDetail } from '@/lib/admin/types';
-import { EmptyState } from './empty-state';
-import { Icon } from './icons';
+import { formatMoney } from "@/lib/admin/format";
+import type { RecoveryDetail } from "@/lib/admin/types";
+import { EmptyState } from "./empty-state";
+import { Icon } from "./icons";
+import { adminI18n } from "@/i18n";
 
 export function RecoveryCartTab({ recovery }: { recovery: RecoveryDetail }) {
   if (!recovery.lineItems.length) {
     return (
-      <EmptyState title="No cart line items">
-        The stored checkout payload does not contain line-item details.
+      <EmptyState title="empty.noCartLineItems">
+        {adminI18n.t("empty.checkoutPayload")}
       </EmptyState>
     );
   }
@@ -37,16 +38,16 @@ export function RecoveryCartTab({ recovery }: { recovery: RecoveryDetail }) {
               {item.title}
             </h4>
             <p className="mt-1 text-xs text-gray-500">
-              {item.variant ?? 'Default variant'}
+              {item.variant ?? adminI18n.t("recovery.defaultVariant")}
             </p>
             <div className="mt-2 flex items-center justify-between gap-3">
               <span className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500">
-                Qty: {item.quantity}
+                {adminI18n.t("recovery.quantity", { quantity: item.quantity })}
               </span>
               <span className="text-sm font-bold text-gray-900">
                 {formatMoney(
                   item.price,
-                  item.currency ?? recovery.currency ?? 'GBP',
+                  item.currency ?? recovery.currency,
                 )}
               </span>
             </div>
@@ -60,7 +61,7 @@ export function RecoveryCartTab({ recovery }: { recovery: RecoveryDetail }) {
           rel="noreferrer"
           className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-700)] hover:text-[var(--brand-900)]"
         >
-          Open checkout <Icon name="external" className="h-4 w-4" />
+          {adminI18n.t("recovery.openCheckout")} <Icon name="external" className="h-4 w-4" />
         </a>
       ) : null}
     </div>

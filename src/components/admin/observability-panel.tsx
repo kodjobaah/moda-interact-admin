@@ -1,9 +1,6 @@
 import { Icon } from './icons';
 import type { GrafanaNavigation } from '@/lib/observability/grafana';
-
-function environmentLabel(environment: string) {
-  return environment.charAt(0).toUpperCase() + environment.slice(1);
-}
+import { adminEnvironmentLabel, adminI18n } from '@/i18n';
 
 export function ObservabilityPanel({ navigation }: { navigation: GrafanaNavigation }) {
   return (
@@ -12,36 +9,34 @@ export function ObservabilityPanel({ navigation }: { navigation: GrafanaNavigati
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--brand-700)]">
-              Operations
+              {adminI18n.t('observability.operations')}
             </p>
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-950">
-              System observability
+              {adminI18n.t('observability.title')}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-              Open Moda Interact&apos;s private Grafana Cloud dashboards, logs,
-              traces and metrics. Grafana uses its own authenticated session.
+              {adminI18n.t('observability.description')}
             </p>
           </div>
           <div className="inline-flex w-fit items-center rounded-full border border-[var(--brand-200)] bg-white px-3 py-1.5 text-sm font-semibold text-[var(--brand-900)] shadow-sm">
-            {environmentLabel(navigation.environment)}
+            {adminEnvironmentLabel(navigation.environment)}
           </div>
         </div>
 
         {!navigation.configured ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
             <h2 className="text-base font-semibold text-amber-950">
-              Grafana access is not configured
+              {adminI18n.t('observability.notConfigured')}
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-900/80">
-              This Admin environment does not currently have a valid Grafana
-              destination. Other administration features remain available.
+              {adminI18n.t('observability.notConfiguredDescription')}
             </p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {navigation.links.map((link) => (
               <a
-                key={link.label}
+                key={link.labelKey}
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -49,12 +44,12 @@ export function ObservabilityPanel({ navigation }: { navigation: GrafanaNavigati
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-950">{link.label}</h2>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">{link.description}</p>
+                    <h2 className="text-lg font-semibold text-gray-950">{adminI18n.t(link.labelKey)}</h2>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{adminI18n.t(link.descriptionKey)}</p>
                   </div>
                   <Icon name="external" className="h-5 w-5 shrink-0 text-[var(--brand-700)]" />
                 </div>
-                <p className="mt-5 text-sm font-semibold text-[var(--brand-800)]">Open in Grafana</p>
+                <p className="mt-5 text-sm font-semibold text-[var(--brand-800)]">{adminI18n.t('observability.openGrafana')}</p>
               </a>
             ))}
             {navigation.links.length === 0 && navigation.baseUrl ? (
@@ -66,9 +61,9 @@ export function ObservabilityPanel({ navigation }: { navigation: GrafanaNavigati
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-950">Grafana Cloud</h2>
+                      <h2 className="text-lg font-semibold text-gray-950">{adminI18n.t('observability.grafanaCloud')}</h2>
                     <p className="mt-2 text-sm leading-6 text-gray-600">
-                      Open the private Moda Interact Grafana Cloud workspace.
+                      {adminI18n.t('observability.grafanaCloudDescription')}
                     </p>
                   </div>
                   <Icon name="external" className="h-5 w-5 shrink-0 text-[var(--brand-700)]" />
@@ -79,8 +74,7 @@ export function ObservabilityPanel({ navigation }: { navigation: GrafanaNavigati
         )}
 
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 text-sm leading-6 text-gray-600">
-          Operational telemetry remains private and Grafana authentication is
-          handled by Grafana Cloud.
+          {adminI18n.t('observability.privateTelemetry')}
         </div>
       </div>
     </div>

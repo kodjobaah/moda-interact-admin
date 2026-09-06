@@ -1,59 +1,56 @@
-const dateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-  timeZone: 'UTC',
-});
-
-const dateFormatter = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
+import { adminI18n, tAdmin } from "@/i18n";
 
 export function formatDateTime(value: Date | null | undefined): string {
-  return value ? `${dateTimeFormatter.format(value)} UTC` : '—';
+  return value
+    ? `${adminI18n.formatDateTime(value, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })} UTC`
+    : "—";
 }
 
 export function formatDate(value: Date | null | undefined): string {
-  return value ? dateFormatter.format(value) : '—';
+  return value
+    ? adminI18n.formatDateTime(value, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
 }
 
 export function formatMoney(
   value: string | null | undefined,
-  currency = 'GBP',
+  currency: string | null | undefined,
 ): string {
-  if (!value) return '—';
+  if (!value || !currency) return tAdmin("empty.unavailable");
   const amount = Number(value);
-  if (!Number.isFinite(amount)) return value;
+  if (!Number.isFinite(amount)) return tAdmin("empty.unavailable");
 
   try {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: currency || 'GBP',
-    }).format(amount);
+    return adminI18n.formatMoney(amount, currency);
   } catch {
-    return `${amount.toFixed(2)} ${currency}`;
+    return tAdmin("empty.unavailable");
   }
 }
 
 export function tenantName(brandName: string | null, domain: string): string {
   if (brandName?.trim()) return brandName.trim();
-  const raw = domain.replace(/\.myshopify\.com$/i, '').replace(/[-_]+/g, ' ');
+  const raw = domain.replace(/\.myshopify\.com$/i, "").replace(/[-_]+/g, " ");
   return raw.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return 'MI';
+  if (!parts.length) return "MI";
   return parts
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
-    .join('');
+    .join("");
 }
 
 export function customerName(
@@ -61,6 +58,6 @@ export function customerName(
   lastName: string | null,
   email: string | null,
 ): string {
-  const name = [firstName, lastName].filter(Boolean).join(' ').trim();
-  return name || email || 'Unnamed customer';
+  const name = [firstName, lastName].filter(Boolean).join(" ").trim();
+  return name || email || tAdmin("customer.unnamed");
 }

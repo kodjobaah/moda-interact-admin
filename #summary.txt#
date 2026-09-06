@@ -1,0 +1,750 @@
+I initially send you the message below
+When OpenAI triggers your webhook to announce that a batch is complete, it sends a standard HTTP POST request with a JSON payload.The most critical field inside this payload is the id (the unique Batch ID generated when you first submitted the job). You will use this ID to match the incoming notification against the pending batch record in your database.📦 The Webhook Payload StructureHere is exactly what the JSON body looks like when OpenAI hits your server's endpoint:json{
+  "id": "batch_abc123XYZ789",
+  "object": "batch",
+  "endpoint": "/v1/chat/completions",
+  "errors": null,
+  "input_file_id": "file-inputXYZ123",
+  "output_file_id": "file-output987ABC",
+  "error_file_id": null,
+  "status": "completed",
+  "request_counts": {
+    "total": 1,
+    "completed": 1,
+    "failed": 0
+  },
+  "created_at": 1715642000,
+  "in_progress_at": 1715642005,
+  "expires_at": 1715645605,
+  "finalizing_at": 1715642120,
+  "completed_at": 1715642130,
+  "failed_at": null,
+  "expired_at": null,
+  "cancelling_at": null,
+  "cancelled_at": null,
+  "metadata": {
+    "customer_id": "merchant_99482",
+    "purpose": "welcome_email_translation"
+  }
+}
+Use code with caution.🔍 3 Keys to Identifying Your Batch ContextBecause the webhook payload only tells you about the overall batch wrapper, you need a way to link it back to your internal database elements (like a specific Shopify store or a specific ticket ID). You can achieve this using three distinct fields:1. The id (The Primary Key)When you first call openai.batches.create(), it instantly returns a batch object containing an ID like batch_abc123. You must save this ID into your database column (e.g., openai_batch_id) right away. When the webhook arrives, simply query your database:javascriptconst batchRecord = await db.collection('batches').findOne({ openai_batch_id: payload.id });
+Use code with caution.2. The metadata ObjectWhen creating a batch, OpenAI allows you to pass custom key-value pairs in a optional metadata parameter. This data is echoed back perfectly inside the webhook payload. You can inject tracking points directly into the batch, such as:"shopify_shop_domain": "://myshopify.com""ticket_type": "canned_response"3. The custom_id (Inside the Output File)While the webhook identifies the entire batch, it doesn't list the individual translation strings. To identify individual messages inside a batch, you use the custom_id property. When you build your original .jsonl input file, you must attach a unique string to every single line:json{"custom_id": "ticket_row_88421", "method": "POST", "url": "/v1/chat/completions", "body": {...}}
+Use code with caution.When you download the final output_file_id provided by the webhook, OpenAI returns a file where every completed line features your original custom_id. You can loop through the lines and update your exact database rows instantly.
+
+📥 How the Batch API Delivers Your ResponsesThe integration relies on a polling architecture paired with a webhook notification system (if configured). The exact workflow operates through the following steps:[ Your Server ] --(Sends Bulk JSONL File)--> [ OpenAI Batch API ]
+                                                    | (Processes within 24h)
+[ Your Server ] <--(1. Receives Webhook Event)------| 
+       |                                            v
+(2. Downloads Final Output File) <----------- [ Results Cloud Storage ]
+1. The Webhook Notification (Highly Recommended)When you create a batch job via the API, you can specify a webhook_endpoints property.As soon as OpenAI finishes processing the last message in your batch, their system sends an HTTP POST request to your server.The payload of this webhook tells you that the batch status has changed to completed and provides a unique output_file_id.
+
+
+It contains strict algorithmic constraints that force GPT-4o-mini to behave purely as an invisible, high-accuracy translation layer. It prevents the model from adding friendly conversational filler (like "Here is your translation:"), stops it from trying to solve the customer's problem, and protects critical e-commerce variables.
+
+
+You are a precise, production-grade e-commerce localization engine for a Shopify ticketing application. Your sole task is to translate the user-provided support message from its original language into the target language requested by the system.
+
+Strict Operational Constraints:
+1. OUTPUT RAW TRANSLATION ONLY: Do not include introductory text, conversational filler, concluding remarks, or explanations (e.g., do NOT write "Here is the translation:", do NOT use quotation marks around the output). Return ONLY the translated text.
+2. DO NOT ACT AS A CUSTOMER SUPPORT AGENT: Do not try to answer the customer's questions, do not solve their problem, and do not offer advice. Translate the message exactly as written, even if the text contains complaints, rude language, or errors.
+3. PRESERVE E-COMMERCE VARIABLES: Completely ignore and leave completely untouched all order numbers (e.g., #1024, #US-98522), tracking numbers, monetary values (e.g., $45.99, €12, £50), URLs, email addresses, dates, and times. 
+4. MAINTAIN INTENT & TONE: Adapt the translation naturally into the target language so it sounds professional and grammatically correct to a native speaker, while perfectly preserving the emotional tone (e.g., angry, polite, confused) of the original writer.
+5. CODE SAFEGUARDING: If the incoming text contains HTML tags (e.g., <br>, <strong>), Markdown, or emojis, preserve them in their exact structural positions within the translated output.
+6. COMPRESSION RULE: If the original message breaks off mid-sentence due to a character limit, translate it exactly up to that point without trying to complete the sentence.
+
+Target Language: {{ TARGET_LANGUAGE }}
+
+And these are your responses:
+Your notes are heading in a good direction, but I would make one important architectural change: do not use the OpenAI Batch API for individual ARCH-006 message translations.
+
+You already have Redis/BullMQ providing the asynchronous boundary. For a 500-character support message, the clean flow is:
+
+Merchant/Admin submits message
+        ↓
+Validate 1–500 characters
+        ↓
+Persist original message in PostgreSQL
+        ↓
+Create Translation row = PENDING
+        ↓
+Enqueue translation job in Redis
+        ↓
+Background worker consumes job
+        ↓
+Call translation provider
+        ↓
+Validate returned translation
+        ↓
+Update Translation row = AVAILABLE
+
+That gives us asynchronous processing without adding another asynchronous batching layer.
+
+The OpenAI Batch API is designed for offline workloads and has a 24-hour completion window, although jobs often finish sooner. It is useful for thousands of non-urgent requests, but not ideal for a merchant support inbox where an administrator may expect the translation within seconds.
+
+I agree with the 500-character limit — with one distinction
+
+I would change ARCH-006 from:
+
+1..10,000 characters
+
+to:
+
+Merchant-authored message: 1..500
+Admin-authored message:    1..500
+
+and enforce it both client-side and server-side.
+
+But I would not limit the translated result itself to 500 characters.
+
+For example:
+
+originalBody
+  ≤ 500 user-visible characters
+
+translatedBody
+  may exceed 500
+
+Some languages naturally expand significantly during translation. A perfectly valid 500-character English message could become 600+ characters in another language.
+
+So:
+
+500 = author input constraint
+NOT translation-output constraint
+
+And we should reject over-length input rather than silently truncate it.
+
+That means I would remove this from your proposed prompt:
+
+If the original message breaks off mid-sentence due to a character limit...
+
+Moda shouldn't deliberately send a chopped message to the translator. The UI should stop the author at 500 and the server should reject anything exceeding the limit.
+
+I would also make "character" Unicode-safe
+
+Do not use simply:
+
+body.length <= 500
+
+because JavaScript counts UTF-16 code units. Emojis and some non-Latin characters can count strangely.
+
+We should define the rule as approximately:
+
+500 user-perceived Unicode characters
+
+and use Intl.Segmenter/grapheme segmentation where supported.
+
+That matters for the global-language work we've just done.
+
+Persistence should happen before Redis
+
+I would slightly change:
+
+merchant sends a message → it is sent to Redis
+
+to:
+
+merchant sends message
+        ↓
+database transaction
+        ↓
+MerchantMessage created
+originalBody preserved exactly
+status = AVAILABLE
+translation row = PENDING
+        ↓
+enqueue translation job
+
+The database must be the source of truth.
+
+If Redis is unavailable:
+
+message still exists
+translation = PENDING / retry-required
+
+The merchant must never lose their message because Redis was unavailable.
+
+That is already consistent with the ARCH-006 principle we established earlier.
+
+The queue payload should also stay tiny:
+
+{
+  messageId: "...",
+  translationId: "...",
+  targetLanguageTag: "en-GB"
+}
+
+Not:
+
+{
+  shopId,
+  merchantName,
+  body,
+  translatedBody,
+  ...
+}
+
+The worker should load the authoritative message from PostgreSQL using messageId.
+
+Translation provider flow
+
+For the normal case, I recommend:
+
+merchant-communications queue
+        ↓
+translation worker
+        ↓
+load MerchantMessage
+        ↓
+check translation still PENDING
+        ↓
+provider.translate(...)
+        ↓
+persist AVAILABLE
+
+A synchronous API call inside the asynchronous BullMQ worker is enough.
+
+The user's HTTP request never waits for the LLM.
+
+That's important:
+
+HTTP request is synchronous only until DB persistence
+                 ↓
+             return 200
+
+Translation is asynchronous
+                 ↓
+            BullMQ worker
+
+So we don't need OpenAI Batch merely to make translation asynchronous.
+
+Where OpenAI webhooks could fit
+
+There is a second option if we deliberately want provider-side asynchronous processing:
+
+BullMQ worker
+   ↓
+OpenAI Responses API background request
+   ↓
+store providerResponseId
+   ↓
+OpenAI response.completed webhook
+   ↓
+verify signature
+   ↓
+enqueue result-processing job
+   ↓
+retrieve response
+   ↓
+update MerchantMessageTranslation
+
+OpenAI currently supports response.completed webhooks. The webhook contains an event with data.id identifying the response; OpenAI's own example retrieves the completed response using that ID.
+
+That would look like:
+
+{
+  "object": "event",
+  "id": "evt_...",
+  "type": "response.completed",
+  "data": {
+    "id": "resp_..."
+  }
+}
+
+rather than your pasted Batch object.
+
+OpenAI also says webhook consumers should respond quickly, verify signatures, and handle duplicate deliveries; webhook-id can be used for deduplication.
+
+But even that is probably unnecessary for 500-character translations.
+
+I would start with:
+
+BullMQ worker → ordinary provider request
+
+and keep provider-webhook/background processing as an implementation option if volumes later justify it.
+
+Your Batch notes are technically useful, but for another use case
+
+The Batch concepts you identified are basically correct:
+
+batch.id
+    → identifies entire batch
+
+metadata
+    → associates batch with bounded application context
+
+custom_id
+    → associates individual JSONL request/result
+
+OpenAI currently allows optional Batch metadata, and every Batch input request must have a unique custom_id; the output order is not guaranteed, so OpenAI specifically says to match results by custom_id.
+
+That could be useful later for something such as:
+
+"Translate our entire help centre into 20 languages"
+
+or:
+
+"Re-translate 100,000 historical support messages"
+
+But not:
+
+merchant sends:
+"Can you please help with my subscription?"
+
+For that, Batch is unnecessary overhead.
+
+Your translation prompt
+
+The core prompt is good. I would retain the principle but make it provider-neutral and slightly stricter.
+
+Conceptually:
+
+ROLE:
+You are a translation engine, not a support agent.
+
+INPUT:
+sourceLanguageTag
+targetLanguageTag
+originalBody
+
+REQUIREMENTS:
+- return translation only;
+- do not answer or act on message contents;
+- preserve tone and intent;
+- preserve identifiers, URLs, email addresses,
+  monetary values, dates, times, tracking/order numbers;
+- preserve HTML/Markdown/emoji structure;
+- do not invent missing content;
+- do not summarise;
+- do not censor or soften;
+- do not change commerce facts.
+
+I would not put GPT-4o-mini into the architecture task.
+
+Instead:
+
+TRANSLATION_PROVIDER
+TRANSLATION_MODEL
+
+should be runtime configuration.
+
+ARCH-006 should own the contract:
+
+interface TranslationProvider {
+  translate(input: {
+    originalBody: string;
+    sourceLanguageTag: string;
+    targetLanguageTag: string;
+  }): Promise<{
+    translatedBody: string;
+  }>;
+}
+
+Then OpenAI can be the initial provider without ARCH-006 becoming an OpenAI-specific architecture.
+
+One more safeguard I'd add
+
+Before making the provider call:
+
+originalBody hash/version
+
+should be captured.
+
+When the result comes back, only apply it if it still corresponds to:
+
+messageId
++
+translationId
++
+source message version
++
+targetLanguageTag
+
+For ARCH-006 messages are immutable, which makes this especially simple.
+
+For example:
+
+MerchantMessage
+  id = msg_123
+  originalBody = "Bonjour..."
+  immutable
+
+MerchantMessageTranslation
+  messageId = msg_123
+  targetLanguageTag = en-GB
+  status = PENDING
+  providerRequestId = ...
+
+Then retries cannot accidentally attach an English translation to the wrong message or language.
+
+Revised ARCH-006 translation flow
+
+I would therefore make your design:
+
+MERCHANT / ADMIN
+      │
+      │ message ≤ 500 chars
+      ▼
+Application
+      │
+      ├── validate
+      ├── resolve authenticated author
+      └── DB transaction
+             │
+             ├── MerchantMessage
+             │      originalBody immutable
+             │
+             └── MerchantMessageTranslation
+                    status=PENDING
+                           │
+                           ▼
+                 merchant-communications
+                       BullMQ
+                           │
+                           ▼
+                  Background Worker
+                           │
+                           ├── load message
+                           ├── validate state
+                           ├── source language
+                           ├── target language
+                           │
+                           ▼
+                 TranslationProvider
+                           │
+                           ▼
+                   translated text
+                           │
+                           ▼
+            validate + version/idempotency guard
+                           │
+                           ▼
+            MerchantMessageTranslation
+                    AVAILABLE
+                           │
+              ┌────────────┴────────────┐
+              ▼                         ▼
+        Merchant UI                 Admin UI
+
+That is simpler than:
+
+BullMQ → Batch file → Batch API → provider queue
+→ webhook → download file → parse custom_id → database
+
+for a single 500-character support message.
+
+And it still leaves Batch available later for genuine bulk localisation.
+
+I would definitely update the ARCH-006 tasks with your 500-character author limit and the more explicit translation-provider contract before we start implementing ARCH-006-BACKGROUND-001.
+
+So the idea is that our base language is english. so if merchant is english..then no need for translation we just store the message. But if it is another language then we peform the translation and store it. This also applies for response from admin to merchant. Based on the issues we have encountered if the agent can you make sure implementation details are explicit and clear.  And we should create one or more tasks to impliment this before any work on the ui.
+In terms of the webhook where will it sit, i was thinking in the admin application. So when openai calls the webook..we read the file with the corresponding message. we also need to make sure we are able to identify effectively the route of the translation..ie. merchant -> admin or admin -> merchant
+
+I would not put the OpenAI webhook in the Admin application.
+
+The cleaner boundary is a small provider-callback HTTP entrypoint owned by moda-interact-background, because translation processing belongs to the background domain and the callback serves both directions:
+
+MERCHANT_TO_ADMIN
+ADMIN_TO_MERCHANT
+SYSTEM_TO_MERCHANT
+
+The Admin application should not become responsible for provider infrastructure simply because one side of the conversation is an administrator.
+
+I would structure it like this:
+
+OpenAI
+   │
+   │ POST completion webhook
+   ▼
+callbacks.modainteract.com
+   │
+   ▼
+moda-interact-gateway
+   │ host routing only
+   ▼
+moda-translation-callback
+(moda-interact-background repo)
+   │
+   ├─ verify OpenAI signature
+   ├─ deduplicate webhook event
+   ├─ extract provider response/batch ID
+   └─ enqueue completion job
+              │
+              ▼
+      merchant-communications
+              │
+              ▼
+        background worker
+              │
+              ├─ resolve database record
+              ├─ retrieve provider result/file
+              ├─ map result to translationId
+              └─ persist translatedBody
+
+I would not download and parse the OpenAI result file inside the webhook HTTP request. The webhook should remain very fast: verify, identify, enqueue, return 2xx. The BullMQ worker should perform the slower provider-file download and database updates.
+
+Direction must be persisted before OpenAI is called
+
+This is the important part of your question. We should never receive a callback and then try to work out:
+
+Was this merchant → admin or admin → merchant?
+
+That fact should already exist in PostgreSQL.
+
+I would make the translation record carry something like:
+
+enum MerchantTranslationDirection {
+  MERCHANT_TO_ADMIN
+  ADMIN_TO_MERCHANT
+  SYSTEM_TO_MERCHANT
+}
+
+and conceptually:
+
+MerchantMessageTranslation
+
+id
+messageId
+direction
+sourceLanguageTag
+targetLanguageTag
+status
+
+provider
+providerRequestId
+providerBatchId
+
+translatedBody
+createdAt
+completedAt
+
+For example, merchant French → Admin:
+
+translationId:        tr_123
+messageId:            msg_456
+direction:            MERCHANT_TO_ADMIN
+sourceLanguageTag:    fr-FR
+targetLanguageTag:    en-GB
+status:               PENDING
+providerBatchId:      batch_abc
+
+Admin → French merchant:
+
+translationId:        tr_789
+messageId:            msg_790
+direction:            ADMIN_TO_MERCHANT
+sourceLanguageTag:    en-GB
+targetLanguageTag:    fr-FR
+status:               PENDING
+providerBatchId:      batch_def
+
+Then when the result arrives:
+
+provider ID
+    ↓
+MerchantMessageTranslation
+    ↓
+direction already known
+source already known
+target already known
+message already known
+
+There is zero inference.
+
+custom_id should be our translation ID
+
+If we use Batch JSONL, I would make this even stronger:
+
+{
+  "custom_id": "translation:tr_123",
+  "method": "POST",
+  "url": "/v1/responses",
+  "body": {
+    ...
+  }
+}
+
+The output's custom_id then maps directly to:
+
+MerchantMessageTranslation.id
+
+rather than mapping to a shop, ticket, email or other indirect identifier.
+
+So:
+
+OpenAI output line
+custom_id = translation:tr_123
+            │
+            ▼
+MerchantMessageTranslation tr_123
+            │
+            ├─ messageId
+            ├─ MERCHANT_TO_ADMIN
+            ├─ fr-FR
+            └─ en-GB
+
+That is much safer.
+
+English-base behaviour
+
+This also gives us the deterministic rule you described.
+
+Merchant → Admin
+merchant display/source language
+        │
+        ├── base language = en
+        │       ↓
+        │   store original
+        │   AVAILABLE immediately
+        │   NO translation row
+        │   NO Redis translation job
+        │   NO OpenAI call
+        │
+        └── non-English
+                ↓
+            store original
+            AVAILABLE immediately
+                +
+            Translation:
+              MERCHANT_TO_ADMIN
+              source = merchant language
+              target = en-GB
+              status = PENDING
+                ↓
+            Redis
+                ↓
+            provider
+
+So:
+
+en-US → Admin     no translation
+en-GB → Admin     no translation
+en-CA → Admin     no translation
+fr-FR → Admin     translate to en-GB
+de-DE → Admin     translate to en-GB
+ja-JP → Admin     translate to en-GB
+
+We don't waste money translating English into English.
+
+Admin → Merchant
+
+Admin's support base language is:
+
+en-GB
+
+Then:
+
+merchant display language
+        │
+        ├── base = en
+        │       ↓
+        │   original Admin message is immediately AVAILABLE
+        │   NO translation
+        │
+        └── non-English
+                ↓
+            originalBody = English
+            displayLanguageTag = merchant language
+            message = PROCESSING
+                +
+            Translation:
+              ADMIN_TO_MERCHANT
+              en-GB → merchant language
+              PENDING
+                ↓
+            translation completes
+                ↓
+            message AVAILABLE
+
+That preserves the earlier ARCH-006 rule that we must not silently show an English fallback to a non-English merchant. The existing architecture already says Admin/System→merchant messages remain PROCESSING until the required display-language translation is ready.
+
+Merchant→Admin is different because the original merchant message is immediately useful and therefore remains available even while its operational English translation is pending.
+
+One correction concerning the OpenAI mechanism
+
+There are actually two provider mechanisms we should distinguish.
+
+OpenAI currently documents response.completed events for Responses, including background responses.
+
+The Batch API definitely exposes status and output_file_id on the completed Batch object.
+
+But I would not yet write our architecture assuming that OpenAI Batch completion itself provides the exact webhook behaviour in your pasted example unless we verify that specific contract. If Batch does not provide the callback we need, the background worker can poll the Batch status and use exactly the same result-processing path.
+
+Therefore I would make our internal architecture provider-neutral:
+
+Provider completion
+       │
+       ├── webhook
+       │
+       └── polling
+              │
+              ▼
+same internal job:
+
+translation-provider-completed
+{
+   providerWorkId
+}
+
+Everything after that is identical.
+
+And this should definitely happen before UI
+
+I would now make the pre-UI chain:
+
+DATABASE-001
+support persistence
++ source/display language snapshots
++ translation direction
++ provider correlation
++ 500-character authored-message contract
+        ↓
+SHARED-001
+canonical translation contracts
++ direction enum
++ queue schemas
++ English-base decision rules
+        ↓
+SHARED-002
+publish contracts
+        ↓
+BACKGROUND-001
+translation provider + worker
+        ↓
+BACKGROUND-004
+provider completion/result processing
+        ↓
+GATEWAY-001
+provider callback routing if webhook mode is used
+        ↓
+        ├─────────────────────────┐
+        ▼                         ▼
+SHOPIFY-003                  ADMIN-003
+merchant submit              admin submit
+server capability            server capability
+NO UI                        NO UI
+        │                         │
+        ▼                         ▼
+SHOPIFY-001                  ADMIN-001
+Merchant Messages UI         Merchant Messages UI
+
+That means neither UI agent gets to invent any of this behaviour.
+
+The UI tasks will simply be told:
+
+Merchant UI:
+call accepted merchant-message service
+
+Admin UI:
+call accepted admin-message service
+
+Do not:
+- create translation rows directly
+- decide whether translation is required
+- call OpenAI
+- enqueue provider jobs directly
+- determine translation direction
+- manufacture language tags
+
+And the provider callback would be a backend capability, not an Admin page route.
+
+I think this is considerably safer than putting /api/webhooks/openai inside moda-interact-admin, particularly because doing that would force us to make a special unauthenticated exception inside an otherwise privileged Admin application.

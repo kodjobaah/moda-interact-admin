@@ -128,7 +128,7 @@ export type QueueMonitorDefinition = {
 
 export type QueueOverviewDefinition = {
   queueName: string;
-  label: string;
+  labelKey: string;
 };
 
 export type QueueOverviewQueue = QueueOverviewDefinition & {
@@ -244,31 +244,31 @@ const queueDefinitions: QueueMonitorDefinition[] = [
   },
   {
     queueName: 'pending-recovery-candidates',
-    jobNames: ['Pending recovery candidates'],
+    jobNames: ['evaluate-pending-recovery'],
     supportedJobNames: ['evaluate-pending-recovery'],
   },
   {
     queueName: 'whatsapp-events',
-    jobNames: ['WhatsApp events'],
+    jobNames: ['whatsapp-events'],
   },
 ];
 
 const queueOverviewDefinitions: QueueOverviewDefinition[] = [
   {
     queueName: SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_EVENTS.queueName,
-    label: 'Checkout Events',
+    labelKey: 'queue.checkoutEvents',
   },
   {
     queueName: SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.ORDER_EVENTS.queueName,
-    label: 'Order Events',
+    labelKey: 'queue.orderEvents',
   },
   {
     queueName: 'pending-recovery-candidates',
-    label: 'Pending Recoveries',
+    labelKey: 'queue.pendingRecoveries',
   },
   {
     queueName: 'whatsapp-events',
-    label: 'WhatsApp Events',
+    labelKey: 'queue.whatsappEvents',
   },
 ];
 

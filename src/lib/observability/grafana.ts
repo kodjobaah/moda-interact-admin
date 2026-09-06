@@ -1,6 +1,6 @@
 type GrafanaLink = {
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   href: string;
 };
 
@@ -47,18 +47,18 @@ export function getGrafanaNavigation(): GrafanaNavigation {
   const baseUrl = validateUrl(process.env.GRAFANA_BASE_URL, environment);
   const candidates: Array<[string, string, string | undefined]> = [
     [
-      'Platform dashboard',
-      'Open the main Moda Interact operational dashboard.',
+      'observability.dashboard',
+      'observability.dashboardDescription',
       process.env.GRAFANA_PLATFORM_DASHBOARD_URL,
     ],
-    ['Logs', 'Search private application and infrastructure logs in Grafana.', process.env.GRAFANA_LOGS_URL],
-    ['Traces', 'Inspect distributed traces and request correlation in Grafana.', process.env.GRAFANA_TRACES_URL],
-    ['Metrics', 'Inspect platform and service metrics in Grafana.', process.env.GRAFANA_METRICS_URL],
+    ['observability.logs', 'observability.logsDescription', process.env.GRAFANA_LOGS_URL],
+    ['observability.traces', 'observability.tracesDescription', process.env.GRAFANA_TRACES_URL],
+    ['observability.metrics', 'observability.metricsDescription', process.env.GRAFANA_METRICS_URL],
   ];
 
   const links = candidates.flatMap(([label, description, raw]) => {
     const href = validateUrl(raw, environment);
-    return href ? [{ label, description, href }] : [];
+    return href ? [{ labelKey: label, descriptionKey: description, href }] : [];
   });
 
   return {

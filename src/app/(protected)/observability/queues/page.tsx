@@ -1,6 +1,7 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import { QueueMonitor } from "@/components/admin/queue-monitor";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
+import { adminI18n } from "@/i18n";
 
 export default async function ShopifyQueuesPage() {
   await requirePlatformAdminPage();
@@ -11,10 +12,10 @@ export default async function ShopifyQueuesPage() {
         <div className="mx-auto max-w-6xl">
           <div className="mb-6">
             <h1 className="text-3xl font-bold tracking-tight text-gray-950">
-              Shopify Queues
+              {adminI18n.t("nav.shopifyQueues")}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
-              Read-only diagnostics for the Shopify event queues.
+              {adminI18n.t("queue.pageDescription")}
             </p>
           </div>
           <QueueMonitor />
