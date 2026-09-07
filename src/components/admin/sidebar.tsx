@@ -9,7 +9,7 @@ export function Sidebar({
   administratorRole,
   grafanaHref,
 }: {
-  active: "tenants" | "observability" | "queues";
+  active: "tenants" | "observability" | "queues" | "merchant-support";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -45,6 +45,14 @@ export function Sidebar({
         >
           <Icon name="users" className="h-5 w-5 text-[var(--brand-700)]" />
           {adminI18n.t("nav.tenantDirectory")}
+        </Link>
+        <Link
+          href="/merchant-support"
+          aria-current={active === "merchant-support" ? "page" : undefined}
+          className={`${base} ${active === "merchant-support" ? selected : idle}`}
+        >
+          <Icon name="message" className="h-5 w-5 text-[var(--brand-700)]" />
+          {adminI18n.t("nav.merchantMessages")}
         </Link>
         <div>
           <Link

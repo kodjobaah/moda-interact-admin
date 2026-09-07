@@ -3,6 +3,7 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "nav.tenantDirectory",
   "nav.observability",
   "nav.shopifyQueues",
+  "nav.merchantMessages",
   "nav.grafana",
   "nav.administrator",
   "search.tenantsLabel",

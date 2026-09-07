@@ -47,10 +47,17 @@ type MessageRow = {
   originalBody: string;
   sourceLanguageTag: string;
   displayLanguageTag: string | null;
-  translatedBody: string | null;
-  translationStatus: string | null;
   createdAt: Date;
   readAt: Date | null;
+  translations: TranslationView[];
+};
+
+type TranslationView = {
+  id: string;
+  targetLanguageTag: string;
+  status: string;
+  translatedBody: string | null;
+  createdAt: Date;
 };
 
 type TransactionClient = {
@@ -85,6 +92,63 @@ function targetLanguage(defaultLanguageTag: string | null): string {
   const value = defaultLanguageTag?.trim();
   if (!value) return PLATFORM_SUPPORT_LANGUAGE_TAG;
   return new Intl.Locale(value).toString();
+}
+
+const DEVELOPMENT_PLATFORM_ADMIN = {
+  id: 'development-platform-admin',
+  provider: 'development',
+  providerSubject: 'development-platform-admin',
+  email: 'development-platform-admin@local.invalid',
+  displayName: 'Development Platform Admin',
+  role: 'SUPER_ADMIN',
+  active: true,
+} as const;
+
+async function ensureDevelopmentPlatformAdmin(
+  transaction: TransactionClient,
+  principal: PlatformAdminPrincipal,
+): Promise<void> {
+  if (!principal.developmentBypass) return;
+
+  await transaction.$executeRaw(Prisma.sql`
+    INSERT INTO "public"."PlatformAdmin" (
+      "id", "provider", "providerSubject", "email", "displayName", "role", "active", "updatedAt"
+    ) VALUES (
+      ${DEVELOPMENT_PLATFORM_ADMIN.id}, ${DEVELOPMENT_PLATFORM_ADMIN.provider},
+      ${DEVELOPMENT_PLATFORM_ADMIN.providerSubject}, ${DEVELOPMENT_PLATFORM_ADMIN.email},
+      ${DEVELOPMENT_PLATFORM_ADMIN.displayName}, CAST(${DEVELOPMENT_PLATFORM_ADMIN.role} AS "public"."PlatformAdminRole"),
+      ${DEVELOPMENT_PLATFORM_ADMIN.active}, CURRENT_TIMESTAMP
+    ) ON CONFLICT ("id") DO NOTHING
+  `);
+
+  const rows = await transaction.$queryRaw<[
+    {
+      id: string;
+      provider: string;
+      providerSubject: string;
+      email: string;
+      displayName: string | null;
+      role: string;
+      active: boolean;
+    },
+  ]>(Prisma.sql`
+    SELECT "id", "provider", "providerSubject", "email", "displayName", "role", "active"
+    FROM "public"."PlatformAdmin"
+    WHERE "id" = ${DEVELOPMENT_PLATFORM_ADMIN.id}
+  `);
+  const backing = rows[0];
+  if (
+    !backing ||
+    backing.id !== DEVELOPMENT_PLATFORM_ADMIN.id ||
+    backing.provider !== DEVELOPMENT_PLATFORM_ADMIN.provider ||
+    backing.providerSubject !== DEVELOPMENT_PLATFORM_ADMIN.providerSubject ||
+    backing.email !== DEVELOPMENT_PLATFORM_ADMIN.email ||
+    backing.displayName !== DEVELOPMENT_PLATFORM_ADMIN.displayName ||
+    backing.role !== DEVELOPMENT_PLATFORM_ADMIN.role ||
+    backing.active !== DEVELOPMENT_PLATFORM_ADMIN.active
+  ) {
+    throw new Error('The reserved development platform administrator identity conflicts with the database.');
+  }
 }
 
 export async function getMerchantCommunicationsQueue(): Promise<SupportQueue | null> {
@@ -320,6 +384,7 @@ export async function takeMerchantSupportThreadOwnership(
   const principal = await requirePlatformAdminMutation();
   const client = database ?? (prisma as unknown as DatabaseClient);
   return client.$transaction(async (transaction) => {
+    await ensureDevelopmentPlatformAdmin(transaction, principal);
     const claimed = await transaction.$executeRaw(Prisma.sql`
       UPDATE "support"."MerchantSupportThread"
       SET "assignedPlatformAdminId" = ${principal.id}, "assignedAt" = NOW(), "updatedAt" = NOW()
@@ -450,31 +515,73 @@ export async function getMerchantSupportThread(
   const thread = rows[0];
   if (!thread) return null;
 
-  const messages = await prisma.$queryRaw<MessageRow[]>(Prisma.sql`
-    SELECT
-      m."id", m."kind", m."state", m."originalBody", m."sourceLanguageTag",
-      m."displayLanguageTag", m."createdAt", m."readAt",
-      tr."translatedBody", tr."status" AS "translationStatus"
-    FROM "support"."MerchantSupportMessage" m
-    LEFT JOIN LATERAL (
-      SELECT "translatedBody", "status"
-      FROM "support"."MerchantMessageTranslation"
-      WHERE "messageId" = m."id"
-      ORDER BY "createdAt" DESC
-      LIMIT 1
-    ) tr ON true
-    WHERE m."threadId" = ${threadId}
-    ORDER BY m."createdAt" ASC, m."id" ASC
-    LIMIT ${MAX_THREAD_MESSAGES}
-  `);
+  const messageRows = await prisma.$transaction(async (transaction) => {
+    await transaction.$executeRaw(Prisma.sql`
+      UPDATE "support"."MerchantSupportMessage"
+      SET "readAt" = NOW(), "updatedAt" = NOW()
+      WHERE "threadId" = ${threadId}
+        AND "kind" = 'MERCHANT'
+        AND "readAt" IS NULL
+    `);
 
-  await prisma.$executeRaw(Prisma.sql`
-    UPDATE "support"."MerchantSupportMessage"
-    SET "readAt" = NOW(), "updatedAt" = NOW()
-    WHERE "threadId" = ${threadId}
-      AND "kind" = 'MERCHANT'
-      AND "readAt" IS NULL
-  `);
+    return transaction.$queryRaw<
+      Array<MessageRow & {
+        translationId: string | null;
+        translationTargetLanguageTag: string | null;
+        translatedBody: string | null;
+        translationStatus: string | null;
+        translationCreatedAt: Date | null;
+      }>
+    >(Prisma.sql`
+      WITH bounded_messages AS (
+        SELECT "id", "threadId", "kind", "state", "originalBody", "sourceLanguageTag",
+          "displayLanguageTag", "createdAt", "readAt"
+        FROM "support"."MerchantSupportMessage"
+        WHERE "threadId" = ${threadId}
+        ORDER BY "createdAt" ASC, "id" ASC
+        LIMIT ${MAX_THREAD_MESSAGES}
+      )
+      SELECT
+        m."id", tr."id" AS "translationId", tr."targetLanguageTag" AS "translationTargetLanguageTag",
+        m."kind", m."state", m."originalBody", m."sourceLanguageTag",
+        m."displayLanguageTag", m."createdAt", m."readAt", tr."translatedBody",
+        tr."status" AS "translationStatus", tr."createdAt" AS "translationCreatedAt"
+      FROM bounded_messages m
+      LEFT JOIN (
+        SELECT "id", "messageId", "targetLanguageTag", "translatedBody", "status", "createdAt",
+          ROW_NUMBER() OVER (PARTITION BY "messageId" ORDER BY "createdAt" ASC, "id" ASC) AS translation_rank
+        FROM "support"."MerchantMessageTranslation"
+      ) tr ON tr."messageId" = m."id" AND tr.translation_rank <= 50
+      ORDER BY m."createdAt" ASC, m."id" ASC, tr."createdAt" ASC NULLS LAST, tr."id" ASC NULLS LAST
+    `);
+  });
+  const messages = messageRows.reduce<MessageRow[]>((result, row) => {
+    let message = result.find((entry) => entry.id === row.id);
+    if (!message) {
+      message = {
+        id: row.id,
+        kind: row.kind,
+        state: row.state,
+        originalBody: row.originalBody,
+        sourceLanguageTag: row.sourceLanguageTag,
+        displayLanguageTag: row.displayLanguageTag,
+        createdAt: row.createdAt,
+        readAt: row.readAt,
+        translations: [],
+      };
+      result.push(message);
+    }
+    if (row.translationId && row.translationTargetLanguageTag && row.translationStatus && row.translationCreatedAt) {
+      message.translations.push({
+        id: row.translationId,
+        targetLanguageTag: row.translationTargetLanguageTag,
+        status: row.translationStatus,
+        translatedBody: row.translatedBody,
+        createdAt: row.translationCreatedAt,
+      });
+    }
+    return result;
+  }, []);
   return { thread, messages };
 }
 
@@ -490,13 +597,14 @@ export async function composeAdministrativeMessage(input: {
     input.database ?? (prisma as unknown as DatabaseClient);
   const messageId = randomUUID();
   const result = await database.$transaction(async (transaction) => {
+    await ensureDevelopmentPlatformAdmin(transaction, principal);
     const rows = await transaction.$queryRaw<[{ shopId: string; assignedPlatformAdminId: string | null; merchantMessageVersion: number; defaultLanguageTag: string | null }]>(Prisma.sql`
       SELECT t."shopId", t."assignedPlatformAdminId", t."merchantMessageVersion",
         ss."defaultLanguageTag"
       FROM "support"."MerchantSupportThread" t
       LEFT JOIN "shopify"."ShopSettings" ss ON ss."shopId" = t."shopId"
       WHERE t."id" = ${input.threadId}
-      FOR UPDATE
+      FOR UPDATE OF t
     `);
     const thread = rows[0];
     if (!thread) throw new Error('Support thread not found.');
@@ -517,7 +625,8 @@ export async function composeAdministrativeMessage(input: {
         "displayLanguageTag", "platformAdminId", "availableAt",
         "respondsThroughMerchantVersion", "createdAt", "updatedAt"
       ) VALUES (
-        ${messageId}, ${input.threadId}, 'ADMINISTRATIVE', ${state}, ${body},
+        ${messageId}, ${input.threadId}, 'ADMINISTRATIVE',
+        CAST(${state} AS "support"."MerchantSupportMessageState"), ${body},
         ${PLATFORM_SUPPORT_LANGUAGE_TAG}, ${target}, ${principal.id},
         ${needsTranslation ? null : now}, ${thread.merchantMessageVersion}, ${now}, ${now}
       )
@@ -574,6 +683,7 @@ export async function requestFailedTranslationReconciliation(input: {
   const database: DatabaseClient =
     input.database ?? (prisma as unknown as DatabaseClient);
   await database.$transaction(async (transaction) => {
+    await ensureDevelopmentPlatformAdmin(transaction, principal);
     const rows = await transaction.$queryRaw<[{ status: string; threadId: string }]>(Prisma.sql`
       SELECT tr."status", m."threadId"
       FROM "support"."MerchantMessageTranslation" tr
@@ -608,11 +718,14 @@ export async function requestFailedTranslationsReconciliation(input: {
   const requestId = randomUUID();
   const database: DatabaseClient =
     input.database ?? (prisma as unknown as DatabaseClient);
-  await database.$executeRaw(Prisma.sql`
-    INSERT INTO "support"."MerchantTranslationReconciliationRequest" (
-      "id", "requestedByPlatformAdminId", "scope", "translationId", "status"
-    ) VALUES (${requestId}, ${principal.id}, 'FAILED_TRANSLATIONS', NULL, 'PENDING')
-  `);
+  await database.$transaction(async (transaction) => {
+    await ensureDevelopmentPlatformAdmin(transaction, principal);
+    await transaction.$executeRaw(Prisma.sql`
+      INSERT INTO "support"."MerchantTranslationReconciliationRequest" (
+        "id", "requestedByPlatformAdminId", "scope", "translationId", "status"
+      ) VALUES (${requestId}, ${principal.id}, 'FAILED_TRANSLATIONS', NULL, 'PENDING')
+    `);
+  });
   await enqueueReconcileBestEffort(
     requestId,
     input.queue === undefined ? await getMerchantCommunicationsQueue() : input.queue,
@@ -655,7 +768,8 @@ export async function requestAdditionalTranslation(input: {
         "id", "messageId", "direction", "sourceLanguageTag", "targetLanguageTag",
         "status", "createdAt", "updatedAt"
       ) VALUES (
-        ${randomUUID()}, ${input.messageId}, ${direction},
+        ${randomUUID()}, ${input.messageId},
+        CAST(${direction} AS "support"."MerchantTranslationDirection"),
         ${message.sourceLanguageTag}, ${target}, 'PENDING', NOW(), NOW()
       ) ON CONFLICT ("messageId", "targetLanguageTag") DO NOTHING
     `);

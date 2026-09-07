@@ -56,7 +56,11 @@ test('enforces the Unicode body limit and owner recheck', () => {
 
     const database = {
       $transaction: async (callback) => callback({
-        $queryRaw: async () => [{
+          $queryRaw: async (query) => query.sql.includes('FROM "public"."PlatformAdmin"') ? [{
+            id: 'development-platform-admin', provider: 'development', providerSubject: 'development-platform-admin',
+            email: 'development-platform-admin@local.invalid', displayName: 'Development Platform Admin',
+            role: 'SUPER_ADMIN', active: true,
+          }] : [{
           shopId: 'shop-1',
           assignedPlatformAdminId: 'development-platform-admin',
           merchantMessageVersion: 1,
@@ -71,7 +75,11 @@ test('enforces the Unicode body limit and owner recheck', () => {
         body,
         database: {
           $transaction: async (callback) => callback({
-            $queryRaw: async () => [{
+            $queryRaw: async (query) => query.sql.includes('FROM "public"."PlatformAdmin"') ? [{
+              id: 'development-platform-admin', provider: 'development', providerSubject: 'development-platform-admin',
+              email: 'development-platform-admin@local.invalid', displayName: 'Development Platform Admin',
+              role: 'SUPER_ADMIN', active: true,
+            }] : [{
               shopId: 'shop-1',
               assignedPlatformAdminId,
               merchantMessageVersion: 1,
@@ -109,17 +117,32 @@ test('commits English and non-English compose work before queue handling', () =>
       let executions = 0;
       let queueCalls = 0;
       let responseBoundaryConditions = [];
+      let threadReadQuery;
+      let messageInsertQuery;
       const database = {
         $transaction: async (callback) => callback({
-          $queryRaw: async () => [{
-            shopId: 'shop-1',
-            assignedPlatformAdminId: 'development-platform-admin',
-            merchantMessageVersion: 1,
-            defaultLanguageTag,
-          }],
+            $queryRaw: async (query) => {
+              if (query.sql.includes('FROM "public"."PlatformAdmin"')) return [{
+                id: 'development-platform-admin', provider: 'development', providerSubject: 'development-platform-admin',
+                email: 'development-platform-admin@local.invalid', displayName: 'Development Platform Admin',
+                role: 'SUPER_ADMIN', active: true,
+              }];
+              if (query.sql.includes('FROM "support"."MerchantSupportThread"')) {
+                threadReadQuery = query;
+              }
+              return [{
+                shopId: 'shop-1',
+                assignedPlatformAdminId: 'development-platform-admin',
+                merchantMessageVersion: 1,
+                defaultLanguageTag,
+              }];
+            },
           $executeRaw: async (query) => {
             executions += 1;
-            if (executions === (defaultLanguageTag === 'en-GB' ? 2 : 3)) {
+            if (query.sql.includes('INSERT INTO "support"."MerchantSupportMessage"')) {
+              messageInsertQuery = query;
+            }
+            if (executions === (defaultLanguageTag === 'en-GB' ? 3 : 4)) {
               responseBoundaryConditions = query.values.filter(
                 (value) => typeof value === 'boolean',
               );
@@ -139,23 +162,56 @@ test('commits English and non-English compose work before queue handling', () =>
         executions,
         queueCalls,
         responseBoundaryConditions,
+        threadReadSql: threadReadQuery.sql,
+        messageInsertSql: messageInsertQuery.sql,
+        messageInsertValues: messageInsertQuery.values,
       };
     };
     console.log(JSON.stringify({ english: await run('en-GB'), french: await run('fr-FR') }));
   `);
 
-  assert.deepEqual(result.english, {
+  const {
+    threadReadSql: englishThreadReadSql,
+    messageInsertSql: englishMessageInsertSql,
+    messageInsertValues: englishMessageInsertValues,
+    ...englishResult
+  } = result.english;
+  const {
+    threadReadSql: frenchThreadReadSql,
+    messageInsertSql: frenchMessageInsertSql,
+    messageInsertValues: frenchMessageInsertValues,
+    ...frenchResult
+  } = result.french;
+  assert.deepEqual(englishResult, {
     hasTranslation: false,
-    executions: 2,
+    executions: 3,
     queueCalls: 0,
     responseBoundaryConditions: [true, true],
   });
-  assert.deepEqual(result.french, {
+  assert.deepEqual(frenchResult, {
     hasTranslation: true,
-    executions: 3,
+    executions: 4,
     queueCalls: 1,
     responseBoundaryConditions: [false, false],
   });
+  for (const threadReadSql of [englishThreadReadSql, frenchThreadReadSql]) {
+    const normalizedSql = threadReadSql.replace(/\s+/g, ' ').trim();
+    assert.match(normalizedSql, /LEFT JOIN "shopify"\."ShopSettings" ss/);
+    assert.match(normalizedSql, /FOR UPDATE OF t/);
+    assert.doesNotMatch(normalizedSql, /FOR UPDATE(?!\s+OF\s+t)/);
+  }
+  for (const [messageInsertSql, messageInsertValues, state] of [
+    [englishMessageInsertSql, englishMessageInsertValues, 'AVAILABLE'],
+    [frenchMessageInsertSql, frenchMessageInsertValues, 'PROCESSING'],
+  ]) {
+    const normalizedSql = messageInsertSql.replace(/\s+/g, ' ').trim();
+    assert.match(normalizedSql, /INSERT INTO "support"\."MerchantSupportMessage"/);
+    assert.match(
+      normalizedSql,
+      /CAST\((?:\?|\$\d+) AS "support"\."MerchantSupportMessageState"\)/,
+    );
+    assert.ok(messageInsertValues.includes(state));
+  }
 });
 
 test('maps persisted message kinds and respects existing translation status', () => {
@@ -163,6 +219,7 @@ test('maps persisted message kinds and respects existing translation status', ()
     import { requestAdditionalTranslation } from ${JSON.stringify(moduleUrl)};
     const run = async (kind, status) => {
       const values = [];
+      let directionInsertQuery;
       let queryCount = 0;
       let queueCalls = 0;
       const database = {
@@ -170,7 +227,13 @@ test('maps persisted message kinds and respects existing translation status', ()
           $queryRaw: async () => queryCount++ === 0
             ? [{ kind, sourceLanguageTag: 'fr-FR' }]
             : [{ id: 'translation-1', status }],
-          $executeRaw: async (query) => { values.push(query.values); return 1; },
+          $executeRaw: async (query) => {
+            values.push(query.values);
+            if (query.sql.includes('INSERT INTO "support"."MerchantMessageTranslation"')) {
+              directionInsertQuery = query;
+            }
+            return 1;
+          },
         }),
       };
       const id = await requestAdditionalTranslation({
@@ -179,7 +242,13 @@ test('maps persisted message kinds and respects existing translation status', ()
         database,
         queue: { add: async () => { queueCalls += 1; } },
       });
-      return { id, values, queueCalls };
+      return {
+        id,
+        values,
+        queueCalls,
+        directionInsertSql: directionInsertQuery.sql,
+        directionInsertValues: directionInsertQuery.values,
+      };
     };
     let invalid = false;
     try {
@@ -207,6 +276,13 @@ test('maps persisted message kinds and respects existing translation status', ()
   assert.ok(result.administrative.values.flat().includes('ADMIN_TO_MERCHANT'));
   assert.ok(result.system.values.flat().includes('SYSTEM_TO_MERCHANT'));
   assert.equal(result.merchant.id, 'translation-1');
+  const normalizedDirectionSql = result.merchant.directionInsertSql.replace(/\s+/g, ' ').trim();
+  assert.match(normalizedDirectionSql, /INSERT INTO "support"\."MerchantMessageTranslation"/);
+  assert.match(
+    normalizedDirectionSql,
+    /CAST\((?:\?|\$\d+) AS "support"\."MerchantTranslationDirection"\)/,
+  );
+  assert.ok(result.merchant.directionInsertValues.includes('MERCHANT_TO_ADMIN'));
 });
 
 test('keeps reconciliation durable when queue enqueue fails and caches producers', () => {
@@ -219,6 +295,64 @@ test('keeps reconciliation durable when queue enqueue fails and caches producers
   assert.match(source, /adminCanRequestGlobalReconciliation/);
   assert.match(source, /status === 'PENDING'/);
   assert.doesNotMatch(source, /shared_job_id_runtime_unavailable/);
+});
+
+test('returns post-read state and bounded translation-safe arrays', () => {
+  const readUpdate = source.indexOf('SET "readAt" = NOW()');
+  const messageSelect = source.indexOf('WITH bounded_messages');
+  assert.ok(readUpdate >= 0 && readUpdate < messageSelect);
+  assert.match(source, /translations: TranslationView\[\]/);
+  assert.match(source, /ROW_NUMBER\(\) OVER \(PARTITION BY "messageId"/);
+  assert.match(source, /tr\.translation_rank <= 50/);
+  assert.match(source, /targetLanguageTag: row\.translationTargetLanguageTag/);
+  assert.match(source, /translatedBody: row\.translatedBody/);
+  assert.match(source, /createdAt: row\.translationCreatedAt/);
+  assert.match(source, /AND "kind" = 'MERCHANT'/);
+  assert.match(source, /AND "readAt" IS NULL/);
+  assert.doesNotMatch(source, /latestTranslation/);
+});
+
+test('materializes development attribution for every FK-backed support mutation', () => {
+  assert.match(source, /ON CONFLICT \("id"\) DO NOTHING/);
+  assert.match(source, /reserved development platform administrator identity conflicts/);
+  assert.equal((source.match(/ensureDevelopmentPlatformAdmin\(transaction, principal\)/g) ?? []).length, 4);
+  assert.match(source, /requestFailedTranslationsReconciliation[\s\S]*?database\.\$transaction/);
+  assert.match(source, /if \(!principal\.developmentBypass\) return;/);
+});
+
+test('casts the development principal role as the PostgreSQL enum while binding its value', () => {
+  const result = runBehaviorScript(`
+    import { composeAdministrativeMessage } from ${JSON.stringify(moduleUrl)};
+    let identityInsert;
+    await composeAdministrativeMessage({
+      threadId: 'thread-1',
+      body: 'hello',
+      database: {
+        $transaction: async (callback) => callback({
+          $queryRaw: async (query) => query.sql.includes('FROM "public"."PlatformAdmin"')
+            ? [{
+                id: 'development-platform-admin', provider: 'development',
+                providerSubject: 'development-platform-admin',
+                email: 'development-platform-admin@local.invalid',
+                displayName: 'Development Platform Admin', role: 'SUPER_ADMIN', active: true,
+              }]
+            : [{ shopId: 'shop-1', assignedPlatformAdminId: 'development-platform-admin',
+                merchantMessageVersion: 1, defaultLanguageTag: 'en-GB' }],
+          $executeRaw: async (query) => {
+            if (query.sql.includes('INSERT INTO "public"."PlatformAdmin"')) identityInsert = query;
+            return 1;
+          },
+        }),
+      },
+      queue: null,
+    });
+    console.log(JSON.stringify({ sql: identityInsert.sql, values: identityInsert.values }));
+  `);
+
+  assert.match(result.sql, /CAST\((?:\?|\$\d+) AS "public"\."PlatformAdminRole"\)/);
+  assert.match(result.sql, /"updatedAt"/);
+  assert.match(result.sql, /CURRENT_TIMESTAMP/);
+  assert.ok(result.values.includes('SUPER_ADMIN'));
 });
 
 test('reuses production queues, closes replaced queues, and leaves injected queues open', () => {
@@ -243,7 +377,11 @@ test('reuses production queues, closes replaced queues, and leaves injected queu
       body: 'hello',
       database: {
         $transaction: async (callback) => callback({
-          $queryRaw: async () => [{
+          $queryRaw: async (query) => query.sql.includes('FROM "public"."PlatformAdmin"') ? [{
+            id: 'development-platform-admin', provider: 'development', providerSubject: 'development-platform-admin',
+            email: 'development-platform-admin@local.invalid', displayName: 'Development Platform Admin',
+            role: 'SUPER_ADMIN', active: true,
+          }] : [{
             shopId: 'shop-1',
             assignedPlatformAdminId: 'development-platform-admin',
             merchantMessageVersion: 1,
@@ -285,7 +423,11 @@ test('persists targeted reconciliation before a failed queue hint', () => {
       translationId: 'translation-failed',
       database: {
         $transaction: async (callback) => callback({
-          $queryRaw: async () => [{ status: 'FAILED', threadId: 'thread-1' }],
+            $queryRaw: async (query) => query.sql.includes('FROM "public"."PlatformAdmin"') ? [{
+              id: 'development-platform-admin', provider: 'development', providerSubject: 'development-platform-admin',
+              email: 'development-platform-admin@local.invalid', displayName: 'Development Platform Admin',
+              role: 'SUPER_ADMIN', active: true,
+            }] : [{ status: 'FAILED', threadId: 'thread-1' }],
           $executeRaw: async () => { writes += 1; return 1; },
         }),
       },
@@ -295,7 +437,7 @@ test('persists targeted reconciliation before a failed queue hint', () => {
   `);
 
   assert.match(result.requestId, /^[0-9a-f-]{36}$/);
-  assert.equal(result.writes, 1);
+  assert.equal(result.writes, 2);
 });
 
 test('enforces global reconciliation authorization and durability', () => {
@@ -308,7 +450,14 @@ test('enforces global reconciliation authorization and durability', () => {
     let writes = 0;
     const requestId = await requestFailedTranslationsReconciliation({
       database: {
-        $executeRaw: async () => { writes += 1; return 1; },
+        $transaction: async (callback) => callback({
+          $queryRaw: async () => [{
+            id: 'development-platform-admin', provider: 'development', providerSubject: 'development-platform-admin',
+            email: 'development-platform-admin@local.invalid', displayName: 'Development Platform Admin',
+            role: 'SUPER_ADMIN', active: true,
+          }],
+          $executeRaw: async () => { writes += 1; return 1; },
+        }),
       },
       queue: { add: async () => { throw new Error('Redis down'); } },
     });
@@ -325,7 +474,7 @@ test('enforces global reconciliation authorization and durability', () => {
   `);
 
   assert.match(result.requestId, /^[0-9a-f-]{36}$/);
-  assert.equal(result.writes, 1);
+  assert.equal(result.writes, 2);
   assert.equal(result.superAdminAllowed, true);
   assert.equal(result.platformAdminAllowed, false);
 });
@@ -393,12 +542,17 @@ test('compare-and-set ownership has one winner and reloads the losing owner', ()
     };
     const database = {
       $transaction: async (callback) => callback({
-        $executeRaw: async () => {
+        $executeRaw: async (query) => {
+          if (query.sql.includes('INSERT INTO "public"."PlatformAdmin"')) return 1;
           if (!available) return 0;
           available = false;
           return 1;
         },
-        $queryRaw: async () => [owner],
+        $queryRaw: async (query) => query.sql.includes('FROM "public"."PlatformAdmin"') ? [{
+          id: 'development-platform-admin', provider: 'development', providerSubject: 'development-platform-admin',
+          email: 'development-platform-admin@local.invalid', displayName: 'Development Platform Admin',
+          role: 'SUPER_ADMIN', active: true,
+        }] : [owner],
       }),
       $executeRaw: async () => 1,
     };

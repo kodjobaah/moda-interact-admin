@@ -3,6 +3,7 @@
   "nav.tenantDirectory": "Tenant Directory",
   "nav.observability": "Observability",
   "nav.shopifyQueues": "Shopify Queues",
+  "nav.merchantMessages": "Merchant Messages",
   "nav.grafana": "Grafana",
   "nav.administrator": "Administrator",
   "search.tenantsLabel": "Search tenants",
