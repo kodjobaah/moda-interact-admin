@@ -715,6 +715,7 @@ export async function readQueueJobSnapshot(
   const limit = parseQueueJobPositiveInteger(options.limit, DEFAULT_QUEUE_JOB_LIMIT, MAX_QUEUE_JOB_LIMIT);
   const direction = parseQueueJobDirection(options.direction);
   const redisUrl = options.redisUrl ?? process.env.REDIS_URL;
+  console.log('Redis URL:', redisUrl);
   if (!redisUrl) throw new QueueMonitorUnavailableError();
 
   try {
