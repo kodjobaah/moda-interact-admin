@@ -34,7 +34,7 @@ const moduleUrl = pathToFileURL(sourcePath).href;
 test('consumes the published shared release without a local declaration shim', () => {
   assert.equal(
     packageJson.dependencies['@modainteract/moda-interact-shared'],
-    '0.7.1',
+    '^0.7.3',
   );
   assert.equal(
     existsSync(resolve(root, 'src/types/shared-merchant-communications.d.ts')),
@@ -45,6 +45,51 @@ test('consumes the published shared release without a local declaration shim', (
     /from '@modainteract\/moda-interact-shared\/merchant-communications\/node'/,
   );
   assert.doesNotMatch(source, /await import\(\s*['"]@modainteract\/moda-interact-shared\/merchant-communications\/node/);
+});
+
+test('bounds protected shop suggestions and aligns search with brand/domain matching', () => {
+  const result = runBehaviorScript(`
+    import { getMerchantSupportShopSuggestions } from ${JSON.stringify(moduleUrl)};
+    let queryCalls = 0;
+    let suggestionQuery;
+    const database = {
+      $queryRaw: async (query) => {
+        queryCalls += 1;
+        suggestionQuery = query;
+        return [{
+          threadId: 'thread-1',
+          shopId: 'shop-1',
+          domain: 'north.example.com',
+          brandName: 'North',
+          needsAdminResponse: true,
+        }];
+      },
+    };
+    const short = await getMerchantSupportShopSuggestions({ query: ' n ', database });
+    const suggestions = await getMerchantSupportShopSuggestions({ query: 'North', limit: 99, database });
+    console.log(JSON.stringify({
+      short,
+      suggestions,
+      queryCalls,
+      sql: suggestionQuery.sql,
+      values: suggestionQuery.values,
+    }));
+  `);
+
+  assert.deepEqual(result.short, []);
+  assert.deepEqual(result.suggestions, [{
+    threadId: 'thread-1',
+    shopId: 'shop-1',
+    domain: 'north.example.com',
+    brandName: 'North',
+    needsAdminResponse: true,
+  }]);
+  assert.equal(result.queryCalls, 1);
+  assert.match(result.sql, /FROM "support"\."MerchantSupportThread"/);
+  assert.match(result.sql, /LEFT JOIN "shopify"\."ShopBrand"/);
+  assert.match(result.sql, /s\."domain" ILIKE/);
+  assert.match(result.sql, /sb\."brandName" ILIKE/);
+  assert.ok(result.values.includes(8));
 });
 
 test('enforces the Unicode body limit and owner recheck', () => {

@@ -181,16 +181,14 @@ export async function getTenantDirectory(input: {
       brand: {
         select: { brandName: true, squareLogoUrl: true, logoUrl: true },
       },
-      subscriptions: {
-        orderBy: { updatedAt: 'desc' },
-        take: 1,
-        select: { planHandle: true, plan: { select: { name: true } } },
+      subscription: {
+        select: { observedShopifyPlanHandle: true, plan: { select: { name: true } } },
       },
     },
   });
 
   const tenants: TenantListItem[] = rows.map((row) => {
-    const subscription = row.subscriptions[0];
+    const subscription = row.subscription;
     return {
       id: row.id,
       domain: row.domain,
@@ -199,7 +197,7 @@ export async function getTenantDirectory(input: {
       brandName: row.brand?.brandName ?? null,
       logoUrl: row.brand?.squareLogoUrl ?? row.brand?.logoUrl ?? null,
       planName: subscription?.plan?.name ?? null,
-      planHandle: subscription?.planHandle ?? null,
+      planHandle: subscription?.observedShopifyPlanHandle ?? null,
     };
   });
 
@@ -227,11 +225,9 @@ export async function getTenantDetail(
       settings: {
         select: { onboardingCompleted: true, recoveryDelayMinutes: true },
       },
-      subscriptions: {
-        orderBy: { updatedAt: 'desc' },
-        take: 1,
+      subscription: {
         select: {
-          planHandle: true,
+          observedShopifyPlanHandle: true,
           status: true,
           currentPeriodStart: true,
           currentPeriodEnd: true,
@@ -242,7 +238,7 @@ export async function getTenantDetail(
   });
 
   if (!row) return null;
-  const subscription = row.subscriptions[0];
+  const subscription = row.subscription;
 
   return {
     id: row.id,
@@ -253,7 +249,7 @@ export async function getTenantDetail(
     brandName: row.brand?.brandName ?? null,
     logoUrl: row.brand?.squareLogoUrl ?? row.brand?.logoUrl ?? null,
     planName: subscription?.plan?.name ?? null,
-    planHandle: subscription?.planHandle ?? null,
+    planHandle: subscription?.observedShopifyPlanHandle ?? null,
     recoveryDelayMinutes: row.settings?.recoveryDelayMinutes ?? null,
     onboardingCompleted: row.settings?.onboardingCompleted ?? false,
     subscriptionStatus: subscription?.status ?? null,

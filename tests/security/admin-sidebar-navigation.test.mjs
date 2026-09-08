@@ -55,8 +55,10 @@ test("sidebar uses a stable desktop rail and bottom administrator treatment", as
 test("navigation does not add unavailable mockup destinations", async () => {
   const sidebarSource = await readSource("src/components/admin/sidebar.tsx");
 
-  assert.doesNotMatch(sidebarSource, /href="\/(dashboard|billing|settings)"/);
-  assert.doesNotMatch(sidebarSource, /Dashboard|Billing|Settings/);
+  assert.match(sidebarSource, /href="\/billing"/);
+  assert.match(sidebarSource, /nav\.billing/);
+  assert.doesNotMatch(sidebarSource, /href="\/(dashboard|settings)"/);
+  assert.doesNotMatch(sidebarSource, /Dashboard|Settings/);
 });
 
 test("Grafana navigation uses an existing validated destination or the overview route", async () => {

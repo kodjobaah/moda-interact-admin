@@ -2,6 +2,7 @@
 
 import {
   composeAdministrativeMessage,
+  getMerchantSupportShopSuggestions,
   releaseMerchantSupportThreadOwnership,
   reassignMerchantSupportThreadOwnership,
   requestAdditionalTranslation,
@@ -9,6 +10,12 @@ import {
   requestFailedTranslationsReconciliation,
   takeMerchantSupportThreadOwnership,
 } from '@/lib/admin/merchant-support';
+
+export async function getMerchantSupportShopSuggestionsAction(input: {
+  query: string;
+}) {
+  return getMerchantSupportShopSuggestions({ query: input.query, limit: 8 });
+}
 
 export async function composeAdministrativeMessageAction(input: {
   threadId: string;

@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState, useTransition } from 'react';
+import { FormEvent, useEffect, useRef, useState, useTransition } from 'react';
 import {
   AuthoredSupportBodySchema,
   countUnicodeGraphemes,
 } from '@modainteract/moda-interact-shared/merchant-communications';
 import {
   composeAdministrativeMessageAction,
+  getMerchantSupportShopSuggestionsAction,
   releaseMerchantSupportThreadOwnershipAction,
   reassignMerchantSupportThreadOwnershipAction,
   requestAdditionalTranslationAction,
@@ -21,9 +22,11 @@ import { Icon } from './icons';
 import { adminI18n, adminStatusLabel } from '@/i18n';
 import type { PlatformAdminPrincipal } from '@/lib/auth/platform-admin';
 import type {
+  MerchantSupportShopSuggestion,
   MerchantSupportThreadDetail,
   PendingSupportFilter,
 } from '@/lib/admin/merchant-support';
+import { tenantName } from '@/lib/admin/format';
 import { withParamUpdates } from '@/lib/admin/query';
 
 type PendingData = {
@@ -58,10 +61,57 @@ const filterLabels: Record<PendingSupportFilter, string> = {
   'assigned-to-others': 'Assigned to others',
 };
 
+const SUPPORTED_TRANSLATION_LANGUAGE_OPTIONS = [
+  { value: 'cs', label: 'Czech' },
+  { value: 'da', label: 'Danish' },
+  { value: 'de', label: 'German' },
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fi', label: 'Finnish' },
+  { value: 'fr', label: 'French' },
+  { value: 'it', label: 'Italian' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'nb', label: 'Norwegian Bokmål' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'pl', label: 'Polish' },
+  { value: 'pt-BR', label: 'Portuguese (Brazil)' },
+  { value: 'pt-PT', label: 'Portuguese (Portugal)' },
+  { value: 'sv', label: 'Swedish' },
+  { value: 'th', label: 'Thai' },
+  { value: 'tr', label: 'Turkish' },
+  { value: 'zh-Hans', label: 'Chinese (Simplified)' },
+  { value: 'zh-Hant', label: 'Chinese (Traditional)' },
+] as const;
+
 export function MerchantSupportInbox({ principal, pending, thread, filter, search, params }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState(search);
+  const [suggestions, setSuggestions] = useState<MerchantSupportShopSuggestion[]>([]);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const suggestionRequestSequence = useRef(0);
+
+  useEffect(() => {
+    const query = searchValue.trim();
+    const requestSequence = ++suggestionRequestSequence.current;
+    if (query.length < 2) {
+      return;
+    }
+    const timeout = window.setTimeout(async () => {
+      try {
+        const result = await getMerchantSupportShopSuggestionsAction({ query });
+        if (requestSequence === suggestionRequestSequence.current) {
+          setSuggestions(result.slice(0, 8));
+          setActiveSuggestionIndex(-1);
+        }
+      } catch {
+        if (requestSequence === suggestionRequestSequence.current) setSuggestions([]);
+      }
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [searchValue]);
 
   function runAction(action: () => Promise<unknown>) {
     setError(null);
@@ -77,6 +127,16 @@ export function MerchantSupportInbox({ principal, pending, thread, filter, searc
 
   const queryParams = { ...params, filter, ...(search ? { search } : {}) };
   const globalReconcile = () => runAction(() => requestFailedTranslationsReconciliationAction());
+  function selectSuggestion(suggestion: MerchantSupportShopSuggestion) {
+    suggestionRequestSequence.current += 1;
+    setSuggestions([]);
+    setActiveSuggestionIndex(-1);
+    router.push(withParamUpdates('/merchant-support', params, {
+      thread: suggestion.threadId,
+      page: 1,
+      search: null,
+    }));
+  }
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -105,11 +165,57 @@ export function MerchantSupportInbox({ principal, pending, thread, filter, searc
               </div>
               <Icon name="message" className="h-5 w-5 text-[var(--brand-600)]" />
             </div>
-            <form action="/merchant-support" className="mt-4 flex gap-2">
+            <form action="/merchant-support" className="relative mt-4 flex gap-2">
               <label htmlFor="support-search" className="sr-only">Search pending shops</label>
-              <input id="support-search" name="search" defaultValue={search} placeholder="Search shop domain" className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              <input
+                id="support-search"
+                name="search"
+                value={searchValue}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSearchValue(value);
+                  if (value.trim().length < 2) {
+                    suggestionRequestSequence.current += 1;
+                    setSuggestions([]);
+                    setActiveSuggestionIndex(-1);
+                  }
+                }}
+                onBlur={() => window.setTimeout(() => { setSuggestions([]); setActiveSuggestionIndex(-1); }, 0)}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown' && suggestions.length) {
+                    event.preventDefault();
+                    setActiveSuggestionIndex((index) => (index + 1) % suggestions.length);
+                  } else if (event.key === 'ArrowUp' && suggestions.length) {
+                    event.preventDefault();
+                    setActiveSuggestionIndex((index) => (index - 1 + suggestions.length) % suggestions.length);
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    suggestionRequestSequence.current += 1;
+                    setSuggestions([]);
+                    setActiveSuggestionIndex(-1);
+                  } else if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+                    event.preventDefault();
+                    selectSuggestion(suggestions[activeSuggestionIndex]);
+                  }
+                }}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={suggestions.length > 0}
+                aria-controls={suggestions.length ? 'support-search-suggestions' : undefined}
+                aria-activedescendant={activeSuggestionIndex >= 0 ? `support-suggestion-${suggestions[activeSuggestionIndex].threadId}` : undefined}
+                placeholder="Search shop or brand"
+                className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
               <input type="hidden" name="filter" value={filter} />
               <button type="submit" className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Search</button>
+              {suggestions.length ? <ul id="support-search-suggestions" role="listbox" className="absolute left-0 right-16 top-full z-10 mt-1 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                {suggestions.map((suggestion, index) => <li key={suggestion.threadId} id={`support-suggestion-${suggestion.threadId}`} role="option" aria-selected={index === activeSuggestionIndex}>
+                  <button type="button" className={`block w-full px-3 py-2 text-left text-sm ${index === activeSuggestionIndex ? 'bg-[var(--brand-50)]' : 'hover:bg-gray-50'}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectSuggestion(suggestion)}>
+                    <span className="block font-semibold text-[var(--brand-900)]">{tenantName(suggestion.brandName, suggestion.domain)}</span>
+                    <span className="block text-xs text-gray-500">{suggestion.domain}{suggestion.needsAdminResponse ? ' · Pending response' : ''}</span>
+                  </button>
+                </li>)}
+              </ul> : null}
             </form>
             <div className="mt-3 flex flex-wrap gap-2" aria-label="Pending support filters">
               {Object.entries(filterLabels).map(([value, label]) => (
@@ -180,8 +286,9 @@ function OwnershipControls({ threadId, ownerId, principal, canRelease, runAction
 
 function SupportMessage({ message, runAction, isPending }: { message: MerchantSupportThreadDetail['messages'][number]; runAction: (action: () => Promise<unknown>) => void; isPending: boolean }) {
   const [selectedTranslationId, setSelectedTranslationId] = useState<string | null>(null);
-  const [targetLanguageTag, setTargetLanguageTag] = useState('');
+  const [languageSelection, setLanguageSelection] = useState('');
   const selectedTranslation = message.translations.find((translation) => translation.id === selectedTranslationId) ?? null;
+  const targetLanguageTag = languageSelection;
   const label = message.kind === 'MERCHANT' ? 'Merchant' : message.kind === 'SYSTEM' ? 'System' : 'Moda Support';
   const readLabel = message.kind === 'MERCHANT'
     ? message.readAt ? 'Read by support' : 'Unread by support'
@@ -201,7 +308,14 @@ function SupportMessage({ message, runAction, isPending }: { message: MerchantSu
             {translation.status === 'FAILED' ? <button type="button" onClick={() => runAction(() => requestTranslationReconciliationAction({ translationId: translation.id }))} disabled={isPending} className="font-semibold text-red-700 underline disabled:opacity-50">Retry / Reconcile</button> : null}
           </span>
         ))}
-        <form className="ml-auto flex items-center gap-2" onSubmit={(event) => { event.preventDefault(); if (targetLanguageTag.trim()) runAction(() => requestAdditionalTranslationAction({ messageId: message.id, targetLanguageTag: targetLanguageTag.trim() })); }}><label htmlFor={`translation-${message.id}`} className="sr-only">Additional translation language</label><input id={`translation-${message.id}`} value={targetLanguageTag} onChange={(event) => setTargetLanguageTag(event.target.value)} placeholder="Language tag" className="w-28 rounded border border-gray-300 px-2 py-1.5" /><button type="submit" disabled={isPending || !targetLanguageTag.trim()} className="font-semibold text-[var(--brand-700)] underline disabled:opacity-50">Translate</button></form>
+        <form className="ml-auto flex flex-wrap items-center justify-end gap-2" onSubmit={(event) => { event.preventDefault(); if (targetLanguageTag) runAction(() => requestAdditionalTranslationAction({ messageId: message.id, targetLanguageTag })); }}>
+          <label htmlFor={`translation-${message.id}`} className="sr-only">Additional translation language</label>
+          <select id={`translation-${message.id}`} value={languageSelection} onChange={(event) => setLanguageSelection(event.target.value)} className="rounded border border-gray-300 px-2 py-1.5 text-xs">
+            <option value="">Select language…</option>
+            {SUPPORTED_TRANSLATION_LANGUAGE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <button type="submit" disabled={isPending || !targetLanguageTag} className="font-semibold text-[var(--brand-700)] underline disabled:opacity-50">Translate</button>
+        </form>
       </div>
     </li>
   );

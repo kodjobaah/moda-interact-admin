@@ -247,6 +247,14 @@ export type PendingSupportThreadSummary = {
   lastMerchantMessageAt: Date | null;
 };
 
+export type MerchantSupportShopSuggestion = {
+  threadId: string;
+  shopId: string;
+  domain: string;
+  brandName: string | null;
+  needsAdminResponse: boolean;
+};
+
 type PendingSupportQueryResult = {
   items: PendingSupportThreadSummary[];
   page: number;
@@ -330,7 +338,11 @@ export async function getPendingMerchantSupportThreads(input: {
   const where = Prisma.sql`
     t."needsAdminResponse" = true
     AND ${pendingFilter}
-    AND (${search} = '' OR s."domain" ILIKE ${pattern})
+    AND (
+      ${search} = ''
+      OR s."domain" ILIKE ${pattern}
+      OR sb."brandName" ILIKE ${pattern}
+    )
   `;
   const rows = await client.$queryRaw<
     Array<{
@@ -348,6 +360,7 @@ export async function getPendingMerchantSupportThreads(input: {
       t."lastMerchantMessageAt", ${ownerSelectSql()}
     FROM "support"."MerchantSupportThread" t
     INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
+    LEFT JOIN "shopify"."ShopBrand" sb ON sb."shopId" = s."id"
     LEFT JOIN "public"."PlatformAdmin" a ON a."id" = t."assignedPlatformAdminId"
     WHERE ${where}
     ORDER BY t."lastMerchantMessageAt" DESC NULLS LAST, t."id" ASC
@@ -357,6 +370,7 @@ export async function getPendingMerchantSupportThreads(input: {
     SELECT COUNT(*)::bigint AS "count"
     FROM "support"."MerchantSupportThread" t
     INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
+    LEFT JOIN "shopify"."ShopBrand" sb ON sb."shopId" = s."id"
     WHERE ${where}
   `);
   const totalItems = Number(count);
@@ -375,6 +389,46 @@ export async function getPendingMerchantSupportThreads(input: {
     totalItems,
     totalPages: Math.max(1, Math.ceil(totalItems / safePageSize)),
   };
+}
+
+export async function getMerchantSupportShopSuggestions(input: {
+  query: string;
+  limit?: number;
+  database?: DatabaseClient;
+}): Promise<MerchantSupportShopSuggestion[]> {
+  await requirePlatformAdminRead();
+  const query = input.query.trim().slice(0, 120);
+  if (query.length < 2) return [];
+
+  const limit = Math.min(Math.max(Math.trunc(input.limit ?? 8), 1), 8);
+  const pattern = `%${query}%`;
+  const database = input.database ?? (prisma as unknown as DatabaseClient);
+  const rows = await database.$queryRaw<
+    Array<{
+      threadId: string;
+      shopId: string;
+      domain: string;
+      brandName: string | null;
+      needsAdminResponse: boolean;
+    }>
+  >(Prisma.sql`
+    SELECT
+      t."id" AS "threadId",
+      s."id" AS "shopId",
+      s."domain",
+      sb."brandName",
+      t."needsAdminResponse"
+    FROM "support"."MerchantSupportThread" t
+    INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
+    LEFT JOIN "shopify"."ShopBrand" sb ON sb."shopId" = s."id"
+    WHERE s."domain" ILIKE ${pattern} OR sb."brandName" ILIKE ${pattern}
+    ORDER BY t."needsAdminResponse" DESC,
+      t."lastMessageAt" DESC NULLS LAST,
+      s."domain" ASC,
+      t."id" ASC
+    LIMIT ${limit}
+  `);
+  return rows;
 }
 
 export async function takeMerchantSupportThreadOwnership(

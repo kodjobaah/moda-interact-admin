@@ -9,7 +9,7 @@ export async function AdminShell({
   search,
   children,
 }: {
-  active: "tenants" | "observability" | "queues" | "merchant-support";
+  active: "tenants" | "observability" | "queues" | "merchant-support" | "billing";
   search?: string;
   children: ReactNode;
 }) {
