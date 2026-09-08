@@ -13,6 +13,11 @@ import type {
   PageResult,
   TenantBilling,
 } from "./types";
+import {
+  billingDateBoundary,
+  billingOverrideState,
+  effectiveOutboundHardCap,
+} from "./billing-presentation.mjs";
 
 const MAX_PAGE_SIZE = 50;
 
@@ -48,17 +53,6 @@ function pageResult<T>(
     totalItems,
     totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
   };
-}
-
-export function billingDateBoundary(
-  value: string | undefined,
-  endOfDay = false,
-): Date | undefined {
-  if (!value) return undefined;
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`)
-    : new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 function decimalValue(value: Prisma.Decimal | null | undefined): string {
@@ -271,18 +265,17 @@ export async function getTenantBilling(
   const adjustmentTotal = adjustments._sum.quantity ?? 0;
   const committed = counter?.committedQuantity ?? 0;
   const reserved = counter?.reservedQuantity ?? 0;
-  const overrideActive = override
-    ? override.expiresAt === null || override.expiresAt > now
-    : false;
+  const overrideState = billingOverrideState(override, now);
+  const overrideActive = overrideState === "ACTIVE";
   const configuredHardLimit = overrideActive
     ? (override?.outboundHardLimit ??
       subscription.plan?.defaultOutboundHardLimit ??
       null)
     : (subscription.plan?.defaultOutboundHardLimit ?? null);
-  const effectiveOutboundHardCap =
-    configuredHardLimit === null || !policy
-      ? configuredHardLimit
-      : Math.min(configuredHardLimit, policy.absoluteOutboundHardLimit);
+  const effectiveHardCap = effectiveOutboundHardCap(
+    configuredHardLimit,
+    policy?.absoluteOutboundHardLimit ?? null,
+  );
   return {
     subscription,
     allowance: {
@@ -304,8 +297,8 @@ export async function getTenantBilling(
       subscription.plan?.defaultOutboundHardLimit ?? null,
     platformAbsoluteOutboundHardLimit:
       policy?.absoluteOutboundHardLimit ?? null,
-    effectiveOutboundHardCap,
-    overrideState: override ? (overrideActive ? "ACTIVE" : "EXPIRED") : null,
+    effectiveOutboundHardCap: effectiveHardCap,
+    overrideState,
     overrideReason: override?.reason ?? null,
     pauseNewRecoveries: overrideActive
       ? (override?.pauseNewRecoveries ?? null)

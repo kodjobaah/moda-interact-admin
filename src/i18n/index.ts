@@ -6,6 +6,7 @@ import {
 } from "@modainteract/moda-interact-shared/internationalization";
 import catalogue from "./locales/en.json";
 import { ADMIN_REQUIRED_I18N_KEYS } from "./required-keys";
+import { localizedReportStateLabel } from "@/lib/admin/billing-presentation.mjs";
 
 validateIcuCatalogue(catalogue, ADMIN_REQUIRED_I18N_KEYS, { locale: "en" });
 
@@ -40,9 +41,9 @@ export function adminStatusLabel(value: string | null | undefined): string {
 export function adminBillingReportStateLabel(
   value: string | null | undefined,
 ): string {
-  if (!value) return adminI18n.t("empty.notRecorded");
-  const key = `billing.state.${value}`;
-  return Object.hasOwn(catalogue, key) ? adminI18n.t(key) : value;
+  return localizedReportStateLabel(value, (key: string) =>
+    Object.hasOwn(catalogue, key) ? adminI18n.t(key) : undefined,
+  );
 }
 
 export function adminRoleLabel(value: string): string {

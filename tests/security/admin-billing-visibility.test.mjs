@@ -3,6 +3,13 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  billingDateBoundary,
+  billingOverrideState,
+  effectiveOutboundHardCap,
+  localizedReportStateLabel,
+  tenantBillingLedgerPresentation,
+} from "../../src/lib/admin/billing-presentation.mjs";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -77,7 +84,7 @@ test("billing ledger preserves report states, diagnostics, and inclusive date bo
   ]);
 
   assert.match(source, /billingDateBoundary\(input\.to, true\)/);
-  assert.match(source, /23:59:59\.999/);
+  assert.match(source, /from "\.\/billing-presentation\.mjs"/);
   for (const diagnostic of [
     "providerErrorCode",
     "providerResponseSummary",
@@ -92,6 +99,87 @@ test("billing ledger preserves report states, diagnostics, and inclusive date bo
   assert.match(tenant, /adminBillingReportStateLabel/);
 });
 
+test("billing helpers preserve cap, expiry, and date boundary semantics", () => {
+  assert.equal(effectiveOutboundHardCap(80, 100), 80);
+  assert.equal(effectiveOutboundHardCap(150, 100), 100);
+  assert.equal(effectiveOutboundHardCap(80, null), null);
+  assert.equal(effectiveOutboundHardCap(null, 100), null);
+
+  const now = new Date("2026-09-08T12:00:00.000Z");
+  const expiredOverride = {
+    expiresAt: new Date("2026-09-08T11:59:59.999Z"),
+    outboundHardLimit: 50,
+    pauseNewRecoveries: true,
+    pauseAutomatedWhatsapp: true,
+  };
+  assert.equal(billingOverrideState(expiredOverride, now), "EXPIRED");
+  assert.equal(expiredOverride.outboundHardLimit, 50);
+  assert.equal(expiredOverride.pauseNewRecoveries, true);
+  assert.equal(expiredOverride.pauseAutomatedWhatsapp, true);
+  assert.equal(effectiveOutboundHardCap(80, 100), 80);
+
+  assert.equal(
+    billingDateBoundary("2026-09-08", false).toISOString(),
+    "2026-09-08T00:00:00.000Z",
+  );
+  assert.equal(
+    billingDateBoundary("2026-09-08", true).toISOString(),
+    "2026-09-08T23:59:59.999Z",
+  );
+});
+
+test("billing report-state labels use localized values without reported fallback", () => {
+  const labels = {
+    "billing.state.PENDING": "Pending",
+    "billing.state.REPORTED": "Reported",
+    "empty.notRecorded": "Not recorded",
+  };
+  const translate = (key) => labels[key];
+
+  assert.equal(localizedReportStateLabel("PENDING", translate), "Pending");
+  assert.notEqual(localizedReportStateLabel("PENDING", translate), "Reported");
+  assert.equal(localizedReportStateLabel("REPORTED", translate), "Reported");
+});
+
+test("tenant ledger presentation exposes every safe reporting diagnostic", () => {
+  const occurredAt = new Date("2026-09-08T10:00:00.000Z");
+  const lastReportAttemptAt = new Date("2026-09-08T10:01:00.000Z");
+  const reportedAt = new Date("2026-09-08T10:02:00.000Z");
+  const presentation = tenantBillingLedgerPresentation(
+    {
+      occurredAt,
+      metric: "RECOVERY_CONVERSATION",
+      quantity: "2",
+      shopifyReportState: "RETRYABLE",
+      providerErrorCode: "TEMPORARY_FAILURE",
+      providerResponseSummary: "Retry scheduled",
+      reportAttemptCount: 3,
+      lastReportAttemptAt,
+      reportedAt,
+      shopifyEventHandle: "recovery-meter",
+    },
+    {
+      empty: "Not recorded",
+      formatDateTime: (value) => `date:${value.toISOString()}`,
+      formatNumber: (value) => `number:${value}`,
+      reportStateLabel: (value) => `label:${value}`,
+    },
+  );
+
+  assert.deepEqual(presentation, {
+    occurredAt: "date:2026-09-08T10:00:00.000Z",
+    metric: "RECOVERY_CONVERSATION",
+    quantity: "number:2",
+    reportState: "label:RETRYABLE",
+    providerErrorCode: "TEMPORARY_FAILURE",
+    providerResponseSummary: "Retry scheduled",
+    reportAttemptCount: "number:3",
+    lastReportAttemptAt: "date:2026-09-08T10:01:00.000Z",
+    reportedAt: "date:2026-09-08T10:02:00.000Z",
+    shopifyEventHandle: "recovery-meter",
+  });
+});
+
 test("tenant billing reports period message usage and ignores expired override caps", async () => {
   const [source, tenant] = await Promise.all([
     readFile(path.join(repositoryRoot, "src/lib/admin/billing.ts"), "utf8"),
@@ -104,11 +192,8 @@ test("tenant billing reports period message usage and ignores expired override c
   assert.match(source, /UsageMetric\.OUTBOUND_AUTOMATED_MESSAGE/);
   assert.match(source, /currentPeriodAutomatedMessageQuantity/);
   assert.match(source, /automatedMessages === null/);
-  assert.match(source, /override\.expiresAt > now/);
-  assert.match(
-    source,
-    /Math\.min\(configuredHardLimit, policy\.absoluteOutboundHardLimit\)/,
-  );
+  assert.match(source, /billingOverrideState\(override, now\)/);
+  assert.match(source, /effectiveOutboundHardCap/);
   assert.match(tenant, /billing\.automatedMessageUsage/);
   assert.match(tenant, /billing\.effectiveOutboundHardCap/);
   assert.match(tenant, /billing\.overrideExpired/);

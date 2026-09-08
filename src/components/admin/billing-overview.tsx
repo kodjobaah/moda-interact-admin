@@ -45,7 +45,7 @@ export function BillingOverviewCards({
       />
       <Metric
         label={adminI18n.t("billing.paidRecoveryUsage")}
-        value={overview.paidRecoveryUsage}
+        value={adminI18n.formatNumber(Number(overview.paidRecoveryUsage))}
       />
       <Metric
         label={adminI18n.t("billing.unmappedSubscriptions")}
@@ -58,7 +58,9 @@ export function BillingOverviewCards({
       {Object.entries(overview.reportStates).map(([state, count]) => (
         <Metric
           key={state}
-          label={adminI18n.t("billing.reportState", { state })}
+          label={adminI18n.t("billing.reportState", {
+            state: adminBillingReportStateLabel(state),
+          })}
           value={adminI18n.formatNumber(count)}
         />
       ))}
@@ -105,11 +107,17 @@ export function BillingLedger({
             className="mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm font-normal"
           >
             <option value="">{adminI18n.t("billing.allStates")}</option>
-            <option value="PENDING">PENDING</option>
-            <option value="IN_FLIGHT">IN_FLIGHT</option>
-            <option value="RETRYABLE">RETRYABLE</option>
-            <option value="REPORTED">REPORTED</option>
-            <option value="NEEDS_ATTENTION">NEEDS_ATTENTION</option>
+            {[
+              "PENDING",
+              "IN_FLIGHT",
+              "RETRYABLE",
+              "REPORTED",
+              "NEEDS_ATTENTION",
+            ].map((state) => (
+              <option key={state} value={state}>
+                {adminBillingReportStateLabel(state)}
+              </option>
+            ))}
           </select>
         </label>
         <label className="text-xs font-semibold text-gray-600">

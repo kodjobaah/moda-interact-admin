@@ -1,5 +1,6 @@
 import type { TenantBilling } from "@/lib/admin/types";
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
+import { tenantBillingLedgerPresentation } from "@/lib/admin/billing-presentation.mjs";
 import { Pagination } from "./pagination";
 
 function Value({ label, value }: { label: string; value: string | number }) {
@@ -160,22 +161,27 @@ export function TenantBillingView({
             <Value
               label={adminI18n.t("billing.outboundSoftLimit")}
               value={
-                billing.override.outboundSoftLimit ??
-                adminI18n.t("empty.notRecorded")
+                billing.override.outboundSoftLimit === null
+                  ? adminI18n.t("empty.notRecorded")
+                  : adminI18n.formatNumber(billing.override.outboundSoftLimit)
               }
             />
             <Value
               label={adminI18n.t("billing.outboundHardLimit")}
               value={
-                billing.override.outboundHardLimit ??
-                adminI18n.t("empty.notRecorded")
+                billing.override.outboundHardLimit === null
+                  ? adminI18n.t("empty.notRecorded")
+                  : adminI18n.formatNumber(billing.override.outboundHardLimit)
               }
             />
             <Value
               label={adminI18n.t("billing.recoverySafetyCeiling")}
               value={
-                billing.override.recoverySafetyCeiling ??
-                adminI18n.t("empty.notRecorded")
+                billing.override.recoverySafetyCeiling === null
+                  ? adminI18n.t("empty.notRecorded")
+                  : adminI18n.formatNumber(
+                      billing.override.recoverySafetyCeiling,
+                    )
               }
             />
             <Value
@@ -188,14 +194,14 @@ export function TenantBillingView({
             />
             <Value
               label={adminI18n.t("billing.overrideReason")}
-              value={billing.overrideReason ?? empty}
+              value={billing.override.reason ?? empty}
             />
             <Value
               label={adminI18n.t("billing.pauseNewRecoveries")}
               value={
-                billing.pauseNewRecoveries === null
+                billing.override.pauseNewRecoveries === null
                   ? empty
-                  : billing.pauseNewRecoveries
+                  : billing.override.pauseNewRecoveries
                     ? adminI18n.t("billingControls.enabled")
                     : adminI18n.t("billingControls.disabled")
               }
@@ -203,9 +209,9 @@ export function TenantBillingView({
             <Value
               label={adminI18n.t("billing.pauseAutomatedWhatsapp")}
               value={
-                billing.pauseAutomatedWhatsapp === null
+                billing.override.pauseAutomatedWhatsapp === null
                   ? empty
-                  : billing.pauseAutomatedWhatsapp
+                  : billing.override.pauseAutomatedWhatsapp
                     ? adminI18n.t("billingControls.enabled")
                     : adminI18n.t("billingControls.disabled")
               }
@@ -246,49 +252,73 @@ export function TenantBillingView({
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    {adminI18n.t("billing.occurredAt")}
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    {adminI18n.t("billing.metric")}
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    {adminI18n.t("billing.quantity")}
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    {adminI18n.t("billing.reportStateLabel")}
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    {adminI18n.t("billing.providerErrorCode")}
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    {adminI18n.t("billing.reportAttempts")}
-                  </th>
+                  {[
+                    adminI18n.t("billing.occurredAt"),
+                    adminI18n.t("billing.metric"),
+                    adminI18n.t("billing.quantity"),
+                    adminI18n.t("billing.reportStateLabel"),
+                    adminI18n.t("billing.providerErrorCode"),
+                    adminI18n.t("billing.providerResponse"),
+                    adminI18n.t("billing.reportAttempts"),
+                    adminI18n.t("billing.lastReportAttemptAt"),
+                    adminI18n.t("billing.reportedAt"),
+                    adminI18n.t("billing.shopifyEventHandle"),
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
+                    >
+                      {heading}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {billing.ledger.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {adminI18n.formatDateTime(item.occurredAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {item.metric}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {quantity(item.quantity)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {adminBillingReportStateLabel(item.shopifyReportState)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {item.providerErrorCode ?? empty}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {adminI18n.formatNumber(item.reportAttemptCount)}
-                    </td>
-                  </tr>
-                ))}
+                {billing.ledger.items.map((item) => {
+                  const row = tenantBillingLedgerPresentation(item, {
+                    empty,
+                    formatDateTime: (value: Date) =>
+                      adminI18n.formatDateTime(value),
+                    formatNumber: (value: number) =>
+                      adminI18n.formatNumber(value),
+                    reportStateLabel: (value: string) =>
+                      adminBillingReportStateLabel(value),
+                  });
+                  return (
+                    <tr key={item.id}>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.occurredAt}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.metric}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.quantity}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.reportState}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.providerErrorCode}
+                      </td>
+                      <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
+                        {row.providerResponseSummary}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.reportAttemptCount}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.lastReportAttemptAt}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                        {row.reportedAt}
+                      </td>
+                      <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
+                        {row.shopifyEventHandle}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
