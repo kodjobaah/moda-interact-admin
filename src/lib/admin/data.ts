@@ -2,9 +2,9 @@ import {
   CheckoutRecoveryStatus,
   Prisma,
   type ConversationMessage,
-} from '@prisma/client';
-import { requirePlatformAdminRead } from '@/lib/auth/platform-admin';
-import { prisma } from '@/lib/prisma';
+} from "@prisma/client";
+import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
+import { prisma } from "@/lib/prisma";
 import type {
   CustomerListItem,
   PageResult,
@@ -15,8 +15,9 @@ import type {
   RecoveryMessage,
   TenantDetail,
   TenantListItem,
-} from './types';
-import { customerName } from './format';
+} from "./types";
+import { customerName } from "./format";
+import { getTenantBillingControls } from "./billing-controls";
 
 const ACTIVE_RECOVERY_STATUSES: CheckoutRecoveryStatus[] = [
   CheckoutRecoveryStatus.DETECTED,
@@ -41,14 +42,14 @@ function decimalToString(value: Prisma.Decimal | null): string | null {
 function asJsonObject(
   value: Prisma.JsonValue | undefined,
 ): Record<string, Prisma.JsonValue> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
+  return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, Prisma.JsonValue>)
     : null;
 }
 
 function jsonString(value: Prisma.JsonValue | undefined): string | null {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return String(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
   return null;
 }
 
@@ -56,7 +57,7 @@ function safeHttpUrl(value: string | null): string | null {
   if (!value) return null;
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:'
+    return url.protocol === "http:" || url.protocol === "https:"
       ? url.toString()
       : null;
   } catch {
@@ -105,7 +106,7 @@ function normalizeLineItems(
       jsonString(variantObject?.title);
     const quantityRaw = row.quantity;
     const quantity =
-      typeof quantityRaw === 'number'
+      typeof quantityRaw === "number"
         ? quantityRaw
         : Number(jsonString(quantityRaw) ?? 1) || 1;
     const price =
@@ -146,10 +147,10 @@ export async function getTenantDirectory(input: {
   const where: Prisma.ShopWhereInput = search
     ? {
         OR: [
-          { domain: { contains: search, mode: 'insensitive' } },
+          { domain: { contains: search, mode: "insensitive" } },
           {
             brand: {
-              is: { brandName: { contains: search, mode: 'insensitive' } },
+              is: { brandName: { contains: search, mode: "insensitive" } },
             },
           },
         ],
@@ -158,11 +159,11 @@ export async function getTenantDirectory(input: {
 
   const [totalItems, activeTenants, activeRecoveries] = await Promise.all([
     prisma.shop.count({ where }),
-    prisma.shop.count({ where: { status: 'ACTIVE' } }),
+    prisma.shop.count({ where: { status: "ACTIVE" } }),
     prisma.checkoutRecovery.count({
       where: {
         status: { in: ACTIVE_RECOVERY_STATUSES },
-        shop: { status: 'ACTIVE' },
+        shop: { status: "ACTIVE" },
       },
     }),
   ]);
@@ -170,7 +171,7 @@ export async function getTenantDirectory(input: {
   const safePage = Math.min(page, totalPages);
   const rows = await prisma.shop.findMany({
     where,
-    orderBy: [{ updatedAt: 'desc' }, { domain: 'asc' }],
+    orderBy: [{ updatedAt: "desc" }, { domain: "asc" }],
     skip: (safePage - 1) * pageSize,
     take: pageSize,
     select: {
@@ -182,7 +183,10 @@ export async function getTenantDirectory(input: {
         select: { brandName: true, squareLogoUrl: true, logoUrl: true },
       },
       subscription: {
-        select: { observedShopifyPlanHandle: true, plan: { select: { name: true } } },
+        select: {
+          observedShopifyPlanHandle: true,
+          plan: { select: { name: true } },
+        },
       },
     },
   });
@@ -231,7 +235,13 @@ export async function getTenantDetail(
           status: true,
           currentPeriodStart: true,
           currentPeriodEnd: true,
-          plan: { select: { name: true } },
+          plan: {
+            select: {
+              name: true,
+              defaultOutboundSoftLimit: true,
+              defaultOutboundHardLimit: true,
+            },
+          },
         },
       },
     },
@@ -239,6 +249,9 @@ export async function getTenantDetail(
 
   if (!row) return null;
   const subscription = row.subscription;
+
+  const billingControls = await getTenantBillingControls(shopId);
+  if (!billingControls) return null;
 
   return {
     id: row.id,
@@ -255,6 +268,11 @@ export async function getTenantDetail(
     subscriptionStatus: subscription?.status ?? null,
     currentPeriodStart: subscription?.currentPeriodStart ?? null,
     currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
+    defaultOutboundSoftLimit:
+      subscription?.plan?.defaultOutboundSoftLimit ?? 10,
+    defaultOutboundHardLimit:
+      subscription?.plan?.defaultOutboundHardLimit ?? 20,
+    billingControls,
   };
 }
 
@@ -273,13 +291,13 @@ export async function getTenantCustomers(input: {
       ? {
           AND: terms.map((term) => ({
             OR: [
-              { firstName: { contains: term, mode: 'insensitive' } },
-              { lastName: { contains: term, mode: 'insensitive' } },
-              { email: { contains: term, mode: 'insensitive' } },
-              { phone: { contains: term, mode: 'insensitive' } },
+              { firstName: { contains: term, mode: "insensitive" } },
+              { lastName: { contains: term, mode: "insensitive" } },
+              { email: { contains: term, mode: "insensitive" } },
+              { phone: { contains: term, mode: "insensitive" } },
               {
                 phones: {
-                  some: { phone: { contains: term, mode: 'insensitive' } },
+                  some: { phone: { contains: term, mode: "insensitive" } },
                 },
               },
             ],
@@ -293,7 +311,7 @@ export async function getTenantCustomers(input: {
   const safePage = Math.min(page, totalPages);
   const rows = await prisma.customer.findMany({
     where,
-    orderBy: { updatedAt: 'desc' },
+    orderBy: { updatedAt: "desc" },
     skip: (safePage - 1) * pageSize,
     take: pageSize,
     select: {
@@ -304,7 +322,7 @@ export async function getTenantCustomers(input: {
       phone: true,
       phones: {
         where: { endedAt: null },
-        orderBy: { startedAt: 'desc' },
+        orderBy: { startedAt: "desc" },
         take: 1,
         select: { phone: true },
       },
@@ -346,7 +364,7 @@ export async function getCustomerRecoveries(input: {
       phone: true,
       phones: {
         where: { endedAt: null },
-        orderBy: { startedAt: 'desc' },
+        orderBy: { startedAt: "desc" },
         take: 1,
         select: { phone: true },
       },
@@ -364,7 +382,7 @@ export async function getCustomerRecoveries(input: {
   const safePage = Math.min(page, totalPages);
   const rows = await prisma.checkoutRecovery.findMany({
     where,
-    orderBy: { detectedAt: 'desc' },
+    orderBy: { detectedAt: "desc" },
     skip: (safePage - 1) * pageSize,
     take: pageSize,
     select: {
@@ -431,7 +449,7 @@ export async function getRecoveryDetail(input: {
           phone: true,
           phones: {
             where: { endedAt: null },
-            orderBy: { startedAt: 'desc' },
+            orderBy: { startedAt: "desc" },
             take: 1,
             select: { phone: true },
           },
@@ -441,7 +459,7 @@ export async function getRecoveryDetail(input: {
         select: { id: true, outcome: true },
       },
       statusHistory: {
-        orderBy: { occurredAt: 'asc' },
+        orderBy: { occurredAt: "asc" },
         select: {
           id: true,
           fromStatus: true,
@@ -475,7 +493,7 @@ export async function getRecoveryDetail(input: {
     const safeMessagePage = Math.min(messagePage, messageTotalPages);
     const messageRows = await prisma.conversationMessage.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
       skip: (safeMessagePage - 1) * messagePageSize,
       take: messagePageSize,
     });
