@@ -4,6 +4,7 @@ import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import { getBillingPlans } from "@/lib/admin/billing-plan";
 import { getBillingLedger, getBillingOverview } from "@/lib/admin/billing";
 import { adminI18n } from "@/i18n";
+<<<<<<< HEAD
 import {
   BillingLedger,
   BillingOverviewCards,
@@ -15,6 +16,10 @@ import {
   type SearchParamRecord,
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
+=======
+import { PlatformBillingControls } from "@/components/admin/billing-controls";
+import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
+>>>>>>> ca88289ae9aa3bb4e27982a2a05b61d6a684dfef
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +47,8 @@ export default async function BillingPage({ searchParams }: PageProps) {
       to: firstParam(rawParams.to),
     }),
   ]);
+  const plans = await getBillingPlans();
+  const policy = await getPlatformBillingPolicy();
 
   return (
     <AdminShell active="billing">
@@ -58,6 +65,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <BillingLedger ledger={ledger} params={params} />
         <div className="my-8" />
         <BillingPlanCatalog plans={plans} />
+        <div className="mt-8">
+          <PlatformBillingControls policy={policy} />
+        </div>
       </div>
     </AdminShell>
   );
