@@ -29,6 +29,29 @@ export type TenantDetail = TenantListItem & {
   subscriptionStatus: string | null;
   currentPeriodStart: Date | null;
   currentPeriodEnd: Date | null;
+  defaultOutboundSoftLimit: number;
+  defaultOutboundHardLimit: number;
+  billingControls: TenantBillingControls;
+};
+
+export type TenantBillingControls = {
+  override: {
+    outboundSoftLimit: number | null;
+    outboundHardLimit: number | null;
+    pauseNewRecoveries: boolean | null;
+    pauseAutomatedWhatsapp: boolean | null;
+    recoverySafetyCeiling: number | null;
+    reason: string;
+    expiresAt: Date | null;
+  } | null;
+  allowance: {
+    baseAllowance: number | null;
+    totalAdjustments: number;
+    committed: number;
+    reserved: number;
+    effectiveAllowance: number | null;
+    effectiveRemaining: number | null;
+  };
 };
 
 export type CustomerListItem = {

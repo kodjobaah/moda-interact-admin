@@ -3,12 +3,15 @@ import { BillingPlanCatalog } from "@/components/admin/billing-plan-catalog";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import { getBillingPlans } from "@/lib/admin/billing-plan";
 import { adminI18n } from "@/i18n";
+import { PlatformBillingControls } from "@/components/admin/billing-controls";
+import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
 
 export const dynamic = "force-dynamic";
 
 export default async function BillingPage() {
   await requirePlatformAdminPage();
   const plans = await getBillingPlans();
+  const policy = await getPlatformBillingPolicy();
 
   return (
     <AdminShell active="billing">
@@ -22,6 +25,9 @@ export default async function BillingPage() {
           </p>
         </div>
         <BillingPlanCatalog plans={plans} />
+        <div className="mt-8">
+          <PlatformBillingControls policy={policy} />
+        </div>
       </div>
     </AdminShell>
   );
