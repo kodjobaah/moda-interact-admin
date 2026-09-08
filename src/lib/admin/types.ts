@@ -18,7 +18,7 @@ export type BillingOverview = {
     unmapped: number;
     syncError: number;
   };
-  freeExhausted: number;
+  freeExhausted: number | null;
   paidRecoveryUsage: string;
   reportStates: Record<string, number>;
 };
@@ -74,6 +74,14 @@ export type TenantBilling = {
     remaining: number;
   };
   paidRecoveryUsage: string;
+  currentPeriodAutomatedMessageQuantity: string | null;
+  planDefaultOutboundHardLimit: number | null;
+  platformAbsoluteOutboundHardLimit: number | null;
+  effectiveOutboundHardCap: number | null;
+  overrideState: "ACTIVE" | "EXPIRED" | null;
+  overrideReason: string | null;
+  pauseNewRecoveries: boolean | null;
+  pauseAutomatedWhatsapp: boolean | null;
   override: {
     outboundSoftLimit: number | null;
     outboundHardLimit: number | null;

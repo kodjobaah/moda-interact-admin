@@ -50,9 +50,14 @@ function pageResult<T>(
   };
 }
 
-function dateValue(value: string | undefined): Date | undefined {
+export function billingDateBoundary(
+  value: string | undefined,
+  endOfDay = false,
+): Date | undefined {
   if (!value) return undefined;
-  const date = new Date(value);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`)
+    : new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
@@ -62,58 +67,47 @@ function decimalValue(value: Prisma.Decimal | null | undefined): string {
 
 export async function getBillingOverview(): Promise<BillingOverview> {
   await requirePlatformAdminRead();
-  const [
-    free,
-    paid,
-    unmapped,
-    syncError,
-    freeExhausted,
-    paidUsage,
-    reportStateCounts,
-  ] = await Promise.all([
-    prisma.shop.count({
-      where: {
-        subscription: { is: { plan: { is: { kind: BillingPlanKind.FREE } } } },
-      },
-    }),
-    prisma.shop.count({
-      where: {
-        subscription: {
-          is: { plan: { is: { kind: BillingPlanKind.PAID_METERED } } },
+  const [free, paid, unmapped, syncError, paidUsage, reportStateCounts] =
+    await Promise.all([
+      prisma.shop.count({
+        where: {
+          subscription: {
+            is: { plan: { is: { kind: BillingPlanKind.FREE } } },
+          },
         },
-      },
-    }),
-    prisma.subscription.count({ where: { status: "UNMAPPED" } }),
-    prisma.subscription.count({ where: { status: "SYNC_ERROR" } }),
-    prisma.shopEntitlementCounter.count({
-      where: {
-        counter: EntitlementCounter.FREE_RECOVERY_LIFETIME,
-        committedQuantity: { gte: 5 },
-      },
-    }),
-    prisma.usageEvent.aggregate({
-      where: {
-        metric: UsageMetric.RECOVERY_CONVERSATION,
-        shopifyReportState: ShopifyReportState.REPORTED,
-      },
-      _sum: { quantity: true },
-    }),
-    Promise.all(
-      REPORT_STATES.map(
-        async (state) =>
-          [
-            state,
-            await prisma.usageEvent.count({
-              where: { shopifyReportState: state },
-            }),
-          ] as const,
+      }),
+      prisma.shop.count({
+        where: {
+          subscription: {
+            is: { plan: { is: { kind: BillingPlanKind.PAID_METERED } } },
+          },
+        },
+      }),
+      prisma.subscription.count({ where: { status: "UNMAPPED" } }),
+      prisma.subscription.count({ where: { status: "SYNC_ERROR" } }),
+      prisma.usageEvent.aggregate({
+        where: {
+          metric: UsageMetric.RECOVERY_CONVERSATION,
+          shopifyReportState: ShopifyReportState.REPORTED,
+        },
+        _sum: { quantity: true },
+      }),
+      Promise.all(
+        REPORT_STATES.map(
+          async (state) =>
+            [
+              state,
+              await prisma.usageEvent.count({
+                where: { shopifyReportState: state },
+              }),
+            ] as const,
+        ),
       ),
-    ),
-  ]);
+    ]);
 
   return {
     planDistribution: { free, paid, unmapped, syncError },
-    freeExhausted,
+    freeExhausted: null,
     paidRecoveryUsage: decimalValue(paidUsage._sum.quantity),
     reportStates: Object.fromEntries(reportStateCounts),
   };
@@ -133,8 +127,8 @@ export async function getBillingLedger(input: {
     input.pageSize,
   );
   const occurredAt: Prisma.DateTimeFilter = {};
-  const from = dateValue(input.from);
-  const to = dateValue(input.to);
+  const from = billingDateBoundary(input.from);
+  const to = billingDateBoundary(input.to, true);
   if (from) occurredAt.gte = from;
   if (to) occurredAt.lte = to;
   const where: Prisma.UsageEventWhereInput = {
@@ -210,7 +204,16 @@ export async function getTenantBilling(
   });
   if (!subscription) return null;
 
-  const [counter, adjustments, usage, override, ledger] = await Promise.all([
+  const now = new Date();
+  const [
+    counter,
+    adjustments,
+    usage,
+    automatedMessages,
+    override,
+    policy,
+    ledger,
+  ] = await Promise.all([
     prisma.shopEntitlementCounter.findUnique({
       where: {
         shopId_counter: {
@@ -237,6 +240,16 @@ export async function getTenantBilling(
       },
       _sum: { quantity: true },
     }),
+    subscription.billingPeriod
+      ? prisma.usageEvent.aggregate({
+          where: {
+            shopId,
+            billingPeriodId: subscription.billingPeriod.id,
+            metric: UsageMetric.OUTBOUND_AUTOMATED_MESSAGE,
+          },
+          _sum: { quantity: true },
+        })
+      : Promise.resolve(null),
     prisma.shopBillingPolicyOverride.findUnique({
       where: { shopId },
       select: {
@@ -249,6 +262,7 @@ export async function getTenantBilling(
         expiresAt: true,
       },
     }),
+    prisma.platformBillingPolicy.findUnique({ where: { id: "default" } }),
     getBillingLedger({ shopId, page: ledgerPage, pageSize: ledgerPageSize }),
   ]);
 
@@ -257,6 +271,18 @@ export async function getTenantBilling(
   const adjustmentTotal = adjustments._sum.quantity ?? 0;
   const committed = counter?.committedQuantity ?? 0;
   const reserved = counter?.reservedQuantity ?? 0;
+  const overrideActive = override
+    ? override.expiresAt === null || override.expiresAt > now
+    : false;
+  const configuredHardLimit = overrideActive
+    ? (override?.outboundHardLimit ??
+      subscription.plan?.defaultOutboundHardLimit ??
+      null)
+    : (subscription.plan?.defaultOutboundHardLimit ?? null);
+  const effectiveOutboundHardCap =
+    configuredHardLimit === null || !policy
+      ? configuredHardLimit
+      : Math.min(configuredHardLimit, policy.absoluteOutboundHardLimit);
   return {
     subscription,
     allowance: {
@@ -270,6 +296,23 @@ export async function getTenantBilling(
       ),
     },
     paidRecoveryUsage: decimalValue(usage._sum.quantity),
+    currentPeriodAutomatedMessageQuantity:
+      automatedMessages === null
+        ? null
+        : decimalValue(automatedMessages._sum.quantity),
+    planDefaultOutboundHardLimit:
+      subscription.plan?.defaultOutboundHardLimit ?? null,
+    platformAbsoluteOutboundHardLimit:
+      policy?.absoluteOutboundHardLimit ?? null,
+    effectiveOutboundHardCap,
+    overrideState: override ? (overrideActive ? "ACTIVE" : "EXPIRED") : null,
+    overrideReason: override?.reason ?? null,
+    pauseNewRecoveries: overrideActive
+      ? (override?.pauseNewRecoveries ?? null)
+      : null,
+    pauseAutomatedWhatsapp: overrideActive
+      ? (override?.pauseAutomatedWhatsapp ?? null)
+      : null,
     override,
     ledger,
     discrepancy: null,

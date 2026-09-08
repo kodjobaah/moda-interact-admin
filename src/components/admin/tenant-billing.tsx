@@ -1,5 +1,5 @@
 import type { TenantBilling } from "@/lib/admin/types";
-import { adminI18n } from "@/i18n";
+import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { Pagination } from "./pagination";
 
 function Value({ label, value }: { label: string; value: string | number }) {
@@ -21,6 +21,8 @@ export function TenantBillingView({
   params: Record<string, string>;
 }) {
   const subscription = billing.subscription;
+  const quantity = (value: string) => adminI18n.formatNumber(Number(value));
+  const empty = adminI18n.t("empty.notRecorded");
   return (
     <div className="space-y-6">
       <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -111,7 +113,41 @@ export function TenantBillingView({
           />
           <Value
             label={adminI18n.t("billing.paidRecoveryUsage")}
-            value={billing.paidRecoveryUsage}
+            value={quantity(billing.paidRecoveryUsage)}
+          />
+          <Value
+            label={adminI18n.t("billing.automatedMessageUsage")}
+            value={
+              billing.currentPeriodAutomatedMessageQuantity === null
+                ? adminI18n.t("empty.unavailable")
+                : quantity(billing.currentPeriodAutomatedMessageQuantity)
+            }
+          />
+          <Value
+            label={adminI18n.t("billing.hardLimit")}
+            value={
+              billing.planDefaultOutboundHardLimit === null
+                ? adminI18n.t("empty.unavailable")
+                : adminI18n.formatNumber(billing.planDefaultOutboundHardLimit)
+            }
+          />
+          <Value
+            label={adminI18n.t("billing.platformOutboundHardCap")}
+            value={
+              billing.platformAbsoluteOutboundHardLimit === null
+                ? adminI18n.t("empty.unavailable")
+                : adminI18n.formatNumber(
+                    billing.platformAbsoluteOutboundHardLimit,
+                  )
+            }
+          />
+          <Value
+            label={adminI18n.t("billing.effectiveOutboundHardCap")}
+            value={
+              billing.effectiveOutboundHardCap === null
+                ? adminI18n.t("empty.unavailable")
+                : adminI18n.formatNumber(billing.effectiveOutboundHardCap)
+            }
           />
         </dl>
       </section>
@@ -140,6 +176,38 @@ export function TenantBillingView({
               value={
                 billing.override.recoverySafetyCeiling ??
                 adminI18n.t("empty.notRecorded")
+              }
+            />
+            <Value
+              label={adminI18n.t("billing.overrideState")}
+              value={
+                billing.overrideState === "ACTIVE"
+                  ? adminI18n.t("billing.overrideActive")
+                  : adminI18n.t("billing.overrideExpired")
+              }
+            />
+            <Value
+              label={adminI18n.t("billing.overrideReason")}
+              value={billing.overrideReason ?? empty}
+            />
+            <Value
+              label={adminI18n.t("billing.pauseNewRecoveries")}
+              value={
+                billing.pauseNewRecoveries === null
+                  ? empty
+                  : billing.pauseNewRecoveries
+                    ? adminI18n.t("billingControls.enabled")
+                    : adminI18n.t("billingControls.disabled")
+              }
+            />
+            <Value
+              label={adminI18n.t("billing.pauseAutomatedWhatsapp")}
+              value={
+                billing.pauseAutomatedWhatsapp === null
+                  ? empty
+                  : billing.pauseAutomatedWhatsapp
+                    ? adminI18n.t("billingControls.enabled")
+                    : adminI18n.t("billingControls.disabled")
               }
             />
             <Value
@@ -190,6 +258,12 @@ export function TenantBillingView({
                   <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                     {adminI18n.t("billing.reportStateLabel")}
                   </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                    {adminI18n.t("billing.providerErrorCode")}
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                    {adminI18n.t("billing.reportAttempts")}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -202,10 +276,16 @@ export function TenantBillingView({
                       {item.metric}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {item.quantity}
+                      {quantity(item.quantity)}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                      {item.shopifyReportState}
+                      {adminBillingReportStateLabel(item.shopifyReportState)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                      {item.providerErrorCode ?? empty}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                      {adminI18n.formatNumber(item.reportAttemptCount)}
                     </td>
                   </tr>
                 ))}

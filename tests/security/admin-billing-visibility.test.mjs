@@ -46,3 +46,82 @@ test("billing UI exposes the bounded ledger filters and unavailable reconciliati
   assert.match(tenant, /billing\.discrepancyUnavailable/);
   assert.match(tenant, /pageParam="billingPage"/);
 });
+
+test("billing overview does not infer Free exhaustion from a counter threshold", async () => {
+  const source = await readFile(
+    path.join(repositoryRoot, "src/lib/admin/billing.ts"),
+    "utf8",
+  );
+  const overview = await readFile(
+    path.join(repositoryRoot, "src/components/admin/billing-overview.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /freeExhausted: null/);
+  assert.doesNotMatch(source, /shopEntitlementCounter\.count/);
+  assert.match(overview, /overview\.freeExhausted === null/);
+  assert.match(overview, /empty\.unavailable/);
+});
+
+test("billing ledger preserves report states, diagnostics, and inclusive date boundaries", async () => {
+  const [source, overview, tenant] = await Promise.all([
+    readFile(path.join(repositoryRoot, "src/lib/admin/billing.ts"), "utf8"),
+    readFile(
+      path.join(repositoryRoot, "src/components/admin/billing-overview.tsx"),
+      "utf8",
+    ),
+    readFile(
+      path.join(repositoryRoot, "src/components/admin/tenant-billing.tsx"),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(source, /billingDateBoundary\(input\.to, true\)/);
+  assert.match(source, /23:59:59\.999/);
+  for (const diagnostic of [
+    "providerErrorCode",
+    "providerResponseSummary",
+    "reportAttemptCount",
+    "lastReportAttemptAt",
+    "reportedAt",
+    "shopifyEventHandle",
+  ]) {
+    assert.match(overview, new RegExp(diagnostic));
+  }
+  assert.match(overview, /adminBillingReportStateLabel/);
+  assert.match(tenant, /adminBillingReportStateLabel/);
+});
+
+test("tenant billing reports period message usage and ignores expired override caps", async () => {
+  const [source, tenant] = await Promise.all([
+    readFile(path.join(repositoryRoot, "src/lib/admin/billing.ts"), "utf8"),
+    readFile(
+      path.join(repositoryRoot, "src/components/admin/tenant-billing.tsx"),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(source, /UsageMetric\.OUTBOUND_AUTOMATED_MESSAGE/);
+  assert.match(source, /currentPeriodAutomatedMessageQuantity/);
+  assert.match(source, /automatedMessages === null/);
+  assert.match(source, /override\.expiresAt > now/);
+  assert.match(
+    source,
+    /Math\.min\(configuredHardLimit, policy\.absoluteOutboundHardLimit\)/,
+  );
+  assert.match(tenant, /billing\.automatedMessageUsage/);
+  assert.match(tenant, /billing\.effectiveOutboundHardCap/);
+  assert.match(tenant, /billing\.overrideExpired/);
+});
+
+test("Admin-002 controls remain wired alongside the overview and ledger", async () => {
+  const page = await readFile(
+    path.join(repositoryRoot, "src/app/(protected)/billing/page.tsx"),
+    "utf8",
+  );
+
+  assert.match(page, /BillingPlanCatalog/);
+  assert.match(page, /PlatformBillingControls/);
+  assert.match(page, /getPlatformBillingPolicy/);
+  assert.doesNotMatch(page, /<<<<<<<|=======|>>>>>>>/);
+});

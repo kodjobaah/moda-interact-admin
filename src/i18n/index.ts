@@ -37,6 +37,14 @@ export function adminStatusLabel(value: string | null | undefined): string {
     : value;
 }
 
+export function adminBillingReportStateLabel(
+  value: string | null | undefined,
+): string {
+  if (!value) return adminI18n.t("empty.notRecorded");
+  const key = `billing.state.${value}`;
+  return Object.hasOwn(catalogue, key) ? adminI18n.t(key) : value;
+}
+
 export function adminRoleLabel(value: string): string {
   return Object.hasOwn(catalogue, `role.${value}`)
     ? adminI18n.t(`role.${value}`)

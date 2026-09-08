@@ -3,7 +3,7 @@ import type {
   BillingOverview,
   PageResult,
 } from "@/lib/admin/types";
-import { adminI18n } from "@/i18n";
+import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { Pagination } from "./pagination";
 
 function Metric({ label, value }: { label: string; value: string | number }) {
@@ -37,7 +37,11 @@ export function BillingOverviewCards({
       />
       <Metric
         label={adminI18n.t("billing.freeExhausted")}
-        value={adminI18n.formatNumber(overview.freeExhausted)}
+        value={
+          overview.freeExhausted === null
+            ? adminI18n.t("empty.unavailable")
+            : adminI18n.formatNumber(overview.freeExhausted)
+        }
       />
       <Metric
         label={adminI18n.t("billing.paidRecoveryUsage")}
@@ -69,6 +73,8 @@ export function BillingLedger({
   ledger: PageResult<BillingLedgerItem>;
   params: Record<string, string>;
 }) {
+  const quantity = (value: string) => adminI18n.formatNumber(Number(value));
+  const empty = adminI18n.t("empty.notRecorded");
   return (
     <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 px-5 py-4">
@@ -142,7 +148,12 @@ export function BillingLedger({
                   adminI18n.t("billing.quantity"),
                   adminI18n.t("billing.occurredAt"),
                   adminI18n.t("billing.reportStateLabel"),
-                  adminI18n.t("billing.providerStatus"),
+                  adminI18n.t("billing.providerErrorCode"),
+                  adminI18n.t("billing.providerResponse"),
+                  adminI18n.t("billing.reportAttempts"),
+                  adminI18n.t("billing.lastReportAttemptAt"),
+                  adminI18n.t("billing.reportedAt"),
+                  adminI18n.t("billing.shopifyEventHandle"),
                 ].map((heading) => (
                   <th
                     key={heading}
@@ -163,16 +174,35 @@ export function BillingLedger({
                     {item.metric}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                    {item.quantity}
+                    {quantity(item.quantity)}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
                     {adminI18n.formatDateTime(item.occurredAt)}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                    {item.shopifyReportState}
+                    {adminBillingReportStateLabel(item.shopifyReportState)}
                   </td>
                   <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
-                    {item.providerErrorCode ?? adminI18n.t("billing.reported")}
+                    {item.providerErrorCode ?? empty}
+                  </td>
+                  <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
+                    {item.providerResponseSummary ?? empty}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                    {adminI18n.formatNumber(item.reportAttemptCount)}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                    {item.lastReportAttemptAt
+                      ? adminI18n.formatDateTime(item.lastReportAttemptAt)
+                      : empty}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
+                    {item.reportedAt
+                      ? adminI18n.formatDateTime(item.reportedAt)
+                      : empty}
+                  </td>
+                  <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
+                    {item.shopifyEventHandle ?? empty}
                   </td>
                 </tr>
               ))}
