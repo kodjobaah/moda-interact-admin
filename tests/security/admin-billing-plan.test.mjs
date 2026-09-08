@@ -88,6 +88,54 @@ test("enforces mutually exclusive Free and paid billing fields", () => {
   });
 });
 
+test("validates repeatable recovery-credit pack mappings without price fields", () => {
+  const result = runBehaviorScript(`
+    import { parseBillingPlanForm } from ${JSON.stringify(moduleUrl)};
+    const attempt = (values) => {
+      ${form({})}
+      for (const [key, value] of Object.entries(values)) form.set(key, value);
+      try { return parseBillingPlanForm(form); } catch { return null; }
+    };
+    const paid = {
+      kind: 'PAID_METERED',
+      freeLifetimeConversationAllowance: '',
+      shopifyUsageEventHandle: 'recovery-meter',
+      recoveryCreditPackEnabled: 'on',
+      recoveryCreditsPerPack: '25',
+      shopifyRecoveryCreditPackEventHandle: 'pack-meter',
+      includedRecoveryConversationAllowance: '200',
+    };
+    console.log(JSON.stringify({
+      accepted: attempt(paid),
+      disabledFieldsRejected: attempt({ recoveryCreditsPerPack: '25' }) === null,
+      zeroAllowanceRejected: attempt({ ...paid, includedRecoveryConversationAllowance: '-1' }) === null,
+      duplicateMeterRejected: attempt({ ...paid, shopifyRecoveryCreditPackEventHandle: 'recovery-meter' }) === null,
+      missingPackFieldsRejected: attempt({ ...paid, recoveryCreditPackEnabled: 'off', recoveryCreditsPerPack: '', shopifyRecoveryCreditPackEventHandle: '' }) !== null,
+    }));
+  `);
+  assert.equal(result.accepted.recoveryCreditsPerPack, 25);
+  assert.equal(result.accepted.includedRecoveryConversationAllowance, 200);
+  assert.equal(result.disabledFieldsRejected, true);
+  assert.equal(result.zeroAllowanceRejected, true);
+  assert.equal(result.duplicateMeterRejected, true);
+  assert.equal(result.missingPackFieldsRejected, true);
+  assert.doesNotMatch(actionSource, /price|amount/i);
+});
+
+test("exposes required recovery-credit pack copy through the Admin ICU catalogue", () => {
+  const catalogue = JSON.parse(
+    readFileSync(resolve(root, "src/i18n/locales/en.json"), "utf8"),
+  );
+  assert.equal(
+    catalogue["billing.recoveryCreditPackHelp"],
+    "Pack price is configured in Shopify App Pricing. Moda stores only the pack size and Shopify meter mapping.",
+  );
+  assert.equal(
+    catalogue["billing.recoveryCreditPackRateHelp"],
+    "Configure a cheaper recovery-credit-pack meter rate on higher paid plans in Shopify if that is the intended commercial policy.",
+  );
+});
+
 test("requires bounded safety defaults and a mutation reason", () => {
   const result = runBehaviorScript(`
     import { parseBillingPlanForm } from ${JSON.stringify(moduleUrl)};

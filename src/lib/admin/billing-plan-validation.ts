@@ -19,6 +19,10 @@ export type BillingPlanFormValues = {
   name: string;
   kind: BillingPlanKind;
   shopifyUsageEventHandle: string | null;
+  includedRecoveryConversationAllowance: number | null;
+  recoveryCreditPackEnabled: boolean;
+  recoveryCreditsPerPack: number | null;
+  shopifyRecoveryCreditPackEventHandle: string | null;
   freeLifetimeConversationAllowance: number | null;
   defaultOutboundSoftLimit: number;
   defaultOutboundHardLimit: number;
@@ -36,6 +40,14 @@ function positiveInteger(value: string, label: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${label} must be a positive integer.`);
+  }
+  return parsed;
+}
+
+function nonNegativeInteger(value: string, label: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${label} must be a non-negative integer.`);
   }
   return parsed;
 }
@@ -93,6 +105,50 @@ export function parseBillingPlanForm(
   }
 
   const usageHandle = text(formData.get("shopifyUsageEventHandle")) || null;
+  const recoveryCreditPackEnabled =
+    formData.get("recoveryCreditPackEnabled") === "on";
+  const recoveryCreditsPerPackText = text(
+    formData.get("recoveryCreditsPerPack"),
+  );
+  const recoveryCreditsPerPack = recoveryCreditsPerPackText
+    ? positiveInteger(recoveryCreditsPerPackText, "Recovery credits per pack")
+    : null;
+  const recoveryCreditPackEventHandle =
+    text(formData.get("shopifyRecoveryCreditPackEventHandle")) || null;
+  const includedRecoveryAllowanceText = text(
+    formData.get("includedRecoveryConversationAllowance"),
+  );
+  const includedRecoveryConversationAllowance = includedRecoveryAllowanceText
+    ? nonNegativeInteger(
+        includedRecoveryAllowanceText,
+        "Included recovery conversation allowance",
+      )
+    : null;
+  if (!recoveryCreditPackEnabled) {
+    if (recoveryCreditsPerPack !== null || recoveryCreditPackEventHandle) {
+      throw new Error(
+        "Disabled recovery-credit packs cannot define pack size or event handle.",
+      );
+    }
+  } else {
+    if (recoveryCreditsPerPack === null || !recoveryCreditPackEventHandle) {
+      throw new Error(
+        "Enabled recovery-credit packs require a positive pack size and event handle.",
+      );
+    }
+    if (recoveryCreditPackEventHandle === usageHandle) {
+      throw new Error(
+        "Recovery-credit pack and normal recovery event handles must differ.",
+      );
+    }
+    if (kindResult.data === "PAID_METERED") {
+      if (includedRecoveryConversationAllowance === null) {
+        throw new Error(
+          "Paid plans with recovery-credit packs require a non-negative included allowance.",
+        );
+      }
+    }
+  }
   const allowanceText = text(formData.get("freeLifetimeConversationAllowance"));
   const freeLifetimeConversationAllowance = allowanceText
     ? positiveInteger(allowanceText, "Free lifetime conversation allowance")
@@ -132,6 +188,10 @@ export function parseBillingPlanForm(
     name,
     kind: kindResult.data,
     shopifyUsageEventHandle: usageHandle,
+    includedRecoveryConversationAllowance,
+    recoveryCreditPackEnabled,
+    recoveryCreditsPerPack,
+    shopifyRecoveryCreditPackEventHandle: recoveryCreditPackEventHandle,
     freeLifetimeConversationAllowance,
     defaultOutboundSoftLimit,
     defaultOutboundHardLimit,
