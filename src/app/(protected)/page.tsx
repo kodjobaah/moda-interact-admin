@@ -1,28 +1,29 @@
-import { AdminShell } from '@/components/admin/admin-shell';
-import { requirePlatformAdminPage } from '@/lib/auth/platform-admin';
-import { KpiCard } from '@/components/admin/kpi-card';
+import { AdminShell } from "@/components/admin/admin-shell";
+import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
+import { KpiCard } from "@/components/admin/kpi-card";
 import {
   RecoveryDrawer,
   type DrawerTab,
-} from '@/components/admin/recovery-drawer';
-import { TenantTable } from '@/components/admin/tenant-table';
+} from "@/components/admin/recovery-drawer";
+import { TenantTable } from "@/components/admin/tenant-table";
 import {
   QueueMonitorUnavailableError,
   readQueueOverviewSnapshot,
-} from '@/lib/admin/queue-monitor';
+} from "@/lib/admin/queue-monitor";
 import {
   getCustomerRecoveries,
   getRecoveryDetail,
   getTenantCustomers,
   getTenantDetail,
   getTenantDirectory,
-} from '@/lib/admin/data';
+} from "@/lib/admin/data";
+import { getTenantBilling } from "@/lib/admin/billing";
 import type {
   CustomerListItem,
   PageResult,
   RecoveryListItem,
-} from '@/lib/admin/types';
-import { adminI18n, adminQueueLabel } from '@/i18n';
+} from "@/lib/admin/types";
+import { adminI18n, adminQueueLabel } from "@/i18n";
 import {
   cleanSearch,
   firstParam,
@@ -30,9 +31,9 @@ import {
   positiveInt,
   withParamUpdates,
   type SearchParamRecord,
-} from '@/lib/admin/query';
+} from "@/lib/admin/query";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const TENANT_PAGE_SIZE = 10;
 const CUSTOMER_PAGE_SIZE = 8;
@@ -50,7 +51,8 @@ export default async function Home({ searchParams }: PageProps) {
   const search = cleanSearch(rawParams.q);
   const tenantPage = positiveInt(rawParams.page);
   const tenantId = firstParam(rawParams.tenant) ?? null;
-  const tab = firstParam(rawParams.tab) === 'logs' ? 'logs' : 'admin';
+  const rawTab = firstParam(rawParams.tab);
+  const tab = rawTab === "logs" || rawTab === "billing" ? rawTab : "admin";
   const customerSearch = cleanSearch(rawParams.customerSearch);
   const customerPage = positiveInt(rawParams.customerPage);
   const customerId = firstParam(rawParams.customerId) ?? null;
@@ -59,10 +61,10 @@ export default async function Home({ searchParams }: PageProps) {
   const messagePage = positiveInt(rawParams.messagePage);
   const rawDrawerTab = firstParam(rawParams.drawerTab);
   const drawerTab: DrawerTab =
-    rawDrawerTab === 'cart' || rawDrawerTab === 'lifecycle'
+    rawDrawerTab === "cart" || rawDrawerTab === "lifecycle"
       ? rawDrawerTab
-      : 'conversation';
-  const saved = firstParam(rawParams.saved) === '1';
+      : "conversation";
+  const saved = firstParam(rawParams.saved) === "1";
 
   const directory = await getTenantDirectory({
     page: tenantPage,
@@ -78,12 +80,20 @@ export default async function Home({ searchParams }: PageProps) {
   }
 
   const selectedTenant = tenantId ? await getTenantDetail(tenantId) : null;
+  const tenantBilling =
+    selectedTenant && tab === "billing"
+      ? await getTenantBilling(
+          selectedTenant.id,
+          positiveInt(rawParams.billingPage),
+          10,
+        )
+      : null;
 
   let customers: PageResult<CustomerListItem> | null = null;
   let selectedCustomer: CustomerListItem | null = null;
   let recoveries: PageResult<RecoveryListItem> | null = null;
 
-  if (selectedTenant && tab === 'logs') {
+  if (selectedTenant && tab === "logs") {
     customers = await getTenantCustomers({
       shopId: selectedTenant.id,
       page: customerPage,
@@ -113,43 +123,65 @@ export default async function Home({ searchParams }: PageProps) {
         })
       : null;
 
-  const returnTo = withParamUpdates('/', params, { saved: null });
+  const returnTo = withParamUpdates("/", params, { saved: null });
 
   return (
     <AdminShell active="tenants" search={search}>
       <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[var(--brand-900)]">
-            {adminI18n.t('nav.tenantDirectory')}
+            {adminI18n.t("nav.tenantDirectory")}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {adminI18n.t('tenant.directoryDescription')}
+            {adminI18n.t("tenant.directoryDescription")}
           </p>
         </div>
 
         <section
           className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6"
-          aria-label={adminI18n.t('tenant.platformSummary')}
+          aria-label={adminI18n.t("tenant.platformSummary")}
         >
           <KpiCard
-            label={adminI18n.t('tenant.activeTenants')}
+            label={adminI18n.t("tenant.activeTenants")}
             value={adminI18n.formatNumber(directory.kpis.activeTenants)}
           />
           <KpiCard
-            label={adminI18n.t('tenant.activeRecoveries')}
+            label={adminI18n.t("tenant.activeRecoveries")}
             value={adminI18n.formatNumber(directory.kpis.activeRecoveries)}
             accent
           />
-          {(queueOverview?.queues ?? [
-            { queueName: 'checkout-events', labelKey: 'queue.checkoutEvents', active: null },
-            { queueName: 'order-events', labelKey: 'queue.orderEvents', active: null },
-            { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries', active: null },
-            { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents', active: null },
-          ]).map((queue) => (
+          {(
+            queueOverview?.queues ?? [
+              {
+                queueName: "checkout-events",
+                labelKey: "queue.checkoutEvents",
+                active: null,
+              },
+              {
+                queueName: "order-events",
+                labelKey: "queue.orderEvents",
+                active: null,
+              },
+              {
+                queueName: "pending-recovery-candidates",
+                labelKey: "queue.pendingRecoveries",
+                active: null,
+              },
+              {
+                queueName: "whatsapp-events",
+                labelKey: "queue.whatsappEvents",
+                active: null,
+              },
+            ]
+          ).map((queue) => (
             <KpiCard
               key={queue.queueName}
               label={adminQueueLabel(queue.queueName)}
-              value={queue.active === null ? adminI18n.t('empty.unavailable') : adminI18n.formatNumber(queue.active)}
+              value={
+                queue.active === null
+                  ? adminI18n.t("empty.unavailable")
+                  : adminI18n.formatNumber(queue.active)
+              }
               status={queue.active === null}
             />
           ))}
@@ -166,6 +198,7 @@ export default async function Home({ searchParams }: PageProps) {
           params={params}
           returnTo={returnTo}
           saved={saved}
+          billing={tenantBilling}
         />
       </div>
 

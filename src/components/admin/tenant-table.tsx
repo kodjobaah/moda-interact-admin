@@ -5,6 +5,7 @@ import type {
   PageResult,
   RecoveryListItem,
   TenantDetail,
+  TenantBilling,
   TenantListItem,
 } from "@/lib/admin/types";
 import { EmptyState } from "./empty-state";
@@ -25,10 +26,11 @@ export function TenantTable({
   params,
   returnTo,
   saved,
+  billing,
 }: {
   tenants: PageResult<TenantListItem>;
   selectedTenant: TenantDetail | null;
-  tab: "admin" | "logs";
+  tab: "admin" | "logs" | "billing";
   customers: PageResult<CustomerListItem> | null;
   customerSearch: string;
   selectedCustomer: CustomerListItem | null;
@@ -36,6 +38,7 @@ export function TenantTable({
   params: Record<string, string>;
   returnTo: string;
   saved?: boolean;
+  billing: TenantBilling | null;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -104,6 +107,7 @@ export function TenantTable({
                           params={params}
                           returnTo={returnTo}
                           saved={saved}
+                          billing={billing}
                         />
                       ) : null
                     }

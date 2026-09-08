@@ -1,14 +1,16 @@
-import Link from 'next/link';
-import { withParamUpdates } from '@/lib/admin/query';
+import Link from "next/link";
+import { withParamUpdates } from "@/lib/admin/query";
 import type {
   CustomerListItem,
   PageResult,
   RecoveryListItem,
   TenantDetail,
-} from '@/lib/admin/types';
-import { RecoveryLogs } from './recovery-logs';
-import { TenantAdministration } from './tenant-administration';
-import { adminI18n } from '@/i18n';
+  TenantBilling,
+} from "@/lib/admin/types";
+import { RecoveryLogs } from "./recovery-logs";
+import { TenantAdministration } from "./tenant-administration";
+import { TenantBillingView } from "./tenant-billing";
+import { adminI18n } from "@/i18n";
 
 export function TenantDetailPanel({
   tenant,
@@ -20,9 +22,10 @@ export function TenantDetailPanel({
   params,
   returnTo,
   saved,
+  billing,
 }: {
   tenant: TenantDetail;
-  tab: 'admin' | 'logs';
+  tab: "admin" | "logs" | "billing";
   customers: PageResult<CustomerListItem> | null;
   customerSearch: string;
   selectedCustomer: CustomerListItem | null;
@@ -30,9 +33,10 @@ export function TenantDetailPanel({
   params: Record<string, string>;
   returnTo: string;
   saved?: boolean;
+  billing: TenantBilling | null;
 }) {
-  const adminHref = withParamUpdates('/', params, {
-    tab: 'admin',
+  const adminHref = withParamUpdates("/", params, {
+    tab: "admin",
     customerId: null,
     customerPage: null,
     customerSearch: null,
@@ -42,38 +46,51 @@ export function TenantDetailPanel({
     messagePage: null,
     saved: null,
   });
-  const logsHref = withParamUpdates('/', params, {
-    tab: 'logs',
+  const logsHref = withParamUpdates("/", params, {
+    tab: "logs",
     customerPage: 1,
     saved: null,
   });
+  const billingHref = withParamUpdates("/", params, {
+    tab: "billing",
+    billingPage: 1,
+    saved: null,
+  });
   const activeClass =
-    'border-b-2 border-[var(--brand-700)] pb-2 font-semibold text-[var(--brand-700)]';
+    "border-b-2 border-[var(--brand-700)] pb-2 font-semibold text-[var(--brand-700)]";
   const idleClass =
-    'border-b-2 border-transparent pb-2 font-medium text-gray-500 hover:text-gray-700';
+    "border-b-2 border-transparent pb-2 font-medium text-gray-500 hover:text-gray-700";
 
   return (
     <div className="px-6 py-6 sm:px-10">
       <div className="mb-6 flex gap-6 border-b border-gray-200 pb-2">
         <Link
           href={adminHref}
-          className={tab === 'admin' ? activeClass : idleClass}
+          className={tab === "admin" ? activeClass : idleClass}
         >
-          {adminI18n.t('tenant.administration')}
+          {adminI18n.t("tenant.administration")}
         </Link>
         <Link
           href={logsHref}
-          className={tab === 'logs' ? activeClass : idleClass}
+          className={tab === "logs" ? activeClass : idleClass}
         >
-          {adminI18n.t('tenant.recoveryLogs')}
+          {adminI18n.t("tenant.recoveryLogs")}
+        </Link>
+        <Link
+          href={billingHref}
+          className={tab === "billing" ? activeClass : idleClass}
+        >
+          {adminI18n.t("tenant.billing")}
         </Link>
       </div>
-      {tab === 'admin' ? (
+      {tab === "admin" ? (
         <TenantAdministration
           tenant={tenant}
           returnTo={returnTo}
           saved={saved}
         />
+      ) : tab === "billing" && billing ? (
+        <TenantBillingView billing={billing} params={params} />
       ) : customers ? (
         <RecoveryLogs
           customers={customers}
