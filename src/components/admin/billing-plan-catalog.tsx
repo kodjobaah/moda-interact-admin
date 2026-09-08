@@ -81,6 +81,48 @@ function PlanForm({ plan }: { plan?: BillingPlanRow }) {
             defaultValue={plan?.shopifyUsageEventHandle ?? ""}
           />
         </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 sm:col-span-2">
+          <input
+            type="checkbox"
+            name="recoveryCreditPackEnabled"
+            defaultChecked={plan?.recoveryCreditPackEnabled ?? false}
+          />
+          {adminI18n.t("billing.recoveryCreditPackEnabled")}
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          {adminI18n.t("billing.recoveryCreditsPerPack")}
+          <input
+            className={inputClass}
+            name="recoveryCreditsPerPack"
+            type="number"
+            min="1"
+            defaultValue={plan?.recoveryCreditsPerPack ?? ""}
+          />
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          {adminI18n.t("billing.recoveryCreditPackEventHandle")}
+          <input
+            className={inputClass}
+            name="shopifyRecoveryCreditPackEventHandle"
+            defaultValue={plan?.shopifyRecoveryCreditPackEventHandle ?? ""}
+          />
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          {adminI18n.t("billing.includedRecoveryAllowance")}
+          <input
+            className={inputClass}
+            name="includedRecoveryConversationAllowance"
+            type="number"
+            min="0"
+            defaultValue={plan?.includedRecoveryConversationAllowance ?? ""}
+          />
+        </label>
+        <p className="text-sm text-gray-600 sm:col-span-2">
+          {adminI18n.t("billing.recoveryCreditPackHelp")}
+        </p>
+        <p className="text-sm text-gray-600 sm:col-span-2">
+          {adminI18n.t("billing.recoveryCreditPackRateHelp")}
+        </p>
         <label className="text-sm font-medium text-gray-700">
           {adminI18n.t("billing.freeAllowance")}
           <input
@@ -220,6 +262,26 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
                   type="hidden"
                   name="terminalMessageReservedSlots"
                   value={plan.terminalMessageReservedSlots}
+                />
+                <input
+                  type="hidden"
+                  name="recoveryCreditPackEnabled"
+                  value={plan.recoveryCreditPackEnabled ? "on" : "off"}
+                />
+                <input
+                  type="hidden"
+                  name="recoveryCreditsPerPack"
+                  value={plan.recoveryCreditsPerPack ?? ""}
+                />
+                <input
+                  type="hidden"
+                  name="shopifyRecoveryCreditPackEventHandle"
+                  value={plan.shopifyRecoveryCreditPackEventHandle ?? ""}
+                />
+                <input
+                  type="hidden"
+                  name="includedRecoveryConversationAllowance"
+                  value={plan.includedRecoveryConversationAllowance ?? ""}
                 />
                 {plan.kind === "FREE" ? (
                   <input

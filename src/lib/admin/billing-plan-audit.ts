@@ -4,6 +4,10 @@ export type BillingPlanAuditSource = {
   kind: string;
   active: boolean;
   shopifyUsageEventHandle: string | null;
+  includedRecoveryConversationAllowance: number | null;
+  recoveryCreditPackEnabled: boolean;
+  recoveryCreditsPerPack: number | null;
+  shopifyRecoveryCreditPackEventHandle: string | null;
   freeLifetimeConversationAllowance: number | null;
   defaultOutboundSoftLimit: number;
   defaultOutboundHardLimit: number;
@@ -20,6 +24,12 @@ export function billingPlanAuditSnapshot(
     kind: source.kind,
     active: source.active,
     shopifyUsageEventHandle: source.shopifyUsageEventHandle,
+    includedRecoveryConversationAllowance:
+      source.includedRecoveryConversationAllowance,
+    recoveryCreditPackEnabled: source.recoveryCreditPackEnabled,
+    recoveryCreditsPerPack: source.recoveryCreditsPerPack,
+    shopifyRecoveryCreditPackEventHandle:
+      source.shopifyRecoveryCreditPackEventHandle,
     freeLifetimeConversationAllowance: source.freeLifetimeConversationAllowance,
     defaultOutboundSoftLimit: source.defaultOutboundSoftLimit,
     defaultOutboundHardLimit: source.defaultOutboundHardLimit,

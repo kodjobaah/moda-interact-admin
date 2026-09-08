@@ -66,14 +66,13 @@ export async function mutateBillingPlanAction(
           reason: values.reason,
           relatedEntityType: "BillingPlan",
           relatedEntityId: existing.id,
-          beforeValue: {
-            active: existing.active,
-            shopifyPlanHandle: existing.shopifyPlanHandle,
-          },
-          afterValue: {
-            active: updated.active,
-            shopifyPlanHandle: updated.shopifyPlanHandle,
-          },
+          beforeValue: billingPlanAuditSnapshot(
+            existing,
+          ) as Prisma.InputJsonObject,
+          afterValue: billingPlanAuditSnapshot({
+            ...updated,
+            features: existing.features,
+          }) as Prisma.InputJsonObject,
         },
       });
     });
@@ -89,6 +88,12 @@ export async function mutateBillingPlanAction(
           name: values.name,
           kind: values.kind,
           shopifyUsageEventHandle: values.shopifyUsageEventHandle,
+          includedRecoveryConversationAllowance:
+            values.includedRecoveryConversationAllowance,
+          recoveryCreditPackEnabled: values.recoveryCreditPackEnabled,
+          recoveryCreditsPerPack: values.recoveryCreditsPerPack,
+          shopifyRecoveryCreditPackEventHandle:
+            values.shopifyRecoveryCreditPackEventHandle,
           freeLifetimeConversationAllowance:
             values.freeLifetimeConversationAllowance,
           defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
@@ -142,6 +147,12 @@ export async function mutateBillingPlanAction(
         name: values.name,
         kind: values.kind,
         shopifyUsageEventHandle: values.shopifyUsageEventHandle,
+        includedRecoveryConversationAllowance:
+          values.includedRecoveryConversationAllowance,
+        recoveryCreditPackEnabled: values.recoveryCreditPackEnabled,
+        recoveryCreditsPerPack: values.recoveryCreditsPerPack,
+        shopifyRecoveryCreditPackEventHandle:
+          values.shopifyRecoveryCreditPackEventHandle,
         freeLifetimeConversationAllowance:
           values.freeLifetimeConversationAllowance,
         defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
