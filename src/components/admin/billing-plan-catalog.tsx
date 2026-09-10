@@ -1,4 +1,5 @@
 import { mutateBillingPlanAction } from "@/app/actions/billing-plan";
+import Link from "next/link";
 import type { BillingPlanRow } from "@/lib/admin/billing-plan";
 import { BILLING_FEATURES } from "@/lib/admin/billing-plan-validation";
 import { adminI18n } from "@/i18n";
@@ -36,7 +37,7 @@ function FeatureToggles({ plan }: { plan?: BillingPlanRow }) {
   );
 }
 
-function PlanForm({ plan }: { plan?: BillingPlanRow }) {
+export function PlanForm({ plan }: { plan?: BillingPlanRow }) {
   const intent = plan ? "update" : "create";
   return (
     <form action={mutateBillingPlanAction} className="space-y-4">
@@ -204,23 +205,23 @@ function PlanForm({ plan }: { plan?: BillingPlanRow }) {
 
 export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
   return (
-    <div className="space-y-8">
-      <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-1 text-lg font-semibold text-gray-950">
-          {adminI18n.t("billing.newPlan")}
-        </h2>
-        <p className="mb-5 text-sm text-gray-600">
-          {adminI18n.t("billing.newPlanDescription")}
-        </p>
-        <PlanForm />
+    <div className="space-y-4">
+      <section className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-950">{adminI18n.t("billing.tab.plans")}</h2>
+          <p className="mt-1 text-sm text-gray-600">{adminI18n.t("billing.plansDescription")}</p>
+        </div>
+        <Link href="/billing?view=plans&drawer=register-plan" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]">
+          {adminI18n.t("billing.registerPlanAction")}
+        </Link>
       </section>
-      <section className="space-y-4">
+      <section className="grid gap-4 lg:grid-cols-2">
         {plans.map((plan) => (
           <article
             key={plan.id}
             className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
           >
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-semibold text-gray-950">
@@ -238,7 +239,11 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
                   {plan.shopifyPlanHandle}
                 </p>
               </div>
-              <form action={mutateBillingPlanAction}>
+              <div className="flex items-center gap-2">
+                <Link href={`/billing?view=plans&planId=${encodeURIComponent(plan.id)}`} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                  {adminI18n.t("billing.editPlanAction")}
+                </Link>
+                <form action={mutateBillingPlanAction}>
                 <input type="hidden" name="intent" value="toggle" />
                 <input type="hidden" name="id" value={plan.id} />
                 <input type="hidden" name="kind" value={plan.kind} />
@@ -314,9 +319,15 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
                     ? adminI18n.t("billing.deactivate")
                     : adminI18n.t("billing.activate")}
                 </button>
-              </form>
+                </form>
+              </div>
             </div>
-            <PlanForm plan={plan} />
+            <dl className="mt-5 grid gap-3 border-t border-gray-100 pt-4 text-sm sm:grid-cols-2">
+              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.kind")}</dt><dd className="font-medium text-gray-900">{plan.kind}</dd></div>
+              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.usageHandle")}</dt><dd className="break-words font-mono text-xs text-gray-900">{plan.shopifyUsageEventHandle ?? adminI18n.t("empty.notRecorded")}</dd></div>
+              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.includedRecoveryAllowance")}</dt><dd className="font-medium text-gray-900">{plan.includedRecoveryConversationAllowance ?? adminI18n.t("empty.notRecorded")}</dd></div>
+              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.recoveryCreditPackEnabled")}</dt><dd className="font-medium text-gray-900">{plan.recoveryCreditPackEnabled ? adminI18n.t("billing.active") : adminI18n.t("billing.inactive")}</dd></div>
+            </dl>
           </article>
         ))}
       </section>

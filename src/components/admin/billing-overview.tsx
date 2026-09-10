@@ -3,7 +3,9 @@ import type {
   BillingOverview,
   PageResult,
 } from "@/lib/admin/types";
+import Link from "next/link";
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
+import { buildUrl } from "@/lib/admin/query";
 import { Pagination } from "./pagination";
 
 function Metric({ label, value }: { label: string; value: string | number }) {
@@ -55,15 +57,6 @@ export function BillingOverviewCards({
         label={adminI18n.t("billing.syncErrors")}
         value={adminI18n.formatNumber(overview.planDistribution.syncError)}
       />
-      {Object.entries(overview.reportStates).map(([state, count]) => (
-        <Metric
-          key={state}
-          label={adminI18n.t("billing.reportState", {
-            state: adminBillingReportStateLabel(state),
-          })}
-          value={adminI18n.formatNumber(count)}
-        />
-      ))}
     </section>
   );
 }
@@ -76,7 +69,6 @@ export function BillingLedger({
   params: Record<string, string>;
 }) {
   const quantity = (value: string) => adminI18n.formatNumber(Number(value));
-  const empty = adminI18n.t("empty.notRecorded");
   return (
     <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 px-5 py-4">
@@ -150,24 +142,12 @@ export function BillingLedger({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {[
-                  adminI18n.t("billing.shop"),
-                  adminI18n.t("billing.metric"),
-                  adminI18n.t("billing.quantity"),
-                  adminI18n.t("billing.occurredAt"),
-                  adminI18n.t("billing.reportStateLabel"),
-                  adminI18n.t("billing.providerErrorCode"),
-                  adminI18n.t("billing.providerResponse"),
-                  adminI18n.t("billing.reportAttempts"),
-                  adminI18n.t("billing.lastReportAttemptAt"),
-                  adminI18n.t("billing.reportedAt"),
-                  adminI18n.t("billing.shopifyEventHandle"),
-                ].map((heading) => (
+                {["billing.shop", "billing.metric", "billing.quantity", "billing.reportStateLabel", "billing.occurredAt", "billing.viewDetails"].map((key) => (
                   <th
-                    key={heading}
+                    key={key}
                     className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase"
                   >
-                    {heading}
+                    {adminI18n.t(key)}
                   </th>
                 ))}
               </tr>
@@ -185,32 +165,15 @@ export function BillingLedger({
                     {quantity(item.quantity)}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                    {adminI18n.formatDateTime(item.occurredAt)}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
                     {adminBillingReportStateLabel(item.shopifyReportState)}
                   </td>
-                  <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
-                    {item.providerErrorCode ?? empty}
-                  </td>
-                  <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
-                    {item.providerResponseSummary ?? empty}
-                  </td>
                   <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                    {adminI18n.formatNumber(item.reportAttemptCount)}
+                    {adminI18n.formatDateTime(item.occurredAt)}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                    {item.lastReportAttemptAt
-                      ? adminI18n.formatDateTime(item.lastReportAttemptAt)
-                      : empty}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-sm text-gray-600">
-                    {item.reportedAt
-                      ? adminI18n.formatDateTime(item.reportedAt)
-                      : empty}
-                  </td>
-                  <td className="max-w-xs px-5 py-3 text-sm text-gray-600">
-                    {item.shopifyEventHandle ?? empty}
+                  <td className="whitespace-nowrap px-5 py-3 text-sm">
+                    <Link className="font-semibold text-[var(--brand-700)] hover:underline" href={buildUrl("/billing", { ...params, view: "events", eventId: item.id })}>
+                      {adminI18n.t("billing.viewDetails")}
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -228,9 +191,9 @@ export function BillingLedger({
         page={ledger.page}
         totalPages={ledger.totalPages}
         totalItems={ledger.totalItems}
-        pageParam="ledgerPage"
+        pageParam="eventPage"
         countKey="pagination.items"
-        resetParams={["ledgerPage"]}
+        resetParams={["eventPage"]}
       />
     </section>
   );
