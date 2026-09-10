@@ -32,6 +32,7 @@ test("billing reads stay platform-admin protected and tenant scoped", async () =
   assert.match(source, /getRecoveryCreditPurchaseDetail/);
   assert.match(source, /getBillingLedgerItem/);
   assert.match(source, /MAX_PAGE_SIZE = 50/);
+  assert.match(source, /input\.pageSize \?\? 20/);
   assert.match(source, /createdAt: "desc"/);
   assert.match(source, /RecoveryCreditPurchaseStatus/);
   assert.match(source, /providerErrorCode: true/);

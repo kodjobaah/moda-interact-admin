@@ -214,7 +214,7 @@ export async function getBillingLedger(input: {
 
 export async function getRecoveryCreditPurchases(input: {
   page: number;
-  pageSize: number;
+  pageSize?: number;
   shopId?: string;
   status?: RecoveryCreditPurchaseStatus;
 }): Promise<PageResult<RecoveryCreditPurchaseItem>> {
@@ -222,7 +222,7 @@ export async function getRecoveryCreditPurchases(input: {
   if (input.status && !RECOVERY_PACK_STATUSES.includes(input.status)) {
     throw new Error("Unsupported recovery-credit purchase status");
   }
-  const { page: requestedPage, pageSize } = boundedPage(input.page, input.pageSize);
+  const { page: requestedPage, pageSize } = boundedPage(input.page, input.pageSize ?? 20);
   const where: Prisma.RecoveryCreditPurchaseWhereInput = {
     ...(input.shopId ? { shopId: input.shopId } : {}),
     ...(input.status ? { status: input.status } : {}),
