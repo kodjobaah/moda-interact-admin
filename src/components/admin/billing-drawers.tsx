@@ -52,11 +52,15 @@ export function BillingPlanDrawer({
 export function RecoveryCreditPurchaseDrawer({
   purchase,
   params,
+  returnPath,
 }: {
   purchase: RecoveryCreditPurchaseItem;
   params: Record<string, string>;
+  returnPath?: string;
 }) {
-  const closeHref = withParamUpdates("/billing", params, { purchaseId: null });
+  const closeHref = returnPath
+    ? withParamUpdates(returnPath, params, { purchaseId: null })
+    : withParamUpdates("/billing", params, { purchaseId: null });
   const event = purchase.usageEvent;
   const eventReported = event.shopifyReportState === "REPORTED";
   return (
@@ -102,11 +106,15 @@ export function RecoveryCreditPurchaseDrawer({
 export function BillingEventDrawer({
   event,
   params,
+  returnPath,
 }: {
   event: BillingLedgerItem;
   params: Record<string, string>;
+  returnPath?: string;
 }) {
-  const closeHref = withParamUpdates("/billing", params, { eventId: null });
+  const closeHref = returnPath
+    ? withParamUpdates(returnPath, params, { eventId: null })
+    : withParamUpdates("/billing", params, { eventId: null });
   return (
     <AdminDetailDrawer
       title={adminI18n.t("billing.eventDetails")}

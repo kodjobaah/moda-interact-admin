@@ -17,10 +17,18 @@ import {
   getTenantDetail,
   getTenantDirectory,
 } from "@/lib/admin/data";
-import { getTenantBilling } from "@/lib/admin/billing";
+import {
+  getBillingLedger,
+  getBillingLedgerItem,
+  getRecoveryCreditPurchaseDetail,
+  getRecoveryCreditPurchases,
+  getTenantBilling,
+} from "@/lib/admin/billing";
 import type {
+  BillingLedgerItem,
   CustomerListItem,
   PageResult,
+  RecoveryCreditPurchaseItem,
   RecoveryListItem,
 } from "@/lib/admin/types";
 import { adminI18n, adminQueueLabel } from "@/i18n";
@@ -39,6 +47,10 @@ const TENANT_PAGE_SIZE = 10;
 const CUSTOMER_PAGE_SIZE = 8;
 const RECOVERY_PAGE_SIZE = 8;
 const MESSAGE_PAGE_SIZE = 20;
+const BILLING_PAGE_SIZE = 10;
+
+const billingViews = ["overview", "usage", "shopify", "activity"] as const;
+type BillingView = (typeof billingViews)[number];
 
 type PageProps = {
   searchParams: Promise<SearchParamRecord>;
@@ -53,6 +65,12 @@ export default async function Home({ searchParams }: PageProps) {
   const tenantId = firstParam(rawParams.tenant) ?? null;
   const rawTab = firstParam(rawParams.tab);
   const tab = rawTab === "logs" || rawTab === "billing" ? rawTab : "admin";
+  const rawBillingView = firstParam(rawParams.billingView);
+  const billingView: BillingView = billingViews.includes(
+    rawBillingView as BillingView,
+  )
+    ? (rawBillingView as BillingView)
+    : "overview";
   const customerSearch = cleanSearch(rawParams.customerSearch);
   const customerPage = positiveInt(rawParams.customerPage);
   const customerId = firstParam(rawParams.customerId) ?? null;
@@ -65,6 +83,8 @@ export default async function Home({ searchParams }: PageProps) {
       ? rawDrawerTab
       : "conversation";
   const saved = firstParam(rawParams.saved) === "1";
+  const purchaseId = firstParam(rawParams.purchaseId) ?? null;
+  const eventId = firstParam(rawParams.eventId) ?? null;
 
   const directory = await getTenantDirectory({
     page: tenantPage,
@@ -85,9 +105,38 @@ export default async function Home({ searchParams }: PageProps) {
       ? await getTenantBilling(
           selectedTenant.id,
           positiveInt(rawParams.billingPage),
-          10,
+          BILLING_PAGE_SIZE,
+          false,
         )
       : null;
+
+  let billingPacks: PageResult<RecoveryCreditPurchaseItem> | null = null;
+  let billingEvents: PageResult<BillingLedgerItem> | null = null;
+  let selectedPurchase: RecoveryCreditPurchaseItem | null = null;
+  let selectedEvent: BillingLedgerItem | null = null;
+
+  if (selectedTenant && tab === "billing" && billingView === "activity") {
+    [billingPacks, billingEvents] = await Promise.all([
+      getRecoveryCreditPurchases({
+        shopId: selectedTenant.id,
+        page: positiveInt(rawParams.packPage),
+        pageSize: BILLING_PAGE_SIZE,
+      }),
+      getBillingLedger({
+        shopId: selectedTenant.id,
+        page: positiveInt(rawParams.billingPage),
+        pageSize: BILLING_PAGE_SIZE,
+      }),
+    ]);
+    [selectedPurchase, selectedEvent] = await Promise.all([
+      purchaseId
+        ? getRecoveryCreditPurchaseDetail(purchaseId, selectedTenant.id)
+        : Promise.resolve(null),
+      eventId
+        ? getBillingLedgerItem(eventId, selectedTenant.id)
+        : Promise.resolve(null),
+    ]);
+  }
 
   let customers: PageResult<CustomerListItem> | null = null;
   let selectedCustomer: CustomerListItem | null = null;
@@ -199,6 +248,11 @@ export default async function Home({ searchParams }: PageProps) {
           returnTo={returnTo}
           saved={saved}
           billing={tenantBilling}
+          billingView={billingView}
+          billingPacks={billingPacks}
+          billingEvents={billingEvents}
+          selectedPurchase={selectedPurchase}
+          selectedEvent={selectedEvent}
         />
       </div>
 

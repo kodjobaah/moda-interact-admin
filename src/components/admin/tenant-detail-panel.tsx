@@ -6,6 +6,8 @@ import type {
   RecoveryListItem,
   TenantDetail,
   TenantBilling,
+  BillingLedgerItem,
+  RecoveryCreditPurchaseItem,
 } from "@/lib/admin/types";
 import { RecoveryLogs } from "./recovery-logs";
 import { TenantAdministration } from "./tenant-administration";
@@ -23,6 +25,11 @@ export function TenantDetailPanel({
   returnTo,
   saved,
   billing,
+  billingView,
+  billingPacks,
+  billingEvents,
+  selectedPurchase,
+  selectedEvent,
 }: {
   tenant: TenantDetail;
   tab: "admin" | "logs" | "billing";
@@ -34,6 +41,11 @@ export function TenantDetailPanel({
   returnTo: string;
   saved?: boolean;
   billing: TenantBilling | null;
+  billingView: "overview" | "usage" | "shopify" | "activity";
+  billingPacks: PageResult<RecoveryCreditPurchaseItem> | null;
+  billingEvents: PageResult<BillingLedgerItem> | null;
+  selectedPurchase: RecoveryCreditPurchaseItem | null;
+  selectedEvent: BillingLedgerItem | null;
 }) {
   const adminHref = withParamUpdates("/", params, {
     tab: "admin",
@@ -44,16 +56,30 @@ export function TenantDetailPanel({
     recoveryId: null,
     drawerTab: null,
     messagePage: null,
+    billingView: null,
+    billingPage: null,
+    packPage: null,
+    purchaseId: null,
+    eventId: null,
     saved: null,
   });
   const logsHref = withParamUpdates("/", params, {
     tab: "logs",
     customerPage: 1,
+    billingView: null,
+    billingPage: null,
+    packPage: null,
+    purchaseId: null,
+    eventId: null,
     saved: null,
   });
   const billingHref = withParamUpdates("/", params, {
     tab: "billing",
-    billingPage: 1,
+    billingView: "overview",
+    billingPage: null,
+    packPage: null,
+    purchaseId: null,
+    eventId: null,
     saved: null,
   });
   const activeClass =
@@ -90,7 +116,15 @@ export function TenantDetailPanel({
           saved={saved}
         />
       ) : tab === "billing" && billing ? (
-        <TenantBillingView billing={billing} params={params} />
+        <TenantBillingView
+          billing={billing}
+          params={params}
+          billingView={billingView}
+          packs={billingPacks}
+          events={billingEvents}
+          selectedPurchase={selectedPurchase}
+          selectedEvent={selectedEvent}
+        />
       ) : customers ? (
         <RecoveryLogs
           customers={customers}

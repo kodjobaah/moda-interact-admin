@@ -122,7 +122,7 @@ test("billing UI exposes the bounded ledger filters and unavailable reconciliati
   assert.match(page, /getBillingLedger/);
   assert.match(page, /pageSize: 20/);
   assert.match(page, /firstParam\(rawParams\.state\)/);
-  assert.match(tenant, /billing\.discrepancyUnavailable/);
+  assert.match(tenant, /billing\.reconciliationUnavailableShort/);
   assert.match(tenant, /pageParam="billingPage"/);
 });
 

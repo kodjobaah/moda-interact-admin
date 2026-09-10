@@ -282,6 +282,7 @@ export async function getTenantBilling(
   shopId: string,
   ledgerPage = 1,
   ledgerPageSize = 10,
+  includeLedger = true,
 ): Promise<TenantBilling | null> {
   await requirePlatformAdminRead();
   const subscription = await prisma.subscription.findUnique({
@@ -373,7 +374,9 @@ export async function getTenantBilling(
       },
     }),
     prisma.platformBillingPolicy.findUnique({ where: { id: "default" } }),
-    getBillingLedger({ shopId, page: ledgerPage, pageSize: ledgerPageSize }),
+    includeLedger
+      ? getBillingLedger({ shopId, page: ledgerPage, pageSize: ledgerPageSize })
+      : Promise.resolve(pageResult([], 1, ledgerPageSize, 0)),
   ]);
 
   const baseAllowance =
