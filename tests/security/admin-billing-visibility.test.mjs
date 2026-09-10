@@ -8,6 +8,7 @@ import {
   billingOverrideState,
   effectiveOutboundHardCap,
   localizedReportStateLabel,
+  recoveryCreditPurchaseStatusLabel,
   tenantBillingLedgerPresentation,
 } from "../../src/lib/admin/billing-presentation.mjs";
 
@@ -22,17 +23,88 @@ test("billing reads stay platform-admin protected and tenant scoped", async () =
     "utf8",
   );
 
-  assert.equal((source.match(/requirePlatformAdminRead\(\)/g) ?? []).length, 3);
+  assert.equal((source.match(/requirePlatformAdminRead\(\)/g) ?? []).length, 6);
   assert.match(source, /shopId: input\.shopId/);
   assert.match(source, /shopId,/);
   assert.match(source, /metric: UsageMetric\.RECOVERY_CONVERSATION/);
   assert.match(source, /take: pageSize/);
+  assert.match(source, /getRecoveryCreditPurchases/);
+  assert.match(source, /getRecoveryCreditPurchaseDetail/);
+  assert.match(source, /getBillingLedgerItem/);
+  assert.match(source, /MAX_PAGE_SIZE = 50/);
+  assert.match(source, /input\.pageSize \?\? 20/);
+  assert.match(source, /createdAt: "desc"/);
+  assert.match(source, /RecoveryCreditPurchaseStatus/);
+  const detailHelper = (name) => {
+    const start = source.indexOf(`export async function ${name}`);
+    const end = source.indexOf("\nexport async function ", start + 1);
+    return source.slice(start, end === -1 ? undefined : end);
+  };
+  for (const helper of [
+    "getRecoveryCreditPurchaseDetail",
+    "getBillingLedgerItem",
+  ]) {
+    const detailSource = detailHelper(helper);
+    assert.match(detailSource, /where: \{ id, \.\.\.\(shopId \? \{ shopId \} : \{\}\) \}/);
+  }
+  assert.match(source, /providerResponseSummary: row\.usageEvent\.providerResponseSummary\?\.slice\(0, 2000\)/);
   assert.match(source, /providerErrorCode: true/);
   assert.doesNotMatch(
     source,
     /providerAccessToken|providerSecret|accessToken|apiKey/,
   );
   assert.match(source, /discrepancy: null/);
+});
+
+test("ARCH-008 catalogue uses the normative asynchronous billing copy", async () => {
+  const catalogue = JSON.parse(
+    await readFile(path.join(repositoryRoot, "src/i18n/locales/en.json"), "utf8"),
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      [
+        "billing.tab.appEvents",
+        "billing.state.REPORTED",
+        "billing.submittedAt",
+        "billing.asyncReceiptHelp",
+        "billing.devDashboardHelp",
+        "billing.packStatus.PENDING_BILLING",
+        "billing.packStatus.ACTIVE",
+        "billing.packStatus.NEEDS_ATTENTION",
+        "billing.packStatus.CANCELLED",
+        "billing.eventDetails",
+        "billing.creditsGranted",
+        "billing.planSnapshot",
+        "billing.noRecoveryPacks",
+        "billing.billingHealth",
+        "billing.overrideActiveWarning",
+        "billing.overrideExpiredNotice",
+        "billing.activity",
+        "billing.reconciliationUnavailableShort",
+      ].map((key) => [key, catalogue[key]]),
+    ),
+    {
+      "billing.tab.appEvents": "App Events",
+      "billing.state.REPORTED": "Submitted to Shopify",
+      "billing.submittedAt": "Submitted at",
+      "billing.asyncReceiptHelp": "Shopify has received the App Event. Billing validation is asynchronous.",
+      "billing.devDashboardHelp": "If provider usage does not reconcile, inspect App Billing Event logs in the Shopify Dev Dashboard.",
+      "billing.packStatus.PENDING_BILLING": "Awaiting Shopify confirmation",
+      "billing.packStatus.ACTIVE": "Active",
+      "billing.packStatus.NEEDS_ATTENTION": "Needs attention",
+      "billing.packStatus.CANCELLED": "Cancelled",
+      "billing.eventDetails": "App Event details",
+      "billing.creditsGranted": "Credits",
+      "billing.planSnapshot": "Plan handle snapshot",
+      "billing.noRecoveryPacks": "No recovery-credit purchases match the current filters.",
+      "billing.billingHealth": "Billing status",
+      "billing.overrideActiveWarning": "Billing policy override active",
+      "billing.overrideExpiredNotice": "An expired billing policy override is recorded.",
+      "billing.activity": "Billing activity",
+      "billing.reconciliationUnavailableShort": "Shopify usage comparison is not available for this tenant.",
+    },
+  );
+  assert.equal(catalogue["billing.reportedAt"], "Submitted at");
 });
 
 test("billing UI exposes the bounded ledger filters and unavailable reconciliation state", async () => {
@@ -131,14 +203,37 @@ test("billing helpers preserve cap, expiry, and date boundary semantics", () => 
 test("billing report-state labels use localized values without reported fallback", () => {
   const labels = {
     "billing.state.PENDING": "Pending",
-    "billing.state.REPORTED": "Reported",
+    "billing.state.REPORTED": "Submitted to Shopify",
     "empty.notRecorded": "Not recorded",
   };
   const translate = (key) => labels[key];
 
   assert.equal(localizedReportStateLabel("PENDING", translate), "Pending");
   assert.notEqual(localizedReportStateLabel("PENDING", translate), "Reported");
-  assert.equal(localizedReportStateLabel("REPORTED", translate), "Reported");
+  assert.equal(localizedReportStateLabel("REPORTED", translate), "Submitted to Shopify");
+});
+
+test("recovery pack statuses use the exact asynchronous billing labels", () => {
+  const labels = {
+    "billing.packStatus.PENDING_BILLING": "Awaiting Shopify confirmation",
+    "billing.packStatus.ACTIVE": "Active",
+    "billing.packStatus.NEEDS_ATTENTION": "Needs attention",
+    "billing.packStatus.CANCELLED": "Cancelled",
+    "empty.notRecorded": "Not recorded",
+  };
+  const translate = (key) => labels[key];
+
+  assert.deepEqual(
+    ["PENDING_BILLING", "ACTIVE", "NEEDS_ATTENTION", "CANCELLED"].map(
+      (status) => recoveryCreditPurchaseStatusLabel(status, translate),
+    ),
+    [
+      "Awaiting Shopify confirmation",
+      "Active",
+      "Needs attention",
+      "Cancelled",
+    ],
+  );
 });
 
 test("tenant ledger presentation exposes every safe reporting diagnostic", () => {
