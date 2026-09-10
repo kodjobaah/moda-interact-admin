@@ -64,7 +64,7 @@ export function PlatformBillingControls({
         </div>
         <Link
           className="text-sm font-semibold text-[var(--brand-700)] hover:underline"
-          href="/billing"
+          href="/billing?view=overview"
         >
           {adminI18n.t("billingControls.backToCatalog")}
         </Link>

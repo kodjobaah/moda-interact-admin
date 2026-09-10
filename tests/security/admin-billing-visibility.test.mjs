@@ -150,7 +150,7 @@ test("billing ledger preserves report states, diagnostics, and inclusive date bo
       "utf8",
     ),
     readFile(
-      path.join(repositoryRoot, "src/components/admin/tenant-billing.tsx"),
+      path.join(repositoryRoot, "src/components/admin/billing-drawers.tsx"),
       "utf8",
     ),
   ]);
@@ -165,7 +165,7 @@ test("billing ledger preserves report states, diagnostics, and inclusive date bo
     "reportedAt",
     "shopifyEventHandle",
   ]) {
-    assert.match(overview, new RegExp(diagnostic));
+    assert.match(tenant, new RegExp(diagnostic));
   }
   assert.match(overview, /adminBillingReportStateLabel/);
   assert.match(tenant, /adminBillingReportStateLabel/);

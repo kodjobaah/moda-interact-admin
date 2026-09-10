@@ -11,3 +11,13 @@ export async function getBillingPlans(): Promise<BillingPlanRow[]> {
     orderBy: [{ active: "desc" }, { name: "asc" }],
   });
 }
+
+export async function getBillingPlanById(
+  id: string,
+): Promise<BillingPlanRow | null> {
+  await requirePlatformAdminRead();
+  return prisma.billingPlan.findUnique({
+    where: { id },
+    include: { features: { orderBy: { feature: "asc" } } },
+  });
+}
