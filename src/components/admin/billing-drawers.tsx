@@ -58,6 +58,7 @@ export function RecoveryCreditPurchaseDrawer({
 }) {
   const closeHref = withParamUpdates("/billing", params, { purchaseId: null });
   const event = purchase.usageEvent;
+  const eventReported = event.shopifyReportState === "REPORTED";
   return (
     <AdminDetailDrawer
       title={adminI18n.t("billing.recoveryPackDetails")}
@@ -84,10 +85,12 @@ export function RecoveryCreditPurchaseDrawer({
           [adminI18n.t("billing.providerResponse"), event.providerResponseSummary],
         ]}
       />
-      <p className="mt-6 rounded-md bg-blue-50 p-4 text-sm text-blue-900">
-        {adminI18n.t("billing.asyncReceiptHelp")}
-      </p>
-      {purchase.status === "PENDING_BILLING" ? (
+      {eventReported ? (
+        <p className="mt-6 rounded-md bg-blue-50 p-4 text-sm text-blue-900">
+          {adminI18n.t("billing.asyncReceiptHelp")}
+        </p>
+      ) : null}
+      {eventReported && purchase.status === "PENDING_BILLING" ? (
         <p className="mt-3 rounded-md bg-amber-50 p-4 text-sm text-amber-900">
           {adminI18n.t("billing.devDashboardHelp")}
         </p>

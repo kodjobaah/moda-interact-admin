@@ -327,6 +327,9 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
               <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.usageHandle")}</dt><dd className="break-words font-mono text-xs text-gray-900">{plan.shopifyUsageEventHandle ?? adminI18n.t("empty.notRecorded")}</dd></div>
               <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.includedRecoveryAllowance")}</dt><dd className="font-medium text-gray-900">{plan.includedRecoveryConversationAllowance ?? adminI18n.t("empty.notRecorded")}</dd></div>
               <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.recoveryCreditPackEnabled")}</dt><dd className="font-medium text-gray-900">{plan.recoveryCreditPackEnabled ? adminI18n.t("billing.active") : adminI18n.t("billing.inactive")}</dd></div>
+              {plan.recoveryCreditsPerPack !== null ? (
+                <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.recoveryCreditsPerPack")}</dt><dd className="font-medium text-gray-900">{adminI18n.formatNumber(plan.recoveryCreditsPerPack)}</dd></div>
+              ) : null}
             </dl>
           </article>
         ))}

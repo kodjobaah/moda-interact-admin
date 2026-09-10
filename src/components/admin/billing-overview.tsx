@@ -83,6 +83,7 @@ export function BillingLedger({
         method="get"
         className="grid gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4 sm:grid-cols-4"
       >
+        <input type="hidden" name="view" value="events" />
         <label className="text-xs font-semibold text-gray-600">
           {adminI18n.t("billing.shopId")}
           <input

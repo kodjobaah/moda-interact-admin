@@ -32,6 +32,25 @@ test("billing route loads only the selected view and selected detail", async () 
   assert.match(page, /getBillingLedgerItem/);
 });
 
+test("App Events filters preserve the events view and reset only event selection", async () => {
+  const [overview, drawers] = await Promise.all([
+    read("src/components/admin/billing-overview.tsx"),
+    read("src/components/admin/billing-drawers.tsx"),
+  ]);
+  assert.match(overview, /<input type="hidden" name="view" value="events" \/>/);
+  assert.match(overview, /pageParam="eventPage"/);
+  assert.match(overview, /eventId: item\.id/);
+  assert.match(drawers, /withParamUpdates\("\/billing", params, \{ eventId: null \}\)/);
+});
+
+test("recovery-pack receipt guidance distinguishes pending and submitted events", async () => {
+  const drawers = await read("src/components/admin/billing-drawers.tsx");
+  assert.match(drawers, /const eventReported = event\.shopifyReportState === "REPORTED"/);
+  assert.match(drawers, /\{eventReported \? \(/);
+  assert.match(drawers, /eventReported && purchase\.status === "PENDING_BILLING"/);
+  assert.doesNotMatch(drawers, /\{purchase\.status === "PENDING_BILLING" \? \(/);
+});
+
 test("overview and plans use progressive disclosure", async () => {
   const [page, overview, catalogue] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
@@ -44,6 +63,8 @@ test("overview and plans use progressive disclosure", async () => {
   assert.doesNotMatch(overview, /<BillingPlanCatalog/);
   assert.match(catalogue, /billing\.registerPlanAction/);
   assert.match(catalogue, /billing\.editPlanAction/);
+  assert.match(catalogue, /billing\.recoveryCreditsPerPack/);
+  assert.match(catalogue, /plan\.recoveryCreditsPerPack/);
   assert.doesNotMatch(catalogue, /<PlanForm plan=\{plan\}/);
 });
 
