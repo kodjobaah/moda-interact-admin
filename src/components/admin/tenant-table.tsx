@@ -27,6 +27,11 @@ export function TenantTable({
   returnTo,
   saved,
   billing,
+  billingView,
+  billingPacks,
+  billingEvents,
+  selectedPurchase,
+  selectedEvent,
 }: {
   tenants: PageResult<TenantListItem>;
   selectedTenant: TenantDetail | null;
@@ -39,6 +44,11 @@ export function TenantTable({
   returnTo: string;
   saved?: boolean;
   billing: TenantBilling | null;
+  billingView: "overview" | "usage" | "shopify" | "activity";
+  billingPacks: import("@/lib/admin/types").PageResult<import("@/lib/admin/types").RecoveryCreditPurchaseItem> | null;
+  billingEvents: import("@/lib/admin/types").PageResult<import("@/lib/admin/types").BillingLedgerItem> | null;
+  selectedPurchase: import("@/lib/admin/types").RecoveryCreditPurchaseItem | null;
+  selectedEvent: import("@/lib/admin/types").BillingLedgerItem | null;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -73,6 +83,11 @@ export function TenantTable({
                       recoveryId: null,
                       drawerTab: null,
                       messagePage: null,
+                      billingView: null,
+                      billingPage: null,
+                      packPage: null,
+                      purchaseId: null,
+                      eventId: null,
                       saved: null,
                     })
                   : withParamUpdates("/", params, {
@@ -85,6 +100,11 @@ export function TenantTable({
                       recoveryId: null,
                       drawerTab: null,
                       messagePage: null,
+                      billingView: null,
+                      billingPage: null,
+                      packPage: null,
+                      purchaseId: null,
+                      eventId: null,
                       saved: null,
                     });
 
@@ -108,6 +128,11 @@ export function TenantTable({
                           returnTo={returnTo}
                           saved={saved}
                           billing={billing}
+                          billingView={billingView}
+                          billingPacks={billingPacks}
+                          billingEvents={billingEvents}
+                          selectedPurchase={selectedPurchase}
+                          selectedEvent={selectedEvent}
                         />
                       ) : null
                     }
