@@ -28,6 +28,11 @@ export function localizedReportStateLabel(value, translate) {
   return translate(`billing.state.${value}`) ?? value;
 }
 
+export function recoveryCreditPurchaseStatusLabel(value, translate) {
+  if (!value) return translate("empty.notRecorded");
+  return translate(`billing.packStatus.${value}`) ?? value;
+}
+
 export function tenantBillingLedgerPresentation(item, formatters) {
   return {
     occurredAt: formatters.formatDateTime(item.occurredAt),

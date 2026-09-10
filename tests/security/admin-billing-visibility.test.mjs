@@ -8,6 +8,7 @@ import {
   billingOverrideState,
   effectiveOutboundHardCap,
   localizedReportStateLabel,
+  recoveryCreditPurchaseStatusLabel,
   tenantBillingLedgerPresentation,
 } from "../../src/lib/admin/billing-presentation.mjs";
 
@@ -22,11 +23,17 @@ test("billing reads stay platform-admin protected and tenant scoped", async () =
     "utf8",
   );
 
-  assert.equal((source.match(/requirePlatformAdminRead\(\)/g) ?? []).length, 3);
+  assert.equal((source.match(/requirePlatformAdminRead\(\)/g) ?? []).length, 6);
   assert.match(source, /shopId: input\.shopId/);
   assert.match(source, /shopId,/);
   assert.match(source, /metric: UsageMetric\.RECOVERY_CONVERSATION/);
   assert.match(source, /take: pageSize/);
+  assert.match(source, /getRecoveryCreditPurchases/);
+  assert.match(source, /getRecoveryCreditPurchaseDetail/);
+  assert.match(source, /getBillingLedgerItem/);
+  assert.match(source, /MAX_PAGE_SIZE = 50/);
+  assert.match(source, /createdAt: "desc"/);
+  assert.match(source, /RecoveryCreditPurchaseStatus/);
   assert.match(source, /providerErrorCode: true/);
   assert.doesNotMatch(
     source,
@@ -131,14 +138,37 @@ test("billing helpers preserve cap, expiry, and date boundary semantics", () => 
 test("billing report-state labels use localized values without reported fallback", () => {
   const labels = {
     "billing.state.PENDING": "Pending",
-    "billing.state.REPORTED": "Reported",
+    "billing.state.REPORTED": "Submitted to Shopify",
     "empty.notRecorded": "Not recorded",
   };
   const translate = (key) => labels[key];
 
   assert.equal(localizedReportStateLabel("PENDING", translate), "Pending");
   assert.notEqual(localizedReportStateLabel("PENDING", translate), "Reported");
-  assert.equal(localizedReportStateLabel("REPORTED", translate), "Reported");
+  assert.equal(localizedReportStateLabel("REPORTED", translate), "Submitted to Shopify");
+});
+
+test("recovery pack statuses use the exact asynchronous billing labels", () => {
+  const labels = {
+    "billing.packStatus.PENDING_BILLING": "Awaiting Shopify confirmation",
+    "billing.packStatus.ACTIVE": "Active",
+    "billing.packStatus.NEEDS_ATTENTION": "Needs attention",
+    "billing.packStatus.CANCELLED": "Cancelled",
+    "empty.notRecorded": "Not recorded",
+  };
+  const translate = (key) => labels[key];
+
+  assert.deepEqual(
+    ["PENDING_BILLING", "ACTIVE", "NEEDS_ATTENTION", "CANCELLED"].map(
+      (status) => recoveryCreditPurchaseStatusLabel(status, translate),
+    ),
+    [
+      "Awaiting Shopify confirmation",
+      "Active",
+      "Needs attention",
+      "Cancelled",
+    ],
+  );
 });
 
 test("tenant ledger presentation exposes every safe reporting diagnostic", () => {

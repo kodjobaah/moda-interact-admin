@@ -39,6 +39,33 @@ export type BillingLedgerItem = {
   shopifyEventHandle: string | null;
 };
 
+export type RecoveryCreditPurchaseItem = {
+  id: string;
+  shopId: string;
+  shop: { domain: string; brandName: string | null };
+  planName: string | null;
+  shopifyPlanHandleSnapshot: string;
+  shopifyEventHandleSnapshot: string;
+  creditsGranted: number;
+  status: string;
+  activatedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  usageEvent: {
+    id: string;
+    metric: string;
+    quantity: string;
+    occurredAt: Date;
+    shopifyReportState: string;
+    reportAttemptCount: number;
+    lastReportAttemptAt: Date | null;
+    reportedAt: Date | null;
+    providerErrorCode: string | null;
+    providerResponseSummary: string | null;
+    shopifyEventHandle: string | null;
+  };
+};
+
 export type TenantBilling = {
   subscription: {
     observedShopifyPlanHandle: string | null;

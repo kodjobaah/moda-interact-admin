@@ -2,6 +2,7 @@ import {
   BillingPlanKind,
   EntitlementCounter,
   Prisma,
+  RecoveryCreditPurchaseStatus,
   ShopifyReportState,
   UsageMetric,
 } from "@prisma/client";
@@ -11,6 +12,7 @@ import type {
   BillingLedgerItem,
   BillingOverview,
   PageResult,
+  RecoveryCreditPurchaseItem,
   TenantBilling,
 } from "./types";
 import {
@@ -28,6 +30,54 @@ const REPORT_STATES: ShopifyReportState[] = [
   ShopifyReportState.REPORTED,
   ShopifyReportState.NEEDS_ATTENTION,
 ];
+
+const RECOVERY_PACK_STATUSES = Object.values(RecoveryCreditPurchaseStatus);
+
+const recoveryCreditPurchaseSelect = {
+  id: true,
+  shopId: true,
+  shopifyPlanHandleSnapshot: true,
+  shopifyEventHandleSnapshot: true,
+  creditsGranted: true,
+  status: true,
+  activatedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  shop: { select: { domain: true, brand: { select: { brandName: true } } } },
+  plan: { select: { name: true } },
+  usageEvent: {
+    select: {
+      id: true,
+      metric: true,
+      quantity: true,
+      occurredAt: true,
+      shopifyReportState: true,
+      reportAttemptCount: true,
+      lastReportAttemptAt: true,
+      reportedAt: true,
+      providerErrorCode: true,
+      providerResponseSummary: true,
+      shopifyEventHandle: true,
+    },
+  },
+} satisfies Prisma.RecoveryCreditPurchaseSelect;
+
+function recoveryCreditPurchaseProjection(
+  row: Prisma.RecoveryCreditPurchaseGetPayload<{
+    select: typeof recoveryCreditPurchaseSelect;
+  }>,
+): RecoveryCreditPurchaseItem {
+  return {
+    ...row,
+    shop: { domain: row.shop.domain, brandName: row.shop.brand?.brandName ?? null },
+    planName: row.plan?.name ?? null,
+    usageEvent: {
+      ...row.usageEvent,
+      quantity: decimalValue(row.usageEvent.quantity),
+      providerResponseSummary: row.usageEvent.providerResponseSummary?.slice(0, 2000) ?? null,
+    },
+  };
+}
 
 function boundedPage(
   value: number,
@@ -160,6 +210,72 @@ export async function getBillingLedger(input: {
     pageSize,
     totalItems,
   );
+}
+
+export async function getRecoveryCreditPurchases(input: {
+  page: number;
+  pageSize: number;
+  shopId?: string;
+  status?: RecoveryCreditPurchaseStatus;
+}): Promise<PageResult<RecoveryCreditPurchaseItem>> {
+  await requirePlatformAdminRead();
+  if (input.status && !RECOVERY_PACK_STATUSES.includes(input.status)) {
+    throw new Error("Unsupported recovery-credit purchase status");
+  }
+  const { page: requestedPage, pageSize } = boundedPage(input.page, input.pageSize);
+  const where: Prisma.RecoveryCreditPurchaseWhereInput = {
+    ...(input.shopId ? { shopId: input.shopId } : {}),
+    ...(input.status ? { status: input.status } : {}),
+  };
+  const totalItems = await prisma.recoveryCreditPurchase.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const rows = await prisma.recoveryCreditPurchase.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+    select: recoveryCreditPurchaseSelect,
+  });
+  return pageResult(rows.map(recoveryCreditPurchaseProjection), page, pageSize, totalItems);
+}
+
+export async function getRecoveryCreditPurchaseDetail(
+  id: string,
+  shopId?: string,
+): Promise<RecoveryCreditPurchaseItem | null> {
+  await requirePlatformAdminRead();
+  const row = await prisma.recoveryCreditPurchase.findFirst({
+    where: { id, ...(shopId ? { shopId } : {}) },
+    select: recoveryCreditPurchaseSelect,
+  });
+  return row ? recoveryCreditPurchaseProjection(row) : null;
+}
+
+export async function getBillingLedgerItem(
+  id: string,
+  shopId?: string,
+): Promise<BillingLedgerItem | null> {
+  await requirePlatformAdminRead();
+  const row = await prisma.usageEvent.findFirst({
+    where: { id, ...(shopId ? { shopId } : {}) },
+    select: {
+      id: true,
+      shopId: true,
+      metric: true,
+      quantity: true,
+      occurredAt: true,
+      shopifyReportState: true,
+      reportAttemptCount: true,
+      lastReportAttemptAt: true,
+      reportedAt: true,
+      providerErrorCode: true,
+      providerResponseSummary: true,
+      shopifyEventHandle: true,
+      shop: { select: { domain: true } },
+    },
+  });
+  return row ? { ...row, quantity: decimalValue(row.quantity) } : null;
 }
 
 export async function getTenantBilling(
