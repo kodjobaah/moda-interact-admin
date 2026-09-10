@@ -57,6 +57,26 @@ test("tenant activity keeps primary columns compact and reuses accepted drawers"
   assert.match(tenant, /billing\.reconciliationUnavailableShort/);
 });
 
+test("tenant billing exposes pending and attention states plus complete override details", async () => {
+  const tenant = await read("src/components/admin/tenant-billing.tsx");
+  assert.match(tenant, /billing\.pendingEffectiveAt/);
+  assert.match(tenant, /subscription\.status === "UNMAPPED"/);
+  assert.match(tenant, /billing\.override\.outboundHardLimit/);
+  assert.match(tenant, /billing\.override\.reason/);
+  assert.match(tenant, /billing\.override\.expiresAt/);
+  assert.match(tenant, /billing\.overrideState === "EXPIRED"/);
+});
+
+test("Shopify discrepancy presentation keeps unavailable state and shows business quantities", async () => {
+  const tenant = await read("src/components/admin/tenant-billing.tsx");
+  const catalogue = await read("src/i18n/locales/en.json");
+  assert.match(tenant, /billing\.reconciliationUnavailableShort/);
+  assert.match(tenant, /billing\.discrepancy\.modaQuantity/);
+  assert.match(tenant, /billing\.discrepancy\.shopifyQuantity/);
+  assert.match(catalogue, /billing\.modaQuantity/);
+  assert.match(catalogue, /billing\.shopifyQuantity/);
+});
+
 test("tenant detail drawers return to the tenant route", async () => {
   const drawers = await read("src/components/admin/billing-drawers.tsx");
   assert.match(drawers, /returnPath\?: string/);

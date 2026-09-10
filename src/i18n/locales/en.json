@@ -320,6 +320,8 @@
   "billing.platformOutboundHardCap": "Platform outbound hard cap",
   "billing.reconciliation": "Shopify reconciliation",
   "billing.discrepancyDetected": "A provider discrepancy is recorded for this billing period.",
+  "billing.modaQuantity": "Moda quantity",
+  "billing.shopifyQuantity": "Shopify quantity",
   "billing.discrepancyUnavailable": "Unavailable: this Admin schema does not persist a Shopify usage snapshot for comparison.",
   "billingControls.platformTitle": "Platform billing controls",
   "billingControls.platformDescription": "Set platform-wide safety ceilings and automation pause controls. Changes require SUPER_ADMIN access and are audited.",

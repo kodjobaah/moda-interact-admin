@@ -320,6 +320,8 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "billing.platformOutboundHardCap",
   "billing.reconciliation",
   "billing.discrepancyDetected",
+  "billing.modaQuantity",
+  "billing.shopifyQuantity",
   "billing.discrepancyUnavailable",
   "billingControls.platformTitle",
   "billingControls.platformDescription",

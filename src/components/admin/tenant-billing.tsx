@@ -58,7 +58,7 @@ function Overview({ billing }: { billing: TenantBilling }) {
   const subscription = billing.subscription;
   return (
     <div className="space-y-6">
-      {subscription.status === "SYNC_ERROR" ? (
+      {subscription.status === "SYNC_ERROR" || subscription.status === "UNMAPPED" ? (
         <p className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           {adminI18n.t("billing.billingHealth")}: {subscription.status}
         </p>
@@ -73,6 +73,7 @@ function Overview({ billing }: { billing: TenantBilling }) {
           <Value label={adminI18n.t("tenant.currentPeriodStart")} value={subscription.billingPeriod ? adminI18n.formatDateTime(subscription.billingPeriod.periodStart) : adminI18n.t("empty.notRecorded")} />
           <Value label={adminI18n.t("tenant.currentPeriodEnd")} value={subscription.billingPeriod ? adminI18n.formatDateTime(subscription.billingPeriod.periodEnd) : adminI18n.t("empty.notRecorded")} />
           <Value label={adminI18n.t("billing.pendingPlan")} value={subscription.pendingPlan?.name ?? adminI18n.t("empty.noneObserved")} />
+          <Value label={adminI18n.t("billing.pendingEffectiveAt")} value={subscription.pendingEffectiveAt ? adminI18n.formatDateTime(subscription.pendingEffectiveAt) : adminI18n.t("empty.notRecorded")} />
           <Value label={adminI18n.t("billing.lastSyncedAt")} value={subscription.lastSyncedAt ? adminI18n.formatDateTime(subscription.lastSyncedAt) : adminI18n.t("empty.notRecorded")} />
         </dl>
         <p className="mt-5 border-t border-gray-100 pt-4 text-sm text-gray-600">
@@ -104,7 +105,9 @@ function Usage({ billing }: { billing: TenantBilling }) {
           <Value label={adminI18n.t("billing.hardLimit")} value={billing.planDefaultOutboundHardLimit === null ? adminI18n.t("empty.unavailable") : adminI18n.formatNumber(billing.planDefaultOutboundHardLimit)} />
           <Value label={adminI18n.t("billing.platformOutboundHardCap")} value={billing.platformAbsoluteOutboundHardLimit === null ? adminI18n.t("empty.unavailable") : adminI18n.formatNumber(billing.platformAbsoluteOutboundHardLimit)} />
           <Value label={adminI18n.t("billing.overrideState")} value={billing.overrideState === "ACTIVE" ? adminI18n.t("billing.overrideActive") : billing.overrideState === "EXPIRED" ? adminI18n.t("billing.overrideExpired") : adminI18n.t("billing.defaultPolicy")} />
-          {billing.overrideState === "ACTIVE" && billing.override ? <Value label={adminI18n.t("billing.overrideReason")} value={billing.override.reason} /> : null}
+          {billing.override ? <Value label={adminI18n.t("billing.outboundHardLimit")} value={billing.override.outboundHardLimit === null ? adminI18n.t("empty.unavailable") : adminI18n.formatNumber(billing.override.outboundHardLimit)} /> : null}
+          {billing.override ? <Value label={adminI18n.t("billing.overrideReason")} value={billing.override.reason} /> : null}
+          {billing.override ? <Value label={adminI18n.t("billing.expiresAt")} value={billing.override.expiresAt ? adminI18n.formatDateTime(billing.override.expiresAt) : adminI18n.t("empty.notRecorded")} /> : null}
         </dl>
       </details>
     </section>
@@ -123,9 +126,12 @@ function Shopify({ billing }: { billing: TenantBilling }) {
         <Value label={adminI18n.t("billing.lastSyncedAt")} value={subscription.lastSyncedAt ? adminI18n.formatDateTime(subscription.lastSyncedAt) : adminI18n.t("empty.notRecorded")} />
         <Value label={adminI18n.t("billing.providerStatus")} value={subscription.lastSyncErrorCode ?? subscription.status} />
       </dl>
-      <p className="mt-6 border-t border-gray-100 pt-4 text-sm text-gray-600">
-        {billing.discrepancy ? adminI18n.t("billing.discrepancyDetected") : adminI18n.t("billing.reconciliationUnavailableShort")}
-      </p>
+      {billing.discrepancy ? (
+        <dl className="mt-6 grid gap-4 border-t border-gray-100 pt-4 sm:grid-cols-2">
+          <Value label={adminI18n.t("billing.modaQuantity")} value={billing.discrepancy.modaQuantity} />
+          <Value label={adminI18n.t("billing.shopifyQuantity")} value={billing.discrepancy.shopifyQuantity} />
+        </dl>
+      ) : <p className="mt-6 border-t border-gray-100 pt-4 text-sm text-gray-600">{adminI18n.t("billing.reconciliationUnavailableShort")}</p>}
     </section>
   );
 }
