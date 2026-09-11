@@ -17,6 +17,7 @@ import {
   requestFailedTranslationsReconciliationAction,
   takeMerchantSupportThreadOwnershipAction,
 } from '@/app/actions/merchant-support';
+import { createBillingTriageActionAction } from '@/app/actions/billing-lifecycle';
 import { Pagination } from './pagination';
 import { Icon } from './icons';
 import { adminI18n, adminStatusLabel } from '@/i18n';
@@ -26,6 +27,7 @@ import type {
   MerchantSupportThreadDetail,
   PendingSupportFilter,
 } from '@/lib/admin/merchant-support';
+import type { BillingSupportContext, BillingTriageAction } from '@/lib/admin/billing-lifecycle';
 import { tenantName } from '@/lib/admin/format';
 import { withParamUpdates } from '@/lib/admin/query';
 
@@ -49,6 +51,7 @@ type Props = {
   principal: PlatformAdminPrincipal;
   pending: PendingData;
   thread: MerchantSupportThreadDetail | null;
+  billingContext: BillingSupportContext | null;
   filter: PendingSupportFilter;
   search: string;
   params: Record<string, string>;
@@ -84,7 +87,7 @@ const SUPPORTED_TRANSLATION_LANGUAGE_OPTIONS = [
   { value: 'zh-Hant', label: 'Chinese (Traditional)' },
 ] as const;
 
-export function MerchantSupportInbox({ principal, pending, thread, filter, search, params }: Props) {
+export function MerchantSupportInbox({ principal, pending, thread, billingContext, filter, search, params }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -240,14 +243,14 @@ export function MerchantSupportInbox({ principal, pending, thread, filter, searc
         </section>
 
         <section aria-labelledby="support-thread-heading" className="min-w-0 rounded-xl border border-[var(--brand-200)] bg-white shadow-sm">
-          {thread ? <ThreadPanel thread={thread} principal={principal} runAction={runAction} isPending={isPending} /> : <div className="flex min-h-[420px] items-center justify-center p-8 text-center"><div><Icon name="message" className="mx-auto h-10 w-10 text-[var(--brand-300)]" /><h2 className="mt-4 font-semibold text-[var(--brand-900)]">Select a support thread</h2><p className="mt-2 max-w-sm text-sm text-gray-500">Choose a pending shop to review its bounded support history and ownership state.</p></div></div>}
+          {thread ? <ThreadPanel thread={thread} principal={principal} runAction={runAction} isPending={isPending} billingContext={billingContext} /> : <div className="flex min-h-[420px] items-center justify-center p-8 text-center"><div><Icon name="message" className="mx-auto h-10 w-10 text-[var(--brand-300)]" /><h2 className="mt-4 font-semibold text-[var(--brand-900)]">Select a support thread</h2><p className="mt-2 max-w-sm text-sm text-gray-500">Choose a pending shop to review its bounded support history and ownership state.</p></div></div>}
         </section>
       </div>
     </div>
   );
 }
 
-function ThreadPanel({ thread, principal, runAction, isPending }: { thread: MerchantSupportThreadDetail; principal: PlatformAdminPrincipal; runAction: (action: () => Promise<unknown>) => void; isPending: boolean }) {
+function ThreadPanel({ thread, principal, runAction, isPending, billingContext }: { thread: MerchantSupportThreadDetail; principal: PlatformAdminPrincipal; runAction: (action: () => Promise<unknown>) => void; isPending: boolean; billingContext: BillingSupportContext | null }) {
   const ownerId = thread.thread.assignedPlatformAdminId;
   const isOwner = ownerId === principal.id;
   const canRelease = isOwner || principal.role === 'SUPER_ADMIN';
@@ -264,11 +267,54 @@ function ThreadPanel({ thread, principal, runAction, isPending }: { thread: Merc
           <OwnershipControls threadId={thread.thread.id} ownerId={ownerId} principal={principal} canRelease={canRelease} runAction={runAction} isPending={isPending} />
         </div>
       </div>
+      {billingContext ? <BillingTriagePanel context={billingContext} thread={thread} runAction={runAction} isPending={isPending} /> : null}
       <ol className="max-h-[620px] space-y-4 overflow-auto p-5" aria-label="Support message history">
         {thread.messages.map((message) => <SupportMessage key={message.id} message={message} runAction={runAction} isPending={isPending} />)}
       </ol>
       <ComposeBox threadId={thread.thread.id} enabled={isOwner} runAction={runAction} isPending={isPending} />
     </div>
+  );
+}
+
+function BillingTriagePanel({ context, thread, runAction, isPending }: { context: BillingSupportContext; thread: MerchantSupportThreadDetail; runAction: (action: () => Promise<unknown>) => void; isPending: boolean }) {
+  const [action, setAction] = useState<BillingTriageAction>('PLAN_CHANGE');
+  const [purchaseId, setPurchaseId] = useState('');
+  const [reason, setReason] = useState('');
+  const latestMerchantMessage = [...thread.messages].reverse().find((message) => message.kind === 'MERCHANT');
+  const requiresPurchase = action === 'RECOVERY_CREDIT_REFUND';
+  return (
+    <section aria-labelledby="billing-triage-heading" className="border-b border-gray-100 bg-amber-50/40 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="billing-triage-heading" className="font-semibold text-[var(--brand-900)]">{adminI18n.t('billingTriage.title')}</h2>
+          <p className="mt-1 text-xs text-gray-600">{adminI18n.t('billingTriage.availability', { count: context.purchasedCredits.available })}</p>
+        </div>
+        <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-gray-700">{context.domain}</span>
+      </div>
+      <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto]" onSubmit={(event) => {
+        event.preventDefault();
+        if (!latestMerchantMessage || (requiresPurchase && !purchaseId)) return;
+        runAction(() => createBillingTriageActionAction({ threadId: thread.thread.id, messageId: latestMerchantMessage.id, action, reason, purchaseId: requiresPurchase ? purchaseId : undefined }));
+      }}>
+        <label className="text-xs font-semibold text-gray-700">{adminI18n.t('billingTriage.action')}
+          <select value={action} onChange={(event) => setAction(event.target.value as BillingTriageAction)} className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm">
+            <option value="PLAN_CHANGE">{adminI18n.t('billingTriage.planChange')}</option>
+            <option value="SUBSCRIPTION_CANCELLATION">{adminI18n.t('billingTriage.cancellation')}</option>
+            <option value="RECOVERY_CREDIT_REFUND">{adminI18n.t('billingTriage.refund')}</option>
+          </select>
+        </label>
+        {requiresPurchase ? <label className="text-xs font-semibold text-gray-700">{adminI18n.t('billingTriage.purchase')}
+          <select value={purchaseId} onChange={(event) => setPurchaseId(event.target.value)} className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm">
+            <option value="">{adminI18n.t('billingTriage.selectPurchase')}</option>
+            {context.purchases.filter((purchase) => purchase.status === 'ACTIVE').map((purchase) => <option key={purchase.id} value={purchase.id}>{purchase.id.slice(0, 12)} · {purchase.credits} credits</option>)}
+          </select>
+        </label> : <div />}
+        <label className="text-xs font-semibold text-gray-700">{adminI18n.t('billingTriage.reason')}
+          <input required minLength={1} maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm" />
+        </label>
+        <button type="submit" disabled={isPending || !latestMerchantMessage || (requiresPurchase && !purchaseId)} className="self-end rounded-md bg-[var(--brand-800)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{adminI18n.t('billingTriage.submit')}</button>
+      </form>
+    </section>
   );
 }
 

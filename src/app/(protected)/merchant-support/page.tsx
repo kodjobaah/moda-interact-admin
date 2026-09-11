@@ -5,6 +5,7 @@ import {
   getPendingMerchantSupportThreads,
   type PendingSupportFilter,
 } from '@/lib/admin/merchant-support';
+import { getBillingSupportContext } from '@/lib/admin/billing-lifecycle';
 import { cleanSearch, firstParam, paramsToRecord, positiveInt, type SearchParamRecord } from '@/lib/admin/query';
 import { MerchantSupportInbox } from '@/components/admin/merchant-support-inbox';
 
@@ -35,6 +36,7 @@ export default async function MerchantSupportPage({ searchParams }: PageProps) {
     search,
   });
   const thread = threadId ? await getMerchantSupportThread(threadId) : null;
+  const billingContext = threadId ? await getBillingSupportContext(threadId) : null;
 
   return (
     <AdminShell active="merchant-support">
@@ -43,6 +45,7 @@ export default async function MerchantSupportPage({ searchParams }: PageProps) {
           principal={principal}
           pending={pending}
           thread={thread}
+          billingContext={billingContext}
           filter={filter}
           search={search}
           params={params}
