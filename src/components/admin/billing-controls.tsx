@@ -49,6 +49,7 @@ export function PlatformBillingControls({
     globalPauseAutomatedWhatsapp: boolean;
     absoluteOutboundHardLimit: number;
     defaultWarningPercent: number;
+    lifetimeFreeRecoveryAllowance: number;
   } | null;
 }) {
   return (
@@ -94,7 +95,22 @@ export function PlatformBillingControls({
               required
             />
           </label>
+          <label className="text-sm font-medium text-gray-700">
+            {adminI18n.t("billingControls.lifetimeFreeRecoveryAllowance")}
+            <input
+              className={inputClass}
+              type="number"
+              min="0"
+              step="1"
+              name="lifetimeFreeRecoveryAllowance"
+              defaultValue={policy?.lifetimeFreeRecoveryAllowance ?? ""}
+              required
+            />
+          </label>
         </div>
+        <p className="text-sm text-gray-600">
+          {adminI18n.t("billingControls.lifetimeFreeRecoveryAllowanceHelp")}
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input

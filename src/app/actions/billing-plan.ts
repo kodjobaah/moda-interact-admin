@@ -94,8 +94,6 @@ export async function mutateBillingPlanAction(
           recoveryCreditsPerPack: values.recoveryCreditsPerPack,
           shopifyRecoveryCreditPackEventHandle:
             values.shopifyRecoveryCreditPackEventHandle,
-          freeLifetimeConversationAllowance:
-            values.freeLifetimeConversationAllowance,
           defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
           defaultOutboundHardLimit: values.defaultOutboundHardLimit,
           terminalMessageReservedSlots: values.terminalMessageReservedSlots,
@@ -153,8 +151,6 @@ export async function mutateBillingPlanAction(
         recoveryCreditsPerPack: values.recoveryCreditsPerPack,
         shopifyRecoveryCreditPackEventHandle:
           values.shopifyRecoveryCreditPackEventHandle,
-        freeLifetimeConversationAllowance:
-          values.freeLifetimeConversationAllowance,
         defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
         defaultOutboundHardLimit: values.defaultOutboundHardLimit,
         terminalMessageReservedSlots: values.terminalMessageReservedSlots,

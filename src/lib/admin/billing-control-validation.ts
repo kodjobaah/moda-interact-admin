@@ -5,6 +5,7 @@ export type PlatformBillingPolicyInput = {
   globalPauseAutomatedWhatsapp: boolean;
   absoluteOutboundHardLimit: number;
   defaultWarningPercent: number;
+  lifetimeFreeRecoveryAllowance: number;
   reason: string;
 };
 
@@ -62,6 +63,13 @@ export function parsePlatformBillingPolicyForm(
   if (defaultWarningPercent < 0 || defaultWarningPercent > 100) {
     throw new Error("Warning threshold must be between 0 and 100 percent.");
   }
+  const lifetimeFreeRecoveryAllowance = requiredInt(
+    formData.get("lifetimeFreeRecoveryAllowance"),
+    "Lifetime Free recovery grant",
+  );
+  if (lifetimeFreeRecoveryAllowance < 0) {
+    throw new Error("Lifetime Free recovery grant must be non-negative.");
+  }
   return {
     globalPauseNewRecoveries: checkbox(formData, "globalPauseNewRecoveries"),
     globalPauseAutomatedWhatsapp: checkbox(
@@ -70,6 +78,7 @@ export function parsePlatformBillingPolicyForm(
     ),
     absoluteOutboundHardLimit,
     defaultWarningPercent,
+    lifetimeFreeRecoveryAllowance,
     reason: requiredReason(formData.get("reason")),
   };
 }

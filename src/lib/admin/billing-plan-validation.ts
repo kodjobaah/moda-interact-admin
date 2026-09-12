@@ -23,7 +23,6 @@ export type BillingPlanFormValues = {
   recoveryCreditPackEnabled: boolean;
   recoveryCreditsPerPack: number | null;
   shopifyRecoveryCreditPackEventHandle: string | null;
-  freeLifetimeConversationAllowance: number | null;
   defaultOutboundSoftLimit: number;
   defaultOutboundHardLimit: number;
   terminalMessageReservedSlots: number;
@@ -149,16 +148,7 @@ export function parseBillingPlanForm(
       }
     }
   }
-  const allowanceText = text(formData.get("freeLifetimeConversationAllowance"));
-  const freeLifetimeConversationAllowance = allowanceText
-    ? positiveInteger(allowanceText, "Free lifetime conversation allowance")
-    : null;
   if (kindResult.data === "FREE") {
-    if (!freeLifetimeConversationAllowance) {
-      throw new Error(
-        "Free plans require a positive lifetime conversation allowance.",
-      );
-    }
     if (usageHandle) {
       throw new Error("Free plans cannot report a Shopify usage event handle.");
     }
@@ -167,9 +157,6 @@ export function parseBillingPlanForm(
       throw new Error(
         "Paid plans require an exact Shopify usage event handle.",
       );
-    }
-    if (freeLifetimeConversationAllowance !== null) {
-      throw new Error("Paid plans cannot use a Free lifetime allowance.");
     }
   }
 
@@ -192,7 +179,6 @@ export function parseBillingPlanForm(
     recoveryCreditPackEnabled,
     recoveryCreditsPerPack,
     shopifyRecoveryCreditPackEventHandle: recoveryCreditPackEventHandle,
-    freeLifetimeConversationAllowance,
     defaultOutboundSoftLimit,
     defaultOutboundHardLimit,
     terminalMessageReservedSlots,

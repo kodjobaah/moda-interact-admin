@@ -14,14 +14,13 @@ export async function getTenantBillingControls(shopId: string) {
       where: { id: shopId },
       select: {
         billingPolicyOverride: true,
-        subscription: {
-          select: {
-            plan: { select: { freeLifetimeConversationAllowance: true } },
-          },
-        },
         entitlementCounters: {
           where: { counter: EntitlementCounter.FREE_RECOVERY_LIFETIME },
-          select: { committedQuantity: true, reservedQuantity: true },
+          select: {
+            grantedQuantity: true,
+            committedQuantity: true,
+            reservedQuantity: true,
+          },
         },
       },
     }),
@@ -35,10 +34,9 @@ export async function getTenantBillingControls(shopId: string) {
   ]);
 
   if (!shop) return null;
-  const baseAllowance =
-    shop.subscription?.plan?.freeLifetimeConversationAllowance ?? null;
   const totalAdjustments = adjustments._sum.quantity ?? 0;
   const counter = shop.entitlementCounters[0];
+  const baseAllowance = counter?.grantedQuantity ?? null;
   const committed = counter?.committedQuantity ?? 0;
   const reserved = counter?.reservedQuantity ?? 0;
   const effectiveAllowance =
