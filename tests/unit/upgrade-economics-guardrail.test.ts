@@ -13,6 +13,30 @@ import {
   type UsagePricingSnapshot,
 } from "../../src/lib/admin/upgrade-economics-guardrail.ts";
 
+type UpgradeInput = Parameters<typeof validateUpgradeEconomics>[0];
+type SinglePackInput = Parameters<typeof validateSinglePackShopifyEconomics>[0];
+type ExcludedEvaluatorKey =
+  | "lifetimeFreeRecoveryAllowance"
+  | "promotion"
+  | "promotionCampaign"
+  | "promotionalCredits"
+  | "purchasedCreditBalance"
+  | "refundState"
+  | "merchantUsage"
+  | "currentBalance";
+type Assert<T extends true> = T;
+type NoExcludedEvaluatorKeys<T> =
+  Extract<keyof T, ExcludedEvaluatorKey> extends never ? true : false;
+type UpgradeInputExcludesDomainState = Assert<
+  NoExcludedEvaluatorKeys<UpgradeInput>
+>;
+type SinglePackInputExcludesDomainState = Assert<
+  NoExcludedEvaluatorKeys<SinglePackInput>
+>;
+
+void (undefined as unknown as UpgradeInputExcludesDomainState);
+void (undefined as unknown as SinglePackInputExcludesDomainState);
+
 const free: PlanEconomics = {
   id: "free",
   name: "Free",
@@ -176,30 +200,51 @@ test("5. cheaper overshoot is allowed", () => {
 });
 
 test("6. invalid zero or negative credits are ignored", () => {
-  assert.equal(
-    findCheapestTopUpCombination(
-      [
-        {
-          id: "bad",
-          planId: "free",
-          chargeAmountMinor: 100,
-          creditsGranted: 0,
-        },
-      ],
-      1,
-    ),
-    null,
+  const validOffer = {
+    id: "valid",
+    planId: "free",
+    chargeAmountMinor: 250,
+    creditsGranted: 2,
+  };
+  const result = findCheapestTopUpCombination(
+    [
+      { id: "zero", planId: "free", chargeAmountMinor: 100, creditsGranted: 0 },
+      {
+        id: "negative",
+        planId: "free",
+        chargeAmountMinor: 100,
+        creditsGranted: -1,
+      },
+      validOffer,
+    ],
+    1,
   );
+  assert.equal(result?.costMinor, 250);
+  assert.deepEqual(result?.purchases, [validOffer]);
 });
 
 test("7. invalid zero or negative charges are ignored", () => {
-  assert.equal(
-    findCheapestTopUpCombination(
-      [{ id: "bad", planId: "free", chargeAmountMinor: 0, creditsGranted: 5 }],
-      1,
-    ),
-    null,
+  const validOffer = {
+    id: "valid",
+    planId: "free",
+    chargeAmountMinor: 250,
+    creditsGranted: 2,
+  };
+  const result = findCheapestTopUpCombination(
+    [
+      { id: "zero", planId: "free", chargeAmountMinor: 0, creditsGranted: 5 },
+      {
+        id: "negative",
+        planId: "free",
+        chargeAmountMinor: -1,
+        creditsGranted: 5,
+      },
+      validOffer,
+    ],
+    1,
   );
+  assert.equal(result?.costMinor, 250);
+  assert.deepEqual(result?.purchases, [validOffer]);
 });
 
 test("8. purchase summaries group identical offers", () => {
@@ -367,17 +412,24 @@ test("23. self and non-increasing allowance edges are unverified", () => {
 });
 
 test("24. invalid pack sizes are unverified", () => {
-  const result = validateSinglePackShopifyEconomics({
-    currentPlan: starter,
-    nextPlan: growth,
-    topUpsEnabled: true,
-    recoveryCreditsPerPack: 0,
-    usagePricing: fixed(100),
-  });
-  assert.deepEqual(
-    [result.status, result.code],
-    ["UNVERIFIED", "TOPUP_PRICING_UNAVAILABLE"],
-  );
+  for (const recoveryCreditsPerPack of [
+    null,
+    0,
+    -1,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    const result = validateSinglePackShopifyEconomics({
+      currentPlan: starter,
+      nextPlan: growth,
+      topUpsEnabled: true,
+      recoveryCreditsPerPack,
+      usagePricing: fixed(100),
+    });
+    assert.deepEqual(
+      [result.status, result.code],
+      ["UNVERIFIED", "TOPUP_PRICING_UNAVAILABLE"],
+    );
+  }
 });
 
 test("25. malformed tiers return invalid usage pricing", () => {
@@ -433,53 +485,82 @@ test("28. corrected Free plan uses zero monthly included conversations", () => {
     allTopUpOffers: freeOffers,
     topUpsEnabled: true,
   });
+  assert.equal(result.status, "PASS");
   assert.equal(result.details.additionalCreditsNeeded, 20);
+  assert.equal(result.details.topUpCostMinor, 6000);
+  assert.equal(result.details.stayAndTopUpCostMinor, 6000);
+  assert.equal(result.details.upgradeCostMinor, 3500);
 });
 
 test("29. lifetime-Free policy is not an evaluator input", () => {
-  const first = validateUpgradeEconomics({
-    currentPlan: free,
-    nextPlan: starter,
-    allTopUpOffers: freeOffers,
-    topUpsEnabled: true,
-  });
-  const second = validateUpgradeEconomics({
-    currentPlan: free,
-    nextPlan: starter,
-    allTopUpOffers: freeOffers,
-    topUpsEnabled: true,
-  });
-  assert.deepEqual(second, first);
+  const contexts = [
+    { lifetimeFreeRecoveryAllowance: 5 },
+    { lifetimeFreeRecoveryAllowance: 500 },
+  ];
+  const results = contexts.map(() =>
+    validateUpgradeEconomics({
+      currentPlan: free,
+      nextPlan: starter,
+      allTopUpOffers: freeOffers,
+      topUpsEnabled: true,
+    }),
+  );
+  assert.deepEqual(results[1], results[0]);
 });
 
 test("30. promotion state does not change the evaluator result", () => {
-  const result = validateUpgradeEconomics({
-    currentPlan: free,
-    nextPlan: starter,
-    allTopUpOffers: freeOffers,
-    topUpsEnabled: true,
-  });
-  assert.equal(result.code, "UPGRADE_ECONOMICS_OK");
+  const contexts = [
+    { promotionCampaign: { quantity: 0, expiresAt: null, selected: false } },
+    {
+      promotionCampaign: {
+        quantity: 100,
+        expiresAt: "2026-12-31",
+        selected: true,
+      },
+    },
+  ];
+  const results = contexts.map(() =>
+    validateUpgradeEconomics({
+      currentPlan: free,
+      nextPlan: starter,
+      allTopUpOffers: freeOffers,
+      topUpsEnabled: true,
+    }),
+  );
+  assert.deepEqual(results[1], results[0]);
 });
 
 test("31. purchased-credit state does not change the evaluator result", () => {
-  const result = validateUpgradeEconomics({
-    currentPlan: starter,
-    nextPlan: growth,
-    allTopUpOffers: starterOffers,
-    topUpsEnabled: true,
-  });
-  assert.equal(result.code, "UPGRADE_ECONOMICS_OK");
+  const contexts = [
+    { purchasedCreditBalance: 0, refundState: "NOT_REQUESTED" },
+    { purchasedCreditBalance: 99, refundState: "REFUNDED" },
+  ];
+  const results = contexts.map(() =>
+    validateUpgradeEconomics({
+      currentPlan: starter,
+      nextPlan: growth,
+      allTopUpOffers: starterOffers,
+      topUpsEnabled: true,
+    }),
+  );
+  assert.deepEqual(results[1], results[0]);
 });
 
 test("32. merchant usage is not an evaluator input", () => {
-  const result = validateUpgradeEconomics({
-    currentPlan: growth,
-    nextPlan: scale,
-    allTopUpOffers: growthOffers,
-    topUpsEnabled: true,
-  });
-  assert.equal(result.details.additionalCreditsNeeded, 60);
+  const contexts = [
+    { merchantUsage: 0, currentBalance: 110 },
+    { merchantUsage: 1000, currentBalance: 0 },
+  ];
+  const results = contexts.map(() =>
+    validateUpgradeEconomics({
+      currentPlan: growth,
+      nextPlan: scale,
+      allTopUpOffers: growthOffers,
+      topUpsEnabled: true,
+    }),
+  );
+  assert.deepEqual(results[1], results[0]);
+  assert.equal(results[0].details.additionalCreditsNeeded, 60);
 });
 
 test("33. fixed pricing multiplies units", () => {
