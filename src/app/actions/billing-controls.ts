@@ -49,7 +49,14 @@ export async function mutatePlatformBillingPolicyAction(
     });
     const after = await transaction.platformBillingPolicy.upsert({
       where: { id: "default" },
-      create: { id: "default", ...values },
+      create: {
+        id: "default",
+        globalPauseNewRecoveries: values.globalPauseNewRecoveries,
+        globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
+        absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
+        defaultWarningPercent: values.defaultWarningPercent,
+        lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
+      },
       update: {
         globalPauseNewRecoveries: values.globalPauseNewRecoveries,
         globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,

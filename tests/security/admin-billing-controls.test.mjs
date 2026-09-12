@@ -69,6 +69,27 @@ test("enforces existing platform policy bounds and a required reason", () => {
   });
 });
 
+test("keeps policy creation Prisma-safe while auditing the mutation reason", () => {
+  const createBlock = actionSource.match(
+    /platformBillingPolicy\.upsert\(\{[\s\S]*?create: \{([\s\S]*?)\n\s+\},\n\s+update:/,
+  )?.[1];
+  assert.ok(createBlock);
+  assert.doesNotMatch(createBlock, /\.\.\.values/);
+  assert.match(
+    createBlock,
+    /lifetimeFreeRecoveryAllowance: values\.lifetimeFreeRecoveryAllowance/,
+  );
+  assert.doesNotMatch(createBlock, /reason/);
+  assert.match(
+    actionSource,
+    /reason: values\.reason,\n\s+relatedEntityType: "PlatformBillingPolicy"/,
+  );
+  assert.match(
+    actionSource,
+    /lifetimeFreeRecoveryAllowance: values\.lifetimeFreeRecoveryAllowance,\n\s+version: \{ increment: 1 \}/,
+  );
+});
+
 test("preserves nullable shop override inheritance and validates effective limits", () => {
   const result = runBehaviorScript(`
     import { parseShopBillingOverrideForm } from ${JSON.stringify(validationUrl)};
