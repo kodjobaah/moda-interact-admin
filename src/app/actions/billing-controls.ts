@@ -55,6 +55,7 @@ export async function mutatePlatformBillingPolicyAction(
         globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
         absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
         defaultWarningPercent: values.defaultWarningPercent,
+        lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
         version: { increment: 1 },
       },
     });

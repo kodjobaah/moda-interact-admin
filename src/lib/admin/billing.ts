@@ -69,12 +69,16 @@ function recoveryCreditPurchaseProjection(
 ): RecoveryCreditPurchaseItem {
   return {
     ...row,
-    shop: { domain: row.shop.domain, brandName: row.shop.brand?.brandName ?? null },
+    shop: {
+      domain: row.shop.domain,
+      brandName: row.shop.brand?.brandName ?? null,
+    },
     planName: row.plan?.name ?? null,
     usageEvent: {
       ...row.usageEvent,
       quantity: decimalValue(row.usageEvent.quantity),
-      providerResponseSummary: row.usageEvent.providerResponseSummary?.slice(0, 2000) ?? null,
+      providerResponseSummary:
+        row.usageEvent.providerResponseSummary?.slice(0, 2000) ?? null,
     },
   };
 }
@@ -222,7 +226,10 @@ export async function getRecoveryCreditPurchases(input: {
   if (input.status && !RECOVERY_PACK_STATUSES.includes(input.status)) {
     throw new Error("Unsupported recovery-credit purchase status");
   }
-  const { page: requestedPage, pageSize } = boundedPage(input.page, input.pageSize ?? 20);
+  const { page: requestedPage, pageSize } = boundedPage(
+    input.page,
+    input.pageSize ?? 20,
+  );
   const where: Prisma.RecoveryCreditPurchaseWhereInput = {
     ...(input.shopId ? { shopId: input.shopId } : {}),
     ...(input.status ? { status: input.status } : {}),
@@ -237,7 +244,12 @@ export async function getRecoveryCreditPurchases(input: {
     take: pageSize,
     select: recoveryCreditPurchaseSelect,
   });
-  return pageResult(rows.map(recoveryCreditPurchaseProjection), page, pageSize, totalItems);
+  return pageResult(
+    rows.map(recoveryCreditPurchaseProjection),
+    page,
+    pageSize,
+    totalItems,
+  );
 }
 
 export async function getRecoveryCreditPurchaseDetail(
@@ -302,7 +314,6 @@ export async function getTenantBilling(
         select: {
           name: true,
           kind: true,
-          freeLifetimeConversationAllowance: true,
           shopifyUsageEventHandle: true,
           defaultOutboundHardLimit: true,
         },
@@ -332,7 +343,11 @@ export async function getTenantBilling(
           counter: EntitlementCounter.FREE_RECOVERY_LIFETIME,
         },
       },
-      select: { committedQuantity: true, reservedQuantity: true },
+      select: {
+        grantedQuantity: true,
+        committedQuantity: true,
+        reservedQuantity: true,
+      },
     }),
     prisma.billingAllowanceAdjustment.aggregate({
       where: { shopId, counter: EntitlementCounter.FREE_RECOVERY_LIFETIME },
@@ -379,8 +394,7 @@ export async function getTenantBilling(
       : Promise.resolve(pageResult([], 1, ledgerPageSize, 0)),
   ]);
 
-  const baseAllowance =
-    subscription.plan?.freeLifetimeConversationAllowance ?? 0;
+  const baseAllowance = counter?.grantedQuantity ?? 0;
   const adjustmentTotal = adjustments._sum.quantity ?? 0;
   const committed = counter?.committedQuantity ?? 0;
   const reserved = counter?.reservedQuantity ?? 0;

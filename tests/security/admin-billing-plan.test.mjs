@@ -52,7 +52,6 @@ function form(values) {
     shopifyPlanHandle: "starter-plan",
     name: "Starter",
     kind: "FREE",
-    freeLifetimeConversationAllowance: "5",
     defaultOutboundSoftLimit: "10",
     defaultOutboundHardLimit: "20",
     terminalMessageReservedSlots: "1",
@@ -67,14 +66,14 @@ function form(values) {
     .join(" ")}`;
 }
 
-test("accepts Free plans with the default positive lifetime allowance and no meter", () => {
+test("accepts Free plans without a plan-owned lifetime allowance", () => {
   const result = runBehaviorScript(`
     import { parseBillingPlanForm } from ${JSON.stringify(moduleUrl)};
     ${form({})}
     console.log(JSON.stringify(parseBillingPlanForm(form)));
   `);
   assert.equal(result.kind, "FREE");
-  assert.equal(result.freeLifetimeConversationAllowance, 5);
+  assert.equal("freeLifetimeConversationAllowance" in result, false);
   assert.equal(result.shopifyUsageEventHandle, null);
 });
 
@@ -88,10 +87,13 @@ test("enforces mutually exclusive Free and paid billing fields", () => {
     };
     console.log(JSON.stringify({
       freeMeterRejected: attempt({ shopifyUsageEventHandle: 'meter' }),
-      paidWithoutMeterRejected: attempt({ kind: 'PAID_METERED', freeLifetimeConversationAllowance: '' }),
-      paidFreeAllowanceRejected: attempt({ kind: 'PAID_METERED', shopifyUsageEventHandle: 'meter' }),
+      paidWithoutMeterRejected: attempt({ kind: 'PAID_METERED' }),
+      paidLegacyAllowanceIgnored: (() => {
+        ${form({ kind: "PAID_METERED", freeLifetimeConversationAllowance: "5", shopifyUsageEventHandle: "meter" })}
+        try { return "freeLifetimeConversationAllowance" in parseBillingPlanForm(form); } catch { return false; }
+      })(),
       paidAccepted: (() => {
-        ${form({ kind: "PAID_METERED", freeLifetimeConversationAllowance: "", shopifyUsageEventHandle: "meter" })}
+        ${form({ kind: "PAID_METERED", shopifyUsageEventHandle: "meter" })}
         try { return parseBillingPlanForm(form).kind === 'PAID_METERED'; } catch { return false; }
       })(),
     }));
@@ -99,7 +101,7 @@ test("enforces mutually exclusive Free and paid billing fields", () => {
   assert.deepEqual(result, {
     freeMeterRejected: true,
     paidWithoutMeterRejected: true,
-    paidFreeAllowanceRejected: true,
+    paidLegacyAllowanceIgnored: false,
     paidAccepted: true,
   });
 });
@@ -119,7 +121,6 @@ test("validates the complete recovery-credit pack matrix without price fields", 
     };
     const paid = {
       kind: 'PAID_METERED',
-      freeLifetimeConversationAllowance: '',
       shopifyUsageEventHandle: 'recovery-meter',
       recoveryCreditPackEnabled: 'on',
       recoveryCreditsPerPack: '25',
@@ -287,6 +288,9 @@ test("keeps catalog mutations SUPER_ADMIN-only, immutable, audited, and Prisma-f
   assert.match(actionSource, /Shopify plan handles are immutable/);
   assert.match(actionSource, /transaction\.billingAuditEvent\.create/);
   assert.doesNotMatch(actionSource, /\$(?:queryRaw|executeRaw)/);
+  assert.doesNotMatch(actionSource, /freeLifetimeConversationAllowance/);
+  assert.doesNotMatch(validationSource, /freeLifetimeConversationAllowance/);
+  assert.doesNotMatch(componentSource, /freeLifetimeConversationAllowance/);
 });
 
 test("records persisted before values and resulting after values for paid-plan edits", () => {
@@ -343,12 +347,17 @@ test("records persisted before values and resulting after values for paid-plan e
   assert.equal(result.after.shopifyRecoveryCreditPackEventHandle, "pack-meter");
 });
 
-test("does not default an existing paid plan to a Free allowance", () => {
-  assert.match(
-    readFileSync(
-      resolve(root, "src/components/admin/billing-plan-catalog.tsx"),
-      "utf8",
-    ),
-    /plan\.freeLifetimeConversationAllowance \?\? \"\"/,
-  );
+test("keeps legacy plan audit fields readable", () => {
+  const result = runBehaviorScript(`
+    import { billingPlanAuditSnapshot } from ${JSON.stringify(auditModuleUrl)};
+    console.log(JSON.stringify(billingPlanAuditSnapshot({
+      shopifyPlanHandle: 'legacy-free', name: 'Legacy Free', kind: 'FREE', active: true,
+      shopifyUsageEventHandle: null, includedRecoveryConversationAllowance: null,
+      recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null,
+      shopifyRecoveryCreditPackEventHandle: null, freeLifetimeConversationAllowance: 5,
+      defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1,
+      features: [],
+    })));
+  `);
+  assert.equal(result.freeLifetimeConversationAllowance, 5);
 });

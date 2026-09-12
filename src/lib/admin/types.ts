@@ -81,7 +81,6 @@ export type TenantBilling = {
     plan: {
       name: string;
       kind: string;
-      freeLifetimeConversationAllowance: number | null;
       shopifyUsageEventHandle: string | null;
       defaultOutboundHardLimit: number;
     } | null;

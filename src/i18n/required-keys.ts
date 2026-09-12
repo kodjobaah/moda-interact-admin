@@ -328,6 +328,8 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "billingControls.backToCatalog",
   "billingControls.absoluteHardLimit",
   "billingControls.warningPercent",
+  "billingControls.lifetimeFreeRecoveryAllowance",
+  "billingControls.lifetimeFreeRecoveryAllowanceHelp",
   "billingControls.pauseNewRecoveries",
   "billingControls.pauseAutomatedWhatsapp",
   "billingControls.reason",

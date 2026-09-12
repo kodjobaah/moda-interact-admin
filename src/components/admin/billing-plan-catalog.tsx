@@ -125,18 +125,6 @@ export function PlanForm({ plan }: { plan?: BillingPlanRow }) {
           {adminI18n.t("billing.recoveryCreditPackRateHelp")}
         </p>
         <label className="text-sm font-medium text-gray-700">
-          {adminI18n.t("billing.freeAllowance")}
-          <input
-            className={inputClass}
-            name="freeLifetimeConversationAllowance"
-            type="number"
-            min="1"
-            defaultValue={
-              plan ? (plan.freeLifetimeConversationAllowance ?? "") : 5
-            }
-          />
-        </label>
-        <label className="text-sm font-medium text-gray-700">
           {adminI18n.t("billing.softLimit")}
           <input
             className={inputClass}
@@ -208,10 +196,17 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
     <div className="space-y-4">
       <section className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <div>
-          <h2 className="text-lg font-semibold text-gray-950">{adminI18n.t("billing.tab.plans")}</h2>
-          <p className="mt-1 text-sm text-gray-600">{adminI18n.t("billing.plansDescription")}</p>
+          <h2 className="text-lg font-semibold text-gray-950">
+            {adminI18n.t("billing.tab.plans")}
+          </h2>
+          <p className="mt-1 text-sm text-gray-600">
+            {adminI18n.t("billing.plansDescription")}
+          </p>
         </div>
-        <Link href="/billing?view=plans&drawer=register-plan" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]">
+        <Link
+          href="/billing?view=plans&drawer=register-plan"
+          className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
+        >
           {adminI18n.t("billing.registerPlanAction")}
         </Link>
       </section>
@@ -240,95 +235,128 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Link href={`/billing?view=plans&planId=${encodeURIComponent(plan.id)}`} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                <Link
+                  href={`/billing?view=plans&planId=${encodeURIComponent(plan.id)}`}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
                   {adminI18n.t("billing.editPlanAction")}
                 </Link>
                 <form action={mutateBillingPlanAction}>
-                <input type="hidden" name="intent" value="toggle" />
-                <input type="hidden" name="id" value={plan.id} />
-                <input type="hidden" name="kind" value={plan.kind} />
-                <input
-                  type="hidden"
-                  name="shopifyPlanHandle"
-                  value={plan.shopifyPlanHandle}
-                />
-                <input type="hidden" name="name" value={plan.name} />
-                <input
-                  type="hidden"
-                  name="defaultOutboundSoftLimit"
-                  value={plan.defaultOutboundSoftLimit}
-                />
-                <input
-                  type="hidden"
-                  name="defaultOutboundHardLimit"
-                  value={plan.defaultOutboundHardLimit}
-                />
-                <input
-                  type="hidden"
-                  name="terminalMessageReservedSlots"
-                  value={plan.terminalMessageReservedSlots}
-                />
-                <input
-                  type="hidden"
-                  name="recoveryCreditPackEnabled"
-                  value={plan.recoveryCreditPackEnabled ? "on" : "off"}
-                />
-                <input
-                  type="hidden"
-                  name="recoveryCreditsPerPack"
-                  value={plan.recoveryCreditsPerPack ?? ""}
-                />
-                <input
-                  type="hidden"
-                  name="shopifyRecoveryCreditPackEventHandle"
-                  value={plan.shopifyRecoveryCreditPackEventHandle ?? ""}
-                />
-                <input
-                  type="hidden"
-                  name="includedRecoveryConversationAllowance"
-                  value={plan.includedRecoveryConversationAllowance ?? ""}
-                />
-                {plan.kind === "FREE" ? (
+                  <input type="hidden" name="intent" value="toggle" />
+                  <input type="hidden" name="id" value={plan.id} />
+                  <input type="hidden" name="kind" value={plan.kind} />
                   <input
                     type="hidden"
-                    name="freeLifetimeConversationAllowance"
-                    value={plan.freeLifetimeConversationAllowance ?? ""}
+                    name="shopifyPlanHandle"
+                    value={plan.shopifyPlanHandle}
                   />
-                ) : null}
-                {plan.kind === "PAID_METERED" ? (
+                  <input type="hidden" name="name" value={plan.name} />
                   <input
                     type="hidden"
-                    name="shopifyUsageEventHandle"
-                    value={plan.shopifyUsageEventHandle ?? ""}
+                    name="defaultOutboundSoftLimit"
+                    value={plan.defaultOutboundSoftLimit}
                   />
-                ) : null}
-                <input
-                  type="hidden"
-                  name="reason"
-                  value={
-                    plan.active
-                      ? "Deactivated from billing catalog"
-                      : "Activated in billing catalog"
-                  }
-                />
-                <button
-                  type="submit"
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  {plan.active
-                    ? adminI18n.t("billing.deactivate")
-                    : adminI18n.t("billing.activate")}
-                </button>
+                  <input
+                    type="hidden"
+                    name="defaultOutboundHardLimit"
+                    value={plan.defaultOutboundHardLimit}
+                  />
+                  <input
+                    type="hidden"
+                    name="terminalMessageReservedSlots"
+                    value={plan.terminalMessageReservedSlots}
+                  />
+                  <input
+                    type="hidden"
+                    name="recoveryCreditPackEnabled"
+                    value={plan.recoveryCreditPackEnabled ? "on" : "off"}
+                  />
+                  <input
+                    type="hidden"
+                    name="recoveryCreditsPerPack"
+                    value={plan.recoveryCreditsPerPack ?? ""}
+                  />
+                  <input
+                    type="hidden"
+                    name="shopifyRecoveryCreditPackEventHandle"
+                    value={plan.shopifyRecoveryCreditPackEventHandle ?? ""}
+                  />
+                  <input
+                    type="hidden"
+                    name="includedRecoveryConversationAllowance"
+                    value={plan.includedRecoveryConversationAllowance ?? ""}
+                  />
+                  {plan.kind === "PAID_METERED" ? (
+                    <input
+                      type="hidden"
+                      name="shopifyUsageEventHandle"
+                      value={plan.shopifyUsageEventHandle ?? ""}
+                    />
+                  ) : null}
+                  <input
+                    type="hidden"
+                    name="reason"
+                    value={
+                      plan.active
+                        ? "Deactivated from billing catalog"
+                        : "Activated in billing catalog"
+                    }
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    {plan.active
+                      ? adminI18n.t("billing.deactivate")
+                      : adminI18n.t("billing.activate")}
+                  </button>
                 </form>
               </div>
             </div>
             <dl className="mt-5 grid gap-3 border-t border-gray-100 pt-4 text-sm sm:grid-cols-2">
-              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.kind")}</dt><dd className="font-medium text-gray-900">{plan.kind}</dd></div>
-              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.usageHandle")}</dt><dd className="break-words font-mono text-xs text-gray-900">{plan.shopifyUsageEventHandle ?? adminI18n.t("empty.notRecorded")}</dd></div>
-              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.includedRecoveryAllowance")}</dt><dd className="font-medium text-gray-900">{plan.includedRecoveryConversationAllowance ?? adminI18n.t("empty.notRecorded")}</dd></div>
-              <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.recoveryCreditPackEnabled")}</dt><dd className="font-medium text-gray-900">{plan.recoveryCreditPackEnabled ? adminI18n.t("billing.active") : adminI18n.t("billing.inactive")}</dd></div>
+              <div>
+                <dt className="text-xs text-gray-500">
+                  {adminI18n.t("billing.kind")}
+                </dt>
+                <dd className="font-medium text-gray-900">{plan.kind}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">
+                  {adminI18n.t("billing.usageHandle")}
+                </dt>
+                <dd className="break-words font-mono text-xs text-gray-900">
+                  {plan.shopifyUsageEventHandle ??
+                    adminI18n.t("empty.notRecorded")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">
+                  {adminI18n.t("billing.includedRecoveryAllowance")}
+                </dt>
+                <dd className="font-medium text-gray-900">
+                  {plan.includedRecoveryConversationAllowance ??
+                    adminI18n.t("empty.notRecorded")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">
+                  {adminI18n.t("billing.recoveryCreditPackEnabled")}
+                </dt>
+                <dd className="font-medium text-gray-900">
+                  {plan.recoveryCreditPackEnabled
+                    ? adminI18n.t("billing.active")
+                    : adminI18n.t("billing.inactive")}
+                </dd>
+              </div>
               {plan.recoveryCreditsPerPack !== null ? (
-                <div><dt className="text-xs text-gray-500">{adminI18n.t("billing.recoveryCreditsPerPack")}</dt><dd className="font-medium text-gray-900">{adminI18n.formatNumber(plan.recoveryCreditsPerPack)}</dd></div>
+                <div>
+                  <dt className="text-xs text-gray-500">
+                    {adminI18n.t("billing.recoveryCreditsPerPack")}
+                  </dt>
+                  <dd className="font-medium text-gray-900">
+                    {adminI18n.formatNumber(plan.recoveryCreditsPerPack)}
+                  </dd>
+                </div>
               ) : null}
             </dl>
           </article>

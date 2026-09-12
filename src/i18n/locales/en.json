@@ -328,6 +328,8 @@
   "billingControls.backToCatalog": "Back to billing catalog",
   "billingControls.absoluteHardLimit": "Absolute outbound hard limit",
   "billingControls.warningPercent": "Default warning threshold (%)",
+  "billingControls.lifetimeFreeRecoveryAllowance": "Lifetime Free recovery grant for newly activated merchants",
+  "billingControls.lifetimeFreeRecoveryAllowanceHelp": "This value is snapshotted only when a merchant receives its first verified subscription activation. Changing it does not reset or increase existing merchants' lifetime grants.",
   "billingControls.pauseNewRecoveries": "Pause new recoveries",
   "billingControls.pauseAutomatedWhatsapp": "Pause automated WhatsApp",
   "billingControls.reason": "Mutation reason",

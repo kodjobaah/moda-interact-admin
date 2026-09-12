@@ -23,12 +23,37 @@ function runBehaviorScript(script) {
   return JSON.parse(output.trim().split("\n").at(-1));
 }
 
-test("enforces platform policy bounds and a required reason", () => {
+test("accepts strict non-negative lifetime Free defaults", () => {
+  const result = runBehaviorScript(`
+    import { parsePlatformBillingPolicyForm } from ${JSON.stringify(validationUrl)};
+    const attempt = (value) => {
+      const form = new FormData();
+      for (const [key, entry] of Object.entries({ absoluteOutboundHardLimit: '20', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: value, reason: 'policy change' })) form.set(key, entry);
+      try { return parsePlatformBillingPolicyForm(form).lifetimeFreeRecoveryAllowance; } catch { return null; }
+    };
+    console.log(JSON.stringify({
+      accepted: attempt('7'),
+      negativeRejected: attempt('-1'),
+      blankRejected: attempt(''),
+      decimalRejected: attempt('1.5'),
+      nanRejected: attempt('NaN'),
+    }));
+  `);
+  assert.deepEqual(result, {
+    accepted: 7,
+    negativeRejected: null,
+    blankRejected: null,
+    decimalRejected: null,
+    nanRejected: null,
+  });
+});
+
+test("enforces existing platform policy bounds and a required reason", () => {
   const result = runBehaviorScript(`
     import { parsePlatformBillingPolicyForm } from ${JSON.stringify(validationUrl)};
     const attempt = (values) => {
       const form = new FormData();
-      for (const [key, value] of Object.entries({ absoluteOutboundHardLimit: '20', defaultWarningPercent: '80', reason: 'policy change', ...values })) form.set(key, value);
+      for (const [key, value] of Object.entries({ absoluteOutboundHardLimit: '20', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: '5', reason: 'policy change', ...values })) form.set(key, value);
       try { parsePlatformBillingPolicyForm(form); return false; } catch { return true; }
     };
     console.log(JSON.stringify({
@@ -63,11 +88,37 @@ test("keeps controls protected, audited, append-only, and Prisma-first", () => {
   assert.match(actionSource, /principal\.role !== ['"]SUPER_ADMIN['"]/);
   assert.match(actionSource, /transaction\.billingAuditEvent\.create/g);
   assert.match(actionSource, /transaction\.billingAllowanceAdjustment\.create/);
+  assert.match(actionSource, /lifetimeFreeRecoveryAllowance/);
   assert.doesNotMatch(actionSource, /\$(?:queryRaw|executeRaw)/);
   assert.doesNotMatch(
     actionSource,
     /committedQuantity|reservedQuantity.*update/,
   );
+});
+
+test("keeps policy changes protected, audited, and internal-only", () => {
+  assert.match(actionSource, /PLATFORM_POLICY_CHANGED/);
+  assert.match(actionSource, /beforeValue/);
+  assert.match(actionSource, /afterValue/);
+  const componentSource = readFileSync(
+    resolve(root, "src/components/admin/billing-controls.tsx"),
+    "utf8",
+  );
+  assert.match(componentSource, /name="lifetimeFreeRecoveryAllowance"/);
+  assert.match(componentSource, /policy\?\.lifetimeFreeRecoveryAllowance/);
+  const catalogue = JSON.parse(
+    readFileSync(resolve(root, "src/i18n/locales/en.json"), "utf8"),
+  );
+  assert.equal(
+    catalogue["billingControls.lifetimeFreeRecoveryAllowanceHelp"],
+    "This value is snapshotted only when a merchant receives its first verified subscription activation. Changing it does not reset or increase existing merchants' lifetime grants.",
+  );
+  const pageSource = readFileSync(
+    resolve(root, "src/app/(protected)/billing/controls/page.tsx"),
+    "utf8",
+  );
+  assert.match(pageSource, /requirePlatformAdminPage/);
+  assert.doesNotMatch(pageSource, /\/app\//);
 });
 
 test("server validation enforces the platform ceiling and soft-below-hard rule", () => {

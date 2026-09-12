@@ -8,7 +8,7 @@ export type BillingPlanAuditSource = {
   recoveryCreditPackEnabled: boolean;
   recoveryCreditsPerPack: number | null;
   shopifyRecoveryCreditPackEventHandle: string | null;
-  freeLifetimeConversationAllowance: number | null;
+  freeLifetimeConversationAllowance?: number | null;
   defaultOutboundSoftLimit: number;
   defaultOutboundHardLimit: number;
   terminalMessageReservedSlots: number;
@@ -18,7 +18,7 @@ export type BillingPlanAuditSource = {
 export function billingPlanAuditSnapshot(
   source: BillingPlanAuditSource,
 ): Record<string, unknown> {
-  return {
+  const snapshot: Record<string, unknown> = {
     shopifyPlanHandle: source.shopifyPlanHandle,
     name: source.name,
     kind: source.kind,
@@ -30,7 +30,6 @@ export function billingPlanAuditSnapshot(
     recoveryCreditsPerPack: source.recoveryCreditsPerPack,
     shopifyRecoveryCreditPackEventHandle:
       source.shopifyRecoveryCreditPackEventHandle,
-    freeLifetimeConversationAllowance: source.freeLifetimeConversationAllowance,
     defaultOutboundSoftLimit: source.defaultOutboundSoftLimit,
     defaultOutboundHardLimit: source.defaultOutboundHardLimit,
     terminalMessageReservedSlots: source.terminalMessageReservedSlots,
@@ -42,4 +41,9 @@ export function billingPlanAuditSnapshot(
         typeof feature === "string" ? feature : feature.feature,
       ),
   };
+  if ("freeLifetimeConversationAllowance" in source) {
+    snapshot.freeLifetimeConversationAllowance =
+      source.freeLifetimeConversationAllowance;
+  }
+  return snapshot;
 }
