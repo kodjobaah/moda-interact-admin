@@ -4,9 +4,10 @@ import { mutatePromotionCampaignLifecycle } from "../../src/lib/admin/promotion-
 
 type TestTransaction = {
   events: Array<Record<string, unknown>>;
+  updates: Array<{ where: Record<string, unknown>; data: Record<string, unknown> }>;
   promotionCampaign: {
     findUnique: () => Promise<Record<string, unknown>>;
-    updateMany: () => Promise<{ count: number }>;
+    updateMany: (input: { where: Record<string, unknown>; data: Record<string, unknown> }) => Promise<{ count: number }>;
   };
   promotionCampaignEvent: {
     create: (input: { data: Record<string, unknown> }) => Promise<void>;
@@ -15,11 +16,16 @@ type TestTransaction = {
 
 function transactionFor(campaign: Record<string, unknown>, updateCount = 1): TestTransaction {
   const events: Array<Record<string, unknown>> = [];
+  const updates: Array<{ where: Record<string, unknown>; data: Record<string, unknown> }> = [];
   return {
     events,
+    updates,
     promotionCampaign: {
       findUnique: async () => campaign,
-      updateMany: async () => ({ count: updateCount }),
+      updateMany: async (input: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        updates.push(input);
+        return { count: updateCount };
+      },
     },
     promotionCampaignEvent: {
       create: async ({ data }: { data: Record<string, unknown> }) => { events.push(data); },
@@ -39,6 +45,10 @@ const now = new Date("2026-09-13T00:00:00.000Z");
 test("closes through version CAS before writing one CLOSED event", async () => {
   const transaction = transactionFor(base);
   await mutatePromotionCampaignLifecycle(transaction as never, { id: base.id, intent: "close", adminId: "admin-1" }, now);
+  assert.deepEqual(transaction.updates, [{
+    where: { id: base.id, status: "ACTIVE", version: 3 },
+    data: { status: "CLOSED", version: { increment: 1 } },
+  }]);
   assert.deepEqual(transaction.events, [{ campaignId: base.id, kind: "CLOSED", platformAdminId: "admin-1" }]);
 });
 
@@ -50,6 +60,10 @@ test("rejects an unexpired ACTIVE reopen and allows an expired ACTIVE reopen", a
   );
   const expiredTransaction = transactionFor(base);
   await mutatePromotionCampaignLifecycle(expiredTransaction as never, { id: base.id, intent: "reopen", adminId: "admin-1", expiresAt: new Date("2026-09-21T00:00:00.000Z") }, now);
+  assert.deepEqual(expiredTransaction.updates[0], {
+    where: { id: base.id, status: "ACTIVE", version: 3 },
+    data: { expiresAt: new Date("2026-09-21T00:00:00.000Z"), version: { increment: 1 } },
+  });
   assert.deepEqual(expiredTransaction.events, [{
     campaignId: base.id,
     kind: "EXPIRY_CHANGED",
@@ -62,6 +76,10 @@ test("rejects an unexpired ACTIVE reopen and allows an expired ACTIVE reopen", a
 test("reopening CLOSED appends REOPENED before EXPIRY_CHANGED", async () => {
   const transaction = transactionFor({ ...base, status: "CLOSED" as const });
   await mutatePromotionCampaignLifecycle(transaction as never, { id: base.id, intent: "reopen", adminId: "admin-1", expiresAt: new Date("2026-09-21T00:00:00.000Z") }, now);
+  assert.deepEqual(transaction.updates[0], {
+    where: { id: base.id, status: "CLOSED", version: 3 },
+    data: { expiresAt: new Date("2026-09-21T00:00:00.000Z"), status: "ACTIVE", version: { increment: 1 } },
+  });
   assert.deepEqual(transaction.events.map((event) => event.kind), ["REOPENED", "EXPIRY_CHANGED"]);
 });
 
@@ -71,5 +89,6 @@ test("stale compare-and-set writes no lifecycle audit event", async () => {
     mutatePromotionCampaignLifecycle(transaction as never, { id: base.id, intent: "close", adminId: "admin-1" }, now),
     /changed; reload and retry/,
   );
+  assert.equal(transaction.updates.length, 1);
   assert.equal(transaction.events.length, 0);
 });

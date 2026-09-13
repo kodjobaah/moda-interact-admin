@@ -20,15 +20,23 @@ test("derives all five catalogue states from status and the time window", () => 
 });
 
 test("projects visible target names and domains into a bounded case-insensitive query", () => {
-  const where = promotionCatalogueWhere({ scope: "PLAN", target: `  ${"x".repeat(300)}  ` });
+  const where = promotionCatalogueWhere({ scope: "PLAN", target: " Growth " });
   assert.equal(where.scope, "PLAN");
+  assert.deepEqual(where.OR?.slice(0, 3), [
+    { name: { contains: "Growth", mode: "insensitive" } },
+    { targetPlan: { name: { contains: "Growth", mode: "insensitive" } } },
+    { targetShop: { domain: { contains: "Growth", mode: "insensitive" } } },
+  ]);
+  assert.deepEqual(where.OR?.slice(0, 3).map((entry) => Object.keys(entry)[0]), ["name", "targetPlan", "targetShop"]);
+});
+
+test("bounds target input server-side while preserving exact scope filtering", () => {
+  const where = promotionCatalogueWhere({ scope: "SHOP", target: `  ${"x".repeat(300)}  ` });
+  assert.equal(where.scope, "SHOP");
   const nameFilter = where.OR?.[0];
   assert.ok(nameFilter && "name" in nameFilter);
   if (!nameFilter || !("name" in nameFilter)) throw new Error("Name filter missing.");
-  const nameQuery = nameFilter.name;
-  assert.ok(nameQuery);
-  assert.equal(nameQuery.contains.length, 255);
-  assert.deepEqual(where.OR?.slice(0, 3).map((entry) => Object.keys(entry)[0]), ["name", "targetPlan", "targetShop"]);
+  assert.equal(nameFilter.name?.contains.length, 255);
 });
 
 test("normalizes empty and whitespace target values", () => {
