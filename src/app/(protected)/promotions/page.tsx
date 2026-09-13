@@ -60,6 +60,7 @@ export default async function PromotionsPage({
                 <p className="mt-1 text-xs text-gray-500">{campaign.startsAt.toLocaleString()} to {campaign.expiresAt.toLocaleString()} · created {campaign.createdAt.toLocaleString()} by {campaign.creatorName}</p>
                 <p className="mt-1 text-xs text-gray-500">Last change: {campaign.lastLifecycleChange?.kind ?? "none"} {campaign.lastLifecycleChange?.createdAt.toLocaleString() ?? ""}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href={`/promotions/${encodeURIComponent(campaign.id)}`} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700">View usage</Link>
                   {campaign.status === "DRAFT" ? <Link href={`/promotions?edit=${encodeURIComponent(campaign.id)}`} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700">Edit</Link> : null}
                   <ActivatePromotionCampaignForm campaign={campaign} />
                   <ClosePromotionCampaignForm campaign={campaign} />
