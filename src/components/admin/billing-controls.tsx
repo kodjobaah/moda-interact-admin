@@ -88,7 +88,11 @@ export function PlatformBillingControls({
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
-            Minimum upgrade premium (basis points)
+            Minimum stay+top-up premium above next-plan upgrade
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              {((policy?.minimumUpgradePremiumBps ?? 2000) / 100).toFixed(2)}% (
+              {policy?.minimumUpgradePremiumBps ?? 2000} bps)
+            </span>
             <input
               className={inputClass}
               type="number"
@@ -344,21 +348,33 @@ export function BillingEconomicsControls({
       <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-950">Upgrade ladder</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Configure exact durable plan edges. The higher plan must provide a larger monthly recovery allowance.
+          Configure exact durable plan edges. The higher plan must provide a
+          larger monthly recovery allowance.
         </p>
-        <form action={mutateUpgradeEdgeAction} className="mt-4 grid gap-4 sm:grid-cols-3">
+        <form
+          action={mutateUpgradeEdgeAction}
+          className="mt-4 grid gap-4 sm:grid-cols-3"
+        >
           <label className="text-sm font-medium text-gray-700">
             Lower plan
             <select className={inputClass} name="lowerPlanId" required>
               <option value="">Select plan</option>
-              {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+              {plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}
+                </option>
+              ))}
             </select>
           </label>
           <label className="text-sm font-medium text-gray-700">
             Higher plan
             <select className={inputClass} name="higherPlanId" required>
               <option value="">Select plan</option>
-              {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+              {plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}
+                </option>
+              ))}
             </select>
           </label>
           <label className="text-sm font-medium text-gray-700">
@@ -366,19 +382,46 @@ export function BillingEconomicsControls({
             <input className={inputClass} name="reason" required />
           </label>
           <input type="hidden" name="intent" value="create" />
-          <button className="w-fit rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]" type="submit">Save edge</button>
+          <button
+            className="w-fit rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
+            type="submit"
+          >
+            Save edge
+          </button>
         </form>
         <ul className="mt-5 space-y-2 text-sm text-gray-700">
           {edges.map((edge) => (
-            <li key={edge.id} className="flex items-center justify-between border-t border-gray-100 pt-2">
-              <span>{edge.lowerPlan.name} → {edge.higherPlan.name}</span>
+            <li
+              key={edge.id}
+              className="flex items-center justify-between border-t border-gray-100 pt-2"
+            >
+              <span>
+                {edge.lowerPlan.name} → {edge.higherPlan.name}
+              </span>
               <form action={mutateUpgradeEdgeAction}>
                 <input type="hidden" name="intent" value="deactivate" />
                 <input type="hidden" name="id" value={edge.id} />
-                <input type="hidden" name="lowerPlanId" value={edge.lowerPlan.id} />
-                <input type="hidden" name="higherPlanId" value={edge.higherPlan.id} />
-                <input type="hidden" name="reason" value="Deactivated upgrade edge" />
-                <button className="text-xs font-semibold text-red-700 hover:underline" type="submit">Deactivate</button>
+                <input
+                  type="hidden"
+                  name="lowerPlanId"
+                  value={edge.lowerPlan.id}
+                />
+                <input
+                  type="hidden"
+                  name="higherPlanId"
+                  value={edge.higherPlan.id}
+                />
+                <input
+                  type="hidden"
+                  name="reason"
+                  value="Deactivated upgrade edge"
+                />
+                <button
+                  className="text-xs font-semibold text-red-700 hover:underline"
+                  type="submit"
+                >
+                  Deactivate
+                </button>
               </form>
             </li>
           ))}
@@ -386,29 +429,135 @@ export function BillingEconomicsControls({
       </section>
 
       <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-950">Verified Shopify App Pricing economics</h2>
+        <h2 className="text-lg font-semibold text-gray-950">
+          Verified Shopify App Pricing economics
+        </h2>
         <p className="mt-1 text-sm text-gray-600">
-          Verified Shopify App Pricing economics used by Moda&apos;s Admin guardrail. Shopify remains the charging authority.
+          Verified Shopify App Pricing economics used by Moda&apos;s Admin
+          guardrail. Shopify remains the charging authority.
         </p>
         <form action={recordEconomicsSnapshotAction} className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-medium text-gray-700">Billing plan<select className={inputClass} name="billingPlanId" required><option value="">Select plan</option>{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} ({plan.shopifyPlanHandle})</option>)}</select></label>
-            <label className="text-sm font-medium text-gray-700">Shopify plan handle<input className={inputClass} name="shopifyPlanHandleSnapshot" required /></label>
-            <label className="text-sm font-medium text-gray-700">Monthly recurring amount (minor units)<input className={inputClass} type="number" min="0" name="monthlyRecurringAmountMinor" required /></label>
-            <label className="text-sm font-medium text-gray-700">Currency<input className={inputClass} name="currency" maxLength={3} required /></label>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700"><input type="checkbox" name="recoveryCreditPackEnabledSnapshot" /> Recovery-credit packs enabled</label>
-            <label className="text-sm font-medium text-gray-700">Credits per pack<input className={inputClass} type="number" min="1" name="recoveryCreditsPerPackSnapshot" /></label>
-            <label className="text-sm font-medium text-gray-700">Pack meter handle<input className={inputClass} name="shopifyRecoveryCreditPackEventHandleSnapshot" /></label>
-            <label className="text-sm font-medium text-gray-700">Usage pricing mode<select className={inputClass} name="usagePricingMode"><option value="">No pricing evidence</option><option value="FIXED">FIXED</option><option value="GRADUATED">GRADUATED</option><option value="VOLUME">VOLUME</option></select></label>
-            <label className="text-sm font-medium text-gray-700">Usage pricing currency<input className={inputClass} name="usagePricingCurrency" maxLength={3} /></label>
-            <label className="text-sm font-medium text-gray-700">Fixed unit amount (minor units)<input className={inputClass} type="number" min="0" name="usageUnitAmountMinor" /></label>
+            <label className="text-sm font-medium text-gray-700">
+              Billing plan
+              <select className={inputClass} name="billingPlanId" required>
+                <option value="">Select plan</option>
+                {plans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name} ({plan.shopifyPlanHandle})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Shopify plan handle
+              <input
+                className={inputClass}
+                name="shopifyPlanHandleSnapshot"
+                required
+              />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Monthly recurring amount (minor units)
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                name="monthlyRecurringAmountMinor"
+                required
+              />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Currency
+              <input
+                className={inputClass}
+                name="currency"
+                maxLength={3}
+                required
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input type="checkbox" name="recoveryCreditPackEnabledSnapshot" />{" "}
+              Recovery-credit packs enabled
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Credits per pack
+              <input
+                className={inputClass}
+                type="number"
+                min="1"
+                name="recoveryCreditsPerPackSnapshot"
+              />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Pack meter handle
+              <input
+                className={inputClass}
+                name="shopifyRecoveryCreditPackEventHandleSnapshot"
+              />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Usage pricing mode
+              <select className={inputClass} name="usagePricingMode">
+                <option value="">No pricing evidence</option>
+                <option value="FIXED">FIXED</option>
+                <option value="GRADUATED">GRADUATED</option>
+                <option value="VOLUME">VOLUME</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Usage pricing currency
+              <input
+                className={inputClass}
+                name="usagePricingCurrency"
+                maxLength={3}
+              />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Fixed unit amount (minor units)
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                name="usageUnitAmountMinor"
+              />
+            </label>
           </div>
-          <label className="text-sm font-medium text-gray-700">Tier JSON for GRADUATED/VOLUME<input className={inputClass} name="usageTiersJson" placeholder='[{"upTo":100,"amountPerUnitMinor":1000,"flatAmountMinor":0},{"upTo":null,"amountPerUnitMinor":900,"flatAmountMinor":0}]' /></label>
-          <label className="text-sm font-medium text-gray-700">Verification reason<textarea className={inputClass} name="verificationReason" rows={2} required /></label>
-          <button className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]" type="submit">Record verified snapshot</button>
+          <label className="text-sm font-medium text-gray-700">
+            Tier JSON for GRADUATED/VOLUME
+            <input
+              className={inputClass}
+              name="usageTiersJson"
+              placeholder='[{"upTo":100,"amountPerUnitMinor":1000,"flatAmountMinor":0},{"upTo":null,"amountPerUnitMinor":900,"flatAmountMinor":0}]'
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Verification reason
+            <textarea
+              className={inputClass}
+              name="verificationReason"
+              rows={2}
+              required
+            />
+          </label>
+          <button
+            className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
+            type="submit"
+          >
+            Record verified snapshot
+          </button>
         </form>
         <ul className="mt-5 space-y-2 text-xs text-gray-600">
-          {snapshots.map((snapshot) => <li key={snapshot.id} className="border-t border-gray-100 pt-2">{snapshot.billingPlan.name}: {snapshot.monthlyRecurringAmountMinor} {snapshot.currency}, verified {snapshot.verifiedAt.toISOString()} {snapshot.recoveryCreditPackEnabledSnapshot ? "with packs" : "without packs"}</li>)}
+          {snapshots.map((snapshot) => (
+            <li key={snapshot.id} className="border-t border-gray-100 pt-2">
+              {snapshot.billingPlan.name}:{" "}
+              {snapshot.monthlyRecurringAmountMinor} {snapshot.currency},
+              verified {snapshot.verifiedAt.toISOString()}{" "}
+              {snapshot.recoveryCreditPackEnabledSnapshot
+                ? "with packs"
+                : "without packs"}
+            </li>
+          ))}
         </ul>
       </section>
     </div>
