@@ -9,7 +9,7 @@ export function Sidebar({
   administratorRole,
   grafanaHref,
 }: {
-  active: "tenants" | "observability" | "queues" | "merchant-support" | "billing";
+  active: "tenants" | "observability" | "queues" | "merchant-support" | "billing" | "promotions";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -62,6 +62,16 @@ export function Sidebar({
           <Icon name="box" className="h-5 w-5 text-[var(--brand-700)]" />
           {adminI18n.t("nav.billing")}
         </Link>
+        {administratorRole === "SUPER_ADMIN" ? (
+          <Link
+            href="/promotions"
+            aria-current={active === "promotions" ? "page" : undefined}
+            className={`${base} ${active === "promotions" ? selected : idle}`}
+          >
+            <Icon name="box" className="h-5 w-5 text-[var(--brand-700)]" />
+            Promotions
+          </Link>
+        ) : null}
         <div>
           <Link
             href="/observability/queues"
