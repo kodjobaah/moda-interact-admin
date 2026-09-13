@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { BillingPlanRow } from "@/lib/admin/billing-plan";
 import { BILLING_FEATURES } from "@/lib/admin/billing-plan-validation";
 import { adminI18n } from "@/i18n";
+import type { EvaluatedBillingUpgradeEdge } from "@/lib/admin/billing-plan-guardrail";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]";
@@ -191,7 +192,129 @@ export function PlanForm({ plan }: { plan?: BillingPlanRow }) {
   );
 }
 
-export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
+function EconomicsExplanation({
+  evaluations,
+}: {
+  evaluations: EvaluatedBillingUpgradeEdge[];
+}) {
+  if (!evaluations.length) return null;
+  const money = (minor: number | undefined, currency: string | undefined) =>
+    minor === undefined
+      ? adminI18n.t("empty.notRecorded")
+      : `${currency ?? ""} ${(minor / 100).toFixed(2)}`.trim();
+
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-gray-950">
+        {adminI18n.t("billing.upgradeEconomics")}
+      </h2>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {evaluations.map((evaluation) => {
+          const { details } = evaluation.result;
+          const currency = evaluation.lowerSnapshot?.currency;
+          const statusKey =
+            evaluation.result.status === "PASS"
+              ? "billing.pass"
+              : evaluation.result.status === "FAIL"
+                ? "billing.fail"
+                : "billing.unverified";
+          const explanationKey =
+            evaluation.result.status === "PASS"
+              ? "billing.guardrailPass"
+              : evaluation.result.code === "CURRENCY_MISMATCH"
+                ? "billing.guardrailCurrencyMismatch"
+                : evaluation.result.code === "INVALID_USAGE_PRICING"
+                  ? "billing.guardrailInvalidUsagePricing"
+                  : evaluation.result.code === "TOPUP_PRICING_UNAVAILABLE"
+                    ? "billing.guardrailMissingTopUpEvidence"
+                    : evaluation.result.code === "MISSING_PLAN_PRICE"
+                      ? "billing.guardrailMissingPlanEvidence"
+                      : "billing.guardrailBlocked";
+          return (
+            <article
+              key={evaluation.edge.id}
+              className={`rounded-md border p-4 ${evaluation.result.status === "PASS" ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-semibold text-gray-950">
+                  {evaluation.lowerPlan.name} -&gt; {evaluation.higherPlan.name}
+                </h3>
+                <span className="text-xs font-bold uppercase">
+                  {adminI18n.t(statusKey)}
+                </span>
+              </div>
+              <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-gray-600">
+                    {adminI18n.t("billing.capacityGap")}
+                  </dt>
+                  <dd className="font-medium text-gray-950">
+                    {adminI18n.formatNumber(details.additionalCreditsNeeded)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">
+                    {adminI18n.t("billing.requiredPackUnits")}
+                  </dt>
+                  <dd className="font-medium text-gray-950">
+                    {details.packUnitsNeeded === undefined
+                      ? adminI18n.t("empty.notRecorded")
+                      : adminI18n.formatNumber(details.packUnitsNeeded)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">
+                    {adminI18n.t("billing.stayAndTopUps")}
+                  </dt>
+                  <dd className="font-medium text-gray-950">
+                    {money(details.stayAndTopUpCostMinor, currency)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">
+                    {adminI18n.t("billing.upgradeCost")}
+                  </dt>
+                  <dd className="font-medium text-gray-950">
+                    {money(details.upgradeCostMinor, currency)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">
+                    {adminI18n.t("billing.premium")}
+                  </dt>
+                  <dd className="font-medium text-gray-950">
+                    {details.premiumBps === undefined
+                      ? adminI18n.t("empty.notRecorded")
+                      : `${(details.premiumBps / 100).toFixed(1)}%`}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">
+                    {adminI18n.t("billing.requiredPremium")}
+                  </dt>
+                  <dd className="font-medium text-gray-950">
+                    {`${(evaluation.minimumUpgradePremiumBps / 100).toFixed(1)}%`}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-4 text-sm text-gray-800">
+                {adminI18n.t(explanationKey, { code: evaluation.result.code })}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function BillingPlanCatalog({
+  plans,
+  economics,
+}: {
+  plans: BillingPlanRow[];
+  economics: EvaluatedBillingUpgradeEdge[];
+}) {
   return (
     <div className="space-y-4">
       <section className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -210,6 +333,7 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
           {adminI18n.t("billing.registerPlanAction")}
         </Link>
       </section>
+      <EconomicsExplanation evaluations={economics} />
       <section className="grid gap-4 lg:grid-cols-2">
         {plans.map((plan) => (
           <article

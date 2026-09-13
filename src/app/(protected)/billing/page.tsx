@@ -6,9 +6,16 @@ import {
   BillingPlanDrawer,
   RecoveryCreditPurchaseDrawer,
 } from "@/components/admin/billing-drawers";
-import { BillingRecoveryPacks, parseRecoveryPackStatus } from "@/components/admin/billing-recovery-packs";
+import {
+  BillingRecoveryPacks,
+  parseRecoveryPackStatus,
+} from "@/components/admin/billing-recovery-packs";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
-import { getBillingPlanById, getBillingPlans } from "@/lib/admin/billing-plan";
+import {
+  getBillingPlanById,
+  getBillingPlanEconomics,
+  getBillingPlans,
+} from "@/lib/admin/billing-plan";
 import {
   getBillingLedger,
   getBillingLedgerItem,
@@ -28,7 +35,10 @@ import {
   type SearchParamRecord,
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
-import { BillingEconomicsControls, PlatformBillingControls } from "@/components/admin/billing-controls";
+import {
+  BillingEconomicsControls,
+  PlatformBillingControls,
+} from "@/components/admin/billing-controls";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
 import { getBillingEconomicsControls } from "@/lib/admin/billing-economics";
 
@@ -42,7 +52,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const params = paramsToRecord(rawParams);
   const allowedViews: BillingView[] = ["overview", "plans", "packs", "events", "controls"];
   const rawView = firstParam(rawParams.view) as BillingView | undefined;
-  const view = allowedViews.includes(rawView ?? "overview") ? rawView ?? "overview" : "overview";
+  const view = allowedViews.includes(rawView ?? "overview")
+    ? (rawView ?? "overview")
+    : "overview";
   const rawState = firstParam(rawParams.state);
   const state = Object.values(ShopifyReportState).includes(
     rawState as ShopifyReportState,
@@ -50,35 +62,45 @@ export default async function BillingPage({ searchParams }: PageProps) {
     ? (rawState as ShopifyReportState)
     : undefined;
   const plans = view === "plans" ? await getBillingPlans() : null;
-  const selectedPlan = view === "plans" && firstParam(rawParams.planId)
-    ? await getBillingPlanById(firstParam(rawParams.planId) as string)
-    : null;
+  const planEconomics =
+    view === "plans" ? await getBillingPlanEconomics() : null;
+  const selectedPlan =
+    view === "plans" && firstParam(rawParams.planId)
+      ? await getBillingPlanById(firstParam(rawParams.planId) as string)
+      : null;
   const policy = view === "controls" ? await getPlatformBillingPolicy() : null;
-  const economics = view === "controls" ? await getBillingEconomicsControls() : null;
+  const economics =
+    view === "controls" ? await getBillingEconomicsControls() : null;
   const overview = view === "overview" ? await getBillingOverview() : null;
-  const packs = view === "packs"
-    ? await getRecoveryCreditPurchases({
-        page: positiveInt(rawParams.packPage),
-        pageSize: 20,
-        status: parseRecoveryPackStatus(firstParam(rawParams.packStatus)),
-      })
-    : null;
-  const selectedPurchase = view === "packs" && firstParam(rawParams.purchaseId)
-    ? await getRecoveryCreditPurchaseDetail(firstParam(rawParams.purchaseId) as string)
-    : null;
-  const ledger = view === "events"
-    ? await getBillingLedger({
-        page: positiveInt(rawParams.eventPage),
-        pageSize: 20,
-        state,
-        shopId: firstParam(rawParams.shopId),
-        from: firstParam(rawParams.from),
-        to: firstParam(rawParams.to),
-      })
-    : null;
-  const selectedEvent = view === "events" && firstParam(rawParams.eventId)
-    ? await getBillingLedgerItem(firstParam(rawParams.eventId) as string)
-    : null;
+  const packs =
+    view === "packs"
+      ? await getRecoveryCreditPurchases({
+          page: positiveInt(rawParams.packPage),
+          pageSize: 20,
+          status: parseRecoveryPackStatus(firstParam(rawParams.packStatus)),
+        })
+      : null;
+  const selectedPurchase =
+    view === "packs" && firstParam(rawParams.purchaseId)
+      ? await getRecoveryCreditPurchaseDetail(
+          firstParam(rawParams.purchaseId) as string,
+        )
+      : null;
+  const ledger =
+    view === "events"
+      ? await getBillingLedger({
+          page: positiveInt(rawParams.eventPage),
+          pageSize: 20,
+          state,
+          shopId: firstParam(rawParams.shopId),
+          from: firstParam(rawParams.from),
+          to: firstParam(rawParams.to),
+        })
+      : null;
+  const selectedEvent =
+    view === "events" && firstParam(rawParams.eventId)
+      ? await getBillingLedgerItem(firstParam(rawParams.eventId) as string)
+      : null;
 
   return (
     <AdminShell active="billing">
@@ -92,17 +114,41 @@ export default async function BillingPage({ searchParams }: PageProps) {
           </p>
         </div>
         <BillingTabs current={view} params={params} />
-        {view === "overview" && overview ? <BillingOverviewCards overview={overview} /> : null}
-        {view === "plans" && plans ? <BillingPlanCatalog plans={plans} /> : null}
-        {view === "packs" && packs ? <BillingRecoveryPacks purchases={packs} params={params} /> : null}
-        {view === "events" && ledger ? <BillingLedger ledger={ledger} params={params} /> : null}
-        {view === "controls" && policy ? <PlatformBillingControls policy={policy} /> : null}
-        {view === "controls" && economics ? <BillingEconomicsControls data={economics} /> : null}
-        {view === "plans" && (params.drawer === "register-plan" || selectedPlan) ? (
-          <BillingPlanDrawer plan={selectedPlan ?? undefined} params={params} register={params.drawer === "register-plan"} />
+        {view === "overview" && overview ? (
+          <BillingOverviewCards overview={overview} />
         ) : null}
-        {view === "packs" && selectedPurchase ? <RecoveryCreditPurchaseDrawer purchase={selectedPurchase} params={params} /> : null}
-        {view === "events" && selectedEvent ? <BillingEventDrawer event={selectedEvent} params={params} /> : null}
+        {view === "plans" && plans && planEconomics ? (
+          <BillingPlanCatalog plans={plans} economics={planEconomics} />
+        ) : null}
+        {view === "packs" && packs ? (
+          <BillingRecoveryPacks purchases={packs} params={params} />
+        ) : null}
+        {view === "events" && ledger ? (
+          <BillingLedger ledger={ledger} params={params} />
+        ) : null}
+        {view === "controls" && policy ? (
+          <PlatformBillingControls policy={policy} />
+        ) : null}
+        {view === "controls" && economics ? (
+          <BillingEconomicsControls data={economics} />
+        ) : null}
+        {view === "plans" &&
+        (params.drawer === "register-plan" || selectedPlan) ? (
+          <BillingPlanDrawer
+            plan={selectedPlan ?? undefined}
+            params={params}
+            register={params.drawer === "register-plan"}
+          />
+        ) : null}
+        {view === "packs" && selectedPurchase ? (
+          <RecoveryCreditPurchaseDrawer
+            purchase={selectedPurchase}
+            params={params}
+          />
+        ) : null}
+        {view === "events" && selectedEvent ? (
+          <BillingEventDrawer event={selectedEvent} params={params} />
+        ) : null}
       </div>
     </AdminShell>
   );

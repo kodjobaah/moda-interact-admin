@@ -17,8 +17,15 @@ const actionSource = readFileSync(
   resolve(root, "src/app/actions/billing-plan.ts"),
   "utf8",
 );
+const guardrailSource = readFileSync(
+  resolve(root, "src/lib/admin/billing-plan-guardrail.ts"),
+  "utf8",
+);
 const auditModuleUrl = pathToFileURL(
   resolve(root, "src/lib/admin/billing-plan-audit.ts"),
+).href;
+const guardrailModuleUrl = pathToFileURL(
+  resolve(root, "src/lib/admin/billing-plan-guardrail.ts"),
 ).href;
 const validationSource = readFileSync(
   resolve(root, "src/lib/admin/billing-plan-validation.ts"),
@@ -286,6 +293,67 @@ test("keeps catalog mutations SUPER_ADMIN-only, immutable, audited, and Prisma-f
   assert.doesNotMatch(actionSource, /freeLifetimeConversationAllowance/);
   assert.doesNotMatch(validationSource, /freeLifetimeConversationAllowance/);
   assert.doesNotMatch(componentSource, /freeLifetimeConversationAllowance/);
+});
+
+test("hard-enforces economics before every economics-affecting catalog write", () => {
+  assert.match(
+    actionSource,
+    /validateSinglePackShopifyEconomics|evaluateBillingUpgradeEdge/,
+  );
+  assert.match(actionSource, /assertBillingUpgradeEconomicsPass/);
+  assert.match(actionSource, /BillingAuditAction\.UPGRADE_ECONOMICS_EVALUATED/);
+  const evaluationIndex = actionSource.indexOf(
+    "assertBillingUpgradeEconomicsPass",
+  );
+  const planWriteIndex = actionSource.indexOf("transaction.billingPlan.update");
+  assert.ok(evaluationIndex >= 0 && evaluationIndex < planWriteIndex);
+  assert.match(actionSource, /billingEconomicsSnapshot\.findMany/);
+  assert.match(actionSource, /minimumUpgradePremiumBps/);
+  assert.match(guardrailSource, /lowerSnapshotId/);
+  assert.match(guardrailSource, /stayAndTopUpCostMinor/);
+  assert.match(guardrailSource, /status/);
+  assert.match(guardrailSource, /code/);
+});
+
+test("shared guardrail adapter preserves PASS, FAIL, and UNVERIFIED outcomes", () => {
+  const result = runBehaviorScript(`
+    import { evaluateBillingUpgradeEdge, billingUpgradeEconomicsAuditEvidence } from ${JSON.stringify(guardrailModuleUrl)};
+    const plans = {
+      lower: { id: 'lower', name: 'Starter', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 100, recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'starter-pack' },
+      higher: { id: 'higher', name: 'Growth', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 400, recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null },
+    };
+    const snapshot = { id: 'snapshot-lower', monthlyRecurringAmountMinor: 5000, currency: 'GBP', recoveryCreditPackEnabledSnapshot: true, recoveryCreditsPerPackSnapshot: 50, shopifyRecoveryCreditPackEventHandleSnapshot: 'starter-pack', usagePricingSnapshot: { mode: 'FIXED', currency: 'GBP', unitAmountMinor: 100 } };
+    const higherSnapshot = { id: 'snapshot-higher', monthlyRecurringAmountMinor: 5000, currency: 'GBP', recoveryCreditPackEnabledSnapshot: false, recoveryCreditsPerPackSnapshot: null, shopifyRecoveryCreditPackEventHandleSnapshot: null, usagePricingSnapshot: null };
+    const evaluate = (lowerSnapshot, higher = plans.higher) => evaluateBillingUpgradeEdge({ edge: { id: 'edge', lowerPlanId: 'lower', higherPlanId: 'higher' }, lowerPlan: plans.lower, higherPlan: higher, lowerSnapshot, higherSnapshot, minimumUpgradePremiumBps: 2000 });
+    const pass = evaluate({ ...snapshot, usagePricingSnapshot: { mode: 'FIXED', currency: 'GBP', unitAmountMinor: 2000 } });
+    const fail = evaluate(snapshot);
+    const unverified = evaluate(null);
+    console.log(JSON.stringify({ pass: pass.result.status, fail: fail.result.status, unverified: unverified.result.status, evidence: billingUpgradeEconomicsAuditEvidence(pass, 2000) }));
+  `);
+  assert.deepEqual(
+    { pass: result.pass, fail: result.fail, unverified: result.unverified },
+    { pass: "PASS", fail: "FAIL", unverified: "UNVERIFIED" },
+  );
+  for (const key of [
+    "lowerPlanId",
+    "higherPlanId",
+    "lowerSnapshotId",
+    "higherSnapshotId",
+    "minimumUpgradePremiumBps",
+    "lowerMonthlyIncluded",
+    "higherMonthlyIncluded",
+    "recoveryCreditsPerPack",
+    "packUnitsNeeded",
+    "topUpCostMinor",
+    "stayAndTopUpCostMinor",
+    "upgradeCostMinor",
+    "requiredMinimumMinor",
+    "premiumBps",
+    "status",
+    "code",
+  ]) {
+    assert.ok(Object.hasOwn(result.evidence, key), key);
+  }
 });
 
 test("records persisted before values and resulting after values for paid-plan edits", () => {

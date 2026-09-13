@@ -10,6 +10,11 @@ import {
   parseUpgradeEdgeForm,
   validateEconomicsSnapshotAgainstPlan,
 } from "@/lib/admin/billing-economics-validation";
+import {
+  assertBillingUpgradeEconomicsPass,
+  billingUpgradeEconomicsAuditEvidence,
+  evaluateBillingUpgradeEdge,
+} from "@/lib/admin/billing-plan-guardrail";
 
 async function auditAdminId(
   principal: Awaited<ReturnType<typeof requirePlatformAdminMutation>>,
@@ -91,6 +96,33 @@ export async function mutateUpgradeEdgeAction(
       lowerEdge,
       higherEdge,
     });
+    const policy = await transaction.platformBillingPolicy.findUnique({
+      where: { id: "default" },
+      select: { minimumUpgradePremiumBps: true },
+    });
+    const snapshots = await transaction.billingEconomicsSnapshot.findMany({
+      where: { billingPlanId: { in: [lower.id, higher.id] } },
+      orderBy: { verifiedAt: "desc" },
+    });
+    const latestSnapshots = new Map<string, (typeof snapshots)[number]>();
+    for (const snapshot of snapshots) {
+      if (!latestSnapshots.has(snapshot.billingPlanId)) {
+        latestSnapshots.set(snapshot.billingPlanId, snapshot);
+      }
+    }
+    const evaluation = evaluateBillingUpgradeEdge({
+      edge: {
+        id: decision.action === "reactivate" ? decision.edge.id : "proposed",
+        lowerPlanId: lower.id,
+        higherPlanId: higher.id,
+      },
+      lowerPlan: lower,
+      higherPlan: higher,
+      lowerSnapshot: latestSnapshots.get(lower.id) ?? null,
+      higherSnapshot: latestSnapshots.get(higher.id) ?? null,
+      minimumUpgradePremiumBps: policy?.minimumUpgradePremiumBps ?? 2000,
+    });
+    assertBillingUpgradeEconomicsPass([evaluation]);
     const edge =
       decision.action === "reactivate"
         ? await transaction.billingUpgradeEconomicsEdge.update({
@@ -111,7 +143,13 @@ export async function mutateUpgradeEdgeAction(
           decision.action === "reactivate"
             ? (decision.edge as unknown as Prisma.InputJsonValue)
             : undefined,
-        afterValue: edge as unknown as Prisma.InputJsonValue,
+        afterValue: {
+          edge,
+          economics: billingUpgradeEconomicsAuditEvidence(
+            evaluation,
+            evaluation.minimumUpgradePremiumBps,
+          ),
+        } as unknown as Prisma.InputJsonValue,
       },
     });
   });
