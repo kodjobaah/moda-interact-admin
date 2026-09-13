@@ -3,6 +3,11 @@ import Link from "next/link";
 import type { BillingPlanRow } from "@/lib/admin/billing-plan";
 import { BILLING_FEATURES } from "@/lib/admin/billing-plan-validation";
 import { adminI18n } from "@/i18n";
+import type { EvaluatedBillingUpgradeEdge } from "@/lib/admin/billing-plan-guardrail";
+import {
+  EconomicsExplanation,
+  NoUpgradeEdgeNotice,
+} from "./billing-plan-economics-presentation";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]";
@@ -191,7 +196,13 @@ export function PlanForm({ plan }: { plan?: BillingPlanRow }) {
   );
 }
 
-export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
+export function BillingPlanCatalog({
+  plans,
+  economics,
+}: {
+  plans: BillingPlanRow[];
+  economics: EvaluatedBillingUpgradeEdge[];
+}) {
   return (
     <div className="space-y-4">
       <section className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -210,6 +221,8 @@ export function BillingPlanCatalog({ plans }: { plans: BillingPlanRow[] }) {
           {adminI18n.t("billing.registerPlanAction")}
         </Link>
       </section>
+      <EconomicsExplanation evaluations={economics} />
+      <NoUpgradeEdgeNotice plans={plans} evaluations={economics} />
       <section className="grid gap-4 lg:grid-cols-2">
         {plans.map((plan) => (
           <article

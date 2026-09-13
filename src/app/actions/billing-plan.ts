@@ -10,9 +10,20 @@ import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import { billingPlanAuditSnapshot } from "@/lib/admin/billing-plan-audit";
 import {
+  applyBillingPlanUpdateInTransaction,
+  type BillingPlanMutationTransaction,
+} from "@/lib/admin/billing-plan-mutation";
+import {
   parseBillingPlanForm,
   type BillingPlanFormValues,
 } from "@/lib/admin/billing-plan-validation";
+import {
+  assertBillingUpgradeEconomicsPass,
+  billingUpgradeEconomicsAuditEvidence,
+  evaluateBillingUpgradeEdge,
+  type BillingPlanEconomicsCandidate,
+  type EvaluatedBillingUpgradeEdge,
+} from "@/lib/admin/billing-plan-guardrail";
 
 async function auditAdminId(
   principal: Awaited<ReturnType<typeof requirePlatformAdminMutation>>,
@@ -37,6 +48,89 @@ function featureRows(values: BillingPlanFormValues) {
   }));
 }
 
+async function evaluateAffectedEdges(
+  transaction: Prisma.TransactionClient,
+  planId: string,
+  proposedPlan: BillingPlanEconomicsCandidate,
+): Promise<EvaluatedBillingUpgradeEdge[]> {
+  const policy = await transaction.platformBillingPolicy.findUnique({
+    where: { id: "default" },
+    select: { minimumUpgradePremiumBps: true },
+  });
+  const edges = await transaction.billingUpgradeEconomicsEdge.findMany({
+    where: {
+      active: true,
+      OR: [{ lowerPlanId: planId }, { higherPlanId: planId }],
+    },
+    include: { lowerPlan: true, higherPlan: true },
+  });
+  const activeEdges = edges.filter(({ lowerPlan, higherPlan }) => {
+    const lower = lowerPlan.id === planId ? proposedPlan : lowerPlan;
+    const higher = higherPlan.id === planId ? proposedPlan : higherPlan;
+    return lower.active && higher.active;
+  });
+  if (!activeEdges.length) return [];
+
+  const planIds = [
+    ...new Set(
+      activeEdges.flatMap(({ lowerPlan, higherPlan }) => [
+        lowerPlan.id,
+        higherPlan.id,
+      ]),
+    ),
+  ];
+  const snapshots = await transaction.billingEconomicsSnapshot.findMany({
+    where: { billingPlanId: { in: planIds } },
+    orderBy: { verifiedAt: "desc" },
+  });
+  const latestSnapshots = new Map<string, (typeof snapshots)[number]>();
+  for (const snapshot of snapshots) {
+    if (!latestSnapshots.has(snapshot.billingPlanId)) {
+      latestSnapshots.set(snapshot.billingPlanId, snapshot);
+    }
+  }
+
+  return activeEdges.map(({ lowerPlan, higherPlan, ...edge }) => {
+    const lower = (
+      lowerPlan.id === planId ? proposedPlan : lowerPlan
+    ) as BillingPlanEconomicsCandidate;
+    const higher = (
+      higherPlan.id === planId ? proposedPlan : higherPlan
+    ) as BillingPlanEconomicsCandidate;
+    return evaluateBillingUpgradeEdge({
+      edge,
+      lowerPlan: lower,
+      higherPlan: higher,
+      lowerSnapshot: latestSnapshots.get(lower.id) ?? null,
+      higherSnapshot: latestSnapshots.get(higher.id) ?? null,
+      minimumUpgradePremiumBps: policy?.minimumUpgradePremiumBps ?? 2000,
+    });
+  });
+}
+
+async function auditEconomicsEvaluations(
+  transaction: Prisma.TransactionClient,
+  evaluations: EvaluatedBillingUpgradeEdge[],
+  adminId: string,
+  reason: string,
+): Promise<void> {
+  for (const evaluation of evaluations) {
+    await transaction.billingAuditEvent.create({
+      data: {
+        action: BillingAuditAction.UPGRADE_ECONOMICS_EVALUATED,
+        platformAdminId: adminId,
+        reason,
+        relatedEntityType: "BillingUpgradeEconomicsEdge",
+        relatedEntityId: evaluation.edge.id,
+        afterValue: billingUpgradeEconomicsAuditEvidence(
+          evaluation,
+          evaluation.minimumUpgradePremiumBps,
+        ) as unknown as Prisma.InputJsonObject,
+      },
+    });
+  }
+}
+
 export async function mutateBillingPlanAction(
   formData: FormData,
 ): Promise<void> {
@@ -55,6 +149,23 @@ export async function mutateBillingPlanAction(
         include: { features: true },
       });
       if (!existing) throw new Error("Billing plan not found.");
+      if (!existing.active) {
+        const evaluations = await evaluateAffectedEdges(
+          transaction,
+          existing.id,
+          {
+            ...existing,
+            active: true,
+          },
+        );
+        assertBillingUpgradeEconomicsPass(evaluations);
+        await auditEconomicsEvaluations(
+          transaction,
+          evaluations,
+          adminId,
+          values.reason,
+        );
+      }
       const updated = await transaction.billingPlan.update({
         where: { id: existing.id },
         data: { active: !existing.active },
@@ -139,9 +250,11 @@ export async function mutateBillingPlanAction(
       );
     }
 
-    const updated = await transaction.billingPlan.update({
-      where: { id: existing.id },
-      data: {
+    await applyBillingPlanUpdateInTransaction({
+      transaction: transaction as unknown as BillingPlanMutationTransaction,
+      existing,
+      proposed: {
+        ...existing,
         name: values.name,
         kind: values.kind,
         shopifyUsageEventHandle: values.shopifyUsageEventHandle,
@@ -154,27 +267,10 @@ export async function mutateBillingPlanAction(
         defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
         defaultOutboundHardLimit: values.defaultOutboundHardLimit,
         terminalMessageReservedSlots: values.terminalMessageReservedSlots,
-        features: {
-          deleteMany: {},
-          create: featureRows(values),
-        },
+        features: values.features,
       },
-    });
-    await transaction.billingAuditEvent.create({
-      data: {
-        action: BillingAuditAction.PLAN_CATALOG_CHANGED,
-        platformAdminId: adminId,
-        reason: values.reason,
-        relatedEntityType: "BillingPlan",
-        relatedEntityId: updated.id,
-        beforeValue: billingPlanAuditSnapshot(
-          existing,
-        ) as Prisma.InputJsonObject,
-        afterValue: billingPlanAuditSnapshot({
-          ...values,
-          active: existing.active,
-        }) as Prisma.InputJsonObject,
-      },
+      adminId,
+      reason: values.reason,
     });
   });
   revalidatePath("/billing");
