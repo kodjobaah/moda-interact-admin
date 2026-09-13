@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { ActivatePromotionCampaignForm, PromotionCampaignForm } from "@/components/admin/promotion-campaign-form";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
@@ -11,7 +12,9 @@ export default async function PromotionsPage({
 }: {
   searchParams: Promise<{ edit?: string }>;
 }) {
-  await requirePlatformAdminPage();
+  const principal = await requirePlatformAdminPage();
+  if (principal.role !== "SUPER_ADMIN") redirect("/");
+
   const [{ plans, shops }, campaigns] = await Promise.all([getPromotionTargets(), getPromotionCampaigns()]);
   const editId = (await searchParams).edit;
   const editing = campaigns.find((campaign) => campaign.id === editId);

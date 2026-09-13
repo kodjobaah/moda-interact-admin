@@ -7,12 +7,27 @@ const root = path.resolve(import.meta.dirname, "../..");
 const action = fs.readFileSync(path.join(root, "src/app/actions/promotions.ts"), "utf8");
 const validation = fs.readFileSync(path.join(root, "src/lib/admin/promotion-validation.ts"), "utf8");
 const page = fs.readFileSync(path.join(root, "src/app/(protected)/promotions/page.tsx"), "utf8");
+const sidebar = fs.readFileSync(path.join(root, "src/components/admin/sidebar.tsx"), "utf8");
 const form = fs.readFileSync(path.join(root, "src/components/admin/promotion-campaign-form.tsx"), "utf8");
 
 test("promotion mutations are SUPER_ADMIN-only and use the platform admin guard", () => {
   assert.match(action, /requirePlatformAdminMutation/);
   assert.match(action, /principal\.role !== "SUPER_ADMIN"/);
   assert.match(page, /requirePlatformAdminPage/);
+});
+
+test("the promotions page gates target and campaign loading at the SUPER_ADMIN boundary", () => {
+  assert.match(page, /const principal = await requirePlatformAdminPage\(\)/);
+  assert.match(page, /import \{ redirect \} from "next\/navigation"/);
+  assert.match(page, /if \(principal\.role !== "SUPER_ADMIN"\) redirect\("\/"\)/);
+  const dataLoad = page.indexOf("const [{ plans, shops }, campaigns]");
+  assert.ok(page.indexOf('principal.role !== "SUPER_ADMIN"') < dataLoad);
+});
+
+test("the promotions sidebar link is visible only to SUPER_ADMIN", () => {
+  const promotionsLink = sidebar.match(/administratorRole === "SUPER_ADMIN"[\s\S]*?href="\/promotions"/);
+  assert.ok(promotionsLink);
+  assert.match(sidebar, /administratorRole === "SUPER_ADMIN" \? \(/);
 });
 
 test("campaign validation enforces all three exclusive target shapes", () => {
