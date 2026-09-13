@@ -216,6 +216,7 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "billing.guardrailMissingTopUpEvidence",
   "billing.guardrailInvalidTopUpConfiguration",
   "billing.guardrailMissingPlanEvidence",
+  "billing.guardrailInvalidUpgradeEdge",
   "billing.guardrailBlocked",
   "billing.guardrailCode",
   "billing.noUpgradeEdgeTitle",

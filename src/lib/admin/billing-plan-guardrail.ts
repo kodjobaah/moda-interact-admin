@@ -108,11 +108,35 @@ export function evaluateBillingUpgradeEdge({
           },
         }
       : null;
+  const lowerMonthlyIncluded =
+    lowerPlan.kind === "FREE"
+      ? 0
+      : (lowerPlan.includedRecoveryConversationAllowance ?? 0);
+  const higherMonthlyIncluded =
+    higherPlan.kind === "FREE"
+      ? 0
+      : (higherPlan.includedRecoveryConversationAllowance ?? 0);
+  const invalidEdgeResult: UpgradeEconomicsResult | null =
+    higherPlan.id === lowerPlan.id ||
+    higherMonthlyIncluded <= lowerMonthlyIncluded
+      ? {
+          status: "UNVERIFIED",
+          code: "INVALID_UPGRADE_EDGE",
+          message:
+            "Upgrade economics requires a distinct higher plan with a strictly larger monthly included recovery allowance.",
+          details: {
+            additionalCreditsNeeded:
+              higherMonthlyIncluded - lowerMonthlyIncluded,
+            packSummary: [],
+          },
+        }
+      : null;
   const lowerPackSize = lowerPlan.recoveryCreditPackEnabled
     ? lowerPlan.recoveryCreditsPerPack
     : null;
   const result =
     mismatchResult ??
+    invalidEdgeResult ??
     validateSinglePackShopifyEconomics({
       currentPlan: planEconomics(lowerPlan, lowerSnapshot),
       nextPlan: planEconomics(higherPlan, higherSnapshot),

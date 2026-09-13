@@ -234,6 +234,8 @@ function EconomicsExplanation({
                       ? "billing.guardrailInvalidTopUpConfiguration"
                       : evaluation.result.code === "MISSING_PLAN_PRICE"
                         ? "billing.guardrailMissingPlanEvidence"
+                        : evaluation.result.code === "INVALID_UPGRADE_EDGE"
+                          ? "billing.guardrailInvalidUpgradeEdge"
                         : "billing.guardrailBlocked";
           return (
             <article

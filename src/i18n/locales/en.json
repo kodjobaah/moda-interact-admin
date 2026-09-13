@@ -216,6 +216,7 @@
   "billing.guardrailMissingTopUpEvidence": "Top-up Shopify pricing evidence is missing; activation or change is blocked.",
   "billing.guardrailInvalidTopUpConfiguration": "The proposed top-up size or Shopify meter handle does not match the latest verified Shopify evidence; activation or change is blocked.",
   "billing.guardrailMissingPlanEvidence": "Recurring plan pricing evidence is missing; activation or change is blocked.",
+  "billing.guardrailInvalidUpgradeEdge": "The upgrade edge must use distinct plans and a strictly larger higher-plan allowance; activation or change is blocked.",
   "billing.guardrailBlocked": "Activation or change is blocked by the upgrade economics guardrail ({code}).",
   "billing.guardrailCode": "Guardrail result code: {code}",
   "billing.noUpgradeEdgeTitle": "Plans without a configured upgrade edge",

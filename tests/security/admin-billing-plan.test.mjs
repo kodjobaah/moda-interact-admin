@@ -383,6 +383,76 @@ test("fails closed for stale pack evidence and treats proposed top-ups-off as un
   });
 });
 
+test("re-evaluates every affected edge and blocks invalid or unverifiable proposals atomically", () => {
+  const result = runBehaviorScript(`
+    import { assertBillingUpgradeEconomicsPass, evaluateBillingUpgradeEdge } from ${JSON.stringify(guardrailModuleUrl)};
+    const snapshot = (id, price = 5000, pack = true) => ({ id, monthlyRecurringAmountMinor: price, currency: 'GBP', recoveryCreditPackEnabledSnapshot: pack, recoveryCreditsPerPackSnapshot: pack ? 50 : null, shopifyRecoveryCreditPackEventHandleSnapshot: pack ? 'pack-meter' : null, usagePricingSnapshot: pack ? { mode: 'FIXED', currency: 'GBP', unitAmountMinor: 2000 } : null });
+    const plan = (id, allowance, pack = true) => ({ id, name: id, kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: allowance, recoveryCreditPackEnabled: pack, recoveryCreditsPerPack: pack ? 50 : null, shopifyRecoveryCreditPackEventHandle: pack ? 'pack-meter' : null });
+    const plans = { free: plan('free', 0), starter: plan('starter', 100), growth: plan('growth', 400), scale: plan('scale', 900) };
+    const edges = [['free', 'starter'], ['starter', 'growth'], ['growth', 'scale']];
+    const evaluate = (lowerId, higherId, proposed = {}, missingLowerSnapshot = false) => {
+      const lower = { ...plans[lowerId], ...(proposed[lowerId] ?? {}) };
+      const higher = { ...plans[higherId], ...(proposed[higherId] ?? {}) };
+      return evaluateBillingUpgradeEdge({ edge: { id: lowerId + '-' + higherId, lowerPlanId: lowerId, higherPlanId: higherId }, lowerPlan: lower, higherPlan: higher, lowerSnapshot: missingLowerSnapshot ? null : snapshot('s-' + lowerId), higherSnapshot: snapshot('s-' + higherId, 7500), minimumUpgradePremiumBps: 2000 });
+    };
+    const mutate = (affectedEdges) => {
+      const writes = [];
+      try {
+        assertBillingUpgradeEconomicsPass(affectedEdges);
+        writes.push('billingPlan', 'billingPlanFeature', 'audit');
+        return { committed: true, writes };
+      } catch (error) {
+        return { committed: false, writes, message: error.message };
+      }
+    };
+    const affected = (planId, proposed) => edges.filter(([lower, higher]) => lower === planId || higher === planId).map(([lower, higher]) => evaluate(lower, higher, proposed));
+    const packEnabled = affected('starter', { starter: { recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null } });
+    const lowerAllowance = affected('starter', { starter: { includedRecoveryConversationAllowance: 450 } });
+    const higherAllowance = affected('growth', { growth: { includedRecoveryConversationAllowance: 50 } });
+    const topUpsOff = mutate([evaluate('starter', 'growth', { starter: { recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null } })]);
+    const noSnapshot = evaluate('starter', 'growth', {}, true);
+    const invalid = evaluate('starter', 'growth', { growth: { includedRecoveryConversationAllowance: 100 } });
+    console.log(JSON.stringify({
+      packEnabled: packEnabled.map(({ result }) => result.code),
+      lowerAllowance: lowerAllowance.map(({ result }) => result.code),
+      higherAllowance: higherAllowance.map(({ result }) => result.code),
+      topUpsOff: [topUpsOff.committed, topUpsOff.writes.length],
+      noSnapshot: [noSnapshot.result.status, noSnapshot.result.code],
+      invalid: [invalid.result.status, invalid.result.code],
+      failedAtomic: mutate([noSnapshot]).writes,
+    }));
+  `);
+  assert.deepEqual(result.packEnabled, ["UPGRADE_ECONOMICS_OK", "NO_TOPUPS_AVAILABLE"]);
+  assert.deepEqual(result.lowerAllowance, ["UPGRADE_ECONOMICS_OK", "INVALID_UPGRADE_EDGE"]);
+  assert.deepEqual(result.higherAllowance, ["INVALID_UPGRADE_EDGE", "UPGRADE_ECONOMICS_OK"]);
+  assert.deepEqual(result.topUpsOff, [true, 3]);
+  assert.deepEqual(result.noSnapshot, ["UNVERIFIED", "INVALID_TOPUP_CONFIGURATION"]);
+  assert.deepEqual(result.invalid, ["UNVERIFIED", "INVALID_UPGRADE_EDGE"]);
+  assert.deepEqual(result.failedAtomic, []);
+});
+
+test("renders deterministic economics evidence without exposing provider credentials", () => {
+  assert.match(componentSource, /evaluation\.lowerPlan\.name/);
+  assert.match(componentSource, /evaluation\.higherPlan\.name/);
+  for (const label of [
+    "billing.capacityGap",
+    "billing.topUpPath",
+    "billing.requiredPackUnits",
+    "billing.stayAndTopUps",
+    "billing.upgradeCost",
+    "billing.premium",
+    "billing.requiredPremium",
+    "billing.pass",
+    "billing.fail",
+    "billing.unverified",
+    "billing.noUpgradeEdge",
+  ]) assert.match(componentSource, new RegExp(label.replaceAll(".", "\\.")));
+  assert.match(componentSource, /toFixed\(2\)/);
+  assert.match(componentSource, /billing\.verifiedShopifyEvidence/);
+  assert.doesNotMatch(componentSource, /appSubscriptionCreate|appPurchaseOneTimeCreate|accessToken|clientSecret|password/i);
+  assert.match(readFileSync(resolve(root, "src/i18n/locales/en.json"), "utf8"), /does not authorize Shopify charging/);
+});
+
 test("records persisted before values and resulting after values for paid-plan edits", () => {
   const result = runBehaviorScript(`
     import { billingPlanAuditSnapshot } from ${JSON.stringify(auditModuleUrl)};
