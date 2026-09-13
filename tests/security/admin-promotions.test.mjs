@@ -10,6 +10,8 @@ const page = fs.readFileSync(path.join(root, "src/app/(protected)/promotions/pag
 const sidebar = fs.readFileSync(path.join(root, "src/components/admin/sidebar.tsx"), "utf8");
 const form = fs.readFileSync(path.join(root, "src/components/admin/promotion-campaign-form.tsx"), "utf8");
 const data = fs.readFileSync(path.join(root, "src/lib/admin/promotions.ts"), "utf8");
+const catalogue = fs.readFileSync(path.join(root, "src/lib/admin/promotion-catalogue.ts"), "utf8");
+const lifecycle = fs.readFileSync(path.join(root, "src/lib/admin/promotion-campaign-lifecycle.ts"), "utf8");
 
 test("promotion mutations are SUPER_ADMIN-only and use the platform admin guard", () => {
   assert.match(action, /requirePlatformAdminMutation/);
@@ -81,7 +83,8 @@ test("catalogue retains lifecycle rows and derives bounded running state", () =>
   assert.match(data, /createdAt: true/);
   assert.match(data, /createdByPlatformAdmin/);
   assert.match(data, /lastLifecycleChange/);
-  assert.match(data, /campaign\.startsAt <= now && campaign\.expiresAt > now/);
+  assert.match(catalogue, /now < campaign\.expiresAt/);
+  assert.match(catalogue, /return "SCHEDULED"/);
   assert.match(data, /filters\.state/);
   assert.match(page, /name="state"/);
   assert.match(page, /name="scope"/);
@@ -90,14 +93,14 @@ test("catalogue retains lifecycle rows and derives bounded running state", () =>
 
 test("close and reopen are SUPER_ADMIN-only versioned audited mutations", () => {
   assert.match(action, /intent === "close" \|\| intent === "reopen"/);
-  assert.match(action, /status: existing\.status,[\s\S]*version: existing\.version/);
-  assert.match(action, /PromotionCampaignEventType\.CLOSED/);
-  assert.match(action, /PromotionCampaignEventType\.REOPENED/);
-  assert.match(action, /PromotionCampaignEventType\.EXPIRY_CHANGED/);
-  assert.match(action, /validatePromotionCampaignReopen/);
-  assert.match(action, /Promotion campaign changed; reload and retry/);
-  assert.match(action, /status: PromotionCampaignStatus\.CLOSED/);
-  assert.match(action, /expiresAt,[\s\S]*version: \{ increment: 1 \}/);
+  assert.match(lifecycle, /status: existing\.status,[\s\S]*version: existing\.version/);
+  assert.match(lifecycle, /PromotionCampaignEventType\.CLOSED/);
+  assert.match(lifecycle, /PromotionCampaignEventType\.REOPENED/);
+  assert.match(lifecycle, /PromotionCampaignEventType\.EXPIRY_CHANGED/);
+  assert.match(lifecycle, /validatePromotionCampaignReopen/);
+  assert.match(lifecycle, /Promotion campaign changed; reload and retry/);
+  assert.match(lifecycle, /status: PromotionCampaignStatus\.CLOSED/);
+  assert.match(lifecycle, /expiresAt,[\s\S]*version: \{ increment: 1 \}/);
   assert.doesNotMatch(action, /promotionalCreditGrant\.(create|createMany|upsert|update)/);
   assert.doesNotMatch(action, /merchantPromotionSelection\.(create|createMany|upsert|update)/);
   assert.doesNotMatch(action, /promotionCampaign\.(delete|deleteMany)/);

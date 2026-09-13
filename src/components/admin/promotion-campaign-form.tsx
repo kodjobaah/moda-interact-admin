@@ -105,7 +105,7 @@ export function ClosePromotionCampaignForm({ campaign }: { campaign: PromotionCa
 }
 
 export function ReopenPromotionCampaignForm({ campaign }: { campaign: PromotionCampaignRow }) {
-  if (campaign.status !== "ACTIVE" && campaign.status !== "CLOSED") return null;
+  if (campaign.status !== "CLOSED" && campaign.state !== "EXPIRED") return null;
   return (
     <form action={mutatePromotionCampaignAction} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="intent" value="reopen" />

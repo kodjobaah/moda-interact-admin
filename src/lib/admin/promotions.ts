@@ -1,6 +1,13 @@
 import type { PromotionCampaignStatus, PromotionCampaignEventType, PromotionTargetScope } from "@prisma/client";
 import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
+import {
+  derivePromotionCatalogueState,
+  normalizePromotionTargetQuery,
+  promotionCatalogueWhere,
+  selectLastPromotionLifecycleChange,
+  type PromotionCatalogueState,
+} from "@/lib/admin/promotion-catalogue";
 
 export type PromotionCampaignRow = {
   id: string;
@@ -21,23 +28,14 @@ export type PromotionCampaignRow = {
     kind: PromotionCampaignEventType;
     createdAt: Date;
   } | null;
-  state: "DRAFT" | "RUNNING" | "EXPIRED" | "CLOSED";
+  state: PromotionCatalogueState;
 };
 
 export type PromotionCampaignFilters = {
-  state?: "ALL" | "RUNNING" | "EXPIRED" | "CLOSED";
+  state?: "ALL" | PromotionCatalogueState;
   scope?: PromotionTargetScope | "ALL";
   target?: string;
 };
-
-function deriveCampaignState(
-  campaign: Pick<PromotionCampaignRow, "status" | "startsAt" | "expiresAt">,
-  now: Date,
-): PromotionCampaignRow["state"] {
-  if (campaign.status === "DRAFT") return "DRAFT";
-  if (campaign.status === "CLOSED") return "CLOSED";
-  return campaign.startsAt <= now && campaign.expiresAt > now ? "RUNNING" : "EXPIRED";
-}
 
 export async function getPromotionCampaigns(
   filters: PromotionCampaignFilters = {},
@@ -45,18 +43,7 @@ export async function getPromotionCampaigns(
 ): Promise<PromotionCampaignRow[]> {
   await requirePlatformAdminRead();
   const campaigns = await prisma.promotionCampaign.findMany({
-    where: {
-      ...(filters.scope && filters.scope !== "ALL" ? { scope: filters.scope } : {}),
-      ...(filters.target
-        ? {
-            OR: [
-              { name: { contains: filters.target, mode: "insensitive" } },
-              { targetPlanId: filters.target },
-              { targetShopId: filters.target },
-            ],
-          }
-        : {}),
-    },
+    where: promotionCatalogueWhere({ scope: filters.scope, target: normalizePromotionTargetQuery(filters.target) }),
     orderBy: [{ createdAt: "desc" }],
     select: {
       id: true,
@@ -74,21 +61,21 @@ export async function getPromotionCampaigns(
       createdAt: true,
       createdByPlatformAdmin: { select: { displayName: true, email: true } },
       events: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
+        orderBy: [{ createdAt: "desc" }],
+        take: 5,
         select: { kind: true, createdAt: true },
       },
     },
   });
   return campaigns
     .map((campaign) => {
-      const state = deriveCampaignState(campaign, now);
+      const state = derivePromotionCatalogueState(campaign, now);
       return {
         ...campaign,
         targetPlanName: campaign.targetPlan?.name ?? null,
         targetShopDomain: campaign.targetShop?.domain ?? null,
         creatorName: campaign.createdByPlatformAdmin.displayName ?? campaign.createdByPlatformAdmin.email,
-        lastLifecycleChange: campaign.events[0] ?? null,
+        lastLifecycleChange: selectLastPromotionLifecycleChange(campaign.events),
         state,
       };
     })

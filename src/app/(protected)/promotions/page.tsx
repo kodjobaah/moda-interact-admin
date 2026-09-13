@@ -16,7 +16,7 @@ export default async function PromotionsPage({
   if (principal.role !== "SUPER_ADMIN") redirect("/");
 
   const params = await searchParams;
-  const state = params.state === "RUNNING" || params.state === "EXPIRED" || params.state === "CLOSED" ? params.state : "ALL";
+  const state = params.state === "SCHEDULED" || params.state === "RUNNING" || params.state === "EXPIRED" || params.state === "CLOSED" ? params.state : "ALL";
   const scope = params.scope === "GLOBAL" || params.scope === "PLAN" || params.scope === "SHOP" ? params.scope : "ALL";
   const [{ plans, shops }, campaigns] = await Promise.all([
     getPromotionTargets(),
@@ -35,7 +35,7 @@ export default async function PromotionsPage({
           <Link href="/promotions" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">New campaign</Link>
         </div>
         <form className="mb-6 grid gap-3 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-4" method="get">
-          <label className="text-xs font-semibold text-gray-600">State<select name="state" defaultValue={state} className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm"><option value="ALL">All</option><option value="RUNNING">Running</option><option value="EXPIRED">Expired</option><option value="CLOSED">Closed</option></select></label>
+          <label className="text-xs font-semibold text-gray-600">State<select name="state" defaultValue={state} className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm"><option value="ALL">All</option><option value="SCHEDULED">Scheduled</option><option value="RUNNING">Running</option><option value="EXPIRED">Expired</option><option value="CLOSED">Closed</option></select></label>
           <label className="text-xs font-semibold text-gray-600">Scope<select name="scope" defaultValue={scope} className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm"><option value="ALL">All</option><option value="GLOBAL">Global</option><option value="PLAN">Plan</option><option value="SHOP">Shop</option></select></label>
           <label className="text-xs font-semibold text-gray-600">Target or name<input name="target" defaultValue={params.target} className="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm" maxLength={255} /></label>
           <button type="submit" className="self-end rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Filter</button>
