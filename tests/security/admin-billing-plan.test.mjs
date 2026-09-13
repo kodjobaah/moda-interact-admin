@@ -361,6 +361,9 @@ test("shared guardrail adapter preserves PASS, FAIL, and UNVERIFIED outcomes", (
   ]) {
     assert.ok(Object.hasOwn(result.evidence, key), key);
   }
+  assert.deepEqual(result.evidence.topUpPath, [
+    { quantity: 6, creditsGranted: 50 },
+  ]);
   const serializedEvidence = JSON.stringify(result.evidence);
   assert.doesNotMatch(
     serializedEvidence,
@@ -414,46 +417,74 @@ test("prioritizes invalid upgrade edges over stale pack evidence", () => {
   });
 });
 
-test("re-evaluates every affected edge through the production transaction seam", () => {
+test("re-evaluates exact adjacent edges through the production transaction seam", () => {
   const result = runBehaviorScript(`
     import { applyBillingPlanUpdateInTransaction } from ${JSON.stringify(mutationModuleUrl)};
     const plans = {
-      free: { id: 'free', name: 'Free', kind: 'FREE', active: true, includedRecoveryConversationAllowance: 0, recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'pack-meter', shopifyPlanHandle: 'free', shopifyUsageEventHandle: null, defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1, features: [] },
-      starter: { id: 'starter', name: 'Starter', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 100, recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'pack-meter', shopifyPlanHandle: 'starter', shopifyUsageEventHandle: 'usage', defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1, features: [] },
+      free: { id: 'free', name: 'Free', kind: 'FREE', active: true, includedRecoveryConversationAllowance: 0, recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null, shopifyPlanHandle: 'free', shopifyUsageEventHandle: null, defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1, features: [] },
+      starter: { id: 'starter', name: 'Starter', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 100, recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null, shopifyPlanHandle: 'starter', shopifyUsageEventHandle: 'usage', defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1, features: [] },
       growth: { id: 'growth', name: 'Growth', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 400, recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null, shopifyPlanHandle: 'growth', shopifyUsageEventHandle: 'usage', defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1, features: [] },
       scale: { id: 'scale', name: 'Scale', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 900, recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null, shopifyPlanHandle: 'scale', shopifyUsageEventHandle: 'usage', defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1, features: [] },
     };
-    const edges = [['starter', 'growth']];
-    const snapshot = (id, currency = 'GBP', pack = id === 'starter') => ({ id: 'snapshot-' + id, billingPlanId: id, monthlyRecurringAmountMinor: id === 'free' ? 0 : 5000, currency, recoveryCreditPackEnabledSnapshot: pack, recoveryCreditsPerPackSnapshot: pack ? 50 : null, shopifyRecoveryCreditPackEventHandleSnapshot: pack ? 'pack-meter' : null, usagePricingSnapshot: pack ? { mode: 'FIXED', currency, unitAmountMinor: 2000 } : null, verifiedAt: new Date() });
-    const makeTransaction = ({ currency = 'GBP', missingSnapshots = [], invalidHigher = false, currencyMismatch = false } = {}) => {
+    const edges = [['free', 'starter'], ['starter', 'growth'], ['growth', 'scale']];
+    const snapshot = (id, currency = 'GBP', pack = false, unitAmountMinor = 100) => ({ id: 'snapshot-' + id, billingPlanId: id, monthlyRecurringAmountMinor: id === 'free' ? 0 : id === 'starter' ? 100 : id === 'growth' ? 500 : 1000, currency, recoveryCreditPackEnabledSnapshot: pack, recoveryCreditsPerPackSnapshot: pack ? 50 : null, shopifyRecoveryCreditPackEventHandleSnapshot: pack ? 'pack-meter' : null, usagePricingSnapshot: pack ? { mode: 'FIXED', currency, unitAmountMinor } : null, verifiedAt: new Date() });
+    const makeTransaction = ({ currency = 'GBP', missingSnapshots = [], unitAmountMinor = 100, edgePlanOverrides = {}, mismatchedPlan = null } = {}) => {
       const writes = [];
+      const audit = [];
       return {
         writes,
         platformBillingPolicy: { findUnique: async () => ({ minimumUpgradePremiumBps: 2000 }) },
-        billingUpgradeEconomicsEdge: { findMany: async () => edges.map(([lower, higher], index) => ({ id: 'edge-' + index, lowerPlanId: lower, higherPlanId: higher, active: true, lowerPlan: plans[lower], higherPlan: invalidHigher && higher === 'growth' ? { ...plans[higher], includedRecoveryConversationAllowance: 50 } : plans[higher] })) },
-        billingEconomicsSnapshot: { findMany: async () => Object.keys(plans).filter((id) => !missingSnapshots.includes(id)).map((id) => snapshot(id, currencyMismatch && id === 'growth' ? 'USD' : currency)) },
-        billingAuditEvent: { create: async ({ data }) => { writes.push(data.action); return data; } },
+        billingUpgradeEconomicsEdge: { findMany: async ({ where }) => edges.filter(([lower, higher]) => lower === where.OR[0].lowerPlanId || higher === where.OR[1].higherPlanId).map(([lower, higher], index) => ({ id: 'edge-' + (edges.findIndex(([candidateLower, candidateHigher]) => candidateLower === lower && candidateHigher === higher)), lowerPlanId: lower, higherPlanId: higher, active: true, lowerPlan: { ...plans[lower], ...edgePlanOverrides[lower] }, higherPlan: { ...plans[higher], ...edgePlanOverrides[higher] } })) },
+        billingEconomicsSnapshot: { findMany: async () => Object.keys(plans).filter((id) => !missingSnapshots.includes(id)).map((id) => snapshot(id, id === mismatchedPlan ? 'USD' : currency, id === 'starter', unitAmountMinor)) },
+        billingAuditEvent: { create: async ({ data }) => { writes.push(data.action); audit.push({ action: data.action, relatedEntityId: data.relatedEntityId, status: data.afterValue?.status, code: data.afterValue?.code, topUpPath: data.afterValue?.topUpPath }); return data; } },
         billingPlan: { update: async ({ data }) => { writes.push('BillingPlan.update'); return { ...plans.starter, ...data, id: 'starter' }; } },
         billingPlanFeature: { deleteMany: async () => { writes.push('BillingPlanFeature.deleteMany'); }, createMany: async () => { writes.push('BillingPlanFeature.createMany'); } },
+        audit,
       };
     };
-    const proposal = (overrides = {}) => ({ ...plans.starter, ...overrides, features: [] });
-    const invoke = async (transaction, overrides = {}) => {
-      try { await applyBillingPlanUpdateInTransaction({ transaction, existing: plans.starter, proposed: proposal(overrides), adminId: 'admin-1', reason: 'test' }); return { committed: true, writes: transaction.writes }; }
-      catch (error) { return { committed: false, writes: transaction.writes, message: error.message }; }
+    const proposal = (plan, overrides = {}) => ({ ...plan, ...overrides, features: [] });
+    const invoke = async (transaction, planId, overrides = {}, existingOverrides = {}) => {
+      const existing = { ...plans[planId], ...existingOverrides };
+      try { await applyBillingPlanUpdateInTransaction({ transaction, existing, proposed: proposal(existing, overrides), adminId: 'admin-1', reason: 'test' }); return { committed: true, writes: transaction.writes, audit: transaction.audit }; }
+      catch (error) { return { committed: false, writes: transaction.writes, audit: transaction.audit, message: error.message }; }
     };
-    const enabled = await invoke(makeTransaction(), { recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null });
-    const staleSize = await invoke(makeTransaction(), { recoveryCreditsPerPack: 25 });
-    const lowerAllowance = await invoke(makeTransaction(), { includedRecoveryConversationAllowance: 50 });
-    const invalid = await invoke(makeTransaction({ invalidHigher: true }), { includedRecoveryConversationAllowance: 50 });
-    const missing = await invoke(makeTransaction({ missingSnapshots: ['starter'] }), { includedRecoveryConversationAllowance: 101 });
-    const currency = await invoke(makeTransaction({ currencyMismatch: true }), { includedRecoveryConversationAllowance: 101 });
+    const enabledTransaction = makeTransaction();
+    const enabled = await invoke(enabledTransaction, 'starter', { recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'pack-meter' });
+    const staleSize = await invoke(makeTransaction(), 'starter', { recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 25, shopifyRecoveryCreditPackEventHandle: 'pack-meter' });
+    const lowerAllowance = await invoke(makeTransaction(), 'starter', { includedRecoveryConversationAllowance: 50 });
+    const higherAllowance = await invoke(makeTransaction(), 'growth', { includedRecoveryConversationAllowance: 450 });
+    const topUpsOff = await invoke(makeTransaction(), 'starter', { recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null }, { recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'pack-meter' });
+    const missing = await invoke(makeTransaction({ missingSnapshots: ['starter'] }), 'starter', { recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'pack-meter' });
+    const fail = await invoke(makeTransaction({ unitAmountMinor: 10 }), 'starter', { recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'pack-meter' });
+    const currency = await invoke(makeTransaction({ mismatchedPlan: 'growth' }), 'starter', { recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'pack-meter' });
     const noEdges = makeTransaction(); noEdges.billingUpgradeEconomicsEdge.findMany = async () => [];
-    const isolated = await invoke(noEdges, { includedRecoveryConversationAllowance: 101 });
-    console.log(JSON.stringify({ enabled, staleSize, lowerAllowance, invalid, missing, currency, isolated }));
+    const isolated = await invoke(noEdges, 'starter', { includedRecoveryConversationAllowance: 101 });
+    const topPlan = await invoke(makeTransaction(), 'scale', { name: 'Scale Updated', includedRecoveryConversationAllowance: 901 });
+    console.log(JSON.stringify({ enabled, staleSize, lowerAllowance, higherAllowance, topUpsOff, missing, fail, currency, isolated, topPlan }));
   `);
   assert.equal(result.enabled.committed, true);
+  const economicsAudits = (outcome) =>
+    outcome.audit.filter(
+      ({ action }) => action === "UPGRADE_ECONOMICS_EVALUATED",
+    );
+  assert.deepEqual(
+    economicsAudits(result.enabled).map(
+      ({ relatedEntityId }) => relatedEntityId,
+    ),
+    ["edge-0", "edge-1"],
+  );
+  assert.deepEqual(
+    economicsAudits(result.enabled).map(({ status, code }) => [status, code]),
+    [
+      ["PASS", "NO_TOPUPS_AVAILABLE"],
+      ["PASS", "UPGRADE_ECONOMICS_OK"],
+    ],
+  );
+  assert.deepEqual(economicsAudits(result.enabled)[1].topUpPath, [
+    { quantity: 6, creditsGranted: 50 },
+  ]);
   assert.deepEqual(result.enabled.writes, [
+    "UPGRADE_ECONOMICS_EVALUATED",
     "UPGRADE_ECONOMICS_EVALUATED",
     "BillingPlan.update",
     "PLAN_CATALOG_CHANGED",
@@ -461,25 +492,59 @@ test("re-evaluates every affected edge through the production transaction seam",
   assert.equal(result.staleSize.committed, false);
   assert.deepEqual(result.staleSize.writes, []);
   assert.equal(result.lowerAllowance.committed, true);
-  assert.equal(
-    result.lowerAllowance.writes.includes("UPGRADE_ECONOMICS_EVALUATED"),
-    true,
+  assert.deepEqual(
+    economicsAudits(result.lowerAllowance).map(
+      ({ relatedEntityId }) => relatedEntityId,
+    ),
+    ["edge-0", "edge-1"],
   );
-  assert.equal(result.invalid.committed, false);
-  assert.deepEqual(result.invalid.writes, []);
+  assert.deepEqual(
+    economicsAudits(result.higherAllowance).map(
+      ({ relatedEntityId }) => relatedEntityId,
+    ),
+    ["edge-1", "edge-2"],
+  );
+  assert.equal(result.topUpsOff.committed, true);
+  assert.deepEqual(
+    economicsAudits(result.topUpsOff).map(({ status, code }) => [status, code]),
+    [
+      ["PASS", "NO_TOPUPS_AVAILABLE"],
+      ["PASS", "NO_TOPUPS_AVAILABLE"],
+    ],
+  );
   assert.equal(result.missing.committed, false);
   assert.deepEqual(result.missing.writes, []);
+  assert.equal(result.fail.committed, false);
+  assert.deepEqual(result.fail.writes, []);
   assert.equal(result.currency.committed, false);
   assert.deepEqual(result.currency.writes, []);
   assert.equal(result.isolated.committed, true);
-  assert.equal(result.isolated.writes.includes("UPGRADE_ECONOMICS_EVALUATED"), false);
+  assert.equal(
+    result.isolated.writes.includes("UPGRADE_ECONOMICS_EVALUATED"),
+    false,
+  );
   assert.equal(result.isolated.writes.includes("BillingPlan.update"), true);
+  assert.deepEqual(
+    economicsAudits(result.topPlan).map(
+      ({ relatedEntityId }) => relatedEntityId,
+    ),
+    ["edge-2"],
+  );
+  assert.equal(
+    economicsAudits(result.topPlan).some(
+      ({ relatedEntityId }) => relatedEntityId === "edge-3",
+    ),
+    false,
+  );
 });
 
 test("renders deterministic economics evidence without exposing provider credentials", () => {
   assert.match(componentSource, /EconomicsExplanation/);
   assert.match(componentSource, /NoUpgradeEdgeNotice/);
-  assert.doesNotMatch(componentSource, /appSubscriptionCreate|appPurchaseOneTimeCreate|accessToken|clientSecret|password/i);
+  assert.doesNotMatch(
+    componentSource,
+    /appSubscriptionCreate|appPurchaseOneTimeCreate|accessToken|clientSecret|password/i,
+  );
 });
 
 test("records persisted before values and resulting after values for paid-plan edits", () => {

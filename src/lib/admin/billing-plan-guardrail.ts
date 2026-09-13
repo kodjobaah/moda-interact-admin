@@ -42,6 +42,36 @@ export type EvaluatedBillingUpgradeEdge = {
   result: UpgradeEconomicsResult;
 };
 
+export type BillingUpgradeTopUpPathItem = {
+  quantity: number;
+  creditsGranted: number;
+};
+
+export function billingUpgradeTopUpPath(
+  evaluation: EvaluatedBillingUpgradeEdge,
+): BillingUpgradeTopUpPathItem[] {
+  if (evaluation.result.details.packSummary?.length) {
+    return evaluation.result.details.packSummary.map(
+      ({ quantity, creditsGranted }) => ({ quantity, creditsGranted }),
+    );
+  }
+
+  const quantity = evaluation.result.details.packUnitsNeeded;
+  const creditsGranted = evaluation.lowerPlan.recoveryCreditsPerPack;
+  if (
+    quantity !== undefined &&
+    Number.isSafeInteger(quantity) &&
+    quantity > 0 &&
+    creditsGranted !== null &&
+    Number.isSafeInteger(creditsGranted) &&
+    creditsGranted > 0
+  ) {
+    return [{ quantity, creditsGranted }];
+  }
+
+  return [];
+}
+
 function planEconomics(
   plan: BillingPlanEconomicsCandidate,
   snapshot: BillingEconomicsSnapshotEvidence | null,
@@ -189,7 +219,7 @@ export function billingUpgradeEconomicsAuditEvidence(
         : (evaluation.higherPlan.includedRecoveryConversationAllowance ?? 0),
     recoveryCreditsPerPack: evaluation.lowerPlan.recoveryCreditsPerPack,
     packUnitsNeeded: details.packUnitsNeeded ?? null,
-    topUpPath: details.packSummary ?? [],
+    topUpPath: billingUpgradeTopUpPath(evaluation),
     topUpCostMinor: details.topUpCostMinor ?? null,
     stayAndTopUpCostMinor: details.stayAndTopUpCostMinor ?? null,
     upgradeCostMinor: details.upgradeCostMinor ?? null,

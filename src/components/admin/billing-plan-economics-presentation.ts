@@ -2,7 +2,10 @@ import React from "react";
 import { createInternationalizationRuntime } from "@modainteract/moda-interact-shared/internationalization";
 import catalogue from "../../i18n/locales/en.json" with { type: "json" };
 import type { BillingPlanRow } from "../../lib/admin/billing-plan";
-import type { EvaluatedBillingUpgradeEdge } from "../../lib/admin/billing-plan-guardrail";
+import {
+  billingUpgradeTopUpPath,
+  type EvaluatedBillingUpgradeEdge,
+} from "../../lib/admin/billing-plan-guardrail.ts";
 
 const adminI18n = createInternationalizationRuntime({
   locale: "en",
@@ -37,6 +40,7 @@ export function EconomicsExplanation({
     ),
     ...evaluations.map((evaluation) => {
       const { details } = evaluation.result;
+      const topUpPath = billingUpgradeTopUpPath(evaluation);
       const currency = evaluation.lowerSnapshot?.currency;
       const statusKey =
         evaluation.result.status === "PASS"
@@ -83,11 +87,14 @@ export function EconomicsExplanation({
         React.createElement(
           "dl",
           null,
-          field("billing.capacityGap", adminI18n.formatNumber(details.additionalCreditsNeeded)),
+          field(
+            "billing.capacityGap",
+            adminI18n.formatNumber(details.additionalCreditsNeeded),
+          ),
           field(
             "billing.topUpPath",
-            details.packSummary?.length
-              ? details.packSummary
+            topUpPath.length
+              ? topUpPath
                   .map(
                     (pack) =>
                       `${adminI18n.formatNumber(pack.quantity)} x ${adminI18n.formatNumber(pack.creditsGranted)}`,
@@ -101,8 +108,14 @@ export function EconomicsExplanation({
               ? adminI18n.t("empty.notRecorded")
               : adminI18n.formatNumber(details.packUnitsNeeded),
           ),
-          field("billing.stayAndTopUps", money(details.stayAndTopUpCostMinor, currency)),
-          field("billing.upgradeCost", money(details.upgradeCostMinor, currency)),
+          field(
+            "billing.stayAndTopUps",
+            money(details.stayAndTopUpCostMinor, currency),
+          ),
+          field(
+            "billing.upgradeCost",
+            money(details.upgradeCostMinor, currency),
+          ),
           field(
             "billing.premium",
             details.premiumBps === undefined

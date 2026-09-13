@@ -8,11 +8,14 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "../..");
 const presentation = await import(
   pathToFileURL(
-    resolve(root, "src/components/admin/billing-plan-economics-presentation.ts"),
-  ).href,
+    resolve(
+      root,
+      "src/components/admin/billing-plan-economics-presentation.ts",
+    ),
+  ).href
 );
 const guardrail = await import(
-  pathToFileURL(resolve(root, "src/lib/admin/billing-plan-guardrail.ts")).href,
+  pathToFileURL(resolve(root, "src/lib/admin/billing-plan-guardrail.ts")).href
 );
 
 const plans = {
@@ -86,10 +89,16 @@ test("renders PASS, FAIL, and UNVERIFIED evidence with exact integer-minor curre
 
   assert.match(pass, /Starter/);
   assert.match(pass, /Growth/);
+  assert.match(pass, /300/);
+  assert.match(pass, /6 x 50/);
   assert.match(pass, /GBP 170\.00/);
   assert.match(pass, /GBP 75\.00/);
+  assert.match(pass, /126\.7%/);
+  assert.match(pass, /20\.0%/);
   assert.match(pass, /PASS/);
   assert.match(fail, /FAIL/);
+  assert.match(fail, /300/);
+  assert.match(fail, /6 x 50/);
   assert.match(fail, /activation|blocked/i);
   assert.match(unverified, /UNVERIFIED/);
   assert.doesNotMatch(unverified, /PASS/);
@@ -100,7 +109,11 @@ test("renders NO_UPGRADE_EDGE from configured plans and complete authority wordi
   const evaluations = [evaluate(2000)];
   const noEdgeMarkup = renderToStaticMarkup(
     React.createElement(presentation.NoUpgradeEdgeNotice, {
-      plans: [plans.lower, plans.higher, { ...plans.higher, id: "scale", name: "Scale" }],
+      plans: [
+        plans.lower,
+        plans.higher,
+        { ...plans.higher, id: "scale", name: "Scale" },
+      ],
       evaluations,
     }),
   );
@@ -108,8 +121,14 @@ test("renders NO_UPGRADE_EDGE from configured plans and complete authority wordi
 
   assert.match(noEdgeMarkup, /NO_UPGRADE_EDGE/);
   assert.match(noEdgeMarkup, /Scale/);
-  assert.doesNotMatch(noEdgeMarkup, /invented|higher plan is configured for Growth/);
-  assert.match(evidenceMarkup, /Verified Shopify economics evidence used by the Admin guardrail/);
+  assert.doesNotMatch(
+    noEdgeMarkup,
+    /invented|higher plan is configured for Growth/,
+  );
+  assert.match(
+    evidenceMarkup,
+    /Verified Shopify economics evidence used by the Admin guardrail/,
+  );
   assert.match(evidenceMarkup, /does not authorize Shopify charging/);
   assert.doesNotMatch(
     evidenceMarkup + noEdgeMarkup,
