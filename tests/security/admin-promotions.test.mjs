@@ -12,6 +12,8 @@ const form = fs.readFileSync(path.join(root, "src/components/admin/promotion-cam
 const data = fs.readFileSync(path.join(root, "src/lib/admin/promotions.ts"), "utf8");
 const catalogue = fs.readFileSync(path.join(root, "src/lib/admin/promotion-catalogue.ts"), "utf8");
 const lifecycle = fs.readFileSync(path.join(root, "src/lib/admin/promotion-campaign-lifecycle.ts"), "utf8");
+const report = fs.readFileSync(path.join(root, "src/lib/admin/promotion-report.ts"), "utf8");
+const reportPage = fs.readFileSync(path.join(root, "src/app/(protected)/promotions/[campaignId]/page.tsx"), "utf8");
 
 test("promotion mutations are SUPER_ADMIN-only and use the platform admin guard", () => {
   assert.match(action, /requirePlatformAdminMutation/);
@@ -111,4 +113,21 @@ test("lifecycle forms expose close/reopen without allowing commercial-term edits
   assert.match(form, /ReopenPromotionCampaignForm/);
   assert.match(form, /name="expiresAt" type="datetime-local"/);
   assert.doesNotMatch(form.slice(form.indexOf("export function ReopenPromotionCampaignForm")), /name="(quantity|scope|targetPlanId|targetShopId)"/);
+});
+
+test("campaign reports are SUPER_ADMIN-only, bounded, and read-only", () => {
+  assert.match(report, /requirePlatformAdminRead/);
+  assert.match(report, /principal\.role !== "SUPER_ADMIN"/);
+  assert.match(report, /take: PROMOTION_REPORT_PAGE_SIZE/);
+  assert.match(report, /skip: \(page - 1\) \* PROMOTION_REPORT_PAGE_SIZE/);
+  assert.match(report, /shop: \{ domain: \{ contains: search, mode: "insensitive" \} \}/);
+  assert.match(report, /firstUsedAt: \{ not: null \}/);
+  assert.match(report, /exhaustedAt: \{ not: null \}/);
+  assert.match(report, /currentlySelected: grant\.selection !== null/);
+  assert.doesNotMatch(report, /\.(create|createMany|update|updateMany|upsert|delete|deleteMany)\(/);
+  assert.match(reportPage, /requirePlatformAdminPage/);
+  assert.match(reportPage, /principal\.role !== "SUPER_ADMIN"/);
+  assert.match(reportPage, /name="status"/);
+  assert.match(reportPage, /name="search"/);
+  assert.doesNotMatch(reportPage, /PromotionCampaignForm|mutatePromotionCampaignAction/);
 });
