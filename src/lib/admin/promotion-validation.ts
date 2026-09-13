@@ -54,6 +54,29 @@ export function validatePromotionTarget(
   if (!validShape) throw new Error("Campaign target does not match its scope.");
 }
 
+export function validatePromotionCampaignTerms(values: {
+  name: string;
+  merchantDescription: string | null;
+  scope: PromotionScope;
+  quantity: number;
+  targetPlanId: string | null;
+  targetShopId: string | null;
+  startsAt: Date;
+  expiresAt: Date;
+}): void {
+  validatePromotionTarget(values.scope, values.targetPlanId, values.targetShopId);
+  if (!Number.isSafeInteger(values.quantity) || values.quantity <= 0 || values.quantity > 1_000_000) {
+    throw new Error("Quantity must be a positive integer up to 1,000,000.");
+  }
+  if (values.expiresAt <= values.startsAt) {
+    throw new Error("Expiry must be after the start time.");
+  }
+  if (values.name.length > 255) throw new Error("Campaign name must be at most 255 characters.");
+  if ((values.merchantDescription ?? "").length > 10_000) {
+    throw new Error("Merchant description must be at most 10,000 characters.");
+  }
+}
+
 export function parsePromotionCampaignForm(
   formData: FormData,
 ): PromotionCampaignFormValues {
@@ -72,18 +95,11 @@ export function parsePromotionCampaignForm(
 
   const startsAt = requiredDate(formData.get("startsAt"), "Start time");
   const expiresAt = requiredDate(formData.get("expiresAt"), "Expiry time");
-  if (expiresAt <= startsAt) throw new Error("Expiry must be after the start time.");
-
   const name = requiredText(formData.get("name"), "Campaign name");
-  if (name.length > 255) throw new Error("Campaign name must be at most 255 characters.");
   const description = text(formData.get("merchantDescription"));
-  if (description.length > 10_000) {
-    throw new Error("Merchant description must be at most 10,000 characters.");
-  }
-
-  return {
+  const values = {
     id: text(formData.get("id")) || null,
-    intent,
+    intent: intent as "create" | "update" | "activate",
     name,
     merchantDescription: description || null,
     scope: scope as PromotionScope,
@@ -93,4 +109,6 @@ export function parsePromotionCampaignForm(
     startsAt,
     expiresAt,
   };
+  validatePromotionCampaignTerms(values);
+  return values;
 }

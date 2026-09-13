@@ -6,6 +6,7 @@ import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import {
   parsePromotionCampaignForm,
+  validatePromotionCampaignTerms,
   validatePromotionTarget,
   type PromotionCampaignFormValues,
 } from "@/lib/admin/promotion-validation";
@@ -65,13 +66,15 @@ function campaignData(values: PromotionCampaignFormValues) {
 export async function mutatePromotionCampaignAction(formData: FormData): Promise<void> {
   const principal = await requirePlatformAdminMutation();
   requireSuperAdmin(principal);
-  const values = parsePromotionCampaignForm(formData);
   const adminId = await auditAdminId(principal);
+  const intent = formData.get("intent");
 
-  await prisma.$transaction(async (transaction) => {
-    if (values.intent === "activate") {
-      if (!values.id) throw new Error("A campaign id is required.");
-      const existing = await transaction.promotionCampaign.findUnique({ where: { id: values.id } });
+  if (intent === "activate") {
+    const id = typeof formData.get("id") === "string" ? String(formData.get("id")).trim() : "";
+    if (!id) throw new Error("A campaign id is required.");
+
+    await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.promotionCampaign.findUnique({ where: { id } });
       if (!existing) throw new Error("Promotion campaign not found.");
       if (existing.status !== PromotionCampaignStatus.DRAFT) {
         throw new Error("Only draft campaigns can be activated.");
@@ -88,21 +91,32 @@ export async function mutatePromotionCampaignAction(formData: FormData): Promise
         startsAt: existing.startsAt,
         expiresAt: existing.expiresAt,
       };
+      validatePromotionCampaignTerms(currentValues);
       await resolveTarget(transaction, currentValues);
-      const activated = await transaction.promotionCampaign.update({
-        where: { id: existing.id },
+      const result = await transaction.promotionCampaign.updateMany({
+        where: {
+          id: existing.id,
+          status: PromotionCampaignStatus.DRAFT,
+          version: existing.version,
+        },
         data: { status: PromotionCampaignStatus.ACTIVE, version: { increment: 1 } },
       });
+      if (result.count !== 1) throw new Error("Promotion campaign changed; reload and retry.");
       await transaction.promotionCampaignEvent.create({
         data: {
-          campaignId: activated.id,
+          campaignId: existing.id,
           kind: PromotionCampaignEventType.ACTIVATED,
           platformAdminId: adminId,
         },
       });
-      return;
-    }
+    });
+    revalidatePath("/promotions");
+    return;
+  }
 
+  const values = parsePromotionCampaignForm(formData);
+
+  await prisma.$transaction(async (transaction) => {
     await resolveTarget(transaction, values);
     if (values.intent === "create") {
       const campaign = await transaction.promotionCampaign.create({
@@ -128,10 +142,15 @@ export async function mutatePromotionCampaignAction(formData: FormData): Promise
     if (existing.status !== PromotionCampaignStatus.DRAFT) {
       throw new Error("Activated campaign terms are immutable; create a new campaign.");
     }
-    await transaction.promotionCampaign.update({
-      where: { id: existing.id },
+    const result = await transaction.promotionCampaign.updateMany({
+      where: {
+        id: existing.id,
+        status: PromotionCampaignStatus.DRAFT,
+        version: existing.version,
+      },
       data: { ...campaignData(values), version: { increment: 1 } },
     });
+    if (result.count !== 1) throw new Error("Promotion campaign changed; reload and retry.");
   });
   revalidatePath("/promotions");
 }

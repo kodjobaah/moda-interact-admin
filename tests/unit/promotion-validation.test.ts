@@ -50,3 +50,20 @@ test("quantity and campaign window are validated server-side", () => {
     /after the start/i,
   );
 });
+
+test("persisted campaign terms use the same quantity, window, and target validation", async () => {
+  const { validatePromotionCampaignTerms } = await import("../../src/lib/admin/promotion-validation.ts");
+  assert.throws(
+    () => validatePromotionCampaignTerms({
+      name: "Campaign",
+      merchantDescription: null,
+      scope: "GLOBAL",
+      quantity: 0,
+      targetPlanId: null,
+      targetShopId: null,
+      startsAt: new Date("2026-10-01T09:00:00Z"),
+      expiresAt: new Date("2026-10-31T09:00:00Z"),
+    }),
+    /positive integer/i,
+  );
+});

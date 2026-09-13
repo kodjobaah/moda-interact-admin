@@ -89,13 +89,6 @@ export function ActivatePromotionCampaignForm({ campaign }: { campaign: Promotio
     <form action={mutatePromotionCampaignAction}>
       <input type="hidden" name="intent" value="activate" />
       <input type="hidden" name="id" value={campaign.id} />
-      <input type="hidden" name="name" value={campaign.name} />
-      <input type="hidden" name="scope" value={campaign.scope} />
-      <input type="hidden" name="quantity" value={campaign.quantity} />
-      <input type="hidden" name="targetPlanId" value={campaign.targetPlanId ?? ""} />
-      <input type="hidden" name="targetShopId" value={campaign.targetShopId ?? ""} />
-      <input type="hidden" name="startsAt" value={campaign.startsAt.toISOString()} />
-      <input type="hidden" name="expiresAt" value={campaign.expiresAt.toISOString()} />
       <button type="submit" className="rounded-md border border-green-700 px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50">Activate</button>
     </form>
   );
