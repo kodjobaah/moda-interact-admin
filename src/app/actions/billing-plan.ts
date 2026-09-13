@@ -10,6 +10,10 @@ import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import { billingPlanAuditSnapshot } from "@/lib/admin/billing-plan-audit";
 import {
+  applyBillingPlanUpdateInTransaction,
+  type BillingPlanMutationTransaction,
+} from "@/lib/admin/billing-plan-mutation";
+import {
   parseBillingPlanForm,
   type BillingPlanFormValues,
 } from "@/lib/admin/billing-plan-validation";
@@ -246,41 +250,11 @@ export async function mutateBillingPlanAction(
       );
     }
 
-    const economicsChanged =
-      existing.kind !== values.kind ||
-      existing.includedRecoveryConversationAllowance !==
-        values.includedRecoveryConversationAllowance ||
-      existing.recoveryCreditPackEnabled !== values.recoveryCreditPackEnabled ||
-      existing.recoveryCreditsPerPack !== values.recoveryCreditsPerPack ||
-      existing.shopifyRecoveryCreditPackEventHandle !==
-        values.shopifyRecoveryCreditPackEventHandle;
-    if (economicsChanged) {
-      const evaluations = await evaluateAffectedEdges(
-        transaction,
-        existing.id,
-        {
-          ...existing,
-          kind: values.kind,
-          includedRecoveryConversationAllowance:
-            values.includedRecoveryConversationAllowance,
-          recoveryCreditPackEnabled: values.recoveryCreditPackEnabled,
-          recoveryCreditsPerPack: values.recoveryCreditsPerPack,
-          shopifyRecoveryCreditPackEventHandle:
-            values.shopifyRecoveryCreditPackEventHandle,
-        },
-      );
-      assertBillingUpgradeEconomicsPass(evaluations);
-      await auditEconomicsEvaluations(
-        transaction,
-        evaluations,
-        adminId,
-        values.reason,
-      );
-    }
-
-    const updated = await transaction.billingPlan.update({
-      where: { id: existing.id },
-      data: {
+    await applyBillingPlanUpdateInTransaction({
+      transaction: transaction as unknown as BillingPlanMutationTransaction,
+      existing,
+      proposed: {
+        ...existing,
         name: values.name,
         kind: values.kind,
         shopifyUsageEventHandle: values.shopifyUsageEventHandle,
@@ -293,27 +267,10 @@ export async function mutateBillingPlanAction(
         defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
         defaultOutboundHardLimit: values.defaultOutboundHardLimit,
         terminalMessageReservedSlots: values.terminalMessageReservedSlots,
-        features: {
-          deleteMany: {},
-          create: featureRows(values),
-        },
+        features: values.features,
       },
-    });
-    await transaction.billingAuditEvent.create({
-      data: {
-        action: BillingAuditAction.PLAN_CATALOG_CHANGED,
-        platformAdminId: adminId,
-        reason: values.reason,
-        relatedEntityType: "BillingPlan",
-        relatedEntityId: updated.id,
-        beforeValue: billingPlanAuditSnapshot(
-          existing,
-        ) as Prisma.InputJsonObject,
-        afterValue: billingPlanAuditSnapshot({
-          ...values,
-          active: existing.active,
-        }) as Prisma.InputJsonObject,
-      },
+      adminId,
+      reason: values.reason,
     });
   });
   revalidatePath("/billing");

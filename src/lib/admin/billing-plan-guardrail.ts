@@ -135,8 +135,8 @@ export function evaluateBillingUpgradeEdge({
     ? lowerPlan.recoveryCreditsPerPack
     : null;
   const result =
-    mismatchResult ??
     invalidEdgeResult ??
+    mismatchResult ??
     validateSinglePackShopifyEconomics({
       currentPlan: planEconomics(lowerPlan, lowerSnapshot),
       nextPlan: planEconomics(higherPlan, higherSnapshot),
