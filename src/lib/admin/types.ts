@@ -94,7 +94,6 @@ export type TenantBilling = {
   };
   allowance: {
     base: number;
-    adjustments: number;
     committed: number;
     reserved: number;
     remaining: number;
@@ -159,12 +158,10 @@ export type TenantBillingControls = {
     expiresAt: Date | null;
   } | null;
   allowance: {
-    baseAllowance: number | null;
-    totalAdjustments: number;
+    grantedAllowance: number | null;
     committed: number;
     reserved: number;
-    effectiveAllowance: number | null;
-    effectiveRemaining: number | null;
+    remaining: number | null;
   };
 };
 

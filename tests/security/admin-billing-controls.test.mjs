@@ -108,7 +108,10 @@ test("keeps controls protected, audited, append-only, and Prisma-first", () => {
   assert.match(actionSource, /requirePlatformAdminMutation/);
   assert.match(actionSource, /principal\.role !== ['"]SUPER_ADMIN['"]/);
   assert.match(actionSource, /transaction\.billingAuditEvent\.create/g);
-  assert.match(actionSource, /transaction\.billingAllowanceAdjustment\.create/);
+  assert.doesNotMatch(
+    actionSource,
+    /billingAllowanceAdjustment|FREE_ALLOWANCE_ADJUSTED/,
+  );
   assert.match(actionSource, /lifetimeFreeRecoveryAllowance/);
   assert.doesNotMatch(actionSource, /\$(?:queryRaw|executeRaw)/);
   assert.doesNotMatch(

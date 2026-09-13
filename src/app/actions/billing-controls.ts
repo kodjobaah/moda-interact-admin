@@ -1,11 +1,10 @@
 "use server";
 
-import { BillingAuditAction, EntitlementCounter, Prisma } from "@prisma/client";
+import { BillingAuditAction, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import {
-  parseAllowanceAdjustmentForm,
   parsePlatformBillingPolicyForm,
   parseShopBillingOverrideForm,
   shopBillingOverrideRequiresSuperAdmin,
@@ -188,49 +187,6 @@ export async function mutateShopBillingOverrideAction(
         relatedEntityId: after.id,
         beforeValue: existing as unknown as Prisma.InputJsonValue,
         afterValue: after as unknown as Prisma.InputJsonValue,
-      },
-    });
-  });
-  revalidatePath("/");
-}
-
-export async function addFreeAllowanceAdjustmentAction(
-  formData: FormData,
-): Promise<void> {
-  const principal = await requirePlatformAdminMutation();
-  requireSuperAdmin(principal);
-  const values = parseAllowanceAdjustmentForm(formData);
-  if (values.quantity === 0)
-    throw new Error("Adjustment quantity cannot be zero.");
-  const adminId = await auditAdminId(principal);
-
-  await prisma.$transaction(async (transaction) => {
-    const shop = await transaction.shop.findUnique({
-      where: { id: values.shopId },
-      select: { id: true },
-    });
-    if (!shop) throw new Error("Shop not found.");
-    const adjustment = await transaction.billingAllowanceAdjustment.create({
-      data: {
-        shopId: values.shopId,
-        counter: EntitlementCounter.FREE_RECOVERY_LIFETIME,
-        quantity: values.quantity,
-        reason: values.reason,
-        platformAdminId: adminId,
-      },
-    });
-    await transaction.billingAuditEvent.create({
-      data: {
-        action: BillingAuditAction.FREE_ALLOWANCE_ADJUSTED,
-        shopId: values.shopId,
-        platformAdminId: adminId,
-        reason: values.reason,
-        relatedEntityType: "BillingAllowanceAdjustment",
-        relatedEntityId: adjustment.id,
-        afterValue: {
-          quantity: values.quantity,
-          counter: EntitlementCounter.FREE_RECOVERY_LIFETIME,
-        },
       },
     });
   });

@@ -327,75 +327,67 @@ export async function getTenantBilling(
   if (!subscription) return null;
 
   const now = new Date();
-  const [
-    counter,
-    adjustments,
-    usage,
-    automatedMessages,
-    override,
-    policy,
-    ledger,
-  ] = await Promise.all([
-    prisma.shopEntitlementCounter.findUnique({
-      where: {
-        shopId_counter: {
-          shopId,
-          counter: EntitlementCounter.FREE_RECOVERY_LIFETIME,
-        },
-      },
-      select: {
-        grantedQuantity: true,
-        committedQuantity: true,
-        reservedQuantity: true,
-      },
-    }),
-    prisma.billingAllowanceAdjustment.aggregate({
-      where: { shopId, counter: EntitlementCounter.FREE_RECOVERY_LIFETIME },
-      _sum: { quantity: true },
-    }),
-    prisma.usageEvent.aggregate({
-      where: {
-        shopId,
-        billingPeriodId:
-          subscription.billingPeriod?.id ?? "__no_billing_period__",
-        metric: UsageMetric.RECOVERY_CONVERSATION,
-        shopifyReportState: ShopifyReportState.REPORTED,
-        ...(subscription.plan?.shopifyUsageEventHandle
-          ? { shopifyEventHandle: subscription.plan.shopifyUsageEventHandle }
-          : { shopifyEventHandle: "__no_usage_meter__" }),
-      },
-      _sum: { quantity: true },
-    }),
-    subscription.billingPeriod
-      ? prisma.usageEvent.aggregate({
-          where: {
+  const [counter, usage, automatedMessages, override, policy, ledger] =
+    await Promise.all([
+      prisma.shopEntitlementCounter.findUnique({
+        where: {
+          shopId_counter: {
             shopId,
-            billingPeriodId: subscription.billingPeriod.id,
-            metric: UsageMetric.OUTBOUND_AUTOMATED_MESSAGE,
+            counter: EntitlementCounter.LIFETIME_FREE_RECOVERY_CREDITS,
           },
-          _sum: { quantity: true },
-        })
-      : Promise.resolve(null),
-    prisma.shopBillingPolicyOverride.findUnique({
-      where: { shopId },
-      select: {
-        outboundSoftLimit: true,
-        outboundHardLimit: true,
-        pauseNewRecoveries: true,
-        pauseAutomatedWhatsapp: true,
-        recoverySafetyCeiling: true,
-        reason: true,
-        expiresAt: true,
-      },
-    }),
-    prisma.platformBillingPolicy.findUnique({ where: { id: "default" } }),
-    includeLedger
-      ? getBillingLedger({ shopId, page: ledgerPage, pageSize: ledgerPageSize })
-      : Promise.resolve(pageResult([], 1, ledgerPageSize, 0)),
-  ]);
+        },
+        select: {
+          grantedQuantity: true,
+          committedQuantity: true,
+          reservedQuantity: true,
+        },
+      }),
+      prisma.usageEvent.aggregate({
+        where: {
+          shopId,
+          billingPeriodId:
+            subscription.billingPeriod?.id ?? "__no_billing_period__",
+          metric: UsageMetric.RECOVERY_CONVERSATION,
+          shopifyReportState: ShopifyReportState.REPORTED,
+          ...(subscription.plan?.shopifyUsageEventHandle
+            ? { shopifyEventHandle: subscription.plan.shopifyUsageEventHandle }
+            : { shopifyEventHandle: "__no_usage_meter__" }),
+        },
+        _sum: { quantity: true },
+      }),
+      subscription.billingPeriod
+        ? prisma.usageEvent.aggregate({
+            where: {
+              shopId,
+              billingPeriodId: subscription.billingPeriod.id,
+              metric: UsageMetric.OUTBOUND_AUTOMATED_MESSAGE,
+            },
+            _sum: { quantity: true },
+          })
+        : Promise.resolve(null),
+      prisma.shopBillingPolicyOverride.findUnique({
+        where: { shopId },
+        select: {
+          outboundSoftLimit: true,
+          outboundHardLimit: true,
+          pauseNewRecoveries: true,
+          pauseAutomatedWhatsapp: true,
+          recoverySafetyCeiling: true,
+          reason: true,
+          expiresAt: true,
+        },
+      }),
+      prisma.platformBillingPolicy.findUnique({ where: { id: "default" } }),
+      includeLedger
+        ? getBillingLedger({
+            shopId,
+            page: ledgerPage,
+            pageSize: ledgerPageSize,
+          })
+        : Promise.resolve(pageResult([], 1, ledgerPageSize, 0)),
+    ]);
 
   const baseAllowance = counter?.grantedQuantity ?? 0;
-  const adjustmentTotal = adjustments._sum.quantity ?? 0;
   const committed = counter?.committedQuantity ?? 0;
   const reserved = counter?.reservedQuantity ?? 0;
   const overrideState = billingOverrideState(override, now);
@@ -413,13 +405,9 @@ export async function getTenantBilling(
     subscription,
     allowance: {
       base: baseAllowance,
-      adjustments: adjustmentTotal,
       committed,
       reserved,
-      remaining: Math.max(
-        baseAllowance + adjustmentTotal - committed - reserved,
-        0,
-      ),
+      remaining: Math.max(baseAllowance - committed - reserved, 0),
     },
     paidRecoveryUsage: decimalValue(usage._sum.quantity),
     currentPeriodAutomatedMessageQuantity:

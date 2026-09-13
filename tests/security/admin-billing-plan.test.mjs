@@ -88,10 +88,6 @@ test("enforces mutually exclusive Free and paid billing fields", () => {
     console.log(JSON.stringify({
       freeMeterRejected: attempt({ shopifyUsageEventHandle: 'meter' }),
       paidWithoutMeterRejected: attempt({ kind: 'PAID_METERED' }),
-      paidLegacyAllowanceIgnored: (() => {
-        ${form({ kind: "PAID_METERED", freeLifetimeConversationAllowance: "5", shopifyUsageEventHandle: "meter" })}
-        try { return "freeLifetimeConversationAllowance" in parseBillingPlanForm(form); } catch { return false; }
-      })(),
       paidAccepted: (() => {
         ${form({ kind: "PAID_METERED", shopifyUsageEventHandle: "meter" })}
         try { return parseBillingPlanForm(form).kind === 'PAID_METERED'; } catch { return false; }
@@ -101,7 +97,6 @@ test("enforces mutually exclusive Free and paid billing fields", () => {
   assert.deepEqual(result, {
     freeMeterRejected: true,
     paidWithoutMeterRejected: true,
-    paidLegacyAllowanceIgnored: false,
     paidAccepted: true,
   });
 });
@@ -166,7 +161,7 @@ test("includes all recovery-credit fields in bounded before/after audit snapshot
       shopifyPlanHandle: 'starter-plan', name: 'Starter', kind: 'PAID_METERED', active: true,
       shopifyUsageEventHandle: 'recovery-meter', includedRecoveryConversationAllowance: 100,
       recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null,
-      shopifyRecoveryCreditPackEventHandle: null, freeLifetimeConversationAllowance: null,
+      shopifyRecoveryCreditPackEventHandle: null,
       defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1,
       features: [],
     });
@@ -174,7 +169,7 @@ test("includes all recovery-credit fields in bounded before/after audit snapshot
       shopifyPlanHandle: 'starter-plan', name: 'Starter', kind: 'PAID_METERED', active: true,
       shopifyUsageEventHandle: 'recovery-meter', includedRecoveryConversationAllowance: 200,
       recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 25,
-      shopifyRecoveryCreditPackEventHandle: 'pack-meter', freeLifetimeConversationAllowance: null,
+      shopifyRecoveryCreditPackEventHandle: 'pack-meter',
       defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1,
       features: [],
     });
@@ -306,7 +301,6 @@ test("records persisted before values and resulting after values for paid-plan e
       recoveryCreditPackEnabled: false,
       recoveryCreditsPerPack: null,
       shopifyRecoveryCreditPackEventHandle: null,
-      freeLifetimeConversationAllowance: null,
       defaultOutboundSoftLimit: 10,
       defaultOutboundHardLimit: 20,
       terminalMessageReservedSlots: 1,
@@ -345,19 +339,4 @@ test("records persisted before values and resulting after values for paid-plan e
   assert.equal(result.after.recoveryCreditPackEnabled, true);
   assert.equal(result.after.recoveryCreditsPerPack, 25);
   assert.equal(result.after.shopifyRecoveryCreditPackEventHandle, "pack-meter");
-});
-
-test("keeps legacy plan audit fields readable", () => {
-  const result = runBehaviorScript(`
-    import { billingPlanAuditSnapshot } from ${JSON.stringify(auditModuleUrl)};
-    console.log(JSON.stringify(billingPlanAuditSnapshot({
-      shopifyPlanHandle: 'legacy-free', name: 'Legacy Free', kind: 'FREE', active: true,
-      shopifyUsageEventHandle: null, includedRecoveryConversationAllowance: null,
-      recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null,
-      shopifyRecoveryCreditPackEventHandle: null, freeLifetimeConversationAllowance: 5,
-      defaultOutboundSoftLimit: 10, defaultOutboundHardLimit: 20, terminalMessageReservedSlots: 1,
-      features: [],
-    })));
-  `);
-  assert.equal(result.freeLifetimeConversationAllowance, 5);
 });

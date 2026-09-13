@@ -45,9 +45,15 @@ test("billing reads stay platform-admin protected and tenant scoped", async () =
     "getBillingLedgerItem",
   ]) {
     const detailSource = detailHelper(helper);
-    assert.match(detailSource, /where: \{ id, \.\.\.\(shopId \? \{ shopId \} : \{\}\) \}/);
+    assert.match(
+      detailSource,
+      /where: \{ id, \.\.\.\(shopId \? \{ shopId \} : \{\}\) \}/,
+    );
   }
-  assert.match(source, /providerResponseSummary: row\.usageEvent\.providerResponseSummary\?\.slice\(0, 2000\)/);
+  assert.match(
+    source,
+    /providerResponseSummary:\s*row\.usageEvent\.providerResponseSummary\?\.slice\(0, 2000\)/,
+  );
   assert.match(source, /providerErrorCode: true/);
   assert.doesNotMatch(
     source,
@@ -58,7 +64,10 @@ test("billing reads stay platform-admin protected and tenant scoped", async () =
 
 test("ARCH-008 catalogue uses the normative asynchronous billing copy", async () => {
   const catalogue = JSON.parse(
-    await readFile(path.join(repositoryRoot, "src/i18n/locales/en.json"), "utf8"),
+    await readFile(
+      path.join(repositoryRoot, "src/i18n/locales/en.json"),
+      "utf8",
+    ),
   );
   assert.deepEqual(
     Object.fromEntries(
@@ -87,8 +96,10 @@ test("ARCH-008 catalogue uses the normative asynchronous billing copy", async ()
       "billing.tab.appEvents": "App Events",
       "billing.state.REPORTED": "Submitted to Shopify",
       "billing.submittedAt": "Submitted at",
-      "billing.asyncReceiptHelp": "Shopify has received the App Event. Billing validation is asynchronous.",
-      "billing.devDashboardHelp": "If provider usage does not reconcile, inspect App Billing Event logs in the Shopify Dev Dashboard.",
+      "billing.asyncReceiptHelp":
+        "Shopify has received the App Event. Billing validation is asynchronous.",
+      "billing.devDashboardHelp":
+        "If provider usage does not reconcile, inspect App Billing Event logs in the Shopify Dev Dashboard.",
       "billing.packStatus.PENDING_BILLING": "Awaiting Shopify confirmation",
       "billing.packStatus.ACTIVE": "Active",
       "billing.packStatus.NEEDS_ATTENTION": "Needs attention",
@@ -96,12 +107,15 @@ test("ARCH-008 catalogue uses the normative asynchronous billing copy", async ()
       "billing.eventDetails": "App Event details",
       "billing.creditsGranted": "Credits",
       "billing.planSnapshot": "Plan handle snapshot",
-      "billing.noRecoveryPacks": "No recovery-credit purchases match the current filters.",
+      "billing.noRecoveryPacks":
+        "No recovery-credit purchases match the current filters.",
       "billing.billingHealth": "Billing status",
       "billing.overrideActiveWarning": "Billing policy override active",
-      "billing.overrideExpiredNotice": "An expired billing policy override is recorded.",
+      "billing.overrideExpiredNotice":
+        "An expired billing policy override is recorded.",
       "billing.activity": "Billing activity",
-      "billing.reconciliationUnavailableShort": "Shopify usage comparison is not available for this tenant.",
+      "billing.reconciliationUnavailableShort":
+        "Shopify usage comparison is not available for this tenant.",
     },
   );
   assert.equal(catalogue["billing.reportedAt"], "Submitted at");
@@ -210,7 +224,10 @@ test("billing report-state labels use localized values without reported fallback
 
   assert.equal(localizedReportStateLabel("PENDING", translate), "Pending");
   assert.notEqual(localizedReportStateLabel("PENDING", translate), "Reported");
-  assert.equal(localizedReportStateLabel("REPORTED", translate), "Submitted to Shopify");
+  assert.equal(
+    localizedReportStateLabel("REPORTED", translate),
+    "Submitted to Shopify",
+  );
 });
 
 test("recovery pack statuses use the exact asynchronous billing labels", () => {
@@ -227,12 +244,7 @@ test("recovery pack statuses use the exact asynchronous billing labels", () => {
     ["PENDING_BILLING", "ACTIVE", "NEEDS_ATTENTION", "CANCELLED"].map(
       (status) => recoveryCreditPurchaseStatusLabel(status, translate),
     ),
-    [
-      "Awaiting Shopify confirmation",
-      "Active",
-      "Needs attention",
-      "Cancelled",
-    ],
+    ["Awaiting Shopify confirmation", "Active", "Needs attention", "Cancelled"],
   );
 });
 

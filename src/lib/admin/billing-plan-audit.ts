@@ -8,7 +8,6 @@ export type BillingPlanAuditSource = {
   recoveryCreditPackEnabled: boolean;
   recoveryCreditsPerPack: number | null;
   shopifyRecoveryCreditPackEventHandle: string | null;
-  freeLifetimeConversationAllowance?: number | null;
   defaultOutboundSoftLimit: number;
   defaultOutboundHardLimit: number;
   terminalMessageReservedSlots: number;
@@ -41,9 +40,5 @@ export function billingPlanAuditSnapshot(
         typeof feature === "string" ? feature : feature.feature,
       ),
   };
-  if ("freeLifetimeConversationAllowance" in source) {
-    snapshot.freeLifetimeConversationAllowance =
-      source.freeLifetimeConversationAllowance;
-  }
   return snapshot;
 }
