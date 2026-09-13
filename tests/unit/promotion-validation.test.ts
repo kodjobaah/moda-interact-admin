@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   parsePromotionCampaignForm,
+  validatePromotionCampaignReopen,
   validatePromotionTarget,
 } from "../../src/lib/admin/promotion-validation.ts";
 
@@ -66,4 +67,18 @@ test("persisted campaign terms use the same quantity, window, and target validat
     }),
     /positive integer/i,
   );
+});
+
+test("reopen requires an expiry after the start and in the future", () => {
+  const startsAt = new Date("2026-10-01T09:00:00Z");
+  const now = new Date("2026-10-15T09:00:00Z");
+  assert.throws(
+    () => validatePromotionCampaignReopen(startsAt, new Date("2026-10-01T09:00:00Z"), now),
+    /after the start/i,
+  );
+  assert.throws(
+    () => validatePromotionCampaignReopen(startsAt, new Date("2026-10-14T09:00:00Z"), now),
+    /future/i,
+  );
+  assert.doesNotThrow(() => validatePromotionCampaignReopen(startsAt, new Date("2026-10-31T09:00:00Z"), now));
 });

@@ -77,6 +77,15 @@ export function validatePromotionCampaignTerms(values: {
   }
 }
 
+export function validatePromotionCampaignReopen(
+  startsAt: Date,
+  expiresAt: Date,
+  now = new Date(),
+): void {
+  if (expiresAt <= startsAt) throw new Error("Expiry must be after the start time.");
+  if (expiresAt <= now) throw new Error("Reopen expiry must be in the future.");
+}
+
 export function parsePromotionCampaignForm(
   formData: FormData,
 ): PromotionCampaignFormValues {

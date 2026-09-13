@@ -4,6 +4,7 @@ import { PromotionCampaignEventType, PromotionCampaignStatus, PromotionTargetSco
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
+import { mutatePromotionCampaignLifecycle } from "@/lib/admin/promotion-campaign-lifecycle";
 import {
   parsePromotionCampaignForm,
   validatePromotionCampaignTerms,
@@ -109,6 +110,22 @@ export async function mutatePromotionCampaignAction(formData: FormData): Promise
           platformAdminId: adminId,
         },
       });
+    });
+    revalidatePath("/promotions");
+    return;
+  }
+
+  if (intent === "close" || intent === "reopen") {
+    const id = typeof formData.get("id") === "string" ? String(formData.get("id")).trim() : "";
+    if (!id) throw new Error("A campaign id is required.");
+
+    await prisma.$transaction(async (transaction) => {
+      const rawExpiresAt = typeof formData.get("expiresAt") === "string" ? String(formData.get("expiresAt")) : "";
+      const expiresAt = rawExpiresAt ? new Date(rawExpiresAt) : undefined;
+      if (intent === "reopen" && (!expiresAt || Number.isNaN(expiresAt.getTime()))) {
+        throw new Error("Expiry time is invalid.");
+      }
+      await mutatePromotionCampaignLifecycle(transaction, { id, intent, adminId, expiresAt });
     });
     revalidatePath("/promotions");
     return;
