@@ -55,6 +55,7 @@ export async function mutatePlatformBillingPolicyAction(
         absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
         defaultWarningPercent: values.defaultWarningPercent,
         lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
+        minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
       },
       update: {
         globalPauseNewRecoveries: values.globalPauseNewRecoveries,
@@ -63,6 +64,7 @@ export async function mutatePlatformBillingPolicyAction(
         defaultWarningPercent: values.defaultWarningPercent,
         lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
         version: { increment: 1 },
+        minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
       },
     });
     await transaction.billingAuditEvent.create({

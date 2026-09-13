@@ -28,8 +28,9 @@ import {
   type SearchParamRecord,
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
-import { PlatformBillingControls } from "@/components/admin/billing-controls";
+import { BillingEconomicsControls, PlatformBillingControls } from "@/components/admin/billing-controls";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
+import { getBillingEconomicsControls } from "@/lib/admin/billing-economics";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
     ? await getBillingPlanById(firstParam(rawParams.planId) as string)
     : null;
   const policy = view === "controls" ? await getPlatformBillingPolicy() : null;
+  const economics = view === "controls" ? await getBillingEconomicsControls() : null;
   const overview = view === "overview" ? await getBillingOverview() : null;
   const packs = view === "packs"
     ? await getRecoveryCreditPurchases({
@@ -95,6 +97,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
         {view === "packs" && packs ? <BillingRecoveryPacks purchases={packs} params={params} /> : null}
         {view === "events" && ledger ? <BillingLedger ledger={ledger} params={params} /> : null}
         {view === "controls" && policy ? <PlatformBillingControls policy={policy} /> : null}
+        {view === "controls" && economics ? <BillingEconomicsControls data={economics} /> : null}
         {view === "plans" && (params.drawer === "register-plan" || selectedPlan) ? (
           <BillingPlanDrawer plan={selectedPlan ?? undefined} params={params} register={params.drawer === "register-plan"} />
         ) : null}

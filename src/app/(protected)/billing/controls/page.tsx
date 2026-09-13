@@ -1,14 +1,18 @@
 import { AdminShell } from "@/components/admin/admin-shell";
-import { PlatformBillingControls } from "@/components/admin/billing-controls";
+import { BillingEconomicsControls, PlatformBillingControls } from "@/components/admin/billing-controls";
 import { adminI18n } from "@/i18n";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
+import { getBillingEconomicsControls } from "@/lib/admin/billing-economics";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function BillingControlsPage() {
   await requirePlatformAdminPage();
-  const policy = await getPlatformBillingPolicy();
+  const [policy, economics] = await Promise.all([
+    getPlatformBillingPolicy(),
+    getBillingEconomicsControls(),
+  ]);
   return (
     <AdminShell active="billing">
       <div className="flex-1 overflow-auto p-4 sm:p-8">
@@ -18,6 +22,7 @@ export default async function BillingControlsPage() {
           </h1>
         </div>
         <PlatformBillingControls policy={policy} />
+        <BillingEconomicsControls data={economics} />
       </div>
     </AdminShell>
   );

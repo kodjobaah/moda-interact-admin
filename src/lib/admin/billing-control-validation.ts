@@ -6,6 +6,7 @@ export type PlatformBillingPolicyInput = {
   absoluteOutboundHardLimit: number;
   defaultWarningPercent: number;
   lifetimeFreeRecoveryAllowance: number;
+  minimumUpgradePremiumBps: number;
   reason: string;
 };
 
@@ -64,6 +65,14 @@ export function parsePlatformBillingPolicyForm(
   if (lifetimeFreeRecoveryAllowance < 0) {
     throw new Error("Lifetime Free recovery grant must be non-negative.");
   }
+  const minimumUpgradePremiumValue = formData.get("minimumUpgradePremiumBps");
+  const minimumUpgradePremiumBps =
+    minimumUpgradePremiumValue === null || minimumUpgradePremiumValue === ""
+      ? 2000
+      : requiredInt(minimumUpgradePremiumValue, "Minimum upgrade premium");
+  if (minimumUpgradePremiumBps < 0 || minimumUpgradePremiumBps > 10_000) {
+    throw new Error("Minimum upgrade premium must be between 0 and 10000 bps.");
+  }
   return {
     globalPauseNewRecoveries: checkbox(formData, "globalPauseNewRecoveries"),
     globalPauseAutomatedWhatsapp: checkbox(
@@ -73,6 +82,7 @@ export function parsePlatformBillingPolicyForm(
     absoluteOutboundHardLimit,
     defaultWarningPercent,
     lifetimeFreeRecoveryAllowance,
+    minimumUpgradePremiumBps,
     reason: requiredReason(formData.get("reason")),
   };
 }
