@@ -84,12 +84,37 @@ export function PromotionCampaignForm({
 }
 
 export function ActivatePromotionCampaignForm({ campaign }: { campaign: PromotionCampaignRow }) {
-  if (campaign.status !== "DRAFT") return null;
-  return (
+  return campaign.status === "DRAFT" ? (
     <form action={mutatePromotionCampaignAction}>
       <input type="hidden" name="intent" value="activate" />
       <input type="hidden" name="id" value={campaign.id} />
       <button type="submit" className="rounded-md border border-green-700 px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50">Activate</button>
+    </form>
+  ) : null;
+}
+
+export function ClosePromotionCampaignForm({ campaign }: { campaign: PromotionCampaignRow }) {
+  if (campaign.status !== "DRAFT" && campaign.status !== "ACTIVE") return null;
+  return (
+    <form action={mutatePromotionCampaignAction}>
+      <input type="hidden" name="intent" value="close" />
+      <input type="hidden" name="id" value={campaign.id} />
+      <button type="submit" className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-50">Close</button>
+    </form>
+  );
+}
+
+export function ReopenPromotionCampaignForm({ campaign }: { campaign: PromotionCampaignRow }) {
+  if (campaign.status !== "ACTIVE" && campaign.status !== "CLOSED") return null;
+  return (
+    <form action={mutatePromotionCampaignAction} className="flex flex-wrap items-end gap-2">
+      <input type="hidden" name="intent" value="reopen" />
+      <input type="hidden" name="id" value={campaign.id} />
+      <label className="text-xs font-medium text-gray-600">
+        New expiry
+        <input className="ml-1 rounded-md border border-gray-300 px-2 py-1 text-xs" name="expiresAt" type="datetime-local" min={localDateTime(campaign.startsAt)} required />
+      </label>
+      <button type="submit" className="rounded-md border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-50">Reopen</button>
     </form>
   );
 }

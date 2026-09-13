@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import {
   parsePromotionCampaignForm,
   validatePromotionCampaignTerms,
+  validatePromotionCampaignReopen,
   validatePromotionTarget,
   type PromotionCampaignFormValues,
 } from "@/lib/admin/promotion-validation";
@@ -109,6 +110,71 @@ export async function mutatePromotionCampaignAction(formData: FormData): Promise
           platformAdminId: adminId,
         },
       });
+    });
+    revalidatePath("/promotions");
+    return;
+  }
+
+  if (intent === "close" || intent === "reopen") {
+    const id = typeof formData.get("id") === "string" ? String(formData.get("id")).trim() : "";
+    if (!id) throw new Error("A campaign id is required.");
+
+    await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.promotionCampaign.findUnique({ where: { id } });
+      if (!existing) throw new Error("Promotion campaign not found.");
+
+      if (intent === "close") {
+        if (existing.status !== PromotionCampaignStatus.DRAFT && existing.status !== PromotionCampaignStatus.ACTIVE) {
+          throw new Error("Only draft or active campaigns can be closed.");
+        }
+        const result = await transaction.promotionCampaign.updateMany({
+          where: {
+            id: existing.id,
+            status: existing.status,
+            version: existing.version,
+          },
+          data: { status: PromotionCampaignStatus.CLOSED, version: { increment: 1 } },
+        });
+        if (result.count !== 1) throw new Error("Promotion campaign changed; reload and retry.");
+        await transaction.promotionCampaignEvent.create({
+          data: { campaignId: existing.id, kind: PromotionCampaignEventType.CLOSED, platformAdminId: adminId },
+        });
+      } else {
+        const rawExpiresAt = typeof formData.get("expiresAt") === "string" ? String(formData.get("expiresAt")) : "";
+        const expiresAt = new Date(rawExpiresAt);
+        if (Number.isNaN(expiresAt.getTime())) throw new Error("Expiry time is invalid.");
+        validatePromotionCampaignReopen(existing.startsAt, expiresAt);
+        if (existing.status !== PromotionCampaignStatus.ACTIVE && existing.status !== PromotionCampaignStatus.CLOSED) {
+          throw new Error("Only active or closed campaigns can be reopened.");
+        }
+        const result = await transaction.promotionCampaign.updateMany({
+          where: {
+            id: existing.id,
+            status: existing.status,
+            version: existing.version,
+          },
+          data: {
+            expiresAt,
+            ...(existing.status === PromotionCampaignStatus.CLOSED ? { status: PromotionCampaignStatus.ACTIVE } : {}),
+            version: { increment: 1 },
+          },
+        });
+        if (result.count !== 1) throw new Error("Promotion campaign changed; reload and retry.");
+        if (existing.status === PromotionCampaignStatus.CLOSED) {
+          await transaction.promotionCampaignEvent.create({
+            data: { campaignId: existing.id, kind: PromotionCampaignEventType.REOPENED, platformAdminId: adminId },
+          });
+        }
+        await transaction.promotionCampaignEvent.create({
+          data: {
+            campaignId: existing.id,
+            kind: PromotionCampaignEventType.EXPIRY_CHANGED,
+            oldExpiresAt: existing.expiresAt,
+            newExpiresAt: expiresAt,
+            platformAdminId: adminId,
+          },
+        });
+      }
     });
     revalidatePath("/promotions");
     return;
