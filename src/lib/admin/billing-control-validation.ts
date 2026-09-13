@@ -25,12 +25,6 @@ export type ExistingShopBillingOverride = Pick<
   "outboundHardLimit" | "recoverySafetyCeiling"
 >;
 
-export type AllowanceAdjustmentInput = {
-  shopId: string;
-  quantity: number;
-  reason: string;
-};
-
 export function shopBillingOverrideRequiresSuperAdmin(
   values: Pick<
     ShopBillingOverrideInput,
@@ -111,16 +105,6 @@ export function parseShopBillingOverrideForm(
     ),
     recoverySafetyCeiling,
     expiresAt,
-    reason: requiredReason(formData.get("reason")),
-  };
-}
-
-export function parseAllowanceAdjustmentForm(
-  formData: FormData,
-): AllowanceAdjustmentInput {
-  return {
-    shopId: requiredText(formData.get("shopId"), "Shop id"),
-    quantity: requiredInt(formData.get("quantity"), "Adjustment quantity"),
     reason: requiredReason(formData.get("reason")),
   };
 }

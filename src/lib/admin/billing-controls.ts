@@ -9,51 +9,37 @@ export async function getPlatformBillingPolicy() {
 
 export async function getTenantBillingControls(shopId: string) {
   await requirePlatformAdminRead();
-  const [shop, adjustments] = await Promise.all([
-    prisma.shop.findUnique({
-      where: { id: shopId },
-      select: {
-        billingPolicyOverride: true,
-        entitlementCounters: {
-          where: { counter: EntitlementCounter.FREE_RECOVERY_LIFETIME },
-          select: {
-            grantedQuantity: true,
-            committedQuantity: true,
-            reservedQuantity: true,
-          },
+  const shop = await prisma.shop.findUnique({
+    where: { id: shopId },
+    select: {
+      billingPolicyOverride: true,
+      entitlementCounters: {
+        where: { counter: EntitlementCounter.LIFETIME_FREE_RECOVERY_CREDITS },
+        select: {
+          grantedQuantity: true,
+          committedQuantity: true,
+          reservedQuantity: true,
         },
       },
-    }),
-    prisma.billingAllowanceAdjustment.aggregate({
-      where: {
-        shopId,
-        counter: EntitlementCounter.FREE_RECOVERY_LIFETIME,
-      },
-      _sum: { quantity: true },
-    }),
-  ]);
+    },
+  });
 
   if (!shop) return null;
-  const totalAdjustments = adjustments._sum.quantity ?? 0;
   const counter = shop.entitlementCounters[0];
-  const baseAllowance = counter?.grantedQuantity ?? null;
+  const grantedAllowance = counter?.grantedQuantity ?? null;
   const committed = counter?.committedQuantity ?? 0;
   const reserved = counter?.reservedQuantity ?? 0;
-  const effectiveAllowance =
-    baseAllowance === null ? null : baseAllowance + totalAdjustments;
 
   return {
     override: shop.billingPolicyOverride,
     allowance: {
-      baseAllowance,
-      totalAdjustments,
+      grantedAllowance,
       committed,
       reserved,
-      effectiveAllowance,
-      effectiveRemaining:
-        effectiveAllowance === null
+      remaining:
+        grantedAllowance === null
           ? null
-          : Math.max(0, effectiveAllowance - committed - reserved),
+          : Math.max(0, grantedAllowance - committed - reserved),
     },
   };
 }

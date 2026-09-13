@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  addFreeAllowanceAdjustmentAction,
   mutatePlatformBillingPolicyAction,
   mutateShopBillingOverrideAction,
 } from "@/app/actions/billing-controls";
@@ -262,24 +261,16 @@ export function TenantBillingControls({
               {adminI18n.t("billingControls.baseAllowance")}
             </dt>
             <dd className="text-lg font-semibold">
-              {allowance.baseAllowance ??
+              {allowance.grantedAllowance ??
                 adminI18n.t("billingControls.notApplicable")}
             </dd>
           </div>
           <div>
             <dt className="text-xs text-gray-500">
-              {adminI18n.t("billingControls.adjustments")}
+              {adminI18n.t("billing.remaining")}
             </dt>
             <dd className="text-lg font-semibold">
-              {allowance.totalAdjustments}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500">
-              {adminI18n.t("billingControls.effectiveRemaining")}
-            </dt>
-            <dd className="text-lg font-semibold">
-              {allowance.effectiveRemaining ??
+              {allowance.remaining ??
                 adminI18n.t("billingControls.notApplicable")}
             </dd>
           </div>
@@ -295,41 +286,7 @@ export function TenantBillingControls({
             </dt>
             <dd className="text-lg font-semibold">{allowance.reserved}</dd>
           </div>
-          <div>
-            <dt className="text-xs text-gray-500">
-              {adminI18n.t("billingControls.effectiveAllowance")}
-            </dt>
-            <dd className="text-lg font-semibold">
-              {allowance.effectiveAllowance ??
-                adminI18n.t("billingControls.notApplicable")}
-            </dd>
-          </div>
         </dl>
-        <form
-          action={addFreeAllowanceAdjustmentAction}
-          className="grid gap-4 sm:grid-cols-[10rem_1fr_auto] sm:items-end"
-        >
-          <input type="hidden" name="shopId" value={shopId} />
-          <label className="text-sm font-medium text-gray-700">
-            {adminI18n.t("billingControls.adjustmentQuantity")}
-            <input
-              className={inputClass}
-              type="number"
-              name="quantity"
-              required
-            />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            {adminI18n.t("billingControls.reason")}
-            <input className={inputClass} name="reason" required />
-          </label>
-          <button
-            className="rounded-md border border-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-[var(--brand-700)] hover:bg-gray-50"
-            type="submit"
-          >
-            {adminI18n.t("billingControls.addAdjustment")}
-          </button>
-        </form>
       </section>
     </div>
   );
