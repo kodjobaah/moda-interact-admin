@@ -208,6 +208,9 @@ function EconomicsExplanation({
       <h2 className="text-lg font-semibold text-gray-950">
         {adminI18n.t("billing.upgradeEconomics")}
       </h2>
+      <p className="mt-1 text-sm text-gray-600">
+        {adminI18n.t("billing.verifiedShopifyEvidence")}
+      </p>
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {evaluations.map((evaluation) => {
           const { details } = evaluation.result;
@@ -227,9 +230,11 @@ function EconomicsExplanation({
                   ? "billing.guardrailInvalidUsagePricing"
                   : evaluation.result.code === "TOPUP_PRICING_UNAVAILABLE"
                     ? "billing.guardrailMissingTopUpEvidence"
-                    : evaluation.result.code === "MISSING_PLAN_PRICE"
-                      ? "billing.guardrailMissingPlanEvidence"
-                      : "billing.guardrailBlocked";
+                    : evaluation.result.code === "INVALID_TOPUP_CONFIGURATION"
+                      ? "billing.guardrailInvalidTopUpConfiguration"
+                      : evaluation.result.code === "MISSING_PLAN_PRICE"
+                        ? "billing.guardrailMissingPlanEvidence"
+                        : "billing.guardrailBlocked";
           return (
             <article
               key={evaluation.edge.id}
@@ -250,6 +255,21 @@ function EconomicsExplanation({
                   </dt>
                   <dd className="font-medium text-gray-950">
                     {adminI18n.formatNumber(details.additionalCreditsNeeded)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">
+                    {adminI18n.t("billing.topUpPath")}
+                  </dt>
+                  <dd className="font-medium text-gray-950">
+                    {details.packSummary?.length
+                      ? details.packSummary
+                          .map(
+                            (pack) =>
+                              `${adminI18n.formatNumber(pack.quantity)} x ${adminI18n.formatNumber(pack.creditsGranted)}`,
+                          )
+                          .join(", ")
+                      : adminI18n.t("billing.noTopUpPath")}
                   </dd>
                 </div>
                 <div>
@@ -300,10 +320,43 @@ function EconomicsExplanation({
               <p className="mt-4 text-sm text-gray-800">
                 {adminI18n.t(explanationKey, { code: evaluation.result.code })}
               </p>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-700">
+                {adminI18n.t("billing.guardrailCode", {
+                  code: evaluation.result.code,
+                })}
+              </p>
             </article>
           );
         })}
       </div>
+    </section>
+  );
+}
+
+function NoUpgradeEdgeNotice({
+  plans,
+  evaluations,
+}: {
+  plans: BillingPlanRow[];
+  evaluations: EvaluatedBillingUpgradeEdge[];
+}) {
+  const lowerPlanIds = new Set(evaluations.map(({ edge }) => edge.lowerPlanId));
+  const plansWithoutNextEdge = plans.filter(
+    (plan) => !lowerPlanIds.has(plan.id),
+  );
+  if (!plansWithoutNextEdge.length) return null;
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-gray-950">
+        {adminI18n.t("billing.noUpgradeEdgeTitle")}
+      </h2>
+      <ul className="mt-3 space-y-2 text-sm text-gray-700">
+        {plansWithoutNextEdge.map((plan) => (
+          <li key={plan.id}>
+            {plan.name}: {adminI18n.t("billing.noUpgradeEdge")}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -334,6 +387,7 @@ export function BillingPlanCatalog({
         </Link>
       </section>
       <EconomicsExplanation evaluations={economics} />
+      <NoUpgradeEdgeNotice plans={plans} evaluations={economics} />
       <section className="grid gap-4 lg:grid-cols-2">
         {plans.map((plan) => (
           <article

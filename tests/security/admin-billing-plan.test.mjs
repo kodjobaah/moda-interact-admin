@@ -356,6 +356,33 @@ test("shared guardrail adapter preserves PASS, FAIL, and UNVERIFIED outcomes", (
   }
 });
 
+test("fails closed for stale pack evidence and treats proposed top-ups-off as unavailable", () => {
+  const result = runBehaviorScript(`
+    import { evaluateBillingUpgradeEdge } from ${JSON.stringify(guardrailModuleUrl)};
+    const lower = { id: 'lower', name: 'Starter', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 100, recoveryCreditPackEnabled: true, recoveryCreditsPerPack: 50, shopifyRecoveryCreditPackEventHandle: 'starter-pack' };
+    const higher = { id: 'higher', name: 'Growth', kind: 'PAID_METERED', active: true, includedRecoveryConversationAllowance: 400, recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null };
+    const lowerSnapshot = { id: 'snapshot-lower', monthlyRecurringAmountMinor: 5000, currency: 'GBP', recoveryCreditPackEnabledSnapshot: true, recoveryCreditsPerPackSnapshot: 50, shopifyRecoveryCreditPackEventHandleSnapshot: 'starter-pack', usagePricingSnapshot: { mode: 'FIXED', currency: 'GBP', unitAmountMinor: 2000 } };
+    const higherSnapshot = { id: 'snapshot-higher', monthlyRecurringAmountMinor: 5000, currency: 'GBP', recoveryCreditPackEnabledSnapshot: false, recoveryCreditsPerPackSnapshot: null, shopifyRecoveryCreditPackEventHandleSnapshot: null, usagePricingSnapshot: null };
+    const evaluate = (plan, snapshot = lowerSnapshot) => evaluateBillingUpgradeEdge({ edge: { id: 'edge', lowerPlanId: 'lower', higherPlanId: 'higher' }, lowerPlan: plan, higherPlan: higher, lowerSnapshot: snapshot, higherSnapshot, minimumUpgradePremiumBps: 2000 });
+    const sizeMismatch = evaluate({ ...lower, recoveryCreditsPerPack: 25 });
+    const handleMismatch = evaluate({ ...lower, shopifyRecoveryCreditPackEventHandle: 'new-starter-pack' });
+    const topUpsOff = evaluate({ ...lower, recoveryCreditPackEnabled: false, recoveryCreditsPerPack: null, shopifyRecoveryCreditPackEventHandle: null });
+    const exact = evaluate(lower);
+    console.log(JSON.stringify({
+      exact: [exact.result.status, exact.result.code],
+      sizeMismatch: [sizeMismatch.result.status, sizeMismatch.result.code],
+      handleMismatch: [handleMismatch.result.status, handleMismatch.result.code],
+      topUpsOff: [topUpsOff.result.status, topUpsOff.result.code],
+    }));
+  `);
+  assert.deepEqual(result, {
+    exact: ["PASS", "UPGRADE_ECONOMICS_OK"],
+    sizeMismatch: ["UNVERIFIED", "INVALID_TOPUP_CONFIGURATION"],
+    handleMismatch: ["UNVERIFIED", "INVALID_TOPUP_CONFIGURATION"],
+    topUpsOff: ["PASS", "NO_TOPUPS_AVAILABLE"],
+  });
+});
+
 test("records persisted before values and resulting after values for paid-plan edits", () => {
   const result = runBehaviorScript(`
     import { billingPlanAuditSnapshot } from ${JSON.stringify(auditModuleUrl)};

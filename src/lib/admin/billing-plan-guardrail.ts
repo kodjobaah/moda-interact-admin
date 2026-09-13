@@ -82,29 +82,45 @@ export function evaluateBillingUpgradeEdge({
   minimumUpgradePremiumBps: number;
 }): EvaluatedBillingUpgradeEdge {
   const lowerPackEvidenceMismatch =
-    lowerSnapshot !== null &&
-    (lowerPlan.recoveryCreditPackEnabled !==
-      lowerSnapshot.recoveryCreditPackEnabledSnapshot ||
-      (lowerPlan.recoveryCreditPackEnabled &&
-        (lowerPlan.recoveryCreditsPerPack !==
-          lowerSnapshot.recoveryCreditsPerPackSnapshot ||
-          lowerPlan.shopifyRecoveryCreditPackEventHandle !==
-            lowerSnapshot.shopifyRecoveryCreditPackEventHandleSnapshot)));
-  const lowerTopUpsEnabled =
-    lowerPlan.recoveryCreditPackEnabled ||
-    lowerSnapshot?.recoveryCreditPackEnabledSnapshot === true ||
-    lowerPackEvidenceMismatch;
+    lowerPlan.recoveryCreditPackEnabled &&
+    (lowerSnapshot === null ||
+      lowerSnapshot.recoveryCreditPackEnabledSnapshot !== true ||
+      lowerPlan.recoveryCreditsPerPack !==
+        lowerSnapshot.recoveryCreditsPerPackSnapshot ||
+      lowerPlan.shopifyRecoveryCreditPackEventHandle !==
+        lowerSnapshot.shopifyRecoveryCreditPackEventHandleSnapshot);
+  const mismatchResult: UpgradeEconomicsResult | null =
+    lowerPackEvidenceMismatch
+      ? {
+          status: "UNVERIFIED",
+          code: "INVALID_TOPUP_CONFIGURATION",
+          message:
+            "Upgrade economics cannot be verified because the proposed top-up pack mapping does not match the latest verified Shopify evidence.",
+          details: {
+            additionalCreditsNeeded:
+              (higherPlan.kind === "FREE"
+                ? 0
+                : (higherPlan.includedRecoveryConversationAllowance ?? 0)) -
+              (lowerPlan.kind === "FREE"
+                ? 0
+                : (lowerPlan.includedRecoveryConversationAllowance ?? 0)),
+            packSummary: [],
+          },
+        }
+      : null;
   const lowerPackSize = lowerPlan.recoveryCreditPackEnabled
     ? lowerPlan.recoveryCreditsPerPack
     : null;
-  const result = validateSinglePackShopifyEconomics({
-    currentPlan: planEconomics(lowerPlan, lowerSnapshot),
-    nextPlan: planEconomics(higherPlan, higherSnapshot),
-    topUpsEnabled: lowerTopUpsEnabled,
-    recoveryCreditsPerPack: lowerPackSize,
-    usagePricing: usagePricing(lowerSnapshot),
-    minimumUpgradePremiumBps,
-  });
+  const result =
+    mismatchResult ??
+    validateSinglePackShopifyEconomics({
+      currentPlan: planEconomics(lowerPlan, lowerSnapshot),
+      nextPlan: planEconomics(higherPlan, higherSnapshot),
+      topUpsEnabled: lowerPlan.recoveryCreditPackEnabled,
+      recoveryCreditsPerPack: lowerPackSize,
+      usagePricing: usagePricing(lowerSnapshot),
+      minimumUpgradePremiumBps,
+    });
 
   return {
     edge,
