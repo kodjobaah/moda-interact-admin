@@ -300,7 +300,6 @@
   "billing.lastSyncedAt": "Last synced at",
   "billing.entitlements": "Entitlement usage",
   "billing.baseAllowance": "Base allowance",
-  "billing.adjustments": "Allowance adjustments",
   "billing.committed": "Committed",
   "billing.reserved": "Reserved",
   "billing.remaining": "Remaining",

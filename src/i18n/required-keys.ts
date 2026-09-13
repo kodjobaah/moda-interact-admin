@@ -300,7 +300,6 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "billing.lastSyncedAt",
   "billing.entitlements",
   "billing.baseAllowance",
-  "billing.adjustments",
   "billing.committed",
   "billing.reserved",
   "billing.remaining",

@@ -317,3 +317,19 @@ test("Admin-002 controls remain wired alongside the overview and ledger", async 
   assert.match(page, /getPlatformBillingPolicy/);
   assert.doesNotMatch(page, /<<<<<<<|=======|>>>>>>>/);
 });
+
+test("first-production tenant billing exposes no allowance-adjustment compatibility key", async () => {
+  const catalogue = JSON.parse(
+    await readFile(
+      path.join(repositoryRoot, "src/i18n/locales/en.json"),
+      "utf8",
+    ),
+  );
+  const requiredKeys = await readFile(
+    path.join(repositoryRoot, "src/i18n/required-keys.ts"),
+    "utf8",
+  );
+
+  assert.equal(catalogue["billing.adjustments"], undefined);
+  assert.doesNotMatch(requiredKeys, /"billing\.adjustments"/);
+});
