@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   decideUpgradeEdgeMutation,
   parseEconomicsSnapshotForm,
+  validateEconomicsSnapshotAgainstPlan,
 } from "../../src/lib/admin/billing-economics-validation.ts";
 
 function snapshotForm(values: Record<string, string>): FormData {
@@ -112,5 +113,87 @@ test("snapshot behavior accepts Prisma Int maximum and rejects overflow", () => 
         recoveryCreditsPerPackSnapshot: "2147483648",
       }),
     ),
+  );
+});
+
+const durablePlanMapping = {
+  shopifyPlanHandle: "starter",
+  recoveryCreditPackEnabled: true,
+  recoveryCreditsPerPack: 10,
+  shopifyRecoveryCreditPackEventHandle: "pack-meter",
+};
+
+function parsedSnapshot(overrides: Record<string, string> = {}) {
+  return parseEconomicsSnapshotForm(
+    snapshotForm({
+      ...baseSnapshot,
+      monthlyRecurringAmountMinor: "3500",
+      ...overrides,
+    }),
+  );
+}
+
+test("ADMIN-008 scenario 44 accepts an exact durable-plan snapshot mapping", () => {
+  assert.doesNotThrow(() =>
+    validateEconomicsSnapshotAgainstPlan(
+      durablePlanMapping,
+      parsedSnapshot(),
+    ),
+  );
+});
+
+test("ADMIN-008 scenario 44 rejects a changed Shopify plan handle", () => {
+  assert.throws(
+    () =>
+      validateEconomicsSnapshotAgainstPlan(
+        durablePlanMapping,
+        parsedSnapshot({ shopifyPlanHandleSnapshot: "starter-v2" }),
+      ),
+    /Shopify plan handle does not match the local mapping/,
+  );
+});
+
+test("ADMIN-008 scenario 44 rejects changed recovery-credit pack enablement", () => {
+  const disabledSnapshot = parseEconomicsSnapshotForm(
+    snapshotForm({
+      billingPlanId: "plan-1",
+      shopifyPlanHandleSnapshot: "starter",
+      monthlyRecurringAmountMinor: "3500",
+      currency: "GBP",
+      verificationReason: "Partner Dashboard verification",
+    }),
+  );
+
+  assert.throws(
+    () =>
+      validateEconomicsSnapshotAgainstPlan(
+        durablePlanMapping,
+        disabledSnapshot,
+      ),
+    /Recovery-credit pack enablement does not match the local mapping/,
+  );
+});
+
+test("ADMIN-008 scenario 44 rejects a changed enabled pack size", () => {
+  assert.throws(
+    () =>
+      validateEconomicsSnapshotAgainstPlan(
+        durablePlanMapping,
+        parsedSnapshot({ recoveryCreditsPerPackSnapshot: "20" }),
+      ),
+    /Recovery-credit pack size does not match the local mapping/,
+  );
+});
+
+test("ADMIN-008 scenario 44 rejects a changed enabled pack event handle", () => {
+  assert.throws(
+    () =>
+      validateEconomicsSnapshotAgainstPlan(
+        durablePlanMapping,
+        parsedSnapshot({
+          shopifyRecoveryCreditPackEventHandleSnapshot: "pack-meter-v2",
+        }),
+      ),
+    /Recovery-credit pack event handle does not match the local mapping/,
   );
 });

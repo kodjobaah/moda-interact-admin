@@ -51,8 +51,14 @@ test("edge and snapshot actions enforce drift, append-only evidence, and safe pr
     /input\.lowerEdge\?\.active \|\| input\.higherEdge\?\.active/,
   );
   assert.match(validation, /input\.higherAllowance <= input\.lowerAllowance/);
-  assert.match(action, /Shopify plan handle does not match/);
-  assert.match(action, /Recovery-credit pack size does not match/);
+  assert.match(
+    action,
+    /validateEconomicsSnapshotAgainstPlan\(plan, values\)/,
+  );
+  assert.match(validation, /Shopify plan handle does not match/);
+  assert.match(validation, /Recovery-credit pack enablement does not match/);
+  assert.match(validation, /Recovery-credit pack size does not match/);
+  assert.match(validation, /Recovery-credit pack event handle does not match/);
   assert.match(action, /billingEconomicsSnapshot\.create/);
   assert.doesNotMatch(
     action,

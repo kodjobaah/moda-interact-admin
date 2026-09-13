@@ -76,6 +76,43 @@ export type EconomicsSnapshotInput = {
   verificationReason: string;
 };
 
+export type EconomicsSnapshotPlanMapping = {
+  shopifyPlanHandle: string;
+  recoveryCreditPackEnabled: boolean;
+  recoveryCreditsPerPack: number | null;
+  shopifyRecoveryCreditPackEventHandle: string | null;
+};
+
+export function validateEconomicsSnapshotAgainstPlan(
+  plan: EconomicsSnapshotPlanMapping,
+  snapshot: EconomicsSnapshotInput,
+): void {
+  if (plan.shopifyPlanHandle !== snapshot.shopifyPlanHandleSnapshot) {
+    throw new Error("Shopify plan handle does not match the local mapping.");
+  }
+  if (
+    plan.recoveryCreditPackEnabled !==
+    snapshot.recoveryCreditPackEnabledSnapshot
+  ) {
+    throw new Error(
+      "Recovery-credit pack enablement does not match the local mapping.",
+    );
+  }
+  if (plan.recoveryCreditsPerPack !== snapshot.recoveryCreditsPerPackSnapshot) {
+    throw new Error(
+      "Recovery-credit pack size does not match the local mapping.",
+    );
+  }
+  if (
+    plan.shopifyRecoveryCreditPackEventHandle !==
+    snapshot.shopifyRecoveryCreditPackEventHandleSnapshot
+  ) {
+    throw new Error(
+      "Recovery-credit pack event handle does not match the local mapping.",
+    );
+  }
+}
+
 export function parseUpgradeEdgeForm(formData: FormData): UpgradeEdgeInput {
   const intent = text(formData.get("intent"));
   if (intent !== "create" && intent !== "deactivate") {

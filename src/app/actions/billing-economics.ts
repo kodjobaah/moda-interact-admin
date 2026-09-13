@@ -8,6 +8,7 @@ import {
   decideUpgradeEdgeMutation,
   parseEconomicsSnapshotForm,
   parseUpgradeEdgeForm,
+  validateEconomicsSnapshotAgainstPlan,
 } from "@/lib/admin/billing-economics-validation";
 
 async function auditAdminId(
@@ -131,26 +132,7 @@ export async function recordEconomicsSnapshotAction(
       where: { id: values.billingPlanId },
     });
     if (!plan) throw new Error("Billing plan not found.");
-    if (plan.shopifyPlanHandle !== values.shopifyPlanHandleSnapshot)
-      throw new Error("Shopify plan handle does not match the local mapping.");
-    if (
-      plan.recoveryCreditPackEnabled !==
-      values.recoveryCreditPackEnabledSnapshot
-    )
-      throw new Error(
-        "Recovery-credit pack enablement does not match the local mapping.",
-      );
-    if (plan.recoveryCreditsPerPack !== values.recoveryCreditsPerPackSnapshot)
-      throw new Error(
-        "Recovery-credit pack size does not match the local mapping.",
-      );
-    if (
-      plan.shopifyRecoveryCreditPackEventHandle !==
-      values.shopifyRecoveryCreditPackEventHandleSnapshot
-    )
-      throw new Error(
-        "Recovery-credit pack event handle does not match the local mapping.",
-      );
+    validateEconomicsSnapshotAgainstPlan(plan, values);
 
     const snapshot = await transaction.billingEconomicsSnapshot.create({
       data: {
