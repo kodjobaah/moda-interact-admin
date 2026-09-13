@@ -23,6 +23,12 @@ export default async function PromotionReportPage({
     status,
   });
   if (!report) notFound();
+  const search = query.search?.trim();
+  const reportPageHref = (page: number) => {
+    const params = new URLSearchParams({ page: String(page), status });
+    if (search) params.set("search", search);
+    return `/promotions/${campaignId}?${params.toString()}`;
+  };
 
   return (
     <AdminShell active="promotions">
@@ -47,12 +53,12 @@ export default async function PromotionReportPage({
         </form>
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="min-w-[1050px] w-full text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-600"><tr><th className="p-3">Merchant</th><th className="p-3">Selected</th><th className="p-3">Granted</th><th className="p-3">Reserved</th><th className="p-3">Committed</th><th className="p-3">Remaining</th><th className="p-3">Used</th><th className="p-3">Status</th></tr></thead>
-            <tbody>{report.merchants.map((merchant) => <tr key={merchant.shopId} className="border-b border-gray-100 last:border-0"><td className="p-3 font-medium text-gray-950">{merchant.shopLabel}</td><td className="p-3">{merchant.firstSelectedAt?.toLocaleString() ?? "-"}<br /><span className="text-xs text-gray-500">{merchant.selectionCount} selection(s){merchant.currentlySelected ? " · current" : ""}</span></td><td className="p-3">{merchant.quantityGranted}</td><td className="p-3">{merchant.reserved}</td><td className="p-3">{merchant.committed}</td><td className="p-3">{merchant.remainingAllocation}</td><td className="p-3">{merchant.firstUsedAt?.toLocaleString() ?? "-"}</td><td className="p-3">{merchant.exhaustedAt ? `Exhausted ${merchant.exhaustedAt.toLocaleString()}` : merchant.currentlySelected ? "Selected" : "Not current"}</td></tr>)}</tbody>
+            <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-600"><tr><th className="p-3">Merchant</th><th className="p-3">First selected</th><th className="p-3">Last selected</th><th className="p-3">Selections</th><th className="p-3">Granted</th><th className="p-3">Reserved</th><th className="p-3">Committed</th><th className="p-3">Remaining</th><th className="p-3">First used</th><th className="p-3">Last used</th><th className="p-3">Status</th></tr></thead>
+            <tbody>{report.merchants.map((merchant) => <tr key={merchant.shopId} className="border-b border-gray-100 last:border-0"><td className="p-3 font-medium text-gray-950">{merchant.shopLabel}</td><td className="p-3">{merchant.firstSelectedAt?.toLocaleString() ?? "-"}</td><td className="p-3">{merchant.lastSelectedAt?.toLocaleString() ?? "-"}</td><td className="p-3">{merchant.selectionCount}</td><td className="p-3">{merchant.quantityGranted}</td><td className="p-3">{merchant.reserved}</td><td className="p-3">{merchant.committed}</td><td className="p-3">{merchant.remainingAllocation}</td><td className="p-3">{merchant.firstUsedAt?.toLocaleString() ?? "-"}</td><td className="p-3">{merchant.lastUsedAt?.toLocaleString() ?? "-"}</td><td className="p-3">{merchant.exhaustedAt ? `Exhausted ${merchant.exhaustedAt.toLocaleString()}` : merchant.currentlySelected ? "Currently selected" : "Not current"}</td></tr>)}</tbody>
           </table>
           {report.merchants.length === 0 ? <p className="p-8 text-sm text-gray-600">No merchants match this report filter.</p> : null}
         </div>
-        <p className="mt-4 text-sm text-gray-500">Page {report.page} of {report.totalPages} · {report.totalMerchants} merchant grants</p>
+        <div className="mt-4 flex items-center justify-between gap-4 text-sm"><p className="text-gray-500">Page {report.page} of {report.totalPages} · {report.totalMerchants} merchant grants</p><div className="flex gap-2">{report.page > 1 ? <Link href={reportPageHref(report.page - 1)} className="rounded-md border border-gray-300 px-3 py-2 font-semibold text-gray-700 hover:bg-gray-50">Previous</Link> : null}{report.page < report.totalPages ? <Link href={reportPageHref(report.page + 1)} className="rounded-md border border-gray-300 px-3 py-2 font-semibold text-gray-700 hover:bg-gray-50">Next</Link> : null}</div></div>
       </div>
     </AdminShell>
   );

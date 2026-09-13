@@ -1,29 +1,21 @@
 import type { Prisma, PromotionCampaignStatus, PromotionTargetScope } from "@prisma/client";
 import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
+import {
+  normalizePromotionReportPage,
+  normalizePromotionReportSearch,
+  PROMOTION_REPORT_PAGE_SIZE,
+  projectPromotionMerchantRow,
+  type PromotionMerchantRow,
+} from "@/lib/admin/promotion-report-model";
 
-export const PROMOTION_REPORT_PAGE_SIZE = 25;
+export { PROMOTION_REPORT_PAGE_SIZE } from "@/lib/admin/promotion-report-model";
+export type { PromotionMerchantRow } from "@/lib/admin/promotion-report-model";
 
 export type PromotionReportFilters = {
   page?: number;
   search?: string;
   status?: "ALL" | "SELECTED" | "USED" | "EXHAUSTED";
-};
-
-export type PromotionMerchantRow = {
-  shopId: string;
-  shopLabel: string;
-  firstSelectedAt: Date | null;
-  lastSelectedAt: Date | null;
-  selectionCount: number;
-  quantityGranted: number;
-  reserved: number;
-  committed: number;
-  remainingAllocation: number;
-  firstUsedAt: Date | null;
-  lastUsedAt: Date | null;
-  exhaustedAt: Date | null;
-  currentlySelected: boolean;
 };
 
 export type PromotionReport = {
@@ -49,15 +41,6 @@ export type PromotionReport = {
   totalPages: number;
 };
 
-function normalizePage(value: number | undefined): number {
-  return Number.isInteger(value) && value && value > 0 ? value : 1;
-}
-
-function normalizeSearch(value: string | undefined): string | undefined {
-  const search = value?.trim().slice(0, 255);
-  return search || undefined;
-}
-
 function grantWhere(
   campaignId: string,
   filters: PromotionReportFilters,
@@ -68,7 +51,7 @@ function grantWhere(
   firstUsedAt?: { not: null };
   exhaustedAt?: { not: null };
 } {
-  const search = normalizeSearch(filters.search);
+  const search = normalizePromotionReportSearch(filters.search);
   const where = { campaignId } as ReturnType<typeof grantWhere>;
   if (search) {
     where.OR = [
@@ -105,7 +88,7 @@ export async function getPromotionReport(
   });
   if (!campaign) return null;
 
-  const page = normalizePage(filters.page);
+  const page = normalizePromotionReportPage(filters.page);
   const where = grantWhere(campaignId, filters);
   const [totalMerchants, grants, aggregate, summaryCounts] = await Promise.all([
     prisma.promotionalCreditGrant.count({ where }),
@@ -148,21 +131,7 @@ export async function getPromotionReport(
       merchantsExhausted: summaryCounts[2],
       totalCreditsCommitted: aggregate._sum.committedQuantity ?? 0,
     },
-    merchants: grants.map((grant) => ({
-      shopId: grant.shopId,
-      shopLabel: grant.shop.domain,
-      firstSelectedAt: grant.firstSelectedAt,
-      lastSelectedAt: grant.lastSelectedAt,
-      selectionCount: grant.selectionCount,
-      quantityGranted: grant.quantity,
-      reserved: grant.reservedQuantity,
-      committed: grant.committedQuantity,
-      remainingAllocation: Math.max(0, grant.quantity - grant.reservedQuantity - grant.committedQuantity),
-      firstUsedAt: grant.firstUsedAt,
-      lastUsedAt: grant.lastUsedAt,
-      exhaustedAt: grant.exhaustedAt,
-      currentlySelected: grant.selection !== null,
-    })),
+    merchants: grants.map((grant) => projectPromotionMerchantRow({ ...grant, shopLabel: grant.shop.domain })),
     page,
     pageSize: PROMOTION_REPORT_PAGE_SIZE,
     totalMerchants,
