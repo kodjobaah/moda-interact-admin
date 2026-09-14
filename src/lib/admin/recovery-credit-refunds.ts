@@ -142,6 +142,34 @@ function statusWhere(status: RecoveryCreditRefundQueueStatus): Prisma.RecoveryCr
       purchase: { status: RecoveryCreditPurchaseStatus.WITHDRAWN, reservedAmount: { gt: 0 } },
     };
   }
+  if (status === "NEEDS_ATTENTION") {
+    return {
+      OR: [
+        { status: RecoveryCreditRefundStatus.NEEDS_ATTENTION },
+        {
+          status: RecoveryCreditRefundStatus.REQUESTED,
+          purchase: {
+            status: {
+              in: [
+                RecoveryCreditPurchaseStatus.REQUESTED,
+                RecoveryCreditPurchaseStatus.ACTIVE,
+                RecoveryCreditPurchaseStatus.COMPLETED,
+                RecoveryCreditPurchaseStatus.REFUNDED,
+              ],
+            },
+          },
+        },
+        {
+          status: RecoveryCreditRefundStatus.REQUESTED,
+          purchase: {
+            status: RecoveryCreditPurchaseStatus.WITHDRAWN,
+            reservedAmount: 0,
+            currentAmount: { lte: 0 },
+          },
+        },
+      ],
+    };
+  }
   if (status === "REQUESTED") return { status: RecoveryCreditRefundStatus.REQUESTED };
   return { status: status as RecoveryCreditRefundStatus };
 }

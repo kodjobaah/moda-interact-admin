@@ -19,6 +19,14 @@ test("refund triage is an authorized bounded read model", async () => {
   assert.match(source, /reservedAmount: \{ gt: 0 \}/);
   assert.match(source, /currentAmount: \{ gt: 0 \}/);
   assert.match(source, /purchasedReservations:/);
+  assert.match(source, /status === "NEEDS_ATTENTION"/);
+  assert.match(source, /status: RecoveryCreditRefundStatus\.NEEDS_ATTENTION/);
+  assert.match(
+    source,
+    /in: \[\s*RecoveryCreditPurchaseStatus\.REQUESTED,\s*RecoveryCreditPurchaseStatus\.ACTIVE,\s*RecoveryCreditPurchaseStatus\.COMPLETED,\s*RecoveryCreditPurchaseStatus\.REFUNDED,\s*\]/s,
+  );
+  assert.match(source, /currentAmount: \{ lte: 0 \}/);
+  assert.match(source, /reservedAmount: 0/);
   assert.match(source, /take: 20/);
   assert.match(source, /refunds:/);
   assert.match(source, /reason: true, finalCreditQuantity: true/);
