@@ -66,6 +66,111 @@ export type RecoveryCreditPurchaseItem = {
   };
 };
 
+export type RecoveryCreditRefundQueueStatus =
+  | "ALL"
+  | "REQUESTED"
+  | "READY_FOR_PROVIDER_ACTION"
+  | "WAITING_FOR_RESERVATIONS"
+  | "PROVIDER_ACTION_REQUIRED"
+  | "NEEDS_ATTENTION"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED";
+
+export type RecoveryCreditRefundItem = {
+  id: string;
+  shopId: string;
+  shop: { domain: string; brandName: string | null };
+  source: string;
+  requestedByShopifyUserId: string | null;
+  status: string;
+  queueStatus: RecoveryCreditRefundQueueStatus;
+  purchase: {
+    id: string;
+    status: string;
+    creditsGranted: number;
+    currentAmount: number;
+    reservedAmount: number;
+    createdAt: Date;
+    activatedAt: Date | null;
+    providerPurchaseAmount: string | null;
+    providerPurchaseCurrency: string | null;
+  };
+  purchaseCreditsGrantedSnapshot: number;
+  currentAmountAtRequestSnapshot: number;
+  reservedAmountAtRequestSnapshot: number;
+  availableAmountAtRequestSnapshot: number;
+  billingPeriodIdSnapshot: string;
+  providerSubscriptionIdSnapshot: string;
+  planHandleSnapshot: string;
+  eventHandleSnapshot: string;
+  purchaseProviderAmountSnapshot: string;
+  purchaseProviderCurrencySnapshot: string;
+  finalCreditQuantity: number | null;
+  expectedProviderAmount: string | null;
+  expectedProviderCurrency: string | null;
+  providerReference: string | null;
+  providerActionKind: string | null;
+  providerAmount: string | null;
+  providerCurrency: string | null;
+  reason: string | null;
+  sourceMessageId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type RecoveryCreditRefundDetail = RecoveryCreditRefundItem & {
+  purchase: RecoveryCreditRefundItem["purchase"] & {
+    planName: string | null;
+    shopifyPlanHandleSnapshot: string;
+    shopifyEventHandleSnapshot: string;
+    providerSubscriptionIdSnapshot: string;
+    providerUsageQuantityBeforeSnapshot: number;
+    providerUsageCostBeforeSnapshot: string;
+    providerUsageCostCurrencyBeforeSnapshot: string;
+    providerUsageQuantityAfterSnapshot: number | null;
+    providerUsageCostAfterSnapshot: string | null;
+    providerUsageCostCurrencyAfterSnapshot: string | null;
+    providerValuationConfirmedAt: Date | null;
+    providerPriceSnapshot: unknown;
+    billingPeriod: {
+      id: string;
+      periodStart: Date;
+      periodEnd: Date;
+      planNameSnapshot: string | null;
+      planKindSnapshot: string | null;
+    };
+  };
+  approvedAt: Date | null;
+  holdAppliedAt: Date | null;
+  providerConfirmedAt: Date | null;
+  completedAt: Date | null;
+  sourceMessage: {
+    id: string;
+    createdAt: Date;
+    shopifyUserId: string | null;
+    systemCode: string | null;
+  } | null;
+  reservations: Array<{
+    id: string;
+    quantity: number;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  refundHistory: Array<{
+    id: string;
+    status: string;
+    source: string;
+    reason: string | null;
+    finalCreditQuantity: number | null;
+    providerAmount: string | null;
+    providerCurrency: string | null;
+    createdAt: Date;
+    completedAt: Date | null;
+  }>;
+};
+
 export type TenantBilling = {
   subscription: {
     observedShopifyPlanHandle: string | null;

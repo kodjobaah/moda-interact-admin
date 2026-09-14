@@ -185,6 +185,7 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "billing.tab.overview",
   "billing.tab.plans",
   "billing.tab.recoveryPacks",
+  "billing.tab.refundRequests",
   "billing.tab.appEvents",
   "billing.tab.controls",
   "billing.tab.usage",

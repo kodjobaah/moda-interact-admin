@@ -7,12 +7,12 @@ import { test } from "node:test";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (relativePath) => readFile(path.join(repositoryRoot, relativePath), "utf8");
 
-test("global billing exposes exactly five URL-backed views with overview fallback", async () => {
+test("global billing exposes URL-backed views with overview fallback", async () => {
   const [page, tabs] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-tabs.tsx"),
   ]);
-  assert.match(page, /allowedViews: BillingView\[\] = \["overview", "plans", "packs", "events", "controls"\]/);
+  assert.match(page, /allowedViews: BillingView\[\] = \["overview", "plans", "packs", "refunds", "events", "controls"\]/);
   assert.match(page, /rawView.*rawParams\.view/);
   assert.match(page, /: "overview"/);
   assert.match(tabs, /<Link/);
