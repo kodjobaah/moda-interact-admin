@@ -41,6 +41,8 @@ import {
 } from "@/components/admin/billing-controls";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
 import { getBillingEconomicsControls } from "@/lib/admin/billing-economics";
+import { RecoveryCreditRefundDrawer, RecoveryCreditRefundQueue, parseRecoveryCreditRefundStatus } from "@/components/admin/recovery-credit-refunds";
+import { getRecoveryCreditRefundDetail, getRecoveryCreditRefunds } from "@/lib/admin/recovery-credit-refunds";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +52,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
   await requirePlatformAdminPage();
   const rawParams = await searchParams;
   const params = paramsToRecord(rawParams);
-  const allowedViews: BillingView[] = ["overview", "plans", "packs", "events", "controls"];
+  const allowedViews: BillingView[] = ["overview", "plans", "packs", "refunds", "events", "controls"];
   const rawView = firstParam(rawParams.view) as BillingView | undefined;
   const view = allowedViews.includes(rawView ?? "overview")
     ? (rawView ?? "overview")
@@ -85,6 +87,18 @@ export default async function BillingPage({ searchParams }: PageProps) {
       ? await getRecoveryCreditPurchaseDetail(
           firstParam(rawParams.purchaseId) as string,
         )
+      : null;
+  const refunds =
+    view === "refunds"
+      ? await getRecoveryCreditRefunds({
+          page: positiveInt(rawParams.refundPage),
+          pageSize: 20,
+          status: parseRecoveryCreditRefundStatus(firstParam(rawParams.refundStatus)),
+        })
+      : null;
+  const selectedRefund =
+    view === "refunds" && firstParam(rawParams.refundId)
+      ? await getRecoveryCreditRefundDetail(firstParam(rawParams.refundId) as string)
       : null;
   const ledger =
     view === "events"
@@ -146,6 +160,8 @@ export default async function BillingPage({ searchParams }: PageProps) {
             params={params}
           />
         ) : null}
+        {view === "refunds" && refunds ? <RecoveryCreditRefundQueue refunds={refunds} params={params} /> : null}
+        {view === "refunds" && selectedRefund ? <RecoveryCreditRefundDrawer refund={selectedRefund} params={params} /> : null}
         {view === "events" && selectedEvent ? (
           <BillingEventDrawer event={selectedEvent} params={params} />
         ) : null}

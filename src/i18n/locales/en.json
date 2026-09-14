@@ -185,6 +185,7 @@
   "billing.tab.overview": "Overview",
   "billing.tab.plans": "Plans",
   "billing.tab.recoveryPacks": "Recovery packs",
+  "billing.tab.refundRequests": "Refund requests",
   "billing.tab.appEvents": "App Events",
   "billing.tab.controls": "Controls",
   "billing.tab.usage": "Usage",
