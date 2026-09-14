@@ -212,7 +212,7 @@ export async function getRecoveryCreditRefundDetail(id: string): Promise<Recover
           refunds: {
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 20,
-            select: { id: true, status: true, source: true, finalCreditQuantity: true, providerAmount: true, providerCurrency: true, createdAt: true, completedAt: true },
+            select: { id: true, status: true, source: true, reason: true, finalCreditQuantity: true, providerAmount: true, providerCurrency: true, createdAt: true, completedAt: true },
           },
         },
       },

@@ -132,13 +132,25 @@ export function RecoveryCreditRefundDrawer({
         ["Provider subscription snapshot", refund.providerSubscriptionIdSnapshot],
         ["Plan handle snapshot", refund.planHandleSnapshot],
         ["Event handle snapshot", refund.eventHandleSnapshot],
+        ["Billing period", refund.purchase.billingPeriod ? `${refund.purchase.billingPeriod.planNameSnapshot ?? "Unnamed plan"} (${adminI18n.formatDateTime(refund.purchase.billingPeriod.periodStart)} - ${adminI18n.formatDateTime(refund.purchase.billingPeriod.periodEnd)})` : null],
+        ["Plan provenance", refund.purchase.planName],
+        ["Usage quantity before", refund.purchase.providerUsageQuantityBeforeSnapshot],
+        ["Usage cost before", `${refund.purchase.providerUsageCostBeforeSnapshot} ${refund.purchase.providerUsageCostCurrencyBeforeSnapshot}`],
+        ["Usage quantity after", refund.purchase.providerUsageQuantityAfterSnapshot],
+        ["Usage cost after", refund.purchase.providerUsageCostAfterSnapshot ? `${refund.purchase.providerUsageCostAfterSnapshot} ${refund.purchase.providerUsageCostCurrencyAfterSnapshot ?? ""}` : null],
+        ["Provider valuation confirmed", refund.purchase.providerValuationConfirmedAt ? adminI18n.formatDateTime(refund.purchase.providerValuationConfirmedAt) : null],
         ["Provider price evidence", providerSnapshot],
         ["Reason", refund.reason],
+        ["Support context message", refund.sourceMessage?.id ?? null],
       ]} />
       <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">Reservations still linked to this purchase</h3>
       <p className="mt-2 text-sm text-gray-600">{refund.reservations.length ? refund.reservations.map((reservation) => `${reservation.quantity} ${label(reservation.status)}`).join(" · ") : "No reservations in the bounded history."}</p>
       <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">Refund workflow history</h3>
-      <p className="mt-2 text-sm text-gray-600">{refund.refundHistory.length ? refund.refundHistory.map((entry) => `${label(entry.status)} · ${entry.finalCreditQuantity ?? "quantity not locked"}`).join(" · ") : "No prior refund history."}</p>
+      <div className="mt-2 space-y-2 text-sm text-gray-600">
+        {refund.refundHistory.length ? refund.refundHistory.map((entry) => (
+          <p key={entry.id}>{adminI18n.formatDateTime(entry.createdAt)} · {label(entry.status)} · {entry.finalCreditQuantity ?? "quantity not locked"} credits · {entry.providerAmount ? `${entry.providerAmount} ${entry.providerCurrency ?? ""}` : "provider amount not recorded"} · {entry.reason ?? "no reason recorded"}</p>
+        )) : <p>No prior refund history.</p>}
+      </div>
       <p className="mt-6 rounded-md bg-gray-50 p-4 text-xs text-gray-600">The current plan or top-up price is evidence only and is not refund authority. This view does not calculate, approve, or settle a provider refund.</p>
     </AdminDetailDrawer>
   );

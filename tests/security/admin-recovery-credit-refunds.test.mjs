@@ -21,6 +21,7 @@ test("refund triage is an authorized bounded read model", async () => {
   assert.match(source, /purchasedReservations:/);
   assert.match(source, /take: 20/);
   assert.match(source, /refunds:/);
+  assert.match(source, /reason: true, finalCreditQuantity: true/);
   assert.doesNotMatch(source, /update\(|create\(|delete\(|creditsRequested|creditsApproved|percentage/);
 });
 
@@ -37,6 +38,11 @@ test("refund triage UI preserves merchant-created requests and exact-lot authori
   assert.match(component, /Final credit quantity will be locked/);
   assert.match(component, /Current amount at request/);
   assert.match(component, /Current purchase amount/);
+  assert.match(component, /Billing period/);
+  assert.match(component, /Usage quantity before/);
+  assert.match(component, /Usage cost after/);
+  assert.match(component, /Support context message/);
+  assert.match(component, /provider amount not recorded/);
   assert.match(component, /current plan or top-up price is evidence only and is not refund authority/i);
   assert.match(component, /does not calculate, approve, or settle/);
   assert.doesNotMatch(component, /type="number"|type="money"|percentage|creditsRequested|creditsApproved/);

@@ -162,6 +162,7 @@ export type RecoveryCreditRefundDetail = RecoveryCreditRefundItem & {
     id: string;
     status: string;
     source: string;
+    reason: string | null;
     finalCreditQuantity: number | null;
     providerAmount: string | null;
     providerCurrency: string | null;
