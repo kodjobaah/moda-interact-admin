@@ -214,8 +214,12 @@ export async function mutateMerchantPricingPlanAction(
     const reason = formData.get("reason");
     if (typeof id !== "string" || !id)
       actionError("A MerchantPricing plan id is required.");
-    if (typeof reason !== "string" || !reason.trim())
-      actionError("A reason is required.");
+    if (
+      typeof reason !== "string" ||
+      !reason.trim() ||
+      reason.trim().length > 2000
+    )
+      actionError("A reason is required and must be at most 2000 characters.");
     await prisma.$transaction(async (transaction) => {
       const existing = await transaction.merchantPricingPlan.findUnique({
         where: { id },

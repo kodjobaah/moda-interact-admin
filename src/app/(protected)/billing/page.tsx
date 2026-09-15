@@ -77,6 +77,8 @@ export default async function BillingPage({ searchParams }: PageProps) {
     ? (rawState as ShopifyReportState)
     : undefined;
   const plans = view === "plans" ? await getMerchantPricingPlans() : null;
+  const plansPolicy =
+    view === "plans" ? await getPlatformBillingPolicy() : null;
   const selectedPlan =
     view === "plans" && firstParam(rawParams.planId)
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
@@ -166,6 +168,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <MerchantPricingPlanDrawer
             plan={selectedPlan ?? undefined}
             cataloguePlans={plans ?? []}
+            minimumUpgradePremiumBps={
+              plansPolicy?.minimumUpgradePremiumBps ?? 2000
+            }
             params={params}
             register={params.drawer === "register-plan"}
           />

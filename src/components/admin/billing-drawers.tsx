@@ -57,11 +57,13 @@ export function BillingPlanDrawer({
 export function MerchantPricingPlanDrawer({
   plan,
   cataloguePlans,
+  minimumUpgradePremiumBps = 2000,
   params,
   register = false,
 }: {
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
+  minimumUpgradePremiumBps?: number;
   params: Record<string, string>;
   register?: boolean;
 }) {
@@ -77,7 +79,11 @@ export function MerchantPricingPlanDrawer({
       closeHref={closeHref}
       size="wide"
     >
-      <MerchantPricingPlanBuilder plan={plan} cataloguePlans={cataloguePlans} />
+      <MerchantPricingPlanBuilder
+        plan={plan}
+        cataloguePlans={cataloguePlans}
+        minimumUpgradePremiumBps={minimumUpgradePremiumBps}
+      />
     </AdminDetailDrawer>
   );
 }

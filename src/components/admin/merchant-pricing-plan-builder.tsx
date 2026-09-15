@@ -5,6 +5,11 @@ import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
 import { parseMoneyToMinorUnits } from "@/lib/admin/merchant-pricing-builder-payload";
 import {
+  evaluateMerchantPricingPortfolio,
+  type MerchantPricingEconomicsPlan,
+  type MerchantPricingPairResult,
+} from "@/lib/admin/merchant-pricing-economics";
+import {
   buildMerchantPricingTranslationTemplate,
   type MerchantPricingTranslationParseResult,
 } from "@/lib/admin/merchant-pricing-translations";
@@ -44,12 +49,48 @@ function initialEvents(plan?: MerchantPricingPlanWithChildren): BuilderEvent[] {
   );
 }
 
+function toEconomicsPlan(
+  plan: MerchantPricingPlanWithChildren,
+): MerchantPricingEconomicsPlan {
+  return {
+    id: plan.id,
+    shopifyPlanHandle: plan.shopifyPlanHandle,
+    name: plan.displayName,
+    includedRecoveryCredits: plan.includedRecoveryCredits,
+    recurringAmountMinor: plan.recurringAmountMinor,
+    currency: plan.currency,
+    usageEvents: plan.usageEvents.map((event) => ({
+      eventHandle: event.eventHandle,
+      creditsGrantedPerUnit: event.creditsGrantedPerUnit,
+      maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
+      pricing:
+        event.pricingMode === "FIXED"
+          ? {
+              mode: "FIXED" as const,
+              currency: event.currency,
+              unitAmountMinor: event.fixedUnitAmountMinor ?? 0,
+            }
+          : {
+              mode: event.pricingMode,
+              currency: event.currency,
+              tiers: event.tiers.map((tier) => ({
+                upTo: tier.upTo,
+                amountPerUnitMinor: tier.amountPerUnitMinor,
+                flatAmountMinor: tier.flatAmountMinor,
+              })),
+            },
+    })),
+  };
+}
+
 export function MerchantPricingPlanBuilder({
   plan,
   cataloguePlans = [],
+  minimumUpgradePremiumBps = 2000,
 }: {
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
+  minimumUpgradePremiumBps?: number;
 }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(plan?.displayName ?? "");
@@ -123,6 +164,66 @@ export function MerchantPricingPlanBuilder({
     placement,
     reason,
     recurring,
+  ]);
+
+  const economicsPreview = useMemo<MerchantPricingPairResult[]>(() => {
+    const candidate: MerchantPricingEconomicsPlan = {
+      id: plan?.id ?? `candidate:${handle.trim()}`,
+      shopifyPlanHandle: handle.trim(),
+      name: name.trim(),
+      includedRecoveryCredits: Number(credits),
+      recurringAmountMinor: payload.recurringAmountMinor,
+      currency: currency.trim().toUpperCase(),
+      usageEvents: events.map((event) => ({
+        eventHandle: event.eventHandle.trim(),
+        creditsGrantedPerUnit: event.creditsGrantedPerUnit,
+        maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
+        pricing:
+          event.pricingMode === "FIXED"
+            ? {
+                mode: "FIXED" as const,
+                currency: currency.trim().toUpperCase(),
+                unitAmountMinor: event.fixedUnitAmountMinor ?? 0,
+              }
+            : {
+                mode: event.pricingMode,
+                currency: currency.trim().toUpperCase(),
+                tiers: event.tiers ?? [],
+              },
+      })),
+    };
+    const ordered = cataloguePlans
+      .filter(
+        (cataloguePlan) =>
+          cataloguePlan.id !== plan?.id && cataloguePlan.isActive,
+      )
+      .map((cataloguePlan) => ({
+        position: cataloguePlan.cataloguePosition,
+        plan: toEconomicsPlan(cataloguePlan),
+      }));
+    ordered.push({
+      position: plan?.cataloguePosition ?? cataloguePlans.length,
+      plan: candidate,
+    });
+    ordered.sort((left, right) => left.position - right.position);
+    const plansById = Object.fromEntries(
+      ordered.map(({ plan: orderedPlan }) => [orderedPlan.id, orderedPlan]),
+    );
+    return evaluateMerchantPricingPortfolio({
+      orderedPlanIds: ordered.map(({ plan: orderedPlan }) => orderedPlan.id),
+      plansById,
+      minimumUpgradePremiumBps,
+    });
+  }, [
+    cataloguePlans,
+    credits,
+    currency,
+    events,
+    handle,
+    minimumUpgradePremiumBps,
+    name,
+    payload.recurringAmountMinor,
+    plan,
   ]);
 
   function addEvent() {
@@ -582,12 +683,35 @@ export function MerchantPricingPlanBuilder({
         </label>
       ) : null}
       {step === 5 ? (
-        <section className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <h3 className="font-semibold">Portfolio economics</h3>
-          <p className="mt-2">
-            The server loads the complete ordered ARCH-014 portfolio and blocks
-            save unless every lower-to-higher comparison passes.
-          </p>
+        <section className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div>
+            <h3 className="font-semibold">Portfolio economics</h3>
+            <p className="mt-2">
+              Every ordered lower-to-higher comparison must pass before save.
+            </p>
+          </div>
+          {economicsPreview.length ? (
+            <ul className="space-y-2">
+              {economicsPreview.map((result) => (
+                <li
+                  key={`${result.lowerPlanId}-${result.higherPlanId}`}
+                  className="rounded border border-amber-200 bg-white p-2"
+                >
+                  <div className="font-semibold">
+                    {result.lowerPlanId} to {result.higherPlanId}:{" "}
+                    {result.status}
+                  </div>
+                  <div>{result.message}</div>
+                  <div className="text-xs">
+                    Additional credits: {result.additionalCreditsNeeded}; code:{" "}
+                    {result.code}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No active plan pair requires comparison yet.</p>
+          )}
         </section>
       ) : null}
       {step === 6 ? (
@@ -614,7 +738,10 @@ export function MerchantPricingPlanBuilder({
       </label>
       <button
         type="submit"
-        disabled={step === 6 && !translationResult?.valid}
+        disabled={
+          !economicsPreview.every((result) => result.status === "PASS") ||
+          (step === 6 && !translationResult?.valid)
+        }
         className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         {plan ? "Save MerchantPricing plan" : "Create MerchantPricing plan"}

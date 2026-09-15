@@ -53,3 +53,8 @@ test("ARCH-014 action never creates a Shopify subscription", async () => {
     false,
   );
 });
+
+test("toggle reasons are bounded like create and edit reasons", async () => {
+  const action = await source("src/app/actions/merchant-pricing-plan.ts");
+  assert.match(action, /reason\.trim\(\)\.length > 2000/);
+});
