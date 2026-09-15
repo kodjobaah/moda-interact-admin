@@ -107,6 +107,16 @@ test("translation importer keeps schema-v2 guidance and upload failures non-dest
   assert.match(importer, /The translation file could not be read\./);
   assert.match(importer, /selectedFileName/);
   assert.match(importer, /editedAfterUpload/);
+  assert.match(importer, /onChange\(rawJson, result\)/);
+  assert.match(importer, /result: MerchantPricingTranslationParseResult \| null/);
+  assert.match(importer, /<div>✓ \{selectedFileName\}<\/div>/);
   assert.match(importer, /Show technical details \(\{result\.issues\.length\} issues\)/);
   assert.doesNotMatch(importer, /\{"error":"Translation package/);
+});
+
+test("final review uses the exact human-readable fixed usage-event summary", async () => {
+  const builder = await source("src/components/admin/merchant-pricing-plan-builder.tsx");
+  assert.match(builder, /formatBuilderEventPrice\(event, currency\)/);
+  assert.match(builder, /per event · \$\{event\.maximumUnitsPerBillingPeriod \?\? "Unlimited"\}/);
+  assert.doesNotMatch(builder, /event · \{event\.pricingMode === "FIXED" \? "fixed price"/);
 });

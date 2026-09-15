@@ -72,7 +72,7 @@ export function MerchantPricingTranslationImport({
   initialRawJson?: string;
   onChange: (
     rawJson: string,
-    result: MerchantPricingTranslationParseResult,
+    result: MerchantPricingTranslationParseResult | null,
   ) => void;
 }) {
   const [rawJson, setRawJson] = useState(initialRawJson ?? "");
@@ -95,8 +95,7 @@ export function MerchantPricingTranslationImport({
   );
 
   useEffect(() => {
-    if (!rawJson) return;
-    onChange(rawJson, result!);
+    onChange(rawJson, result);
   }, [onChange, rawJson, result]);
 
   function updateRawJson(nextRawJson: string, edited = false) {
@@ -242,11 +241,19 @@ export function MerchantPricingTranslationImport({
               : "text-sm text-red-700"
           }
         >
-          {result.valid && selectedFileName ? `✓ ${selectedFileName}` : null}
-          {result.valid
-            ? "20 / 20 languages complete"
-            : `${result.completeCount} / 20 languages complete`}
-          <div>{result.valid ? "Translation file is ready to save." : "Translation file needs attention."}</div>
+          {result.valid && selectedFileName ? (
+            <div>✓ {selectedFileName}</div>
+          ) : null}
+          <div>
+            {result.valid
+              ? "20 / 20 languages complete"
+              : `${result.completeCount} / 20 languages complete`}
+          </div>
+          <div>
+            {result.valid
+              ? "Translation file is ready to save."
+              : "Translation file needs attention."}
+          </div>
         </div>
       ) : null}
       {!result?.valid && result?.issues.length ? (

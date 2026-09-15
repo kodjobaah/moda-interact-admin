@@ -1127,10 +1127,10 @@ export function MerchantPricingPlanBuilder({
             {events.map((event) => (
               <li key={event.eventHandle}>
                 {event.adminLabel}: {event.creditsGrantedPerUnit} credits per
-                event · {event.pricingMode === "FIXED" ? "fixed price" : event.pricingMode === "GRADUATED" ? "graduated pricing" : "volume pricing"}
+                event
                 {event.pricingMode === "FIXED"
                   ? ` · ${formatBuilderEventPrice(event, currency)} per event · ${event.maximumUnitsPerBillingPeriod ?? "Unlimited"}`
-                  : ` across ${event.tiers?.length ?? 0} tiers`}
+                  : ` · ${event.pricingMode === "GRADUATED" ? "graduated pricing" : "volume pricing"} across ${event.tiers?.length ?? 0} tiers`}
               </li>
             ))}
           </ul>
