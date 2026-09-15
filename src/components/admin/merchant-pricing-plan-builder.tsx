@@ -17,7 +17,7 @@ import {
   buildMerchantPricingTranslationTemplate,
   type MerchantPricingTranslationParseResult,
 } from "@/lib/admin/merchant-pricing-translations";
-import { MerchantPricingTranslationImport } from "./merchant-pricing-translation-import";
+import { MerchantPricingTranslationWorkbook } from "./merchant-pricing-translation-workbook";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white p-2 text-sm";
@@ -48,7 +48,10 @@ function formatMinorUnits(value: number | undefined, currency: string): string {
       }).format(value / 100);
 }
 
-function formatBuilderEventPrice(event: BuilderEvent, currency: string): string {
+function formatBuilderEventPrice(
+  event: BuilderEvent,
+  currency: string,
+): string {
   try {
     return formatMinorUnits(
       parseMoneyToMinorUnits(event.fixedUnitAmount ?? "0"),
@@ -848,7 +851,9 @@ export function MerchantPricingPlanBuilder({
                           type="number"
                           min="1"
                           value={tier.upTo ?? ""}
-                          disabled={tierIndex === (event.tiers?.length ?? 1) - 1}
+                          disabled={
+                            tierIndex === (event.tiers?.length ?? 1) - 1
+                          }
                           onChange={(input) =>
                             updateTier(index, tierIndex, {
                               upTo: input.target.value
@@ -1050,9 +1055,9 @@ export function MerchantPricingPlanBuilder({
                       <p>
                         {unboundedZeroCostEventLabel
                           ? `${unboundedZeroCostEventLabel} gives recovery credits for free with no usage limit.`
-                          : "One of the usage events gives recovery credits for free with no usage limit."} Enter a
-                        price greater than 0 or set a maximum number of uses per
-                        billing period.
+                          : "One of the usage events gives recovery credits for free with no usage limit."}{" "}
+                        Enter a price greater than 0 or set a maximum number of
+                        uses per billing period.
                       </p>
                     </div>
                   ) : (
@@ -1062,7 +1067,7 @@ export function MerchantPricingPlanBuilder({
                     <summary>Show technical details</summary>
                     <div>
                       {result.lowerPlanId} to {result.higherPlanId}; additional
-                      credits: {result.additionalCreditsNeeded}; code: {" "}
+                      credits: {result.additionalCreditsNeeded}; code:{" "}
                       {result.code}; status: {result.status}
                     </div>
                   </details>
@@ -1096,15 +1101,19 @@ export function MerchantPricingPlanBuilder({
         </section>
       ) : null}
       {step === 6 ? (
-        <MerchantPricingTranslationImport
+        <MerchantPricingTranslationWorkbook
           planHandle={handle}
-          planName={name}
-          englishDescription={description}
-          highlights={highlights}
-          initialRawJson={
-            translationJson ||
-            (retainedTemplate ? JSON.stringify(retainedTemplate) : undefined)
+          canonicalTemplate={
+            retainedTemplate ??
+            buildMerchantPricingTranslationTemplate({
+              planHandle: handle,
+              planName: name,
+              englishDescription: description,
+              highlights,
+            })
           }
+          highlights={highlights}
+          translationsRetained={translationsRetained}
           onChange={(rawJson, result) => {
             setTranslationJson(rawJson);
             setTranslationResult(result);

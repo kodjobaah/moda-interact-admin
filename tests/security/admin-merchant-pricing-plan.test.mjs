@@ -28,7 +28,10 @@ test("development billing audits use the reserved provisioned administrator iden
   assert.match(identity, /role: 'SUPER_ADMIN'/);
   assert.match(identity, /if \(!principal\.developmentBypass\) return;/);
   assert.match(identity, /ON CONFLICT \("id"\) DO NOTHING/);
-  assert.match(identity, /reserved development platform administrator identity conflicts/);
+  assert.match(
+    identity,
+    /reserved development platform administrator identity conflicts/,
+  );
 });
 
 test("ARCH-014 implementation modules do not use operational plan or economics sources", async () => {
@@ -40,7 +43,7 @@ test("ARCH-014 implementation modules do not use operational plan or economics s
     "src/lib/admin/merchant-pricing-translations.ts",
     "src/components/admin/merchant-pricing-plan-catalog.tsx",
     "src/components/admin/merchant-pricing-plan-builder.tsx",
-    "src/components/admin/merchant-pricing-translation-import.tsx",
+    "src/components/admin/merchant-pricing-translation-workbook.tsx",
   ];
   const contents = await Promise.all(paths.map(source));
   const combined = contents.join("\n");
@@ -74,17 +77,28 @@ test("toggle reasons are bounded like create and edit reasons", async () => {
 });
 
 test("usage-event builder exposes currency-aware labels and blocks unbounded free events", async () => {
-  const builder = await source("src/components/admin/merchant-pricing-plan-builder.tsx");
+  const builder = await source(
+    "src/components/admin/merchant-pricing-plan-builder.tsx",
+  );
   assert.match(builder, /Admin label/);
   assert.match(builder, /Shopify usage-event handle/);
   assert.match(builder, /Recovery credits granted per event/);
   assert.match(builder, /Maximum uses per billing period \(optional\)/);
   assert.match(builder, /<option value="FIXED">Fixed price<\/option>/);
-  assert.match(builder, /<option value="GRADUATED">Graduated pricing<\/option>/);
+  assert.match(
+    builder,
+    /<option value="GRADUATED">Graduated pricing<\/option>/,
+  );
   assert.match(builder, /<option value="VOLUME">Volume pricing<\/option>/);
-  assert.match(builder, /Price per usage event \(\{currency\.toUpperCase\(\)\}\)/);
+  assert.match(
+    builder,
+    /Price per usage event \(\{currency\.toUpperCase\(\)\}\)/,
+  );
   assert.match(builder, /Price per unit \(\{currency\.toUpperCase\(\)\}\)/);
-  assert.match(builder, /Additional flat charge \(\{currency\.toUpperCase\(\)\}\)/);
+  assert.match(
+    builder,
+    /Additional flat charge \(\{currency\.toUpperCase\(\)\}\)/,
+  );
   assert.match(builder, /Unlimited/);
   assert.match(builder, /ZERO_COST_USAGE_EVENT_MESSAGE/);
   assert.match(builder, /events\.some\(hasUnboundedZeroCostFixedEvent\)/);
@@ -92,31 +106,50 @@ test("usage-event builder exposes currency-aware labels and blocks unbounded fre
   assert.match(builder, /Show technical details/);
 });
 
-test("translation importer keeps schema-v2 guidance and upload failures non-destructive", async () => {
-  const importer = await source("src/components/admin/merchant-pricing-translation-import.tsx");
-  assert.match(importer, /How to complete the translation file/);
-  assert.match(importer, /schema-v2|schemaVersion|highlight IDs/);
-  assert.match(importer, /processSelectedTranslationFile/);
-  assert.match(importer, /Drop your completed JSON file here/);
-  assert.match(importer, /Choose JSON file/);
-  assert.match(importer, /type="file"/);
-  assert.match(importer, /accept="\.json,application\/json"/);
-  assert.match(importer, /Upload one JSON file at a time\./);
-  assert.match(importer, /The translation file is larger than 256 KiB\./);
-  assert.match(importer, /Choose a JSON file ending in \.json\./);
-  assert.match(importer, /The translation file could not be read\./);
-  assert.match(importer, /selectedFileName/);
-  assert.match(importer, /editedAfterUpload/);
-  assert.match(importer, /onChange\(rawJson, result\)/);
-  assert.match(importer, /result: MerchantPricingTranslationParseResult \| null/);
-  assert.match(importer, /<div>✓ \{selectedFileName\}<\/div>/);
-  assert.match(importer, /Show technical details \(\{result\.issues\.length\} issues\)/);
-  assert.doesNotMatch(importer, /\{"error":"Translation package/);
+test("translation workbook keeps schema-v2 guidance and upload failures non-destructive", async () => {
+  const workbook = await source(
+    "src/components/admin/merchant-pricing-translation-workbook.tsx",
+  );
+  assert.match(workbook, /Download pre-populated translation spreadsheet/);
+  assert.match(workbook, /processSelectedTranslationWorkbook/);
+  assert.match(workbook, /Drop your completed \.xlsx spreadsheet here/);
+  assert.match(workbook, /Choose spreadsheet/);
+  assert.match(workbook, /type="file"/);
+  assert.match(
+    workbook,
+    /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/,
+  );
+  assert.match(workbook, /Upload one spreadsheet at a time\./);
+  assert.match(workbook, /The translation spreadsheet is larger than 2 MiB\./);
+  assert.match(workbook, /Choose an Excel workbook ending in \.xlsx\./);
+  assert.match(workbook, /The translation spreadsheet could not be read\./);
+  assert.match(workbook, /selectedFileName/);
+  assert.match(workbook, /workbookIssues/);
+  assert.match(
+    workbook,
+    /onChange\(parsed\.canonicalRawJson, parsed\.translationResult\)/,
+  );
+  assert.match(workbook, /Show technical details/);
+  assert.doesNotMatch(
+    workbook,
+    /Paste completed translation JSON|Choose JSON file|\.json/,
+  );
+  await assert.rejects(
+    source("src/components/admin/merchant-pricing-translation-import.tsx"),
+  );
 });
 
 test("final review uses the exact human-readable fixed usage-event summary", async () => {
-  const builder = await source("src/components/admin/merchant-pricing-plan-builder.tsx");
+  const builder = await source(
+    "src/components/admin/merchant-pricing-plan-builder.tsx",
+  );
   assert.match(builder, /formatBuilderEventPrice\(event, currency\)/);
-  assert.match(builder, /per event · \$\{event\.maximumUnitsPerBillingPeriod \?\? "Unlimited"\}/);
-  assert.doesNotMatch(builder, /event · \{event\.pricingMode === "FIXED" \? "fixed price"/);
+  assert.match(
+    builder,
+    /per event · \$\{event\.maximumUnitsPerBillingPeriod \?\? "Unlimited"\}/,
+  );
+  assert.doesNotMatch(
+    builder,
+    /event · \{event\.pricingMode === "FIXED" \? "fixed price"/,
+  );
 });
