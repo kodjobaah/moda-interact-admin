@@ -33,7 +33,7 @@ test("refund triage is an authorized bounded read model", async () => {
   assert.doesNotMatch(source, /update\(|create\(|delete\(|creditsRequested|creditsApproved|percentage/);
 });
 
-test("refund triage UI preserves merchant-created requests and exact-lot authority", async () => {
+test("refund UI preserves exact-lot authority and exposes settlement controls", async () => {
   const [component, page] = await Promise.all([
     readFile(path.join(root, "src/components/admin/recovery-credit-refunds.tsx"), "utf8"),
     readFile(path.join(root, "src/app/(protected)/billing/page.tsx"), "utf8"),
@@ -51,7 +51,11 @@ test("refund triage UI preserves merchant-created requests and exact-lot authori
   assert.match(component, /Usage cost after/);
   assert.match(component, /Support context message/);
   assert.match(component, /provider amount not recorded/);
-  assert.match(component, /current plan or top-up price is evidence only and is not refund authority/i);
-  assert.match(component, /does not calculate, approve, or settle/);
+  assert.match(component, /lockRecoveryCreditRefundAction/);
+  assert.match(component, /rejectRecoveryCreditRefundAction/);
+  assert.match(component, /recordRecoveryCreditProviderEvidenceAction/);
+  assert.match(component, /Frozen settlement evidence/);
+  assert.match(component, /Expected provider amount/);
+  assert.match(component, /Provider settlement is manual through Shopify Partner Dashboard or Support/);
   assert.doesNotMatch(component, /type="number"|type="money"|percentage|creditsRequested|creditsApproved/);
 });
