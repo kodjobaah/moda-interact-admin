@@ -112,7 +112,9 @@ function isCurrency(value: string): boolean {
   return CURRENCY.test(value);
 }
 
-function validatePricing(pricing: MerchantUsagePricing): MerchantPricingResultCode | null {
+function validatePricing(
+  pricing: MerchantUsagePricing,
+): MerchantPricingResultCode | null {
   if (!isCurrency(pricing.currency)) return "INVALID_USAGE_PRICING";
 
   if (pricing.mode === "FIXED") {
@@ -187,13 +189,17 @@ function validateOffers(
 function validatePlanEvidence(
   plan: MerchantPricingEconomicsPlan,
 ): MerchantPricingResultCode | null {
-  if (!isNonNegativeSafeInteger(plan.recurringAmountMinor)) return "MISSING_PLAN_PRICE";
-  if (!isNonNegativeSafeInteger(plan.includedRecoveryCredits)) return "INVALID_USAGE_EVENT";
+  if (!isNonNegativeSafeInteger(plan.recurringAmountMinor))
+    return "MISSING_PLAN_PRICE";
+  if (!isNonNegativeSafeInteger(plan.includedRecoveryCredits))
+    return "INVALID_USAGE_EVENT";
   if (!isCurrency(plan.currency)) return "CURRENCY_MISMATCH";
 
   const validationCode = validateOffers(plan.usageEvents);
   if (validationCode) return validationCode;
-  if (plan.usageEvents.some((offer) => offer.pricing.currency !== plan.currency)) {
+  if (
+    plan.usageEvents.some((offer) => offer.pricing.currency !== plan.currency)
+  ) {
     return "CURRENCY_MISMATCH";
   }
   return null;
@@ -203,14 +209,21 @@ function isUnboundedZeroCostPricing(pricing: MerchantUsagePricing): boolean {
   if (pricing.mode === "FIXED") return pricing.unitAmountMinor === 0;
   if (pricing.mode === "VOLUME") {
     const finalTier = pricing.tiers[pricing.tiers.length - 1];
-    return finalTier.upTo === null && finalTier.amountPerUnitMinor === 0 && finalTier.flatAmountMinor === 0;
+    return (
+      finalTier.upTo === null &&
+      finalTier.amountPerUnitMinor === 0 &&
+      finalTier.flatAmountMinor === 0
+    );
   }
   return pricing.tiers.every(
     (tier) => tier.amountPerUnitMinor === 0 && tier.flatAmountMinor === 0,
   );
 }
 
-function calculateCost(pricing: MerchantUsagePricing, quantity: number): number | null {
+function calculateCost(
+  pricing: MerchantUsagePricing,
+  quantity: number,
+): number | null {
   if (!isNonNegativeSafeInteger(quantity)) return null;
   if (quantity === 0) return 0;
 
@@ -298,7 +311,10 @@ function compareEventHandles(left: string, right: string): number {
   return 0;
 }
 
-function isBetterPath(candidate: CombinationPath, existing: CombinationPath): boolean {
+function isBetterPath(
+  candidate: CombinationPath,
+  existing: CombinationPath,
+): boolean {
   if (candidate.totalCostMinor !== existing.totalCostMinor) {
     return candidate.totalCostMinor < existing.totalCostMinor;
   }
@@ -310,7 +326,12 @@ function isBetterPath(candidate: CombinationPath, existing: CombinationPath): bo
   if (candidateOvershoot !== existingOvershoot) {
     return candidateOvershoot < existingOvershoot;
   }
-  return compareEventHandles(summaryKey(candidate.summary), summaryKey(existing.summary)) < 0;
+  return (
+    compareEventHandles(
+      summaryKey(candidate.summary),
+      summaryKey(existing.summary),
+    ) < 0
+  );
 }
 
 export function findCheapestMerchantUsageCombination(
@@ -321,26 +342,52 @@ export function findCheapestMerchantUsageCombination(
     if (creditsNeeded === 0) {
       return result("PASS", "NO_TOPUPS_AVAILABLE", "No top-ups are required.");
     }
-    return result("UNVERIFIED", "INVALID_USAGE_EVENT", "Credits needed must be a positive safe integer.");
+    return result(
+      "UNVERIFIED",
+      "INVALID_USAGE_EVENT",
+      "Credits needed must be a positive safe integer.",
+    );
   }
   if (creditsNeeded > MAX_PORTFOLIO_ECONOMICS_CREDITS) {
-    return result("UNVERIFIED", "ECONOMICS_SEARCH_LIMIT_EXCEEDED", "The economics search target exceeds the bounded limit.");
+    return result(
+      "UNVERIFIED",
+      "ECONOMICS_SEARCH_LIMIT_EXCEEDED",
+      "The economics search target exceeds the bounded limit.",
+    );
   }
 
   const validationCode = validateOffers(usageEvents);
   if (validationCode) {
-    return result("UNVERIFIED", validationCode, "Usage pricing evidence is not valid for deterministic economics.");
+    return result(
+      "UNVERIFIED",
+      validationCode,
+      "Usage pricing evidence is not valid for deterministic economics.",
+    );
   }
 
-  const sortedOffers = [...usageEvents].sort((left, right) => compareEventHandles(left.eventHandle, right.eventHandle));
+  const sortedOffers = [...usageEvents].sort((left, right) =>
+    compareEventHandles(left.eventHandle, right.eventHandle),
+  );
   const states = new Map<number, CombinationPath>([
-    [0, { totalCostMinor: 0, actualCreditsGranted: 0, totalUnits: 0, summary: [] }],
+    [
+      0,
+      {
+        totalCostMinor: 0,
+        actualCreditsGranted: 0,
+        totalUnits: 0,
+        summary: [],
+      },
+    ],
   ]);
 
   for (const offer of sortedOffers) {
     const quantities = candidateQuantities(offer, creditsNeeded);
     if (!Array.isArray(quantities)) {
-      return result("UNVERIFIED", quantities, "The economics search exceeds its bounded candidate limit.");
+      return result(
+        "UNVERIFIED",
+        quantities,
+        "The economics search exceeds its bounded candidate limit.",
+      );
     }
     const nextStates = new Map(states);
     for (const path of states.values()) {
@@ -348,28 +395,47 @@ export function findCheapestMerchantUsageCombination(
         const costMinor = calculateCost(offer.pricing, quantity);
         const creditsGranted = offer.creditsGrantedPerUnit * quantity;
         if (costMinor === null || !Number.isSafeInteger(creditsGranted)) {
-          return result("UNVERIFIED", "ECONOMICS_SEARCH_LIMIT_EXCEEDED", "The economics calculation exceeds safe integer bounds.");
+          return result(
+            "UNVERIFIED",
+            "ECONOMICS_SEARCH_LIMIT_EXCEEDED",
+            "The economics calculation exceeds safe integer bounds.",
+          );
         }
-        const summary = quantity === 0
-          ? path.summary
-          : [...path.summary, {
-              eventHandle: offer.eventHandle,
-              quantity,
-              creditsGranted,
-              costMinor,
-            }];
+        const summary =
+          quantity === 0
+            ? path.summary
+            : [
+                ...path.summary,
+                {
+                  eventHandle: offer.eventHandle,
+                  quantity,
+                  creditsGranted,
+                  costMinor,
+                },
+              ];
         const candidate: CombinationPath = {
           totalCostMinor: path.totalCostMinor + costMinor,
           actualCreditsGranted: path.actualCreditsGranted + creditsGranted,
           totalUnits: path.totalUnits + quantity,
           summary,
         };
-        if (!Number.isSafeInteger(candidate.totalCostMinor) || !Number.isSafeInteger(candidate.actualCreditsGranted)) {
-          return result("UNVERIFIED", "ECONOMICS_SEARCH_LIMIT_EXCEEDED", "The economics calculation exceeds safe integer bounds.");
+        if (
+          !Number.isSafeInteger(candidate.totalCostMinor) ||
+          !Number.isSafeInteger(candidate.actualCreditsGranted)
+        ) {
+          return result(
+            "UNVERIFIED",
+            "ECONOMICS_SEARCH_LIMIT_EXCEEDED",
+            "The economics calculation exceeds safe integer bounds.",
+          );
         }
-        const stateKey = Math.min(creditsNeeded, candidate.actualCreditsGranted);
+        const stateKey = Math.min(
+          creditsNeeded,
+          candidate.actualCreditsGranted,
+        );
         const existing = nextStates.get(stateKey);
-        if (!existing || isBetterPath(candidate, existing)) nextStates.set(stateKey, candidate);
+        if (!existing || isBetterPath(candidate, existing))
+          nextStates.set(stateKey, candidate);
       }
     }
     states.clear();
@@ -378,9 +444,18 @@ export function findCheapestMerchantUsageCombination(
 
   const best = states.get(creditsNeeded);
   if (!best) {
-    return result("UNVERIFIED", "INVALID_USAGE_PRICING", "No bounded usage pricing combination can meet the requested credits.");
+    return result(
+      "UNVERIFIED",
+      "INVALID_USAGE_PRICING",
+      "No bounded usage pricing combination can meet the requested credits.",
+    );
   }
-  return result("PASS", "PORTFOLIO_ECONOMICS_OK", "A deterministic usage pricing combination satisfies the requested credits.", best);
+  return result(
+    "PASS",
+    "PORTFOLIO_ECONOMICS_OK",
+    "A deterministic usage pricing combination satisfies the requested credits.",
+    best,
+  );
 }
 
 function invalidPair(
@@ -403,39 +478,169 @@ export function evaluateMerchantPricingPair(
   higherPlan: MerchantPricingEconomicsPlan,
   minimumUpgradePremiumBps = DEFAULT_MINIMUM_PREMIUM_BPS,
 ): MerchantPricingPairResult {
-  const additionalCreditsNeeded = higherPlan.includedRecoveryCredits - lowerPlan.includedRecoveryCredits;
-  const base = { lowerPlanId: lowerPlan.id, higherPlanId: higherPlan.id, additionalCreditsNeeded };
-  if (lowerPlan.id === higherPlan.id) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "INVALID_PORTFOLIO_ORDER", "Upgrade plans must have different identities.");
-  if (!isNonNegativeSafeInteger(lowerPlan.recurringAmountMinor) || !isNonNegativeSafeInteger(higherPlan.recurringAmountMinor)) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "MISSING_PLAN_PRICE", "Recurring plan pricing evidence is missing or invalid.");
-  if (!isNonNegativeSafeInteger(lowerPlan.includedRecoveryCredits) || !isNonNegativeSafeInteger(higherPlan.includedRecoveryCredits)) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "INVALID_USAGE_EVENT", "Included recovery credits must be non-negative safe integers.");
-  if (!isCurrency(lowerPlan.currency) || !isCurrency(higherPlan.currency) || lowerPlan.currency !== higherPlan.currency) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "CURRENCY_MISMATCH", "Plan currencies must be equal normalized ISO-style codes.");
-  if (!isNonNegativeSafeInteger(minimumUpgradePremiumBps)) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "INVALID_USAGE_EVENT", "The minimum upgrade premium is invalid.");
-  if (!isPositiveSafeInteger(additionalCreditsNeeded)) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "NON_INCREASING_ALLOWANCE", "The higher plan must provide more included recovery credits.");
+  const additionalCreditsNeeded =
+    higherPlan.includedRecoveryCredits - lowerPlan.includedRecoveryCredits;
+  const base = {
+    lowerPlanId: lowerPlan.id,
+    higherPlanId: higherPlan.id,
+    additionalCreditsNeeded,
+  };
+  if (lowerPlan.id === higherPlan.id)
+    return invalidPair(
+      lowerPlan.id,
+      higherPlan.id,
+      additionalCreditsNeeded,
+      "INVALID_PORTFOLIO_ORDER",
+      "Upgrade plans must have different identities.",
+    );
+  if (
+    !isNonNegativeSafeInteger(lowerPlan.recurringAmountMinor) ||
+    !isNonNegativeSafeInteger(higherPlan.recurringAmountMinor)
+  )
+    return invalidPair(
+      lowerPlan.id,
+      higherPlan.id,
+      additionalCreditsNeeded,
+      "MISSING_PLAN_PRICE",
+      "Recurring plan pricing evidence is missing or invalid.",
+    );
+  if (
+    !isNonNegativeSafeInteger(lowerPlan.includedRecoveryCredits) ||
+    !isNonNegativeSafeInteger(higherPlan.includedRecoveryCredits)
+  )
+    return invalidPair(
+      lowerPlan.id,
+      higherPlan.id,
+      additionalCreditsNeeded,
+      "INVALID_USAGE_EVENT",
+      "Included recovery credits must be non-negative safe integers.",
+    );
+  if (
+    !isCurrency(lowerPlan.currency) ||
+    !isCurrency(higherPlan.currency) ||
+    lowerPlan.currency !== higherPlan.currency
+  )
+    return invalidPair(
+      lowerPlan.id,
+      higherPlan.id,
+      additionalCreditsNeeded,
+      "CURRENCY_MISMATCH",
+      "Plan currencies must be equal normalized ISO-style codes.",
+    );
+  if (!isNonNegativeSafeInteger(minimumUpgradePremiumBps))
+    return invalidPair(
+      lowerPlan.id,
+      higherPlan.id,
+      additionalCreditsNeeded,
+      "INVALID_USAGE_EVENT",
+      "The minimum upgrade premium is invalid.",
+    );
+  if (!isPositiveSafeInteger(additionalCreditsNeeded))
+    return invalidPair(
+      lowerPlan.id,
+      higherPlan.id,
+      additionalCreditsNeeded,
+      "NON_INCREASING_ALLOWANCE",
+      "The higher plan must provide more included recovery credits.",
+    );
 
-  for (const [planToValidate, usageEvents] of [[lowerPlan, lowerPlan.usageEvents], [higherPlan, higherPlan.usageEvents]] as const) {
+  for (const [planToValidate, usageEvents] of [
+    [lowerPlan, lowerPlan.usageEvents],
+    [higherPlan, higherPlan.usageEvents],
+  ] as const) {
     const validationCode = validateOffers(usageEvents);
-    if (validationCode) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, validationCode, "Usage pricing evidence is not valid for deterministic economics.");
-    if (usageEvents.some((offer) => offer.pricing.currency !== planToValidate.currency)) {
-      return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "CURRENCY_MISMATCH", "Usage pricing currency must match its plan currency.");
+    if (validationCode)
+      return invalidPair(
+        lowerPlan.id,
+        higherPlan.id,
+        additionalCreditsNeeded,
+        validationCode,
+        "Usage pricing evidence is not valid for deterministic economics.",
+      );
+    if (
+      usageEvents.some(
+        (offer) => offer.pricing.currency !== planToValidate.currency,
+      )
+    ) {
+      return invalidPair(
+        lowerPlan.id,
+        higherPlan.id,
+        additionalCreditsNeeded,
+        "CURRENCY_MISMATCH",
+        "Usage pricing currency must match its plan currency.",
+      );
     }
   }
 
   if (lowerPlan.usageEvents.length === 0) {
-    return { ...result("PASS", "NO_TOPUPS_AVAILABLE", "The lower plan has no usage top-up path."), ...base };
+    return {
+      ...result(
+        "PASS",
+        "NO_TOPUPS_AVAILABLE",
+        "The lower plan has no usage top-up path.",
+      ),
+      ...base,
+    };
   }
 
-  const combination = findCheapestMerchantUsageCombination(lowerPlan.usageEvents, additionalCreditsNeeded);
+  const combination = findCheapestMerchantUsageCombination(
+    lowerPlan.usageEvents,
+    additionalCreditsNeeded,
+  );
   if (combination.status !== "PASS") return { ...combination, ...base };
 
   const upgradeCostMinor = higherPlan.recurringAmountMinor;
-  const stayAndTopUpCostMinor = lowerPlan.recurringAmountMinor + combination.totalCostMinor;
-  if (!Number.isSafeInteger(stayAndTopUpCostMinor)) return invalidPair(lowerPlan.id, higherPlan.id, additionalCreditsNeeded, "ECONOMICS_SEARCH_LIMIT_EXCEEDED", "The upgrade comparison exceeds safe integer bounds.");
-  const requiredMinimumMinor = Math.ceil(upgradeCostMinor * (10_000 + minimumUpgradePremiumBps) / 10_000);
-  const premiumBps = upgradeCostMinor === 0 ? Number.POSITIVE_INFINITY : Math.round(((stayAndTopUpCostMinor - upgradeCostMinor) * 10_000) / upgradeCostMinor);
-  const details = { ...base, totalCostMinor: combination.totalCostMinor, actualCreditsGranted: combination.actualCreditsGranted, totalUnits: combination.totalUnits, summary: combination.summary, upgradeCostMinor, stayAndTopUpCostMinor, requiredMinimumMinor, premiumBps };
-  if (stayAndTopUpCostMinor <= upgradeCostMinor) return { ...details, status: "FAIL", code: "TOPUPS_CHEAPER_THAN_UPGRADE", message: "Top-ups are as cheap as or cheaper than the higher plan." };
-  if (stayAndTopUpCostMinor < requiredMinimumMinor) return { ...details, status: "FAIL", code: "UPGRADE_ADVANTAGE_TOO_SMALL", message: "The upgrade premium is below the configured minimum." };
-  return { ...details, status: "PASS", code: "PORTFOLIO_ECONOMICS_OK", message: "The higher plan retains the required economic advantage." };
+  const stayAndTopUpCostMinor =
+    lowerPlan.recurringAmountMinor + combination.totalCostMinor;
+  if (!Number.isSafeInteger(stayAndTopUpCostMinor))
+    return invalidPair(
+      lowerPlan.id,
+      higherPlan.id,
+      additionalCreditsNeeded,
+      "ECONOMICS_SEARCH_LIMIT_EXCEEDED",
+      "The upgrade comparison exceeds safe integer bounds.",
+    );
+  const requiredMinimumMinor = Math.ceil(
+    (upgradeCostMinor * (10_000 + minimumUpgradePremiumBps)) / 10_000,
+  );
+  const premiumBps =
+    upgradeCostMinor === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.round(
+          ((stayAndTopUpCostMinor - upgradeCostMinor) * 10_000) /
+            upgradeCostMinor,
+        );
+  const details = {
+    ...base,
+    totalCostMinor: combination.totalCostMinor,
+    actualCreditsGranted: combination.actualCreditsGranted,
+    totalUnits: combination.totalUnits,
+    summary: combination.summary,
+    upgradeCostMinor,
+    stayAndTopUpCostMinor,
+    requiredMinimumMinor,
+    premiumBps,
+  };
+  if (stayAndTopUpCostMinor <= upgradeCostMinor)
+    return {
+      ...details,
+      status: "FAIL",
+      code: "TOPUPS_CHEAPER_THAN_UPGRADE",
+      message: "Top-ups are as cheap as or cheaper than the higher plan.",
+    };
+  if (stayAndTopUpCostMinor < requiredMinimumMinor)
+    return {
+      ...details,
+      status: "FAIL",
+      code: "UPGRADE_ADVANTAGE_TOO_SMALL",
+      message: "The upgrade premium is below the configured minimum.",
+    };
+  return {
+    ...details,
+    status: "PASS",
+    code: "PORTFOLIO_ECONOMICS_OK",
+    message: "The higher plan retains the required economic advantage.",
+  };
 }
 
 export function evaluateMerchantPricingPortfolio({
@@ -444,31 +649,82 @@ export function evaluateMerchantPricingPortfolio({
   minimumUpgradePremiumBps = DEFAULT_MINIMUM_PREMIUM_BPS,
 }: MerchantPricingPortfolioInput): MerchantPricingPairResult[] {
   const ids = new Set(orderedPlanIds);
-  if (ids.size !== orderedPlanIds.length || Object.keys(plansById).length !== orderedPlanIds.length || orderedPlanIds.some((id) => !plansById[id])) {
-    return [invalidPair("", "", 0, "INVALID_PORTFOLIO_ORDER", "The supplied portfolio order does not resolve every plan exactly once.")];
+  if (
+    ids.size !== orderedPlanIds.length ||
+    Object.keys(plansById).length !== orderedPlanIds.length ||
+    orderedPlanIds.some((id) => !plansById[id])
+  ) {
+    return [
+      invalidPair(
+        "",
+        "",
+        0,
+        "INVALID_PORTFOLIO_ORDER",
+        "The supplied portfolio order does not resolve every plan exactly once.",
+      ),
+    ];
   }
   for (const planId of orderedPlanIds) {
     const plan = plansById[planId];
     if (plan.id !== planId) {
-      return [invalidPair(planId, plan.id, 0, "INVALID_PORTFOLIO_ORDER", "The portfolio map key must match the resolved plan identity.")];
+      return [
+        invalidPair(
+          planId,
+          plan.id,
+          0,
+          "INVALID_PORTFOLIO_ORDER",
+          "The portfolio map key must match the resolved plan identity.",
+        ),
+      ];
     }
     const validationCode = validatePlanEvidence(plan);
     if (validationCode) {
-      return [invalidPair(planId, planId, 0, validationCode, "Plan pricing evidence is not valid for deterministic economics.")];
+      return [
+        invalidPair(
+          planId,
+          planId,
+          0,
+          validationCode,
+          "Plan pricing evidence is not valid for deterministic economics.",
+        ),
+      ];
     }
   }
   const results: MerchantPricingPairResult[] = [];
-  for (let lowerIndex = 0; lowerIndex < orderedPlanIds.length - 1; lowerIndex += 1) {
-    for (let higherIndex = lowerIndex + 1; higherIndex < orderedPlanIds.length; higherIndex += 1) {
-      results.push(evaluateMerchantPricingPair(plansById[orderedPlanIds[lowerIndex]], plansById[orderedPlanIds[higherIndex]], minimumUpgradePremiumBps));
+  for (
+    let lowerIndex = 0;
+    lowerIndex < orderedPlanIds.length - 1;
+    lowerIndex += 1
+  ) {
+    for (
+      let higherIndex = lowerIndex + 1;
+      higherIndex < orderedPlanIds.length;
+      higherIndex += 1
+    ) {
+      results.push(
+        evaluateMerchantPricingPair(
+          plansById[orderedPlanIds[lowerIndex]],
+          plansById[orderedPlanIds[higherIndex]],
+          minimumUpgradePremiumBps,
+        ),
+      );
     }
   }
   return results;
 }
 
-export function assertMerchantPricingPortfolioPass(results: MerchantPricingPairResult[]): void {
+export function assertMerchantPricingPortfolioPass(
+  results: MerchantPricingPairResult[],
+): void {
   const failures = results.filter((entry) => entry.status !== "PASS");
   if (failures.length) {
-    throw new Error(failures.map((entry) => `${entry.lowerPlanId}->${entry.higherPlanId}:${entry.code}`).join(", "));
+    throw new Error(
+      failures
+        .map(
+          (entry) =>
+            `${entry.lowerPlanId}->${entry.higherPlanId}:${entry.code}`,
+        )
+        .join(", "),
+    );
   }
 }

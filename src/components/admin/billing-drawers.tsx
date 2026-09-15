@@ -1,9 +1,14 @@
 import type { BillingPlanRow } from "@/lib/admin/billing-plan";
-import type { BillingLedgerItem, RecoveryCreditPurchaseItem } from "@/lib/admin/types";
+import type {
+  BillingLedgerItem,
+  RecoveryCreditPurchaseItem,
+} from "@/lib/admin/types";
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
 import { PlanForm } from "./billing-plan-catalog";
+import { MerchantPricingPlanBuilder } from "./merchant-pricing-plan-builder";
+import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
 
 function DetailList({
   items,
@@ -49,6 +54,40 @@ export function BillingPlanDrawer({
   );
 }
 
+export function MerchantPricingPlanDrawer({
+  plan,
+  cataloguePlans,
+  minimumUpgradePremiumBps = 2000,
+  params,
+  register = false,
+}: {
+  plan?: MerchantPricingPlanWithChildren;
+  cataloguePlans?: MerchantPricingPlanWithChildren[];
+  minimumUpgradePremiumBps?: number;
+  params: Record<string, string>;
+  register?: boolean;
+}) {
+  const closeHref = withParamUpdates("/billing", params, {
+    planId: null,
+    drawer: null,
+  });
+  return (
+    <AdminDetailDrawer
+      title={
+        register ? "Register MerchantPricing plan" : "Edit MerchantPricing plan"
+      }
+      closeHref={closeHref}
+      size="wide"
+    >
+      <MerchantPricingPlanBuilder
+        plan={plan}
+        cataloguePlans={cataloguePlans}
+        minimumUpgradePremiumBps={minimumUpgradePremiumBps}
+      />
+    </AdminDetailDrawer>
+  );
+}
+
 export function RecoveryCreditPurchaseDrawer({
   purchase,
   params,
@@ -72,21 +111,54 @@ export function RecoveryCreditPurchaseDrawer({
         items={[
           [adminI18n.t("billing.purchaseId"), purchase.id],
           [adminI18n.t("billing.shop"), purchase.shop.domain],
-          [adminI18n.t("billing.status"), adminI18n.t(`billing.packStatus.${purchase.status}`)],
+          [
+            adminI18n.t("billing.status"),
+            adminI18n.t(`billing.packStatus.${purchase.status}`),
+          ],
           [adminI18n.t("billing.creditsGranted"), purchase.creditsGranted],
-          [adminI18n.t("billing.createdAt"), adminI18n.formatDateTime(purchase.createdAt)],
-          [adminI18n.t("billing.activatedAt"), purchase.activatedAt ? adminI18n.formatDateTime(purchase.activatedAt) : null],
-          [adminI18n.t("billing.planSnapshot"), purchase.shopifyPlanHandleSnapshot],
-          [adminI18n.t("billing.packMeterSnapshot"), purchase.shopifyEventHandleSnapshot],
+          [
+            adminI18n.t("billing.createdAt"),
+            adminI18n.formatDateTime(purchase.createdAt),
+          ],
+          [
+            adminI18n.t("billing.activatedAt"),
+            purchase.activatedAt
+              ? adminI18n.formatDateTime(purchase.activatedAt)
+              : null,
+          ],
+          [
+            adminI18n.t("billing.planSnapshot"),
+            purchase.shopifyPlanHandleSnapshot,
+          ],
+          [
+            adminI18n.t("billing.packMeterSnapshot"),
+            purchase.shopifyEventHandleSnapshot,
+          ],
           [adminI18n.t("billing.usageEventId"), event.id],
           [adminI18n.t("billing.metric"), event.metric],
           [adminI18n.t("billing.quantity"), event.quantity],
-          [adminI18n.t("billing.reportStateLabel"), adminBillingReportStateLabel(event.shopifyReportState)],
-          [adminI18n.t("billing.submittedAt"), event.reportedAt ? adminI18n.formatDateTime(event.reportedAt) : null],
+          [
+            adminI18n.t("billing.reportStateLabel"),
+            adminBillingReportStateLabel(event.shopifyReportState),
+          ],
+          [
+            adminI18n.t("billing.submittedAt"),
+            event.reportedAt
+              ? adminI18n.formatDateTime(event.reportedAt)
+              : null,
+          ],
           [adminI18n.t("billing.reportAttempts"), event.reportAttemptCount],
-          [adminI18n.t("billing.lastReportAttemptAt"), event.lastReportAttemptAt ? adminI18n.formatDateTime(event.lastReportAttemptAt) : null],
+          [
+            adminI18n.t("billing.lastReportAttemptAt"),
+            event.lastReportAttemptAt
+              ? adminI18n.formatDateTime(event.lastReportAttemptAt)
+              : null,
+          ],
           [adminI18n.t("billing.providerErrorCode"), event.providerErrorCode],
-          [adminI18n.t("billing.providerResponse"), event.providerResponseSummary],
+          [
+            adminI18n.t("billing.providerResponse"),
+            event.providerResponseSummary,
+          ],
         ]}
       />
       {eventReported ? (
@@ -125,13 +197,32 @@ export function BillingEventDrawer({
           [adminI18n.t("billing.shop"), event.shop.domain],
           [adminI18n.t("billing.metric"), event.metric],
           [adminI18n.t("billing.quantity"), event.quantity],
-          [adminI18n.t("billing.reportStateLabel"), adminBillingReportStateLabel(event.shopifyReportState)],
-          [adminI18n.t("billing.occurredAt"), adminI18n.formatDateTime(event.occurredAt)],
+          [
+            adminI18n.t("billing.reportStateLabel"),
+            adminBillingReportStateLabel(event.shopifyReportState),
+          ],
+          [
+            adminI18n.t("billing.occurredAt"),
+            adminI18n.formatDateTime(event.occurredAt),
+          ],
           [adminI18n.t("billing.reportAttempts"), event.reportAttemptCount],
-          [adminI18n.t("billing.lastReportAttemptAt"), event.lastReportAttemptAt ? adminI18n.formatDateTime(event.lastReportAttemptAt) : null],
-          [adminI18n.t("billing.submittedAt"), event.reportedAt ? adminI18n.formatDateTime(event.reportedAt) : null],
+          [
+            adminI18n.t("billing.lastReportAttemptAt"),
+            event.lastReportAttemptAt
+              ? adminI18n.formatDateTime(event.lastReportAttemptAt)
+              : null,
+          ],
+          [
+            adminI18n.t("billing.submittedAt"),
+            event.reportedAt
+              ? adminI18n.formatDateTime(event.reportedAt)
+              : null,
+          ],
           [adminI18n.t("billing.providerErrorCode"), event.providerErrorCode],
-          [adminI18n.t("billing.providerResponse"), event.providerResponseSummary],
+          [
+            adminI18n.t("billing.providerResponse"),
+            event.providerResponseSummary,
+          ],
           [adminI18n.t("billing.shopifyEventHandle"), event.shopifyEventHandle],
           [adminI18n.t("billing.usageEventId"), event.id],
         ]}

@@ -1,9 +1,9 @@
 import { AdminShell } from "@/components/admin/admin-shell";
-import { BillingPlanCatalog } from "@/components/admin/billing-plan-catalog";
+import { MerchantPricingPlanCatalog } from "@/components/admin/merchant-pricing-plan-catalog";
 import { BillingTabs, type BillingView } from "@/components/admin/billing-tabs";
 import {
   BillingEventDrawer,
-  BillingPlanDrawer,
+  MerchantPricingPlanDrawer,
   RecoveryCreditPurchaseDrawer,
 } from "@/components/admin/billing-drawers";
 import {
@@ -12,10 +12,9 @@ import {
 } from "@/components/admin/billing-recovery-packs";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import {
-  getBillingPlanById,
-  getBillingPlanEconomics,
-  getBillingPlans,
-} from "@/lib/admin/billing-plan";
+  getMerchantPricingPlanById,
+  getMerchantPricingPlans,
+} from "@/lib/admin/merchant-pricing-plan";
 import {
   getBillingLedger,
   getBillingLedgerItem,
@@ -41,8 +40,15 @@ import {
 } from "@/components/admin/billing-controls";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
 import { getBillingEconomicsControls } from "@/lib/admin/billing-economics";
-import { RecoveryCreditRefundDrawer, RecoveryCreditRefundQueue, parseRecoveryCreditRefundStatus } from "@/components/admin/recovery-credit-refunds";
-import { getRecoveryCreditRefundDetail, getRecoveryCreditRefunds } from "@/lib/admin/recovery-credit-refunds";
+import {
+  RecoveryCreditRefundDrawer,
+  RecoveryCreditRefundQueue,
+  parseRecoveryCreditRefundStatus,
+} from "@/components/admin/recovery-credit-refunds";
+import {
+  getRecoveryCreditRefundDetail,
+  getRecoveryCreditRefunds,
+} from "@/lib/admin/recovery-credit-refunds";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +58,14 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const principal = await requirePlatformAdminPage();
   const rawParams = await searchParams;
   const params = paramsToRecord(rawParams);
-  const allowedViews: BillingView[] = ["overview", "plans", "packs", "refunds", "events", "controls"];
+  const allowedViews: BillingView[] = [
+    "overview",
+    "plans",
+    "packs",
+    "refunds",
+    "events",
+    "controls",
+  ];
   const rawView = firstParam(rawParams.view) as BillingView | undefined;
   const view = allowedViews.includes(rawView ?? "overview")
     ? (rawView ?? "overview")
@@ -63,12 +76,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
   )
     ? (rawState as ShopifyReportState)
     : undefined;
-  const plans = view === "plans" ? await getBillingPlans() : null;
-  const planEconomics =
-    view === "plans" ? await getBillingPlanEconomics() : null;
+  const plans = view === "plans" ? await getMerchantPricingPlans() : null;
+  const plansPolicy =
+    view === "plans" ? await getPlatformBillingPolicy() : null;
   const selectedPlan =
     view === "plans" && firstParam(rawParams.planId)
-      ? await getBillingPlanById(firstParam(rawParams.planId) as string)
+      ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
       : null;
   const policy = view === "controls" ? await getPlatformBillingPolicy() : null;
   const economics =
@@ -93,12 +106,16 @@ export default async function BillingPage({ searchParams }: PageProps) {
       ? await getRecoveryCreditRefunds({
           page: positiveInt(rawParams.refundPage),
           pageSize: 20,
-          status: parseRecoveryCreditRefundStatus(firstParam(rawParams.refundStatus)),
+          status: parseRecoveryCreditRefundStatus(
+            firstParam(rawParams.refundStatus),
+          ),
         })
       : null;
   const selectedRefund =
     view === "refunds" && firstParam(rawParams.refundId)
-      ? await getRecoveryCreditRefundDetail(firstParam(rawParams.refundId) as string)
+      ? await getRecoveryCreditRefundDetail(
+          firstParam(rawParams.refundId) as string,
+        )
       : null;
   const ledger =
     view === "events"
@@ -131,8 +148,8 @@ export default async function BillingPage({ searchParams }: PageProps) {
         {view === "overview" && overview ? (
           <BillingOverviewCards overview={overview} />
         ) : null}
-        {view === "plans" && plans && planEconomics ? (
-          <BillingPlanCatalog plans={plans} economics={planEconomics} />
+        {view === "plans" && plans ? (
+          <MerchantPricingPlanCatalog plans={plans} />
         ) : null}
         {view === "packs" && packs ? (
           <BillingRecoveryPacks purchases={packs} params={params} />
@@ -148,8 +165,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
         ) : null}
         {view === "plans" &&
         (params.drawer === "register-plan" || selectedPlan) ? (
-          <BillingPlanDrawer
+          <MerchantPricingPlanDrawer
             plan={selectedPlan ?? undefined}
+            cataloguePlans={plans ?? []}
+            minimumUpgradePremiumBps={
+              plansPolicy?.minimumUpgradePremiumBps ?? 2000
+            }
             params={params}
             register={params.drawer === "register-plan"}
           />
@@ -160,7 +181,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
             params={params}
           />
         ) : null}
-        {view === "refunds" && refunds ? <RecoveryCreditRefundQueue refunds={refunds} params={params} /> : null}
+        {view === "refunds" && refunds ? (
+          <RecoveryCreditRefundQueue refunds={refunds} params={params} />
+        ) : null}
         {view === "refunds" && selectedRefund ? (
           <RecoveryCreditRefundDrawer
             refund={selectedRefund}

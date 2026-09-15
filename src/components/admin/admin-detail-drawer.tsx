@@ -5,10 +5,12 @@ import { adminI18n } from "@/i18n";
 export function AdminDetailDrawer({
   title,
   closeHref,
+  size = "default",
   children,
 }: {
   title: string;
   closeHref: string;
+  size?: "default" | "wide";
   children: ReactNode;
 }) {
   return (
@@ -18,7 +20,9 @@ export function AdminDetailDrawer({
         aria-label={adminI18n.t("billing.closeDetails")}
         className="fixed inset-0 z-40 bg-gray-900/30"
       />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[520px] flex-col border-l border-gray-200 bg-white shadow-2xl">
+      <aside
+        className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-gray-200 bg-white shadow-2xl ${size === "wide" ? "max-w-5xl" : "max-w-[520px]"}`}
+      >
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-5">
           <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <Link
