@@ -7,6 +7,7 @@ import {
   projectMerchantPricingCatalogueOrder,
   resolveMerchantPricingPreviewPosition,
 } from "../../src/lib/admin/merchant-pricing-builder-payload.ts";
+import { findUnboundedZeroCostEventLabel } from "../../src/lib/admin/merchant-pricing-builder-presentation.ts";
 
 function payload(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
@@ -251,4 +252,38 @@ test("validates stable highlight keys and bounded merchant content", () => {
       () => parseMerchantPricingBuilderPayload(payload({ highlights })),
       MerchantPricingPayloadError,
     );
+});
+
+test("finds a deterministic Admin label for unbounded zero-cost usage events", () => {
+  const parseMoney = (value: string) => Number(value) * 100;
+  assert.equal(
+    findUnboundedZeroCostEventLabel(
+      [
+        {
+          adminLabel: "Bronze Top Up",
+          pricingMode: "FIXED",
+          creditsGrantedPerUnit: 5,
+          maximumUnitsPerBillingPeriod: null,
+          fixedUnitAmount: "0",
+        },
+      ],
+      parseMoney,
+    ),
+    "Bronze Top Up",
+  );
+  assert.equal(
+    findUnboundedZeroCostEventLabel(
+      [
+        {
+          adminLabel: "Bounded",
+          pricingMode: "FIXED",
+          creditsGrantedPerUnit: 5,
+          maximumUnitsPerBillingPeriod: 1,
+          fixedUnitAmount: "0",
+        },
+      ],
+      parseMoney,
+    ),
+    null,
+  );
 });

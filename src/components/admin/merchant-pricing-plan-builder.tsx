@@ -12,6 +12,7 @@ import {
   type MerchantPricingEconomicsPlan,
   type MerchantPricingPairResult,
 } from "@/lib/admin/merchant-pricing-economics";
+import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant-pricing-builder-presentation";
 import {
   buildMerchantPricingTranslationTemplate,
   type MerchantPricingTranslationParseResult,
@@ -343,6 +344,10 @@ export function MerchantPricingPlanBuilder({
   ]);
 
   const economicsPreview = economicsState.results;
+  const unboundedZeroCostEventLabel = findUnboundedZeroCostEventLabel(
+    events,
+    parseMoneyToMinorUnits,
+  );
   const economicsPassed =
     !economicsState.invalid &&
     economicsPreview.every((result) => result.status === "PASS");
@@ -1043,9 +1048,11 @@ export function MerchantPricingPlanBuilder({
                         Usage-event pricing needs attention
                       </h4>
                       <p>
-                        One of the usage events gives recovery credits for free
-                        with no usage limit. Enter a price greater than 0 or set
-                        a maximum number of uses per billing period.
+                        {unboundedZeroCostEventLabel
+                          ? `${unboundedZeroCostEventLabel} gives recovery credits for free with no usage limit.`
+                          : "One of the usage events gives recovery credits for free with no usage limit."} Enter a
+                        price greater than 0 or set a maximum number of uses per
+                        billing period.
                       </p>
                     </div>
                   ) : (
