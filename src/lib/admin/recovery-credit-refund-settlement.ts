@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 const MAX_REFERENCE_LENGTH = 512;
 const MAX_REASON_LENGTH = 1000;
 const CURRENCY = /^[A-Z]{3}$/;
+const SUPPORTED_CURRENCIES = new Set(Intl.supportedValuesOf("currency"));
 type Transaction = Prisma.TransactionClient;
 
 function bounded(value: string, max: number, name: string): string {
@@ -21,8 +22,30 @@ function bounded(value: string, max: number, name: string): string {
   return trimmed;
 }
 
-function expectedAmount(amount: Prisma.Decimal, quantity: number, granted: number): Prisma.Decimal {
-  return amount.mul(quantity).div(granted).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+function currencyFractionDigits(currency: string): number {
+  if (!CURRENCY.test(currency) || !SUPPORTED_CURRENCIES.has(currency)) {
+    throw new Error("Provider currency is unsupported.");
+  }
+  const fractionDigits = new Intl.NumberFormat("en", {
+    style: "currency",
+    currency,
+  }).resolvedOptions().maximumFractionDigits;
+  if (fractionDigits === undefined || !Number.isInteger(fractionDigits) || fractionDigits < 0 || fractionDigits > 4) {
+    throw new Error("Provider currency precision is unsupported.");
+  }
+  return fractionDigits;
+}
+
+function expectedAmount(
+  amount: Prisma.Decimal,
+  quantity: number,
+  granted: number,
+  currency: string,
+): Prisma.Decimal {
+  return amount
+    .mul(quantity)
+    .div(granted)
+    .toDecimalPlaces(currencyFractionDigits(currency), Prisma.Decimal.ROUND_HALF_UP);
 }
 
 async function createSystemMessage(transaction: Transaction, shopId: string, refundId: string, code: string, body: string): Promise<void> {
@@ -60,20 +83,25 @@ export async function lockRecoveryCreditRefund(refundId: string, reason: string)
     if (refund.status !== RecoveryCreditRefundStatus.REQUESTED) return { status: refund.status } as const;
     if (purchase.status !== RecoveryCreditPurchaseStatus.WITHDRAWN) throw new Error("Purchase is not withdrawn.");
     if (purchase.reservedAmount > 0) throw new Error("WAITING_FOR_RESERVATIONS");
-    if (purchase.currentAmount === 0) return completeZeroCurrent(transaction, principal.id, refund, purchase, aggregate, boundedReason);
+    if (purchase.currentAmount === 0) return completeZeroCurrent(transaction, principal.id, refund, purchase, boundedReason);
     if (purchase.currentAmount < 0) throw new Error("Purchase balance is invalid.");
     assertProvenance(purchase);
     if (aggregate.grantedQuantity < 0 || aggregate.committedQuantity < 0 || aggregate.reservedQuantity < 0 || aggregate.refundingQuantity < purchase.currentAmount || aggregate.grantedQuantity < aggregate.committedQuantity + aggregate.reservedQuantity + aggregate.refundingQuantity) throw new Error("Aggregate purchased-credit parity is inconsistent.");
     const finalCreditQuantity = purchase.currentAmount;
-    const expectedProviderAmount = expectedAmount(purchase.providerPurchaseAmount!, finalCreditQuantity, purchase.creditsGranted);
+    const expectedProviderAmount = expectedAmount(
+      purchase.providerPurchaseAmount!,
+      finalCreditQuantity,
+      purchase.creditsGranted,
+      purchase.providerPurchaseCurrency!,
+    );
     const updated = await transaction.recoveryCreditRefund.updateMany({ where: { id: refund.id, status: RecoveryCreditRefundStatus.REQUESTED, version: refund.version, purchaseId: purchase.id }, data: { status: RecoveryCreditRefundStatus.PROVIDER_ACTION_REQUIRED, finalCreditQuantity, expectedProviderAmount, expectedProviderCurrency: purchase.providerPurchaseCurrency, approvedByPlatformAdminId: principal.id, approvedAt: new Date(), holdAppliedAt: new Date(), version: { increment: 1 }, reason: boundedReason } });
     if (updated.count !== 1) throw new Error("Refund changed while locking provider action.");
     return { status: RecoveryCreditRefundStatus.PROVIDER_ACTION_REQUIRED, finalCreditQuantity, expectedProviderAmount: expectedProviderAmount.toString(), expectedProviderCurrency: purchase.providerPurchaseCurrency };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
-async function completeZeroCurrent(transaction: Transaction, adminId: string, refund: Awaited<ReturnType<typeof loadSettlementState>>["refund"], purchase: Awaited<ReturnType<typeof loadSettlementState>>["purchase"], aggregate: Awaited<ReturnType<typeof loadSettlementState>>["aggregate"], reason: string) {
-  if (purchase.reservedAmount !== 0 || aggregate.refundingQuantity !== 0) throw new Error("Aggregate hold parity is inconsistent.");
+async function completeZeroCurrent(transaction: Transaction, adminId: string, refund: Awaited<ReturnType<typeof loadSettlementState>>["refund"], purchase: Awaited<ReturnType<typeof loadSettlementState>>["purchase"], reason: string) {
+  if (purchase.reservedAmount !== 0) throw new Error("Purchase reservation parity is inconsistent.");
   const purchaseUpdate = await transaction.recoveryCreditPurchase.updateMany({ where: { id: purchase.id, status: RecoveryCreditPurchaseStatus.WITHDRAWN, version: purchase.version, currentAmount: 0, reservedAmount: 0 }, data: { status: RecoveryCreditPurchaseStatus.COMPLETED, version: { increment: 1 } } });
   const refundUpdate = await transaction.recoveryCreditRefund.updateMany({ where: { id: refund.id, status: RecoveryCreditRefundStatus.REQUESTED, version: refund.version }, data: { status: RecoveryCreditRefundStatus.COMPLETED, completedAt: new Date(), reason, version: { increment: 1 } } });
   if (purchaseUpdate.count !== 1 || refundUpdate.count !== 1) throw new Error("Refund changed while closing zero-current purchase.");
@@ -90,7 +118,7 @@ export async function rejectRecoveryCreditRefund(refundId: string, reason: strin
     const { refund, purchase, aggregate } = await loadSettlementState(transaction, refundId);
     if (refund.status !== RecoveryCreditRefundStatus.REQUESTED) throw new Error("Provider action may already have started.");
     if (purchase.status !== RecoveryCreditPurchaseStatus.WITHDRAWN) throw new Error("Purchase is not withdrawn.");
-    if (purchase.currentAmount === 0) return completeZeroCurrent(transaction, principal.id, refund, purchase, aggregate, boundedReason);
+    if (purchase.currentAmount === 0) return completeZeroCurrent(transaction, principal.id, refund, purchase, boundedReason);
     if (purchase.currentAmount < 0 || purchase.reservedAmount < 0 || purchase.reservedAmount > purchase.currentAmount) throw new Error("Purchase balance is invalid.");
     const heldAvailable = purchase.currentAmount - purchase.reservedAmount;
     if (aggregate.refundingQuantity < heldAvailable) throw new Error("Aggregate hold parity is inconsistent.");

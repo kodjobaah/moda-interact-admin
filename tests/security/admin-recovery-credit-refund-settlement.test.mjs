@@ -20,12 +20,34 @@ test("settlement is SUPER_ADMIN-only and locks the exact withdrawn balance", asy
   assert.match(source, /providerPurchaseAmount/);
   assert.match(source, /providerPurchaseCurrency/);
   assert.match(source, /providerValuationConfirmedAt/);
-  assert.match(source, /toDecimalPlaces\(2, Prisma\.Decimal\.ROUND_HALF_UP\)/);
+  assert.match(source, /SUPPORTED_CURRENCIES = new Set\(Intl\.supportedValuesOf\("currency"\)\)/);
+  assert.match(source, /currencyFractionDigits\(currency\)/);
+  assert.doesNotMatch(source, /toDecimalPlaces\(2/);
+  assert.match(source, /toDecimalPlaces\(currencyFractionDigits\(currency\), Prisma\.Decimal\.ROUND_HALF_UP\)/);
+  assert.doesNotMatch(source, /aggregate: Awaited<ReturnType<typeof loadSettlementState>>\["aggregate"\], reason/);
+  assert.doesNotMatch(source, /completeZeroCurrent\(transaction, principal\.id, refund, purchase, aggregate/);
   assert.match(source, /currentAmount: 0/);
   assert.match(source, /status: RecoveryCreditPurchaseStatus\.REFUNDED/);
   assert.match(source, /refundingQuantity: \{ decrement: quantity \}/);
   assert.match(source, /grantedQuantity: \{ decrement: quantity \}/);
   assert.doesNotMatch(source, /refundedQuantity/);
+});
+
+test("currency precision follows ISO currency metadata", async () => {
+  const source = await readFile(path.join(root, "src/lib/admin/recovery-credit-refund-settlement.ts"), "utf8");
+  assert.match(source, /SUPPORTED_CURRENCIES\.has\(currency\)/);
+  assert.match(source, /maximumFractionDigits/);
+  assert.match(source, /fractionDigits < 0/);
+  assert.match(source, /fractionDigits > 4/);
+  assert.match(source, /purchase\.providerPurchaseCurrency/);
+});
+
+test("zero-current completion does not couple independent purchase holds", async () => {
+  const source = await readFile(path.join(root, "src/lib/admin/recovery-credit-refund-settlement.ts"), "utf8");
+  const helper = source.slice(source.indexOf("async function completeZeroCurrent"), source.indexOf("export async function rejectRecoveryCreditRefund"));
+  assert.match(helper, /purchase\.reservedAmount !== 0/);
+  assert.doesNotMatch(helper, /aggregate\.refundingQuantity/);
+  assert.doesNotMatch(helper, /shopEntitlementCounter\.updateMany/);
 });
 
 test("settlement preserves holds on mismatch and uses idempotent shared messages/audit", async () => {

@@ -57,5 +57,9 @@ test("refund UI preserves exact-lot authority and exposes settlement controls", 
   assert.match(component, /Frozen settlement evidence/);
   assert.match(component, /Expected provider amount/);
   assert.match(component, /Provider settlement is manual through Shopify Partner Dashboard or Support/);
+  assert.match(page, /const principal = await requirePlatformAdminPage\(\)/);
+  assert.match(page, /canSettle=\{principal\.role === "SUPER_ADMIN"\}/);
+  assert.match(component, /canSettle: boolean/);
+  assert.match(component, /\{canSettle \? <SettlementActions refund=\{refund\} \/> : null\}/);
   assert.doesNotMatch(component, /type="number"|type="money"|percentage|creditsRequested|creditsApproved/);
 });

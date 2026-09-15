@@ -151,9 +151,11 @@ export function RecoveryCreditRefundQueue({
 export function RecoveryCreditRefundDrawer({
   refund,
   params,
+  canSettle,
 }: {
   refund: RecoveryCreditRefundDetail;
   params: Record<string, string>;
+  canSettle: boolean;
 }) {
   const notice = stateNotice(refund);
   const providerSnapshot = JSON.stringify(refund.purchase.providerPriceSnapshot)?.slice(0, 2000) ?? null;
@@ -211,7 +213,7 @@ export function RecoveryCreditRefundDrawer({
         ["Provider reference", refund.providerReference],
         ["Recorded provider amount", refund.providerAmount ? `${refund.providerAmount} ${refund.providerCurrency ?? ""}` : null],
       ]} />
-      <SettlementActions refund={refund} />
+      {canSettle ? <SettlementActions refund={refund} /> : null}
       <p className="mt-6 rounded-md bg-gray-50 p-4 text-xs text-gray-600">The current plan or top-up price is evidence only; the exact purchase value is the refund authority. Provider settlement is manual through Shopify Partner Dashboard or Support.</p>
     </AdminDetailDrawer>
   );

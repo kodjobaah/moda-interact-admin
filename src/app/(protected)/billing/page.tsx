@@ -49,7 +49,7 @@ export const dynamic = "force-dynamic";
 type PageProps = { searchParams: Promise<SearchParamRecord> };
 
 export default async function BillingPage({ searchParams }: PageProps) {
-  await requirePlatformAdminPage();
+  const principal = await requirePlatformAdminPage();
   const rawParams = await searchParams;
   const params = paramsToRecord(rawParams);
   const allowedViews: BillingView[] = ["overview", "plans", "packs", "refunds", "events", "controls"];
@@ -161,7 +161,13 @@ export default async function BillingPage({ searchParams }: PageProps) {
           />
         ) : null}
         {view === "refunds" && refunds ? <RecoveryCreditRefundQueue refunds={refunds} params={params} /> : null}
-        {view === "refunds" && selectedRefund ? <RecoveryCreditRefundDrawer refund={selectedRefund} params={params} /> : null}
+        {view === "refunds" && selectedRefund ? (
+          <RecoveryCreditRefundDrawer
+            refund={selectedRefund}
+            params={params}
+            canSettle={principal.role === "SUPER_ADMIN"}
+          />
+        ) : null}
         {view === "events" && selectedEvent ? (
           <BillingEventDrawer event={selectedEvent} params={params} />
         ) : null}
