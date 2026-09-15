@@ -133,6 +133,21 @@ test("zero-cost unbounded meters are unverified", () => {
   assert.deepEqual([result.status, result.code], ["UNVERIFIED", "UNBOUNDED_ZERO_COST_USAGE_EVENT"]);
 });
 
+test("paid early VOLUME tiers do not hide an unbounded free tier", () => {
+  const result = findCheapestMerchantUsageCombination([
+    tiered("meter", "VOLUME", [
+      { upTo: 2, amountPerUnitMinor: 100, flatAmountMinor: 0 },
+      { upTo: null, amountPerUnitMinor: 0, flatAmountMinor: 0 },
+    ]),
+  ], 1);
+  assert.deepEqual([result.status, result.code], ["UNVERIFIED", "UNBOUNDED_ZERO_COST_USAGE_EVENT"]);
+});
+
+test("padded event handles are invalid rather than normalized", () => {
+  const result = findCheapestMerchantUsageCombination([fixed(" meter", 1, 1)], 1);
+  assert.equal(result.code, "INVALID_USAGE_EVENT");
+});
+
 test("duplicate event handles are invalid", () => {
   const result = findCheapestMerchantUsageCombination([fixed("meter", 1, 1), fixed("meter", 2, 1)], 1);
   assert.equal(result.code, "INVALID_USAGE_EVENT");
@@ -164,11 +179,27 @@ test("search limit returns the exact bounded code", () => {
   assert.equal(result.code, "ECONOMICS_SEARCH_LIMIT_EXCEEDED");
 });
 
+test("an unbounded VOLUME boundary above the candidate limit is rejected", () => {
+  const result = findCheapestMerchantUsageCombination([
+    tiered("meter", "VOLUME", [
+      { upTo: 100_001, amountPerUnitMinor: 100, flatAmountMinor: 0 },
+      { upTo: null, amountPerUnitMinor: 1, flatAmountMinor: 0 },
+    ]),
+  ], 1);
+  assert.equal(result.code, "ECONOMICS_SEARCH_LIMIT_EXCEEDED");
+});
+
 test("reversing input event order does not change the result", () => {
   const events = [fixed("b", 2, 20), fixed("a", 1, 10)];
   const first = findCheapestMerchantUsageCombination(events, 3);
   const second = findCheapestMerchantUsageCombination([...events].reverse(), 3);
   assert.deepEqual(second, first);
+});
+
+test("tie-breaking is deterministic for mixed-case and punctuation handles", () => {
+  const events = [fixed("a-", 1, 10), fixed("A_", 1, 10)];
+  const result = findCheapestMerchantUsageCombination(events, 1);
+  assert.equal(result.summary[0].eventHandle, "A_");
 });
 
 test("four plans produce six portfolio pairs in nested-loop order", () => {

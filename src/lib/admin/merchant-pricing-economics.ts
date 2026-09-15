@@ -152,7 +152,8 @@ function validateOffer(
   offer: MerchantPricingUsageOffer,
 ): MerchantPricingResultCode | null {
   if (
-    !offer.eventHandle.trim() ||
+    !offer.eventHandle ||
+    offer.eventHandle !== offer.eventHandle.trim() ||
     !isPositiveSafeInteger(offer.creditsGrantedPerUnit) ||
     (offer.maximumUnitsPerBillingPeriod !== null &&
       !isPositiveSafeInteger(offer.maximumUnitsPerBillingPeriod))
@@ -170,7 +171,7 @@ function validateOffers(
   for (const offer of offers) {
     const code = validateOffer(offer);
     if (code) return code;
-    const handle = offer.eventHandle.trim();
+    const handle = offer.eventHandle;
     if (handles.has(handle)) return "INVALID_USAGE_EVENT";
     handles.add(handle);
     if (
@@ -185,6 +186,10 @@ function validateOffers(
 
 function isUnboundedZeroCostPricing(pricing: MerchantUsagePricing): boolean {
   if (pricing.mode === "FIXED") return pricing.unitAmountMinor === 0;
+  if (pricing.mode === "VOLUME") {
+    const finalTier = pricing.tiers[pricing.tiers.length - 1];
+    return finalTier.upTo === null && finalTier.amountPerUnitMinor === 0 && finalTier.flatAmountMinor === 0;
+  }
   return pricing.tiers.every(
     (tier) => tier.amountPerUnitMinor === 0 && tier.flatAmountMinor === 0,
   );
@@ -240,21 +245,16 @@ function candidateQuantities(
   }
 
   if (offer.pricing.mode === "VOLUME") {
-    let previous = 0;
     for (const tier of offer.pricing.tiers) {
-      if (
-        tier.upTo !== null &&
-        tier.upTo + 1 > soloUnits &&
-        tier.upTo + 1 <= (maximum ?? MAX_METER_CANDIDATE_QUANTITY)
-      ) {
-        if (tier.upTo + 1 > MAX_METER_CANDIDATE_QUANTITY) {
+      if (tier.upTo !== null && tier.upTo + 1 > soloUnits) {
+        const laterTierEntry = tier.upTo + 1;
+        if (maximum !== null && laterTierEntry > maximum) break;
+        if (laterTierEntry > MAX_METER_CANDIDATE_QUANTITY) {
           return "ECONOMICS_SEARCH_LIMIT_EXCEEDED";
         }
-        values.add(tier.upTo + 1);
+        values.add(laterTierEntry);
       }
-      if (tier.upTo !== null) previous = tier.upTo;
     }
-    void previous;
     if (maximum !== null) {
       if (maximum > MAX_METER_CANDIDATE_QUANTITY) {
         return "ECONOMICS_SEARCH_LIMIT_EXCEEDED";
@@ -277,6 +277,12 @@ function summaryKey(summary: MerchantPricingCombinationRow[]): string {
   return summary.map((row) => `${row.eventHandle}:${row.quantity}`).join(",");
 }
 
+function compareEventHandles(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function isBetterPath(candidate: CombinationPath, existing: CombinationPath): boolean {
   if (candidate.totalCostMinor !== existing.totalCostMinor) {
     return candidate.totalCostMinor < existing.totalCostMinor;
@@ -289,7 +295,7 @@ function isBetterPath(candidate: CombinationPath, existing: CombinationPath): bo
   if (candidateOvershoot !== existingOvershoot) {
     return candidateOvershoot < existingOvershoot;
   }
-  return summaryKey(candidate.summary) < summaryKey(existing.summary);
+  return compareEventHandles(summaryKey(candidate.summary), summaryKey(existing.summary)) < 0;
 }
 
 export function findCheapestMerchantUsageCombination(
@@ -311,9 +317,7 @@ export function findCheapestMerchantUsageCombination(
     return result("UNVERIFIED", validationCode, "Usage pricing evidence is not valid for deterministic economics.");
   }
 
-  const sortedOffers = [...usageEvents].sort((left, right) =>
-    left.eventHandle.trim().localeCompare(right.eventHandle.trim()),
-  );
+  const sortedOffers = [...usageEvents].sort((left, right) => compareEventHandles(left.eventHandle, right.eventHandle));
   const states = new Map<number, CombinationPath>([
     [0, { totalCostMinor: 0, actualCreditsGranted: 0, totalUnits: 0, summary: [] }],
   ]);
@@ -334,7 +338,7 @@ export function findCheapestMerchantUsageCombination(
         const summary = quantity === 0
           ? path.summary
           : [...path.summary, {
-              eventHandle: offer.eventHandle.trim(),
+              eventHandle: offer.eventHandle,
               quantity,
               creditsGranted,
               costMinor,
