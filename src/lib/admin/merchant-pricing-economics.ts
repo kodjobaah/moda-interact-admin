@@ -184,6 +184,21 @@ function validateOffers(
   return null;
 }
 
+function validatePlanEvidence(
+  plan: MerchantPricingEconomicsPlan,
+): MerchantPricingResultCode | null {
+  if (!isNonNegativeSafeInteger(plan.recurringAmountMinor)) return "MISSING_PLAN_PRICE";
+  if (!isNonNegativeSafeInteger(plan.includedRecoveryCredits)) return "INVALID_USAGE_EVENT";
+  if (!isCurrency(plan.currency)) return "CURRENCY_MISMATCH";
+
+  const validationCode = validateOffers(plan.usageEvents);
+  if (validationCode) return validationCode;
+  if (plan.usageEvents.some((offer) => offer.pricing.currency !== plan.currency)) {
+    return "CURRENCY_MISMATCH";
+  }
+  return null;
+}
+
 function isUnboundedZeroCostPricing(pricing: MerchantUsagePricing): boolean {
   if (pricing.mode === "FIXED") return pricing.unitAmountMinor === 0;
   if (pricing.mode === "VOLUME") {
@@ -431,6 +446,16 @@ export function evaluateMerchantPricingPortfolio({
   const ids = new Set(orderedPlanIds);
   if (ids.size !== orderedPlanIds.length || Object.keys(plansById).length !== orderedPlanIds.length || orderedPlanIds.some((id) => !plansById[id])) {
     return [invalidPair("", "", 0, "INVALID_PORTFOLIO_ORDER", "The supplied portfolio order does not resolve every plan exactly once.")];
+  }
+  for (const planId of orderedPlanIds) {
+    const plan = plansById[planId];
+    if (plan.id !== planId) {
+      return [invalidPair(planId, plan.id, 0, "INVALID_PORTFOLIO_ORDER", "The portfolio map key must match the resolved plan identity.")];
+    }
+    const validationCode = validatePlanEvidence(plan);
+    if (validationCode) {
+      return [invalidPair(planId, planId, 0, validationCode, "Plan pricing evidence is not valid for deterministic economics.")];
+    }
   }
   const results: MerchantPricingPairResult[] = [];
   for (let lowerIndex = 0; lowerIndex < orderedPlanIds.length - 1; lowerIndex += 1) {

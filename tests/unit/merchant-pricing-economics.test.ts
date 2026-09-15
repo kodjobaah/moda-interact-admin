@@ -208,6 +208,36 @@ test("four plans produce six portfolio pairs in nested-loop order", () => {
   assert.deepEqual(results.map((entry) => `${entry.lowerPlanId}->${entry.higherPlanId}`), ["p0->p1", "p0->p2", "p0->p3", "p1->p2", "p1->p3", "p2->p3"]);
 });
 
+test("a valid one-plan portfolio remains valid with zero pair results", () => {
+  const results = evaluateMerchantPricingPortfolio({
+    orderedPlanIds: ["p0"],
+    plansById: { p0: plan("p0", 0, 0) },
+  });
+  assert.deepEqual(results, []);
+});
+
+test("an invalid one-plan portfolio blocks an unbounded free VOLUME event", () => {
+  const results = evaluateMerchantPricingPortfolio({
+    orderedPlanIds: ["p0"],
+    plansById: {
+      p0: plan("p0", 0, 0, [tiered("meter", "VOLUME", [
+        { upTo: 2, amountPerUnitMinor: 100, flatAmountMinor: 0 },
+        { upTo: null, amountPerUnitMinor: 0, flatAmountMinor: 0 },
+      ])]),
+    },
+  });
+  assert.deepEqual([results[0].status, results[0].code], ["UNVERIFIED", "UNBOUNDED_ZERO_COST_USAGE_EVENT"]);
+  assert.throws(() => assertMerchantPricingPortfolioPass(results), /UNBOUNDED_ZERO_COST_USAGE_EVENT/);
+});
+
+test("a one-plan key and id mismatch blocks the portfolio", () => {
+  const results = evaluateMerchantPricingPortfolio({
+    orderedPlanIds: ["catalogue-key"],
+    plansById: { "catalogue-key": plan("actual-plan-id", 0, 0) },
+  });
+  assert.deepEqual([results[0].status, results[0].code], ["UNVERIFIED", "INVALID_PORTFOLIO_ORDER"]);
+});
+
 test("a non-adjacent pair can fail while adjacent pairs pass and assertion blocks", () => {
   const plans = Object.fromEntries([
     plan("p0", 0, 0, [tiered("meter", "VOLUME", [{ upTo: 1, amountPerUnitMinor: 200, flatAmountMinor: 0 }, { upTo: null, amountPerUnitMinor: 0, flatAmountMinor: 150 }])]),
