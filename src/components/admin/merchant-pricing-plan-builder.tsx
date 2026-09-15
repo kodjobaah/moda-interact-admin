@@ -47,6 +47,43 @@ function formatMinorUnits(value: number | undefined, currency: string): string {
       }).format(value / 100);
 }
 
+function formatBuilderEventPrice(event: BuilderEvent, currency: string): string {
+  try {
+    return formatMinorUnits(
+      parseMoneyToMinorUnits(event.fixedUnitAmount ?? "0"),
+      currency,
+    );
+  } catch {
+    return "Invalid price";
+  }
+}
+
+const ZERO_COST_USAGE_EVENT_MESSAGE =
+  "This usage event gives recovery credits for free but has no usage limit. Enter a price greater than 0 or set a maximum number of uses per billing period.";
+
+function hasUnboundedZeroCostFixedEvent(event: BuilderEvent): boolean {
+  if (
+    event.pricingMode !== "FIXED" ||
+    event.creditsGrantedPerUnit <= 0 ||
+    event.maximumUnitsPerBillingPeriod !== null
+  )
+    return false;
+  try {
+    return parseMoneyToMinorUnits(event.fixedUnitAmount ?? "") === 0;
+  } catch {
+    return false;
+  }
+}
+
+function serializeBuilderEvent(event: BuilderEvent): BuilderEvent {
+  if (event.pricingMode === "FIXED") {
+    const { tiers: _tiers, ...fixedEvent } = event;
+    return fixedEvent;
+  }
+  const { fixedUnitAmount: _fixedUnitAmount, ...tieredEvent } = event;
+  return tieredEvent;
+}
+
 function initialEvents(plan?: MerchantPricingPlanWithChildren): BuilderEvent[] {
   return (
     plan?.usageEvents.map((event) => ({
@@ -176,7 +213,7 @@ export function MerchantPricingPlanBuilder({
         : cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
       englishDescription: description,
       reason,
-      usageEvents: events,
+      usageEvents: events.map(serializeBuilderEvent),
       highlights,
     };
   }, [
@@ -391,6 +428,7 @@ export function MerchantPricingPlanBuilder({
   function canNavigateTo(targetStep: number): boolean {
     if (targetStep <= step) return true;
     if (targetStep > step + 1) return false;
+    if (step === 3 && events.some(hasUnboundedZeroCostFixedEvent)) return false;
     return step !== 5 || economicsPassed;
   }
 
@@ -686,76 +724,95 @@ export function MerchantPricingPlanBuilder({
               className="space-y-3 rounded-md border border-gray-200 p-3"
             >
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  className={inputClass}
-                  placeholder="Admin label"
-                  value={event.adminLabel}
-                  onChange={(input) =>
-                    updateEvent(index, { adminLabel: input.target.value })
-                  }
-                />
-                <input
-                  className={inputClass}
-                  placeholder="Event handle"
-                  value={event.eventHandle}
-                  onChange={(input) =>
-                    updateEvent(index, { eventHandle: input.target.value })
-                  }
-                />
-                <input
-                  className={inputClass}
-                  type="number"
-                  min="1"
-                  placeholder="Credits per unit"
-                  value={event.creditsGrantedPerUnit}
-                  onChange={(input) =>
-                    updateEvent(index, {
-                      creditsGrantedPerUnit: Number(input.target.value),
-                    })
-                  }
-                />
-                <input
-                  className={inputClass}
-                  type="number"
-                  min="1"
-                  placeholder="Maximum units (optional)"
-                  value={event.maximumUnitsPerBillingPeriod ?? ""}
-                  onChange={(input) =>
-                    updateEvent(index, {
-                      maximumUnitsPerBillingPeriod: input.target.value
-                        ? Number(input.target.value)
-                        : null,
-                    })
-                  }
-                />
-                <select
-                  className={inputClass}
-                  value={event.pricingMode}
-                  onChange={(input) =>
-                    updateEvent(index, {
-                      pricingMode: input.target
-                        .value as BuilderEvent["pricingMode"],
-                    })
-                  }
-                >
-                  <option value="FIXED">FIXED</option>
-                  <option value="GRADUATED">GRADUATED</option>
-                  <option value="VOLUME">VOLUME</option>
-                </select>
-                <input
-                  className={inputClass}
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="Fixed amount"
-                  value={event.fixedUnitAmount ?? ""}
-                  disabled={event.pricingMode !== "FIXED"}
-                  onChange={(input) =>
-                    updateEvent(index, {
-                      fixedUnitAmount: input.target.value,
-                    })
-                  }
-                />
+                <label className="text-sm font-medium text-gray-700">
+                  Admin label
+                  <input
+                    className={inputClass}
+                    value={event.adminLabel}
+                    onChange={(input) =>
+                      updateEvent(index, { adminLabel: input.target.value })
+                    }
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Shopify usage-event handle
+                  <input
+                    className={inputClass}
+                    value={event.eventHandle}
+                    onChange={(input) =>
+                      updateEvent(index, { eventHandle: input.target.value })
+                    }
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Recovery credits granted per event
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="1"
+                    value={event.creditsGrantedPerUnit}
+                    onChange={(input) =>
+                      updateEvent(index, {
+                        creditsGrantedPerUnit: Number(input.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Maximum uses per billing period (optional)
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="1"
+                    value={event.maximumUnitsPerBillingPeriod ?? ""}
+                    onChange={(input) =>
+                      updateEvent(index, {
+                        maximumUnitsPerBillingPeriod: input.target.value
+                          ? Number(input.target.value)
+                          : null,
+                      })
+                    }
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Pricing model
+                  <select
+                    className={inputClass}
+                    value={event.pricingMode}
+                    onChange={(input) =>
+                      updateEvent(index, {
+                        pricingMode: input.target
+                          .value as BuilderEvent["pricingMode"],
+                      })
+                    }
+                  >
+                    <option value="FIXED">Fixed price</option>
+                    <option value="GRADUATED">Graduated pricing</option>
+                    <option value="VOLUME">Volume pricing</option>
+                  </select>
+                </label>
+                {event.pricingMode === "FIXED" ? (
+                  <label className="text-sm font-medium text-gray-700">
+                    Price per usage event ({currency.toUpperCase()})
+                    <input
+                      className={inputClass}
+                      type="text"
+                      inputMode="decimal"
+                      value={event.fixedUnitAmount ?? ""}
+                      onChange={(input) =>
+                        updateEvent(index, {
+                          fixedUnitAmount: input.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                ) : null}
               </div>
+              {hasUnboundedZeroCostFixedEvent(event) ? (
+                <p className="text-sm font-medium text-red-700">
+                  {ZERO_COST_USAGE_EVENT_MESSAGE}
+                </p>
+              ) : null}
               {event.pricingMode !== "FIXED" ? (
                 <div className="space-y-2 rounded-md bg-gray-50 p-3">
                   <div className="flex items-center justify-between">
@@ -776,45 +833,54 @@ export function MerchantPricingPlanBuilder({
                       key={`${index}-${tierIndex}`}
                       className="grid gap-2 sm:grid-cols-4"
                     >
-                      <input
-                        className={inputClass}
-                        type="number"
-                        min="1"
-                        placeholder="Up to"
-                        value={tier.upTo ?? ""}
-                        disabled={tierIndex === (event.tiers?.length ?? 1) - 1}
-                        onChange={(input) =>
-                          updateTier(index, tierIndex, {
-                            upTo: input.target.value
-                              ? Number(input.target.value)
-                              : null,
-                          })
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Amount per unit"
-                        value={tier.amountPerUnit}
-                        onChange={(input) =>
-                          updateTier(index, tierIndex, {
-                            amountPerUnit: input.target.value,
-                          })
-                        }
-                      />
-                      <input
-                        className={inputClass}
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Flat amount"
-                        value={tier.flatAmount}
-                        onChange={(input) =>
-                          updateTier(index, tierIndex, {
-                            flatAmount: input.target.value,
-                          })
-                        }
-                      />
+                      <label className="text-sm font-medium text-gray-700">
+                        Up to quantity
+                        {tierIndex === (event.tiers?.length ?? 1) - 1 ? (
+                          <span className="ml-1 font-normal">(Unlimited)</span>
+                        ) : null}
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="1"
+                          value={tier.upTo ?? ""}
+                          disabled={tierIndex === (event.tiers?.length ?? 1) - 1}
+                          onChange={(input) =>
+                            updateTier(index, tierIndex, {
+                              upTo: input.target.value
+                                ? Number(input.target.value)
+                                : null,
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="text-sm font-medium text-gray-700">
+                        Price per unit ({currency.toUpperCase()})
+                        <input
+                          className={inputClass}
+                          type="text"
+                          inputMode="decimal"
+                          value={tier.amountPerUnit}
+                          onChange={(input) =>
+                            updateTier(index, tierIndex, {
+                              amountPerUnit: input.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="text-sm font-medium text-gray-700">
+                        Additional flat charge ({currency.toUpperCase()})
+                        <input
+                          className={inputClass}
+                          type="text"
+                          inputMode="decimal"
+                          value={tier.flatAmount}
+                          onChange={(input) =>
+                            updateTier(index, tierIndex, {
+                              flatAmount: input.target.value,
+                            })
+                          }
+                        />
+                      </label>
                       <button
                         type="button"
                         disabled={(event.tiers?.length ?? 0) <= 1}
@@ -971,12 +1037,28 @@ export function MerchantPricingPlanBuilder({
                     {result.lowerPlanId} to {result.higherPlanId}:{" "}
                     {result.status}
                   </div>
-                  <div>{result.message}</div>
-                  <div className="text-xs">
-                    {result.lowerPlanId} to {result.higherPlanId}; additional
-                    credits: {result.additionalCreditsNeeded}; code:{" "}
-                    {result.code}; status: {result.status}
-                  </div>
+                  {result.code === "UNBOUNDED_ZERO_COST_USAGE_EVENT" ? (
+                    <div>
+                      <h4 className="font-semibold">
+                        Usage-event pricing needs attention
+                      </h4>
+                      <p>
+                        One of the usage events gives recovery credits for free
+                        with no usage limit. Enter a price greater than 0 or set
+                        a maximum number of uses per billing period.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>{result.message}</div>
+                  )}
+                  <details className="text-xs">
+                    <summary>Show technical details</summary>
+                    <div>
+                      {result.lowerPlanId} to {result.higherPlanId}; additional
+                      credits: {result.additionalCreditsNeeded}; code: {" "}
+                      {result.code}; status: {result.status}
+                    </div>
+                  </details>
                   <div className="text-xs">
                     Quantities:{" "}
                     {result.summary.length
@@ -1037,9 +1119,10 @@ export function MerchantPricingPlanBuilder({
           <ul className="list-disc pl-5">
             {events.map((event) => (
               <li key={event.eventHandle}>
-                {event.adminLabel}: {event.pricingMode} pricing
+                {event.adminLabel}: {event.creditsGrantedPerUnit} credits per
+                event · {event.pricingMode === "FIXED" ? "fixed price" : event.pricingMode === "GRADUATED" ? "graduated pricing" : "volume pricing"}
                 {event.pricingMode === "FIXED"
-                  ? ` at ${event.fixedUnitAmount ?? ""} ${currency}`
+                  ? ` · ${formatBuilderEventPrice(event, currency)} per event · ${event.maximumUnitsPerBillingPeriod ?? "Unlimited"}`
                   : ` across ${event.tiers?.length ?? 0} tiers`}
               </li>
             ))}
