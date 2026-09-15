@@ -7,6 +7,7 @@ import {
   MERCHANT_PRICING_TRANSLATION_WORKBOOK_MAX_BYTES,
   MERCHANT_PRICING_TRANSLATION_WORKBOOK_MIME,
   parseMerchantPricingTranslationWorkbook,
+  shouldRetainUploadedTranslationWorkbook,
   type MerchantPricingTranslationWorkbookIssue,
 } from "@/lib/admin/merchant-pricing-translation-workbook";
 import {
@@ -157,7 +158,8 @@ export function MerchantPricingTranslationWorkbook({
         highlights,
       });
       setSelectedFileName(file.name);
-      setUploadedBytes(bytes);
+      if (shouldRetainUploadedTranslationWorkbook(parsed.workbookValid))
+        setUploadedBytes(bytes);
       setUploadError(
         parsed.workbookIssues.some(({ code }) => code === "INVALID_XLSX")
           ? "The translation spreadsheet could not be read. Download a fresh spreadsheet and try again."

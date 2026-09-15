@@ -22,6 +22,12 @@ export const MERCHANT_PRICING_TRANSLATION_WORKBOOK_MAX_BYTES =
 export const MERCHANT_PRICING_TRANSLATION_WORKBOOK_MIME =
   TRANSLATION_WORKBOOK_MIME;
 
+export function shouldRetainUploadedTranslationWorkbook(
+  workbookValid: boolean,
+): boolean {
+  return workbookValid;
+}
+
 export type MerchantPricingTranslationWorkbookIssue = {
   code: string;
   message: string;

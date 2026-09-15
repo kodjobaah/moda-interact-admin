@@ -8,6 +8,7 @@ import {
   buildMerchantPricingTranslationWorkbook,
   MERCHANT_PRICING_TRANSLATION_WORKBOOK_MIME,
   parseMerchantPricingTranslationWorkbook,
+  shouldRetainUploadedTranslationWorkbook,
 } from "../../src/lib/admin/merchant-pricing-translation-workbook.ts";
 import {
   MERCHANT_PRICING_LOCALES,
@@ -299,4 +300,9 @@ test("invalid XLSX bytes are rejected without producing canonical state", async 
   assert.equal(result.canonicalRawJson, null);
   assert.equal(result.translationResult, null);
   assert.ok(result.workbookIssues.some(({ code }) => code === "INVALID_XLSX"));
+});
+
+test("invalid workbook selection does not retain bytes for parent-clearing revalidation", () => {
+  assert.equal(shouldRetainUploadedTranslationWorkbook(false), false);
+  assert.equal(shouldRetainUploadedTranslationWorkbook(true), true);
 });
