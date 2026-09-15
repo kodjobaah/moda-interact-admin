@@ -12,7 +12,7 @@ test("global billing exposes URL-backed views with overview fallback", async () 
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-tabs.tsx"),
   ]);
-  assert.match(page, /allowedViews: BillingView\[\] = \["overview", "plans", "packs", "refunds", "events", "controls"\]/);
+  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*"controls",\s*\]/);
   assert.match(page, /rawView.*rawParams\.view/);
   assert.match(page, /: "overview"/);
   assert.match(tabs, /<Link/);
@@ -23,13 +23,14 @@ test("billing route loads only the selected view and selected detail", async () 
   const page = await read("src/app/(protected)/billing/page.tsx");
   assert.doesNotMatch(page, /Promise\.all\(\[\s*getBillingPlans/);
   assert.match(page, /view === "overview" \? await getBillingOverview\(\)/);
-  assert.match(page, /view === "plans" \? await getBillingPlans\(\)/);
+  assert.match(page, /view === "plans" \? await getMerchantPricingPlans\(\)/);
   assert.match(page, /view === "packs"\s*\n\s*\? await getRecoveryCreditPurchases/);
   assert.match(page, /view === "events"\s*\n\s*\? await getBillingLedger/);
   assert.match(page, /view === "controls" \? await getPlatformBillingPolicy\(\)/);
-  assert.match(page, /getBillingPlanById/);
+  assert.match(page, /getMerchantPricingPlanById/);
   assert.match(page, /getRecoveryCreditPurchaseDetail/);
   assert.match(page, /getBillingLedgerItem/);
+  assert.doesNotMatch(page, /getBillingPlans|getBillingPlanById|getBillingPlanEconomics|BillingPlanCatalog|BillingPlanDrawer/);
 });
 
 test("App Events filters preserve the events view and reset only event selection", async () => {
@@ -52,20 +53,21 @@ test("recovery-pack receipt guidance distinguishes pending and submitted events"
 });
 
 test("overview and plans use progressive disclosure", async () => {
-  const [page, overview, catalogue] = await Promise.all([
+  const [page, overview, catalogue, drawers] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-overview.tsx"),
-    read("src/components/admin/billing-plan-catalog.tsx"),
+    read("src/components/admin/merchant-pricing-plan-catalog.tsx"),
+    read("src/components/admin/billing-drawers.tsx"),
   ]);
   assert.match(page, /view === "overview" && overview/);
   assert.match(page, /view === "plans" && plans/);
   assert.doesNotMatch(overview, /providerResponseSummary.*<\/td>/s);
   assert.doesNotMatch(overview, /<BillingPlanCatalog/);
-  assert.match(catalogue, /billing\.registerPlanAction/);
-  assert.match(catalogue, /billing\.editPlanAction/);
-  assert.match(catalogue, /billing\.recoveryCreditsPerPack/);
-  assert.match(catalogue, /plan\.recoveryCreditsPerPack/);
-  assert.doesNotMatch(catalogue, /<PlanForm plan=\{plan\}/);
+  assert.match(page, /<MerchantPricingPlanCatalog plans=\{plans\} \/>/);
+  assert.match(drawers, /export function MerchantPricingPlanDrawer/);
+  assert.match(catalogue, /mutateMerchantPricingPlanAction/);
+  assert.match(catalogue, /drawer=register-plan/);
+  assert.doesNotMatch(`${page}\n${drawers}`, /BillingPlanCatalog|BillingPlanDrawer/);
 });
 
 test("pack and event detail reads remain protected and diagnostics are drawer-only", async () => {
@@ -115,10 +117,10 @@ test("controls remain isolated to the controls view and existing mutation securi
   const [page, controls, security] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-controls.tsx"),
-    read("tests/security/admin-billing-plan.test.mjs"),
+    read("tests/security/admin-merchant-pricing-plan.test.mjs"),
   ]);
   assert.match(page, /view === "controls" && policy/);
   assert.match(page, /<PlatformBillingControls policy=\{policy\}/);
   assert.match(controls, /mutatePlatformBillingPolicyAction/);
-  assert.match(security, /mutateBillingPlanAction|requirePlatformAdmin/);
+  assert.match(security, /mutateMerchantPricingPlanAction|requirePlatformAdmin/);
 });

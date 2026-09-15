@@ -312,7 +312,7 @@ test("Admin-002 controls remain wired alongside the overview and ledger", async 
     "utf8",
   );
 
-  assert.match(page, /BillingPlanCatalog/);
+  assert.match(page, /MerchantPricingPlanCatalog/);
   assert.match(page, /PlatformBillingControls/);
   assert.match(page, /getPlatformBillingPolicy/);
   assert.doesNotMatch(page, /<<<<<<<|=======|>>>>>>>/);
