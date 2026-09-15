@@ -1,4 +1,3 @@
-import type { BillingPlanRow } from "@/lib/admin/billing-plan";
 import type {
   BillingLedgerItem,
   RecoveryCreditPurchaseItem,
@@ -6,7 +5,6 @@ import type {
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
-import { PlanForm } from "./billing-plan-catalog";
 import { MerchantPricingPlanBuilder } from "./merchant-pricing-plan-builder";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
 
@@ -28,29 +26,6 @@ function DetailList({
         </div>
       ))}
     </dl>
-  );
-}
-
-export function BillingPlanDrawer({
-  plan,
-  params,
-  register = false,
-}: {
-  plan?: BillingPlanRow;
-  params: Record<string, string>;
-  register?: boolean;
-}) {
-  const closeHref = withParamUpdates("/billing", params, {
-    planId: null,
-    drawer: null,
-  });
-  return (
-    <AdminDetailDrawer
-      title={adminI18n.t(register ? "billing.newPlan" : "billing.planDetails")}
-      closeHref={closeHref}
-    >
-      <PlanForm plan={plan} />
-    </AdminDetailDrawer>
   );
 }
 
