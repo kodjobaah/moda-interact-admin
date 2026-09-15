@@ -72,7 +72,9 @@ function eventData(
         ? undefined
         : {
             create: (event.tiers ?? []).map((tier, tierPosition) => ({
-              ...tier,
+              upTo: tier.upTo,
+              amountPerUnitMinor: tier.amountPerUnitMinor ?? 0,
+              flatAmountMinor: tier.flatAmountMinor ?? 0,
               position: tierPosition,
             })),
           },
@@ -104,7 +106,11 @@ function candidateFromPayload(
           : {
               mode: event.pricingMode,
               currency: payload.currency,
-              tiers: event.tiers ?? [],
+              tiers: (event.tiers ?? []).map((tier) => ({
+                upTo: tier.upTo,
+                amountPerUnitMinor: tier.amountPerUnitMinor ?? 0,
+                flatAmountMinor: tier.flatAmountMinor ?? 0,
+              })),
             },
     })),
   };

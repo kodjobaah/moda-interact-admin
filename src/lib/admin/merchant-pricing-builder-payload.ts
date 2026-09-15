@@ -4,11 +4,14 @@ export type MerchantPricingBuilderEvent = {
   creditsGrantedPerUnit: number;
   maximumUnitsPerBillingPeriod: number | null;
   pricingMode: "FIXED" | "GRADUATED" | "VOLUME";
+  fixedUnitAmount?: string;
   fixedUnitAmountMinor?: number;
   tiers?: Array<{
     upTo: number | null;
-    amountPerUnitMinor: number;
-    flatAmountMinor: number;
+    amountPerUnit?: string;
+    flatAmount?: string;
+    amountPerUnitMinor?: number;
+    flatAmountMinor?: number;
   }>;
 };
 
@@ -84,9 +87,9 @@ function safeInteger(
 }
 
 export function parseMoneyToMinorUnits(value: unknown): number {
-  if (typeof value !== "string" && typeof value !== "number")
+  if (typeof value !== "string")
     throw new Error("Money must be a decimal string.");
-  const text = String(value).trim();
+  const text = value.trim();
   if (!/^\d+(?:\.\d{1,2})?$/.test(text))
     throw new Error(
       "Money must contain only digits and at most two decimal places.",
@@ -96,6 +99,21 @@ export function parseMoneyToMinorUnits(value: unknown): number {
   if (!Number.isSafeInteger(minor))
     throw new Error("Money exceeds the safe integer limit.");
   return minor;
+}
+
+export function resolveMerchantPricingPreviewPosition(
+  placement: string,
+  catalogueIds: string[],
+): number | null {
+  if (placement === "ONLY") return catalogueIds.length === 0 ? 0 : null;
+  if (placement.startsWith("BEFORE:")) {
+    return catalogueIds[0] === placement.slice("BEFORE:".length) ? 0 : null;
+  }
+  if (placement.startsWith("AFTER:")) {
+    const index = catalogueIds.indexOf(placement.slice("AFTER:".length));
+    return index < 0 ? null : index + 1;
+  }
+  return null;
 }
 
 const TOP_LEVEL_KEYS = [
@@ -109,7 +127,7 @@ const TOP_LEVEL_KEYS = [
   "allowancePeriod",
   "billingPeriod",
   "currency",
-  "recurringAmountMinor",
+  "recurringAmount",
   "placement",
   "englishDescription",
   "reason",
@@ -172,12 +190,16 @@ export function parseMerchantPricingBuilderPayload(
     0,
     issues,
   );
-  const recurringAmountMinor = safeInteger(
-    parsed.recurringAmountMinor,
-    "$.recurringAmountMinor",
-    0,
-    issues,
-  );
+  let recurringAmountMinor = 0;
+  try {
+    recurringAmountMinor = parseMoneyToMinorUnits(parsed.recurringAmount);
+  } catch {
+    issues.push({
+      path: "$.recurringAmount",
+      message:
+        "must be a non-negative decimal money value with at most two decimals",
+    });
+  }
   const currency =
     typeof parsed.currency === "string"
       ? parsed.currency.trim().toUpperCase()
@@ -265,12 +287,18 @@ export function parseMerchantPricingBuilderPayload(
           message: "invalid pricing mode",
         });
       if (pricingMode === "FIXED") {
-        const fixedUnitAmountMinor = safeInteger(
-          rawEvent.fixedUnitAmountMinor,
-          `$.usageEvents[${index}].fixedUnitAmountMinor`,
-          0,
-          issues,
-        );
+        let fixedUnitAmountMinor = 0;
+        try {
+          fixedUnitAmountMinor = parseMoneyToMinorUnits(
+            rawEvent.fixedUnitAmount,
+          );
+        } catch {
+          issues.push({
+            path: `$.usageEvents[${index}].fixedUnitAmount`,
+            message:
+              "must be a non-negative decimal money value with at most two decimals",
+          });
+        }
         if (maximumUnitsPerBillingPeriod === null && fixedUnitAmountMinor === 0)
           issues.push({
             path: `$.usageEvents[${index}]`,
@@ -316,18 +344,28 @@ export function parseMerchantPricingBuilderPayload(
                       1,
                       issues,
                     );
-              const amountPerUnitMinor = safeInteger(
-                rawTier.amountPerUnitMinor,
-                `$.usageEvents[${index}].tiers[${tierIndex}].amountPerUnitMinor`,
-                0,
-                issues,
-              );
-              const flatAmountMinor = safeInteger(
-                rawTier.flatAmountMinor,
-                `$.usageEvents[${index}].tiers[${tierIndex}].flatAmountMinor`,
-                0,
-                issues,
-              );
+              let amountPerUnitMinor = 0;
+              try {
+                amountPerUnitMinor = parseMoneyToMinorUnits(
+                  rawTier.amountPerUnit,
+                );
+              } catch {
+                issues.push({
+                  path: `$.usageEvents[${index}].tiers[${tierIndex}].amountPerUnit`,
+                  message:
+                    "must be a non-negative decimal money value with at most two decimals",
+                });
+              }
+              let flatAmountMinor = 0;
+              try {
+                flatAmountMinor = parseMoneyToMinorUnits(rawTier.flatAmount);
+              } catch {
+                issues.push({
+                  path: `$.usageEvents[${index}].tiers[${tierIndex}].flatAmount`,
+                  message:
+                    "must be a non-negative decimal money value with at most two decimals",
+                });
+              }
               return { upTo, amountPerUnitMinor, flatAmountMinor };
             })
           : [];

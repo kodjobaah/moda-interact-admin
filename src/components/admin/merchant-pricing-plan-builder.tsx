@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
 import { parseMoneyToMinorUnits } from "@/lib/admin/merchant-pricing-builder-payload";
+import { resolveMerchantPricingPreviewPosition } from "@/lib/admin/merchant-pricing-builder-payload";
 import {
   evaluateMerchantPricingPortfolio,
   type MerchantPricingEconomicsPlan,
@@ -23,13 +24,26 @@ type BuilderEvent = {
   creditsGrantedPerUnit: number;
   maximumUnitsPerBillingPeriod: number | null;
   pricingMode: "FIXED" | "GRADUATED" | "VOLUME";
-  fixedUnitAmountMinor?: number;
+  fixedUnitAmount?: string;
   tiers?: Array<{
     upTo: number | null;
-    amountPerUnitMinor: number;
-    flatAmountMinor: number;
+    amountPerUnit: string;
+    flatAmount: string;
   }>;
 };
+
+function minorUnitsToMoney(value: number): string {
+  return `${Math.floor(value / 100)}.${String(value % 100).padStart(2, "0")}`;
+}
+
+function formatMinorUnits(value: number | undefined, currency: string): string {
+  return value === undefined
+    ? "N/A"
+    : new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+      }).format(value / 100);
+}
 
 function initialEvents(plan?: MerchantPricingPlanWithChildren): BuilderEvent[] {
   return (
@@ -39,11 +53,11 @@ function initialEvents(plan?: MerchantPricingPlanWithChildren): BuilderEvent[] {
       creditsGrantedPerUnit: event.creditsGrantedPerUnit,
       maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
       pricingMode: event.pricingMode,
-      fixedUnitAmountMinor: event.fixedUnitAmountMinor ?? 0,
+      fixedUnitAmount: minorUnitsToMoney(event.fixedUnitAmountMinor ?? 0),
       tiers: event.tiers.map((tier) => ({
         upTo: tier.upTo,
-        amountPerUnitMinor: tier.amountPerUnitMinor,
-        flatAmountMinor: tier.flatAmountMinor,
+        amountPerUnit: minorUnitsToMoney(tier.amountPerUnitMinor),
+        flatAmount: minorUnitsToMoney(tier.flatAmountMinor),
       })),
     })) ?? []
   );
@@ -103,7 +117,7 @@ export function MerchantPricingPlanBuilder({
   const [credits, setCredits] = useState(plan?.includedRecoveryCredits ?? 0);
   const [currency, setCurrency] = useState(plan?.currency ?? "USD");
   const [recurring, setRecurring] = useState(
-    plan ? String(plan.recurringAmountMinor / 100) : "0",
+    plan ? minorUnitsToMoney(plan.recurringAmountMinor) : "0",
   );
   const [placement, setPlacement] = useState(
     plan
@@ -127,12 +141,6 @@ export function MerchantPricingPlanBuilder({
     useState<MerchantPricingTranslationParseResult | null>(null);
 
   const payload = useMemo(() => {
-    let recurringAmountMinor = 0;
-    try {
-      recurringAmountMinor = parseMoneyToMinorUnits(recurring);
-    } catch {
-      recurringAmountMinor = -1;
-    }
     return {
       id: plan?.id ?? null,
       shopifyPlanHandle: handle,
@@ -144,7 +152,7 @@ export function MerchantPricingPlanBuilder({
       allowancePeriod: planKind === "FREE" ? "LIFETIME" : "EVERY_30_DAYS",
       billingPeriod: "EVERY_30_DAYS",
       currency: currency.toUpperCase(),
-      recurringAmountMinor,
+      recurringAmount: recurring,
       placement,
       englishDescription: description,
       reason,
@@ -166,30 +174,68 @@ export function MerchantPricingPlanBuilder({
     recurring,
   ]);
 
-  const economicsPreview = useMemo<MerchantPricingPairResult[]>(() => {
+  const economicsState = useMemo(() => {
+    let recurringAmountMinor: number;
+    try {
+      recurringAmountMinor = parseMoneyToMinorUnits(recurring);
+    } catch {
+      return { results: [] as MerchantPricingPairResult[], invalid: true };
+    }
+    let usageEvents: Array<{
+      event: BuilderEvent;
+      pricing: MerchantPricingEconomicsPlan["usageEvents"][number]["pricing"];
+    }>;
+    try {
+      usageEvents = events.map((event) => {
+        if (event.pricingMode === "FIXED") {
+          return {
+            event,
+            pricing: {
+              mode: "FIXED" as const,
+              currency: currency.trim().toUpperCase(),
+              unitAmountMinor: parseMoneyToMinorUnits(
+                event.fixedUnitAmount ?? "",
+              ),
+            },
+          };
+        }
+        return {
+          event,
+          pricing: {
+            mode: event.pricingMode,
+            currency: currency.trim().toUpperCase(),
+            tiers: (event.tiers ?? []).map((tier) => ({
+              upTo: tier.upTo,
+              amountPerUnitMinor: parseMoneyToMinorUnits(tier.amountPerUnit),
+              flatAmountMinor: parseMoneyToMinorUnits(tier.flatAmount),
+            })),
+          },
+        };
+      });
+    } catch {
+      return { results: [] as MerchantPricingPairResult[], invalid: true };
+    }
+    const previewPosition = plan
+      ? plan.cataloguePosition
+      : resolveMerchantPricingPreviewPosition(
+          placement,
+          cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
+        );
+    if (previewPosition === null) {
+      return { results: [] as MerchantPricingPairResult[], invalid: true };
+    }
     const candidate: MerchantPricingEconomicsPlan = {
       id: plan?.id ?? `candidate:${handle.trim()}`,
       shopifyPlanHandle: handle.trim(),
       name: name.trim(),
       includedRecoveryCredits: Number(credits),
-      recurringAmountMinor: payload.recurringAmountMinor,
+      recurringAmountMinor,
       currency: currency.trim().toUpperCase(),
-      usageEvents: events.map((event) => ({
+      usageEvents: usageEvents.map(({ event, pricing }) => ({
         eventHandle: event.eventHandle.trim(),
         creditsGrantedPerUnit: event.creditsGrantedPerUnit,
         maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
-        pricing:
-          event.pricingMode === "FIXED"
-            ? {
-                mode: "FIXED" as const,
-                currency: currency.trim().toUpperCase(),
-                unitAmountMinor: event.fixedUnitAmountMinor ?? 0,
-              }
-            : {
-                mode: event.pricingMode,
-                currency: currency.trim().toUpperCase(),
-                tiers: event.tiers ?? [],
-              },
+        pricing,
       })),
     };
     const ordered = cataloguePlans
@@ -202,18 +248,21 @@ export function MerchantPricingPlanBuilder({
         plan: toEconomicsPlan(cataloguePlan),
       }));
     ordered.push({
-      position: plan?.cataloguePosition ?? cataloguePlans.length,
+      position: previewPosition,
       plan: candidate,
     });
     ordered.sort((left, right) => left.position - right.position);
     const plansById = Object.fromEntries(
       ordered.map(({ plan: orderedPlan }) => [orderedPlan.id, orderedPlan]),
     );
-    return evaluateMerchantPricingPortfolio({
-      orderedPlanIds: ordered.map(({ plan: orderedPlan }) => orderedPlan.id),
-      plansById,
-      minimumUpgradePremiumBps,
-    });
+    return {
+      results: evaluateMerchantPricingPortfolio({
+        orderedPlanIds: ordered.map(({ plan: orderedPlan }) => orderedPlan.id),
+        plansById,
+        minimumUpgradePremiumBps,
+      }),
+      invalid: false,
+    };
   }, [
     cataloguePlans,
     credits,
@@ -222,9 +271,12 @@ export function MerchantPricingPlanBuilder({
     handle,
     minimumUpgradePremiumBps,
     name,
-    payload.recurringAmountMinor,
     plan,
+    placement,
+    recurring,
   ]);
+
+  const economicsPreview = economicsState.results;
 
   function addEvent() {
     if (events.length >= 5) return;
@@ -236,7 +288,7 @@ export function MerchantPricingPlanBuilder({
         creditsGrantedPerUnit: 1,
         maximumUnitsPerBillingPeriod: null,
         pricingMode: "FIXED",
-        fixedUnitAmountMinor: 0,
+        fixedUnitAmount: "0",
       },
     ]);
   }
@@ -283,7 +335,7 @@ export function MerchantPricingPlanBuilder({
               ...candidate,
               tiers: [
                 ...(candidate.tiers ?? []),
-                { upTo: null, amountPerUnitMinor: 0, flatAmountMinor: 0 },
+                { upTo: null, amountPerUnit: "0", flatAmount: "0" },
               ],
             }
           : candidate,
@@ -547,14 +599,14 @@ export function MerchantPricingPlanBuilder({
                 </select>
                 <input
                   className={inputClass}
-                  type="number"
-                  min="0"
-                  placeholder="Fixed amount minor"
-                  value={event.fixedUnitAmountMinor ?? ""}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Fixed amount"
+                  value={event.fixedUnitAmount ?? ""}
                   disabled={event.pricingMode !== "FIXED"}
                   onChange={(input) =>
                     updateEvent(index, {
-                      fixedUnitAmountMinor: Number(input.target.value),
+                      fixedUnitAmount: input.target.value,
                     })
                   }
                 />
@@ -596,25 +648,25 @@ export function MerchantPricingPlanBuilder({
                       />
                       <input
                         className={inputClass}
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Amount per unit"
-                        value={tier.amountPerUnitMinor}
+                        value={tier.amountPerUnit}
                         onChange={(input) =>
                           updateTier(index, tierIndex, {
-                            amountPerUnitMinor: Number(input.target.value),
+                            amountPerUnit: input.target.value,
                           })
                         }
                       />
                       <input
                         className={inputClass}
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Flat amount"
-                        value={tier.flatAmountMinor}
+                        value={tier.flatAmount}
                         onChange={(input) =>
                           updateTier(index, tierIndex, {
-                            flatAmountMinor: Number(input.target.value),
+                            flatAmount: input.target.value,
                           })
                         }
                       />
@@ -703,8 +755,30 @@ export function MerchantPricingPlanBuilder({
                   </div>
                   <div>{result.message}</div>
                   <div className="text-xs">
-                    Additional credits: {result.additionalCreditsNeeded}; code:{" "}
-                    {result.code}
+                    {result.lowerPlanId} to {result.higherPlanId}; additional
+                    credits: {result.additionalCreditsNeeded}; code:{" "}
+                    {result.code}; status: {result.status}
+                  </div>
+                  <div className="text-xs">
+                    Quantities:{" "}
+                    {result.summary.length
+                      ? result.summary
+                          .map(
+                            (row) =>
+                              `${row.eventHandle} x${row.quantity} (${row.creditsGranted} credits, ${row.costMinor} minor)`,
+                          )
+                          .join(", ")
+                      : "none"}
+                  </div>
+                  <div className="text-xs">
+                    Stay + top-up:{" "}
+                    {formatMinorUnits(result.stayAndTopUpCostMinor, currency)};
+                    higher recurring:{" "}
+                    {formatMinorUnits(result.upgradeCostMinor, currency)};
+                    premium:{" "}
+                    {Number.isFinite(result.premiumBps)
+                      ? `${result.premiumBps} bps`
+                      : "infinity/not applicable"}
                   </div>
                 </li>
               ))}
@@ -739,6 +813,7 @@ export function MerchantPricingPlanBuilder({
       <button
         type="submit"
         disabled={
+          economicsState.invalid ||
           !economicsPreview.every((result) => result.status === "PASS") ||
           (step === 6 && !translationResult?.valid)
         }

@@ -4,6 +4,7 @@ import {
   MerchantPricingPayloadError,
   parseMerchantPricingBuilderPayload,
   parseMoneyToMinorUnits,
+  resolveMerchantPricingPreviewPosition,
 } from "../../src/lib/admin/merchant-pricing-builder-payload.ts";
 
 function payload(overrides: Record<string, unknown> = {}) {
@@ -18,7 +19,7 @@ function payload(overrides: Record<string, unknown> = {}) {
     allowancePeriod: "LIFETIME",
     billingPeriod: "EVERY_30_DAYS",
     currency: "USD",
-    recurringAmountMinor: 0,
+    recurringAmount: "0",
     placement: "ONLY",
     englishDescription: "A plan",
     reason: "initial catalogue",
@@ -47,7 +48,7 @@ test("derives allowance period and preserves UI event order without browser posi
           creditsGrantedPerUnit: 2,
           maximumUnitsPerBillingPeriod: 3,
           pricingMode: "FIXED",
-          fixedUnitAmountMinor: 100,
+          fixedUnitAmount: "1.00",
           position: 99,
         },
         {
@@ -56,7 +57,7 @@ test("derives allowance period and preserves UI event order without browser posi
           creditsGrantedPerUnit: 1,
           maximumUnitsPerBillingPeriod: 3,
           pricingMode: "FIXED",
-          fixedUnitAmountMinor: 50,
+          fixedUnitAmount: "0.50",
           position: 0,
         },
       ],
@@ -78,7 +79,7 @@ test("rejects duplicate events, too many events, invalid tiers, unbounded zero-c
       creditsGrantedPerUnit: 1,
       maximumUnitsPerBillingPeriod: 1,
       pricingMode: "FIXED",
-      fixedUnitAmountMinor: 1,
+      fixedUnitAmount: "0.01",
     },
     {
       adminLabel: "Two",
@@ -86,7 +87,7 @@ test("rejects duplicate events, too many events, invalid tiers, unbounded zero-c
       creditsGrantedPerUnit: 1,
       maximumUnitsPerBillingPeriod: 1,
       pricingMode: "FIXED",
-      fixedUnitAmountMinor: 1,
+      fixedUnitAmount: "0.01",
     },
   ];
   assert.throws(
@@ -104,7 +105,7 @@ test("rejects duplicate events, too many events, invalid tiers, unbounded zero-c
             creditsGrantedPerUnit: 1,
             maximumUnitsPerBillingPeriod: 1,
             pricingMode: "FIXED",
-            fixedUnitAmountMinor: 1,
+            fixedUnitAmount: "0.01",
           })),
         }),
       ),
@@ -121,7 +122,7 @@ test("rejects duplicate events, too many events, invalid tiers, unbounded zero-c
               creditsGrantedPerUnit: 1,
               maximumUnitsPerBillingPeriod: null,
               pricingMode: "FIXED",
-              fixedUnitAmountMinor: 0,
+              fixedUnitAmount: "0",
             },
           ],
         }),
@@ -134,5 +135,46 @@ test("rejects duplicate events, too many events, invalid tiers, unbounded zero-c
         payload({ shopifyUsageEventHandle: "forbidden" }),
       ),
     MerchantPricingPayloadError,
+  );
+});
+
+test("normalizes decimal usage prices and resolves explicit preview placement", () => {
+  const parsed = parseMerchantPricingBuilderPayload(
+    payload({
+      recurringAmount: "35.5",
+      usageEvents: [
+        {
+          adminLabel: "Meter",
+          eventHandle: "meter",
+          creditsGrantedPerUnit: 1,
+          maximumUnitsPerBillingPeriod: 2,
+          pricingMode: "GRADUATED",
+          tiers: [
+            { upTo: 1, amountPerUnit: "1.25", flatAmount: "0.5" },
+            { upTo: null, amountPerUnit: "2", flatAmount: "1.00" },
+          ],
+        },
+      ],
+    }),
+  );
+  assert.equal(parsed.recurringAmountMinor, 3550);
+  assert.deepEqual(parsed.usageEvents[0].tiers, [
+    { upTo: 1, amountPerUnitMinor: 125, flatAmountMinor: 50 },
+    { upTo: null, amountPerUnitMinor: 200, flatAmountMinor: 100 },
+  ]);
+  assert.throws(() =>
+    parseMerchantPricingBuilderPayload(payload({ recurringAmount: "1e2" })),
+  );
+  assert.equal(
+    resolveMerchantPricingPreviewPosition("BEFORE:first", ["first", "last"]),
+    0,
+  );
+  assert.equal(
+    resolveMerchantPricingPreviewPosition("AFTER:first", ["first", "last"]),
+    1,
+  );
+  assert.equal(
+    resolveMerchantPricingPreviewPosition("AFTER:missing", ["first", "last"]),
+    null,
   );
 });
