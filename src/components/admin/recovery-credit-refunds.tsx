@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { RecoveryCreditProviderActionKind, RecoveryCreditRefundStatus } from "@prisma/client";
 import type {
   PageResult,
   RecoveryCreditRefundDetail,
   RecoveryCreditRefundItem,
   RecoveryCreditRefundQueueStatus,
 } from "@/lib/admin/types";
+import { lockRecoveryCreditRefundAction, recordRecoveryCreditProviderEvidenceAction, rejectRecoveryCreditRefundAction } from "@/app/actions/recovery-credit-refunds";
 import { buildUrl, withParamUpdates } from "@/lib/admin/query";
 import { adminI18n } from "@/i18n";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
@@ -49,6 +51,56 @@ function stateNotice(refund: RecoveryCreditRefundItem) {
     return "Data integrity attention: this request is not in a valid withdrawn-purchase state.";
   }
   return null;
+}
+
+function SettlementActions({ refund }: { refund: RecoveryCreditRefundDetail }) {
+  if (refund.status === RecoveryCreditRefundStatus.REQUESTED) {
+    return (
+      <div className="mt-8 border-t border-gray-200 pt-6">
+        <h3 className="text-sm font-semibold text-gray-950">Settlement controls</h3>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <form action={async (formData) => { await lockRecoveryCreditRefundAction(refund.id, String(formData.get("reason") ?? "")); }} className="flex flex-wrap gap-2">
+            <input name="reason" required maxLength={1000} placeholder="Lock reason" className="rounded-md border border-gray-300 p-2 text-sm" />
+            <button type="submit" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white">Lock provider action</button>
+          </form>
+          <form action={async (formData) => { await rejectRecoveryCreditRefundAction(refund.id, String(formData.get("reason") ?? "")); }} className="flex flex-wrap gap-2">
+            <input name="reason" required maxLength={1000} placeholder="Rejection reason" className="rounded-md border border-gray-300 p-2 text-sm" />
+            <button type="submit" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700">Reject request</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+  if (refund.status !== RecoveryCreditRefundStatus.PROVIDER_ACTION_REQUIRED && refund.status !== RecoveryCreditRefundStatus.NEEDS_ATTENTION) return null;
+  return <ProviderEvidenceForm refund={refund} />;
+}
+
+function ProviderEvidenceForm({ refund }: { refund: RecoveryCreditRefundDetail }) {
+  return (
+    <div className="mt-8 border-t border-gray-200 pt-6">
+      <h3 className="text-sm font-semibold text-gray-950">Provider settlement evidence</h3>
+      <form action={async (formData) => {
+        await recordRecoveryCreditProviderEvidenceAction({
+          refundId: refund.id,
+          actionKind: String(formData.get("actionKind")) as RecoveryCreditProviderActionKind,
+          providerReference: String(formData.get("providerReference") ?? ""),
+          providerAmount: String(formData.get("providerAmount") ?? ""),
+          providerCurrency: String(formData.get("providerCurrency") ?? ""),
+          confirmed: formData.get("confirmed") === "on",
+        });
+      }} className="mt-3 grid gap-3 sm:grid-cols-2">
+        <select name="actionKind" defaultValue={refund.providerActionKind ?? RecoveryCreditProviderActionKind.REFUND} className="rounded-md border border-gray-300 p-2 text-sm">
+          <option value={RecoveryCreditProviderActionKind.REFUND}>REFUND</option>
+          <option value={RecoveryCreditProviderActionKind.CREDIT}>CREDIT</option>
+        </select>
+        <input name="providerReference" required maxLength={512} defaultValue={refund.providerReference ?? ""} placeholder="Provider reference" className="rounded-md border border-gray-300 p-2 text-sm" />
+        <input name="providerAmount" required defaultValue={refund.providerAmount ?? refund.expectedProviderAmount ?? ""} placeholder="Provider amount" className="rounded-md border border-gray-300 p-2 text-sm" />
+        <input name="providerCurrency" required maxLength={3} defaultValue={refund.providerCurrency ?? refund.expectedProviderCurrency ?? ""} placeholder="Provider currency" className="rounded-md border border-gray-300 p-2 text-sm" />
+        <label className="flex items-center gap-2 text-sm text-gray-700 sm:col-span-2"><input name="confirmed" type="checkbox" required /> I confirm this provider action and evidence.</label>
+        <button type="submit" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white sm:col-span-2">Record provider evidence</button>
+      </form>
+    </div>
+  );
 }
 
 export function RecoveryCreditRefundQueue({
@@ -99,9 +151,11 @@ export function RecoveryCreditRefundQueue({
 export function RecoveryCreditRefundDrawer({
   refund,
   params,
+  canSettle,
 }: {
   refund: RecoveryCreditRefundDetail;
   params: Record<string, string>;
+  canSettle: boolean;
 }) {
   const notice = stateNotice(refund);
   const providerSnapshot = JSON.stringify(refund.purchase.providerPriceSnapshot)?.slice(0, 2000) ?? null;
@@ -151,7 +205,16 @@ export function RecoveryCreditRefundDrawer({
           <p key={entry.id}>{adminI18n.formatDateTime(entry.createdAt)} · {label(entry.status)} · {entry.finalCreditQuantity ?? "quantity not locked"} credits · {entry.providerAmount ? `${entry.providerAmount} ${entry.providerCurrency ?? ""}` : "provider amount not recorded"} · {entry.reason ?? "no reason recorded"}</p>
         )) : <p>No prior refund history.</p>}
       </div>
-      <p className="mt-6 rounded-md bg-gray-50 p-4 text-xs text-gray-600">The current plan or top-up price is evidence only and is not refund authority. This view does not calculate, approve, or settle a provider refund.</p>
+      <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">Frozen settlement evidence</h3>
+      <DetailList items={[
+        ["Final credit quantity", refund.finalCreditQuantity],
+        ["Expected provider amount", refund.expectedProviderAmount ? `${refund.expectedProviderAmount} ${refund.expectedProviderCurrency ?? ""}` : null],
+        ["Recorded provider action", refund.providerActionKind],
+        ["Provider reference", refund.providerReference],
+        ["Recorded provider amount", refund.providerAmount ? `${refund.providerAmount} ${refund.providerCurrency ?? ""}` : null],
+      ]} />
+      {canSettle ? <SettlementActions refund={refund} /> : null}
+      <p className="mt-6 rounded-md bg-gray-50 p-4 text-xs text-gray-600">The current plan or top-up price is evidence only; the exact purchase value is the refund authority. Provider settlement is manual through Shopify Partner Dashboard or Support.</p>
     </AdminDetailDrawer>
   );
 }
