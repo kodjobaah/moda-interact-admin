@@ -14,6 +14,7 @@ import {
   parseMerchantPricingBuilderPayload,
   type MerchantPricingBuilderEvent,
   type MerchantPricingBuilderPayload,
+  projectMerchantPricingCatalogueOrder,
 } from "@/lib/admin/merchant-pricing-builder-payload";
 import {
   assertMerchantPricingPortfolioPass,
@@ -147,15 +148,22 @@ function projectedPortfolio(
   proposed: MerchantPricingEconomicsPlan,
   proposedPosition: number,
   minimumUpgradePremiumBps: number,
+  isCreate: boolean,
 ): void {
-  const ordered = rows
-    .filter((row) => row.id !== proposed.id && row.isActive)
-    .map((row) => ({
-      position: row.cataloguePosition,
-      plan: toMerchantPricingEconomicsPlan(row),
-    }));
-  ordered.push({ position: proposedPosition, plan: proposed });
-  ordered.sort((left, right) => left.position - right.position);
+  const projectedIds = projectMerchantPricingCatalogueOrder(
+    rows.map((row) => row.id),
+    proposed.id,
+    proposedPosition,
+    isCreate ? undefined : proposed.id,
+  );
+  const plansByCatalogueId = new Map(
+    rows.map((row) => [row.id, toMerchantPricingEconomicsPlan(row)]),
+  );
+  plansByCatalogueId.set(proposed.id, proposed);
+  const ordered = projectedIds
+    .map((id) => ({ row: rows.find((candidate) => candidate.id === id), id }))
+    .filter(({ row, id }) => id === proposed.id || row?.isActive)
+    .map(({ id }) => ({ plan: plansByCatalogueId.get(id)! }));
   const plansById = Object.fromEntries(
     ordered.map(({ plan }) => [plan.id, plan]),
   );
@@ -248,6 +256,7 @@ export async function mutateMerchantPricingPlanAction(
           ),
           existing.cataloguePosition,
           policy?.minimumUpgradePremiumBps ?? 2000,
+          false,
         );
       }
       const updated = await transaction.merchantPricingPlan.update({
@@ -310,6 +319,7 @@ export async function mutateMerchantPricingPlanAction(
       ),
       position,
       policy?.minimumUpgradePremiumBps ?? 2000,
+      isCreate,
     );
 
     if (isCreate) {

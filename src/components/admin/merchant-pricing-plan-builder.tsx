@@ -5,6 +5,7 @@ import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
 import { parseMoneyToMinorUnits } from "@/lib/admin/merchant-pricing-builder-payload";
 import { resolveMerchantPricingPreviewPosition } from "@/lib/admin/merchant-pricing-builder-payload";
+import { projectMerchantPricingCatalogueOrder } from "@/lib/admin/merchant-pricing-builder-payload";
 import {
   evaluateMerchantPricingPortfolio,
   type MerchantPricingEconomicsPlan,
@@ -238,20 +239,26 @@ export function MerchantPricingPlanBuilder({
         pricing,
       })),
     };
-    const ordered = cataloguePlans
-      .filter(
-        (cataloguePlan) =>
-          cataloguePlan.id !== plan?.id && cataloguePlan.isActive,
-      )
-      .map((cataloguePlan) => ({
-        position: cataloguePlan.cataloguePosition,
-        plan: toEconomicsPlan(cataloguePlan),
-      }));
-    ordered.push({
-      position: previewPosition,
-      plan: candidate,
-    });
-    ordered.sort((left, right) => left.position - right.position);
+    const projectedIds = projectMerchantPricingCatalogueOrder(
+      cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
+      candidate.id,
+      previewPosition,
+      plan?.id,
+    );
+    const plansByCatalogueId = new Map(
+      cataloguePlans.map((cataloguePlan) => [
+        cataloguePlan.id,
+        toEconomicsPlan(cataloguePlan),
+      ]),
+    );
+    plansByCatalogueId.set(candidate.id, candidate);
+    const ordered = projectedIds
+      .map((id) => ({
+        plan: plansByCatalogueId.get(id)!,
+        source: cataloguePlans.find((cataloguePlan) => cataloguePlan.id === id),
+        id,
+      }))
+      .filter(({ source, id }) => id === candidate.id || source?.isActive);
     const plansById = Object.fromEntries(
       ordered.map(({ plan: orderedPlan }) => [orderedPlan.id, orderedPlan]),
     );

@@ -4,6 +4,7 @@ import {
   MerchantPricingPayloadError,
   parseMerchantPricingBuilderPayload,
   parseMoneyToMinorUnits,
+  projectMerchantPricingCatalogueOrder,
   resolveMerchantPricingPreviewPosition,
 } from "../../src/lib/admin/merchant-pricing-builder-payload.ts";
 
@@ -176,5 +177,36 @@ test("normalizes decimal usage prices and resolves explicit preview placement", 
   assert.equal(
     resolveMerchantPricingPreviewPosition("AFTER:missing", ["first", "last"]),
     null,
+  );
+});
+
+test("projects the exact post-insert order for preview and server evaluation", () => {
+  assert.deepEqual(
+    projectMerchantPricingCatalogueOrder(
+      ["A", "B", "C"],
+      "NEW",
+      resolveMerchantPricingPreviewPosition("BEFORE:A", ["A", "B", "C"])!,
+    ),
+    ["NEW", "A", "B", "C"],
+  );
+  assert.deepEqual(
+    projectMerchantPricingCatalogueOrder(
+      ["A", "B", "C"],
+      "NEW",
+      resolveMerchantPricingPreviewPosition("AFTER:A", ["A", "B", "C"])!,
+    ),
+    ["A", "NEW", "B", "C"],
+  );
+  assert.deepEqual(
+    projectMerchantPricingCatalogueOrder(
+      ["A", "B", "C"],
+      "NEW",
+      resolveMerchantPricingPreviewPosition("AFTER:C", ["A", "B", "C"])!,
+    ),
+    ["A", "B", "C", "NEW"],
+  );
+  assert.deepEqual(
+    projectMerchantPricingCatalogueOrder(["A", "B", "C"], "B", 1, "B"),
+    ["A", "B", "C"],
   );
 });

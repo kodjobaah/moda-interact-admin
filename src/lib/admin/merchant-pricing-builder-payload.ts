@@ -116,6 +116,26 @@ export function resolveMerchantPricingPreviewPosition(
   return null;
 }
 
+export function projectMerchantPricingCatalogueOrder(
+  catalogueIds: string[],
+  candidateId: string,
+  position: number,
+  replacingId?: string,
+): string[] {
+  if (replacingId) {
+    const replacementIndex = catalogueIds.indexOf(replacingId);
+    if (replacementIndex < 0) return [];
+    return catalogueIds.map((id, index) =>
+      index === replacementIndex ? candidateId : id,
+    );
+  }
+  return [
+    ...catalogueIds.slice(0, position),
+    candidateId,
+    ...catalogueIds.slice(position),
+  ];
+}
+
 const TOP_LEVEL_KEYS = [
   "id",
   "shopifyPlanHandle",
