@@ -5,6 +5,7 @@ export type PromotionCampaignFormValues = {
   id: string | null;
   intent: "create" | "update" | "activate";
   name: string;
+  merchantTitle: string;
   merchantDescription: string | null;
   scope: PromotionScope;
   quantity: number;
@@ -56,6 +57,7 @@ export function validatePromotionTarget(
 
 export function validatePromotionCampaignTerms(values: {
   name: string;
+  merchantTitle?: string;
   merchantDescription: string | null;
   scope: PromotionScope;
   quantity: number;
@@ -64,14 +66,31 @@ export function validatePromotionCampaignTerms(values: {
   startsAt: Date;
   expiresAt: Date;
 }): void {
-  validatePromotionTarget(values.scope, values.targetPlanId, values.targetShopId);
-  if (!Number.isSafeInteger(values.quantity) || values.quantity <= 0 || values.quantity > 1_000_000) {
+  validatePromotionTarget(
+    values.scope,
+    values.targetPlanId,
+    values.targetShopId,
+  );
+  if (
+    !Number.isSafeInteger(values.quantity) ||
+    values.quantity <= 0 ||
+    values.quantity > 1_000_000
+  ) {
     throw new Error("Quantity must be a positive integer up to 1,000,000.");
   }
   if (values.expiresAt <= values.startsAt) {
     throw new Error("Expiry must be after the start time.");
   }
-  if (values.name.length > 255) throw new Error("Campaign name must be at most 255 characters.");
+  if (values.name.length > 255)
+    throw new Error("Campaign name must be at most 255 characters.");
+  if (
+    values.merchantTitle !== undefined &&
+    (!values.merchantTitle || values.merchantTitle.length > 255)
+  ) {
+    throw new Error(
+      "Merchant title is required and must be at most 255 characters.",
+    );
+  }
   if ((values.merchantDescription ?? "").length > 10_000) {
     throw new Error("Merchant description must be at most 10,000 characters.");
   }
@@ -82,7 +101,8 @@ export function validatePromotionCampaignReopen(
   expiresAt: Date,
   now = new Date(),
 ): void {
-  if (expiresAt <= startsAt) throw new Error("Expiry must be after the start time.");
+  if (expiresAt <= startsAt)
+    throw new Error("Expiry must be after the start time.");
   if (expiresAt <= now) throw new Error("Reopen expiry must be in the future.");
 }
 
@@ -105,11 +125,19 @@ export function parsePromotionCampaignForm(
   const startsAt = requiredDate(formData.get("startsAt"), "Start time");
   const expiresAt = requiredDate(formData.get("expiresAt"), "Expiry time");
   const name = requiredText(formData.get("name"), "Campaign name");
-  const description = text(formData.get("merchantDescription"));
+  const merchantTitle = requiredText(
+    formData.get("merchantTitle"),
+    "English merchant title",
+  );
+  const description = requiredText(
+    formData.get("merchantDescription"),
+    "English merchant description",
+  );
   const values = {
     id: text(formData.get("id")) || null,
     intent: intent as "create" | "update" | "activate",
     name,
+    merchantTitle,
     merchantDescription: description || null,
     scope: scope as PromotionScope,
     quantity: requiredPositiveInteger(formData.get("quantity"), "Quantity"),

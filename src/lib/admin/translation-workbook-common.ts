@@ -20,6 +20,6 @@ export const TRANSLATION_WORKBOOK_LOCALES: readonly TranslationWorkbookLocale[] 
   }));
 
 export async function loadTranslationWorkbookExcelJS() {
-  const module = await import("exceljs");
-  return module.default ?? module;
+  const exceljsModule = await import("exceljs");
+  return exceljsModule.default ?? exceljsModule;
 }

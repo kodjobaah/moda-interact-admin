@@ -1,4 +1,8 @@
-import type { PromotionCampaignStatus, PromotionCampaignEventType, PromotionTargetScope } from "@prisma/client";
+import type {
+  PromotionCampaignStatus,
+  PromotionCampaignEventType,
+  PromotionTargetScope,
+} from "@prisma/client";
 import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import {
@@ -12,7 +16,14 @@ import {
 export type PromotionCampaignRow = {
   id: string;
   name: string;
-  merchantDescription: string | null;
+  englishMerchantTitle: string;
+  englishMerchantDescription: string | null;
+  translationCount: number;
+  translations: Array<{
+    locale: string;
+    merchantTitle: string;
+    merchantDescription: string;
+  }>;
   scope: PromotionTargetScope;
   quantity: number;
   targetPlanId: string | null;
@@ -43,12 +54,15 @@ export async function getPromotionCampaigns(
 ): Promise<PromotionCampaignRow[]> {
   await requirePlatformAdminRead();
   const campaigns = await prisma.promotionCampaign.findMany({
-    where: promotionCatalogueWhere({ scope: filters.scope, target: normalizePromotionTargetQuery(filters.target) }),
+    where: promotionCatalogueWhere({
+      scope: filters.scope,
+      target: normalizePromotionTargetQuery(filters.target),
+    }),
     orderBy: [{ createdAt: "desc" }],
     select: {
       id: true,
       name: true,
-      merchantDescription: true,
+      translations: { orderBy: { locale: "asc" as const } },
       scope: true,
       quantity: true,
       targetPlanId: true,
@@ -72,14 +86,36 @@ export async function getPromotionCampaigns(
       const state = derivePromotionCatalogueState(campaign, now);
       return {
         ...campaign,
+        englishMerchantTitle:
+          campaign.translations.find(
+            (translation) => translation.locale === "en",
+          )?.merchantTitle ?? "",
+        englishMerchantDescription:
+          campaign.translations.find(
+            (translation) => translation.locale === "en",
+          )?.merchantDescription ?? null,
+        translationCount: campaign.translations.filter(
+          (translation) =>
+            translation.merchantTitle.trim() &&
+            translation.merchantDescription.trim(),
+        ).length,
         targetPlanName: campaign.targetPlan?.name ?? null,
         targetShopDomain: campaign.targetShop?.domain ?? null,
-        creatorName: campaign.createdByPlatformAdmin.displayName ?? campaign.createdByPlatformAdmin.email,
-        lastLifecycleChange: selectLastPromotionLifecycleChange(campaign.events),
+        creatorName:
+          campaign.createdByPlatformAdmin.displayName ??
+          campaign.createdByPlatformAdmin.email,
+        lastLifecycleChange: selectLastPromotionLifecycleChange(
+          campaign.events,
+        ),
         state,
       };
     })
-    .filter((campaign) => !filters.state || filters.state === "ALL" || campaign.state === filters.state);
+    .filter(
+      (campaign) =>
+        !filters.state ||
+        filters.state === "ALL" ||
+        campaign.state === filters.state,
+    );
 }
 
 export async function getPromotionTargets() {
