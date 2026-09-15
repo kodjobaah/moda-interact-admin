@@ -157,7 +157,10 @@ function translatableContentChanged(
   payload: MerchantPricingBuilderPayload,
 ): boolean {
   const previous = existingHighlightSources(existing);
-  if (merchantPricingDescription(existing) !== payload.englishDescription)
+  if (
+    merchantPricingDescription(existing).trim() !==
+    payload.englishDescription.trim()
+  )
     return true;
   if (previous.length !== payload.highlights.length) return true;
   return payload.highlights.some((highlight) => {
@@ -166,8 +169,8 @@ function translatableContentChanged(
     );
     return (
       !old ||
-      old.title !== highlight.title ||
-      old.description !== highlight.description
+      old.title.trim() !== highlight.title.trim() ||
+      old.description.trim() !== highlight.description.trim()
     );
   });
 }
@@ -323,8 +326,6 @@ export async function mutateMerchantPricingPlanAction(
 
   const payload = parsePayload(formData);
   const rawTranslation = formData.get("translationJson");
-  if (typeof rawTranslation !== "string")
-    actionError("A completed translation package is required.");
   await prisma.$transaction(async (transaction) => {
     const rows = await transaction.merchantPricingPlan.findMany({
       include: merchantPricingInclude,
@@ -359,7 +360,10 @@ export async function mutateMerchantPricingPlanAction(
     const contentChanged =
       isCreate || translatableContentChanged(existing, payload);
     const translations = contentChanged
-      ? assertTranslation(rawTranslation, payload)
+      ? assertTranslation(
+          typeof rawTranslation === "string" ? rawTranslation : "",
+          payload,
+        )
       : null;
     const retainedTranslations = existing?.translations ?? [];
     const policy = await transaction.platformBillingPolicy.findUnique({

@@ -90,6 +90,75 @@ test("generates the exact ordered 20-locale template", () => {
   );
 });
 
+test("retains unchanged translations by content key and blanks changed sources", () => {
+  const previous = buildMerchantPricingTranslationTemplate(expected);
+  for (const locale of Object.keys(previous.translations)) {
+    previous.translations[locale as keyof typeof previous.translations] = {
+      description: `Existing description ${locale}`,
+      highlights: {
+        [expected.highlights[0].contentKey]: {
+          title: `Existing title ${locale}`,
+          description: `Existing highlight ${locale}`,
+        },
+      },
+    };
+  }
+
+  const retained = buildMerchantPricingTranslationTemplate({
+    ...expected,
+    highlights: [...expected.highlights].reverse(),
+    previous: {
+      englishDescription: expected.englishDescription,
+      highlights: expected.highlights,
+      translations: Object.entries(previous.translations).map(
+        ([locale, value]) => ({
+          locale,
+          merchantDescription: value.description,
+          highlights: Object.entries(value.highlights).map(
+            ([contentKey, highlight]) => ({
+              contentKey,
+              ...highlight,
+            }),
+          ),
+        }),
+      ),
+    },
+  });
+  assert.equal(retained.translations.fr.description, "Existing description fr");
+  assert.equal(
+    retained.translations.fr.highlights[expected.highlights[0].contentKey]
+      .title,
+    "Existing title fr",
+  );
+
+  const changed = buildMerchantPricingTranslationTemplate({
+    ...expected,
+    englishDescription: "Changed description",
+    highlights: [{ ...expected.highlights[0], title: "Changed title" }],
+    previous: {
+      englishDescription: expected.englishDescription,
+      highlights: expected.highlights,
+      translations: Object.entries(previous.translations).map(
+        ([locale, value]) => ({
+          locale,
+          merchantDescription: value.description,
+          highlights: Object.entries(value.highlights).map(
+            ([contentKey, highlight]) => ({
+              contentKey,
+              ...highlight,
+            }),
+          ),
+        }),
+      ),
+    },
+  });
+  assert.equal(changed.translations.fr.description, "");
+  assert.equal(
+    changed.translations.fr.highlights[expected.highlights[0].contentKey].title,
+    "",
+  );
+});
+
 test("accepts a completed package and rejects aliases and structural mismatches", () => {
   const valid = parseCompletedMerchantPricingTranslationPackage(
     JSON.stringify(completePackage()),
