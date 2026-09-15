@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/admin/admin-shell";
+import { SearchInput } from "@/components/admin/search-input";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import { KpiCard } from "@/components/admin/kpi-card";
 import {
@@ -175,7 +176,14 @@ export default async function Home({ searchParams }: PageProps) {
   const returnTo = withParamUpdates("/", params, { saved: null });
 
   return (
-    <AdminShell active="tenants" search={search}>
+    <AdminShell
+      active="tenants"
+      header={
+        <div className="w-full max-w-2xl">
+          <SearchInput defaultValue={search} />
+        </div>
+      }
+    >
       <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[var(--brand-900)]">
