@@ -1,4 +1,4 @@
-import type { PlatformAdminRole } from '@prisma/client';
+import { PlatformAdminRole } from '@prisma/client';
 import { cache } from 'react';
 
 import { logAdminSecurityEvent } from './audit.ts';
@@ -39,7 +39,7 @@ export class PlatformAdminUnauthorizedError extends Error {
 
 const DEVELOPMENT_PRINCIPAL: PlatformAdminPrincipal = {
   id: 'development-platform-admin',
-  role: 'SUPER_ADMIN' as PlatformAdminRole,
+  role: PlatformAdminRole.SUPER_ADMIN,
   developmentBypass: true,
 };
 

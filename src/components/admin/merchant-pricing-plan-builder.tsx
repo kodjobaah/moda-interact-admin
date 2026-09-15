@@ -736,6 +736,7 @@ export function MerchantPricingPlanBuilder({
             className={`${inputClass} mt-1`}
             rows={6}
             maxLength={2000}
+            required
             value={description}
             onChange={(event) => setDescription(event.target.value)}
           />
@@ -820,6 +821,7 @@ export function MerchantPricingPlanBuilder({
       <button
         type="submit"
         disabled={
+          !description.trim() ||
           economicsState.invalid ||
           !economicsPreview.every((result) => result.status === "PASS") ||
           (step === 6 && !translationResult?.valid)

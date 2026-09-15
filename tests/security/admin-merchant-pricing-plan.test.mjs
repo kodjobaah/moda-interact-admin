@@ -17,6 +17,20 @@ test("MerchantPricing mutation requires SUPER_ADMIN and revalidates server paylo
   assert.match(action, /prisma\.\$transaction/);
 });
 
+test("development billing audits use the reserved provisioned administrator identity", async () => {
+  const action = await source("src/app/actions/merchant-pricing-plan.ts");
+  const identity = await source("src/lib/auth/development-platform-admin.ts");
+
+  assert.match(action, /ensureDevelopmentPlatformAdmin/);
+  assert.match(action, /DEVELOPMENT_PLATFORM_ADMIN\.id/);
+  assert.doesNotMatch(action, /platformAdmin\.findFirst/);
+  assert.match(identity, /id: 'development-platform-admin'/);
+  assert.match(identity, /role: 'SUPER_ADMIN'/);
+  assert.match(identity, /if \(!principal\.developmentBypass\) return;/);
+  assert.match(identity, /ON CONFLICT \("id"\) DO NOTHING/);
+  assert.match(identity, /reserved development platform administrator identity conflicts/);
+});
+
 test("ARCH-014 implementation modules do not use operational plan or economics sources", async () => {
   const paths = [
     "src/app/actions/merchant-pricing-plan.ts",

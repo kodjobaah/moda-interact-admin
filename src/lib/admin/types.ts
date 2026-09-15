@@ -125,10 +125,10 @@ export type RecoveryCreditRefundDetail = RecoveryCreditRefundItem & {
     shopifyPlanHandleSnapshot: string;
     shopifyEventHandleSnapshot: string;
     providerSubscriptionIdSnapshot: string;
-    providerUsageQuantityBeforeSnapshot: number;
+    providerUsageQuantityBeforeSnapshot: string;
     providerUsageCostBeforeSnapshot: string;
     providerUsageCostCurrencyBeforeSnapshot: string;
-    providerUsageQuantityAfterSnapshot: number | null;
+    providerUsageQuantityAfterSnapshot: string | null;
     providerUsageCostAfterSnapshot: string | null;
     providerUsageCostCurrencyAfterSnapshot: string | null;
     providerValuationConfirmedAt: Date | null;

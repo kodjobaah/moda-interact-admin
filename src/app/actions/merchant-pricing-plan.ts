@@ -8,6 +8,10 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
+import {
+  DEVELOPMENT_PLATFORM_ADMIN,
+  ensureDevelopmentPlatformAdmin,
+} from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
 import {
   MerchantPricingPayloadError,
@@ -41,16 +45,19 @@ async function auditAdminId(
   principal: Awaited<ReturnType<typeof requirePlatformAdminMutation>>,
 ): Promise<string> {
   if (!principal.developmentBypass) return principal.id;
-  const developmentAdmin = await prisma.platformAdmin.findFirst({
-    where: { active: true, role: "SUPER_ADMIN" },
-    select: { id: true },
+  return prisma.$transaction(async (transaction) => {
+    await ensureDevelopmentPlatformAdmin(transaction, principal);
+    const developmentAdmin = await transaction.platformAdmin.findUnique({
+      where: { id: DEVELOPMENT_PLATFORM_ADMIN.id },
+      select: { id: true },
+    });
+    return (
+      developmentAdmin?.id ??
+      actionError(
+        "A provisioned SUPER_ADMIN is required before billing mutations can be audited.",
+      )
+    );
   });
-  return (
-    developmentAdmin?.id ??
-    actionError(
-      "A provisioned SUPER_ADMIN is required before billing mutations can be audited.",
-    )
-  );
 }
 
 function eventData(

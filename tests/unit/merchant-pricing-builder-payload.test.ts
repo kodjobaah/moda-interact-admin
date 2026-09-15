@@ -37,6 +37,23 @@ test("parses valid money and rejects ambiguous money forms", () => {
     assert.throws(() => parseMoneyToMinorUnits(value));
 });
 
+test("rejects an empty or missing English description", () => {
+  assert.throws(
+    () =>
+      parseMerchantPricingBuilderPayload(
+        payload({ englishDescription: "  " }),
+      ),
+    /\$\.englishDescription: must be a non-empty string of at most 2000 characters/,
+  );
+  assert.throws(
+    () =>
+      parseMerchantPricingBuilderPayload(
+        payload({ englishDescription: undefined }),
+      ),
+    /\$\.englishDescription: must be a non-empty string of at most 2000 characters/,
+  );
+});
+
 test("derives allowance period and preserves UI event order without browser positions", () => {
   const parsed = parseMerchantPricingBuilderPayload(
     payload({

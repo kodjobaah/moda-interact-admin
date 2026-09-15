@@ -168,6 +168,30 @@ function runPrincipalResolutionCheck() {
   return JSON.parse(result.stdout.trim());
 }
 
+function runDevelopmentPrincipalCheck() {
+  const resolverPath = sourcePath('src/lib/auth/platform-admin.ts');
+  const script = `
+    const auth = await import(${JSON.stringify(resolverPath)});
+    const readPrincipal = await auth.requirePlatformAdminRead();
+    const mutationPrincipal = await auth.requirePlatformAdminMutation();
+    console.log(JSON.stringify({ readPrincipal, mutationPrincipal }));
+  `;
+  const result = spawnSync(
+    process.execPath,
+    ['--experimental-strip-types', '--input-type=module', '--eval', script],
+    {
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        DEPLOYMENT_ENVIRONMENT_NAME: 'development',
+      },
+      encoding: 'utf8',
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout.trim().split('\n').at(-1));
+}
+
 function runMutationBoundaryCheck() {
   const policyPath = sourcePath('src/lib/auth/tenant-action.ts');
   const script = `
@@ -245,6 +269,21 @@ test('principal resolver rechecks the current admin record for session revocatio
   assert.equal(result.allowed.id, 'admin-1');
   assert.equal(result.allowed.developmentBypass, false);
   assert.equal(result.revoked, null);
+});
+
+test('development bypass returns an explicit SUPER_ADMIN principal', () => {
+  assert.deepEqual(runDevelopmentPrincipalCheck(), {
+    readPrincipal: {
+      id: 'development-platform-admin',
+      role: 'SUPER_ADMIN',
+      developmentBypass: true,
+    },
+    mutationPrincipal: {
+      id: 'development-platform-admin',
+      role: 'SUPER_ADMIN',
+      developmentBypass: true,
+    },
+  });
 });
 
 test('direct mutation rejection runs before FormData access or mutation', () => {

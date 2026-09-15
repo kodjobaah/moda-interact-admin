@@ -8,6 +8,10 @@ import { dirname, resolve } from 'node:path';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const sourcePath = resolve(root, 'src/lib/admin/merchant-support.ts');
 const source = readFileSync(sourcePath, 'utf8');
+const developmentAdminSource = readFileSync(
+  resolve(root, 'src/lib/auth/development-platform-admin.ts'),
+  'utf8',
+);
 const packageJson = JSON.parse(
   readFileSync(resolve(root, 'package.json'), 'utf8'),
 );
@@ -358,11 +362,14 @@ test('returns post-read state and bounded translation-safe arrays', () => {
 });
 
 test('materializes development attribution for every FK-backed support mutation', () => {
-  assert.match(source, /ON CONFLICT \("id"\) DO NOTHING/);
-  assert.match(source, /reserved development platform administrator identity conflicts/);
+  assert.match(developmentAdminSource, /ON CONFLICT \("id"\) DO NOTHING/);
+  assert.match(
+    developmentAdminSource,
+    /reserved development platform administrator identity conflicts/,
+  );
   assert.equal((source.match(/ensureDevelopmentPlatformAdmin\(transaction, principal\)/g) ?? []).length, 4);
   assert.match(source, /requestFailedTranslationsReconciliation[\s\S]*?database\.\$transaction/);
-  assert.match(source, /if \(!principal\.developmentBypass\) return;/);
+  assert.match(developmentAdminSource, /if \(!principal\.developmentBypass\) return;/);
 });
 
 test('casts the development principal role as the PostgreSQL enum while binding its value', () => {
