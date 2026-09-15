@@ -22,9 +22,11 @@ function payload(overrides: Record<string, unknown> = {}) {
     currency: "USD",
     recurringAmount: "0",
     placement: "ONLY",
+    catalogueOrderSnapshot: [],
     englishDescription: "A plan",
     reason: "initial catalogue",
     usageEvents: [],
+    highlights: [],
     ...overrides,
   });
 }
@@ -40,9 +42,7 @@ test("parses valid money and rejects ambiguous money forms", () => {
 test("rejects an empty or missing English description", () => {
   assert.throws(
     () =>
-      parseMerchantPricingBuilderPayload(
-        payload({ englishDescription: "  " }),
-      ),
+      parseMerchantPricingBuilderPayload(payload({ englishDescription: "  " })),
     /\$\.englishDescription: must be a non-empty string of at most 2000 characters/,
   );
   assert.throws(
@@ -226,4 +226,29 @@ test("projects the exact post-insert order for preview and server evaluation", (
     projectMerchantPricingCatalogueOrder(["A", "B", "C"], "B", 1, "B"),
     ["A", "B", "C"],
   );
+});
+
+test("validates stable highlight keys and bounded merchant content", () => {
+  const validHighlight = {
+    contentKey: "550e8400-e29b-41d4-a716-446655440000",
+    title: "Included capacity",
+    description: "100 monthly recovery conversations.",
+  };
+  const parsed = parseMerchantPricingBuilderPayload(
+    payload({ highlights: [validHighlight] }),
+  );
+  assert.deepEqual(parsed.highlights, [validHighlight]);
+  for (const highlights of [
+    [{ ...validHighlight, contentKey: "not-a-uuid" }],
+    [validHighlight, validHighlight],
+    [{ ...validHighlight, title: " " }],
+    [{ ...validHighlight, title: "x".repeat(121) }],
+    [{ ...validHighlight, description: " " }],
+    [{ ...validHighlight, description: "x".repeat(501) }],
+    [{ ...validHighlight, extra: true }],
+  ])
+    assert.throws(
+      () => parseMerchantPricingBuilderPayload(payload({ highlights })),
+      MerchantPricingPayloadError,
+    );
 });

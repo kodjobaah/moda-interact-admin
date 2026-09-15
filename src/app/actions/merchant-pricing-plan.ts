@@ -34,6 +34,10 @@ import { parseCompletedMerchantPricingTranslationPackage } from "@/lib/admin/mer
 
 const merchantPricingInclude = {
   translations: true,
+  highlights: {
+    orderBy: { position: "asc" as const },
+    include: { translations: { orderBy: { locale: "asc" as const } } },
+  },
   usageEvents: { include: { tiers: true } },
 };
 
@@ -132,6 +136,42 @@ function validateTranslation(
     planHandle: payload.shopifyPlanHandle,
     planName: payload.name,
     englishDescription: payload.englishDescription,
+    highlights: payload.highlights,
+  });
+}
+
+function existingHighlightSources(existing: MerchantPricingPlanWithChildren) {
+  return existing.highlights.map((highlight) => ({
+    contentKey: highlight.contentKey,
+    title:
+      highlight.translations.find((translation) => translation.locale === "en")
+        ?.merchantTitle ?? "",
+    description:
+      highlight.translations.find((translation) => translation.locale === "en")
+        ?.merchantDescription ?? "",
+  }));
+}
+
+function translatableContentChanged(
+  existing: MerchantPricingPlanWithChildren,
+  payload: MerchantPricingBuilderPayload,
+): boolean {
+  const previous = existingHighlightSources(existing);
+  if (
+    merchantPricingDescription(existing).trim() !==
+    payload.englishDescription.trim()
+  )
+    return true;
+  if (previous.length !== payload.highlights.length) return true;
+  return payload.highlights.some((highlight) => {
+    const old = previous.find(
+      (candidate) => candidate.contentKey === highlight.contentKey,
+    );
+    return (
+      !old ||
+      old.title.trim() !== highlight.title.trim() ||
+      old.description.trim() !== highlight.description.trim()
+    );
   });
 }
 
@@ -286,8 +326,6 @@ export async function mutateMerchantPricingPlanAction(
 
   const payload = parsePayload(formData);
   const rawTranslation = formData.get("translationJson");
-  if (typeof rawTranslation !== "string")
-    actionError("A completed translation package is required.");
   await prisma.$transaction(async (transaction) => {
     const rows = await transaction.merchantPricingPlan.findMany({
       include: merchantPricingInclude,
@@ -305,15 +343,29 @@ export async function mutateMerchantPricingPlanAction(
     if (existing && existing.shopifyPlanHandle !== payload.shopifyPlanHandle)
       actionError("Shopify plan handles are immutable.");
     const isCreate = !existing;
+    if (
+      isCreate &&
+      (payload.catalogueOrderSnapshot === null ||
+        payload.catalogueOrderSnapshot.length !== rows.length ||
+        payload.catalogueOrderSnapshot.some(
+          (id, index) => id !== rows[index]?.id,
+        ))
+    )
+      actionError(
+        "The pricing list changed while you were editing. Review where this plan should appear and try again.",
+      );
     const position = isCreate
       ? placementIndex(payload.placement, rows)
       : existing.cataloguePosition;
-    const descriptionChanged =
-      isCreate ||
-      merchantPricingDescription(existing) !== payload.englishDescription;
-    const translations = descriptionChanged
-      ? assertTranslation(rawTranslation, payload)
+    const contentChanged =
+      isCreate || translatableContentChanged(existing, payload);
+    const translations = contentChanged
+      ? assertTranslation(
+          typeof rawTranslation === "string" ? rawTranslation : "",
+          payload,
+        )
       : null;
+    const retainedTranslations = existing?.translations ?? [];
     const policy = await transaction.platformBillingPolicy.findUnique({
       where: { id: "default" },
       select: { minimumUpgradePremiumBps: true },
@@ -360,6 +412,22 @@ export async function mutateMerchantPricingPlanAction(
               }),
             ),
           },
+          highlights: {
+            create: payload.highlights.map((highlight, position) => ({
+              contentKey: highlight.contentKey,
+              position,
+              translations: {
+                create: Object.entries(translations!.translations).map(
+                  ([locale, value]) => ({
+                    locale,
+                    merchantTitle: value.highlights[highlight.contentKey].title,
+                    merchantDescription:
+                      value.highlights[highlight.contentKey].description,
+                  }),
+                ),
+              },
+            })),
+          },
           usageEvents: {
             create: payload.usageEvents.map((event, eventPosition) =>
               eventData(event, eventPosition, payload.currency),
@@ -403,6 +471,48 @@ export async function mutateMerchantPricingPlanAction(
                 },
               }
             : {}),
+          highlights: {
+            deleteMany: {},
+            create: payload.highlights.map((highlight, position) => ({
+              contentKey: highlight.contentKey,
+              position,
+              translations: {
+                create: Object.entries(
+                  translations?.translations ??
+                    Object.fromEntries(
+                      retainedTranslations.map((translation) => [
+                        translation.locale,
+                        {
+                          description: translation.merchantDescription,
+                          highlights: Object.fromEntries(
+                            existing.highlights.map((oldHighlight) => {
+                              const oldTranslation =
+                                oldHighlight.translations.find(
+                                  (candidate) =>
+                                    candidate.locale === translation.locale,
+                                );
+                              return [
+                                oldHighlight.contentKey,
+                                {
+                                  title: oldTranslation?.merchantTitle ?? "",
+                                  description:
+                                    oldTranslation?.merchantDescription ?? "",
+                                },
+                              ];
+                            }),
+                          ),
+                        },
+                      ]),
+                    ),
+                ).map(([locale, value]) => ({
+                  locale,
+                  merchantTitle: value.highlights[highlight.contentKey].title,
+                  merchantDescription:
+                    value.highlights[highlight.contentKey].description,
+                })),
+              },
+            })),
+          },
           usageEvents: {
             deleteMany: {},
             create: payload.usageEvents.map((event, eventPosition) =>

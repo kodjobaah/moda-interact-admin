@@ -15,6 +15,12 @@ export type MerchantPricingBuilderEvent = {
   }>;
 };
 
+export type MerchantPricingBuilderHighlight = {
+  contentKey: string;
+  title: string;
+  description: string;
+};
+
 export type MerchantPricingBuilderPayload = {
   id: string | null;
   shopifyPlanHandle: string;
@@ -28,9 +34,11 @@ export type MerchantPricingBuilderPayload = {
   currency: string;
   recurringAmountMinor: number;
   placement: "ONLY" | "UNCHANGED" | `BEFORE:${string}` | `AFTER:${string}`;
+  catalogueOrderSnapshot: string[] | null;
   englishDescription: string;
   reason: string;
   usageEvents: MerchantPricingBuilderEvent[];
+  highlights: MerchantPricingBuilderHighlight[];
 };
 
 export type MerchantPricingPayloadIssue = { path: string; message: string };
@@ -149,10 +157,15 @@ const TOP_LEVEL_KEYS = [
   "currency",
   "recurringAmount",
   "placement",
+  "catalogueOrderSnapshot",
   "englishDescription",
   "reason",
   "usageEvents",
+  "highlights",
 ];
+
+const CANONICAL_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function parseMerchantPricingBuilderPayload(
   raw: string,
@@ -422,6 +435,74 @@ export function parseMerchantPricingBuilderPayload(
       }
     });
   }
+  const snapshot = parsed.catalogueOrderSnapshot;
+  if (id === null) {
+    if (
+      !Array.isArray(snapshot) ||
+      snapshot.some((value) => typeof value !== "string")
+    )
+      issues.push({
+        path: "$.catalogueOrderSnapshot",
+        message: "create payloads require an exact string array snapshot",
+      });
+  } else if (snapshot !== null) {
+    issues.push({
+      path: "$.catalogueOrderSnapshot",
+      message: "edit payloads require a null catalogue order snapshot",
+    });
+  }
+  const highlights: MerchantPricingBuilderHighlight[] = [];
+  const highlightKeys = new Set<string>();
+  if (!Array.isArray(parsed.highlights)) {
+    issues.push({ path: "$.highlights", message: "must be an array" });
+  } else {
+    parsed.highlights.forEach((rawHighlight, index) => {
+      const path = `$.highlights[${index}]`;
+      if (!isRecord(rawHighlight)) {
+        issues.push({ path, message: "must be an object" });
+        return;
+      }
+      const expectedKeys = ["contentKey", "title", "description"];
+      for (const key of Object.keys(rawHighlight))
+        if (!expectedKeys.includes(key))
+          issues.push({ path: `${path}.${key}`, message: "unexpected field" });
+      for (const key of expectedKeys)
+        if (!(key in rawHighlight))
+          issues.push({
+            path: `${path}.${key}`,
+            message: "required field is missing",
+          });
+      const contentKey = rawHighlight.contentKey;
+      if (typeof contentKey !== "string" || !CANONICAL_UUID.test(contentKey))
+        issues.push({
+          path: `${path}.contentKey`,
+          message: "must be a canonical UUID string",
+        });
+      else if (highlightKeys.has(contentKey.toLowerCase()))
+        issues.push({
+          path: `${path}.contentKey`,
+          message: "must be unique",
+        });
+      else highlightKeys.add(contentKey.toLowerCase());
+      const title = requiredString(
+        rawHighlight.title,
+        `${path}.title`,
+        120,
+        issues,
+      );
+      const description = requiredString(
+        rawHighlight.description,
+        `${path}.description`,
+        500,
+        issues,
+      );
+      highlights.push({
+        contentKey: typeof contentKey === "string" ? contentKey : "",
+        title,
+        description,
+      });
+    });
+  }
   if (issues.length) throw new MerchantPricingPayloadError(issues);
   return {
     id,
@@ -436,8 +517,10 @@ export function parseMerchantPricingBuilderPayload(
     currency,
     recurringAmountMinor,
     placement: placement as MerchantPricingBuilderPayload["placement"],
+    catalogueOrderSnapshot: snapshot as string[] | null,
     englishDescription,
     reason,
     usageEvents,
+    highlights,
   };
 }

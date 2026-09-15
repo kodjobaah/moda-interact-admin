@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant-pricing-builder-payload";
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
 import { parseMoneyToMinorUnits } from "@/lib/admin/merchant-pricing-builder-payload";
@@ -62,6 +63,20 @@ function initialEvents(plan?: MerchantPricingPlanWithChildren): BuilderEvent[] {
       })),
     })) ?? []
   );
+}
+
+function initialHighlights(
+  plan?: MerchantPricingPlanWithChildren,
+): MerchantPricingBuilderHighlight[] {
+  return (plan?.highlights ?? []).map((highlight) => ({
+    contentKey: highlight.contentKey,
+    title:
+      highlight.translations.find((translation) => translation.locale === "en")
+        ?.merchantTitle ?? "",
+    description:
+      highlight.translations.find((translation) => translation.locale === "en")
+        ?.merchantDescription ?? "",
+  }));
 }
 
 function toEconomicsPlan(
@@ -135,9 +150,10 @@ export function MerchantPricingPlanBuilder({
   );
   const [reason, setReason] = useState("");
   const [events, setEvents] = useState<BuilderEvent[]>(initialEvents(plan));
-  const [translationJson, setTranslationJson] = useState(
-    plan ? JSON.stringify({}) : "",
-  );
+  const [highlights, setHighlights] = useState<
+    MerchantPricingBuilderHighlight[]
+  >(initialHighlights(plan));
+  const [translationJson, setTranslationJson] = useState("");
   const [translationResult, setTranslationResult] =
     useState<MerchantPricingTranslationParseResult | null>(null);
 
@@ -155,15 +171,21 @@ export function MerchantPricingPlanBuilder({
       currency: currency.toUpperCase(),
       recurringAmount: recurring,
       placement,
+      catalogueOrderSnapshot: plan
+        ? null
+        : cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
       englishDescription: description,
       reason,
       usageEvents: events,
+      highlights,
     };
   }, [
     credits,
+    cataloguePlans,
     currency,
     description,
     events,
+    highlights,
     featured,
     handle,
     isActive,
@@ -284,6 +306,93 @@ export function MerchantPricingPlanBuilder({
   ]);
 
   const economicsPreview = economicsState.results;
+  const economicsPassed =
+    !economicsState.invalid &&
+    economicsPreview.every((result) => result.status === "PASS");
+  const requiredFieldsValid =
+    Boolean(handle.trim()) &&
+    Boolean(name.trim()) &&
+    /^[A-Z]{3}$/.test(currency.trim().toUpperCase()) &&
+    Number.isSafeInteger(Number(credits)) &&
+    Number(credits) >= 0 &&
+    Boolean(description.trim()) &&
+    description.trim().length <= 2000 &&
+    events.every(
+      (event) =>
+        Boolean(event.adminLabel.trim()) &&
+        Boolean(event.eventHandle.trim()) &&
+        Number.isSafeInteger(event.creditsGrantedPerUnit) &&
+        event.creditsGrantedPerUnit >= 1,
+    );
+  const retainedTemplate = plan
+    ? buildMerchantPricingTranslationTemplate({
+        planHandle: handle,
+        planName: name,
+        englishDescription: description,
+        highlights,
+        previous: {
+          englishDescription:
+            plan.translations.find((translation) => translation.locale === "en")
+              ?.merchantDescription ?? "",
+          highlights: initialHighlights(plan),
+          translations: plan.translations.map((translation) => ({
+            locale: translation.locale,
+            merchantDescription: translation.merchantDescription,
+            highlights: plan.highlights.map((highlight) => {
+              const value = highlight.translations.find(
+                (candidate) => candidate.locale === translation.locale,
+              );
+              return {
+                contentKey: highlight.contentKey,
+                title: value?.merchantTitle ?? "",
+                description: value?.merchantDescription ?? "",
+              };
+            }),
+          })),
+        },
+      })
+    : null;
+  const translationsRetained =
+    Boolean(plan) &&
+    (
+      plan?.translations.find((translation) => translation.locale === "en")
+        ?.merchantDescription ?? ""
+    ).trim() === description.trim() &&
+    plan?.highlights.length === highlights.length &&
+    highlights.every((highlight) => {
+      const previous = plan?.highlights.find(
+        (candidate) => candidate.contentKey === highlight.contentKey,
+      );
+      const previousEnglish = previous?.translations.find(
+        (translation) => translation.locale === "en",
+      );
+      return (
+        previousEnglish?.merchantTitle.trim() === highlight.title.trim() &&
+        previousEnglish?.merchantDescription.trim() ===
+          highlight.description.trim()
+      );
+    });
+
+  const canSubmit =
+    requiredFieldsValid &&
+    Boolean(reason.trim()) &&
+    reason.trim().length <= 2000 &&
+    economicsPassed &&
+    (translationsRetained || Boolean(translationResult?.valid));
+
+  const placementLabel = plan
+    ? `Current position (${plan.cataloguePosition + 1})`
+    : placement === "ONLY"
+      ? "This will be the first plan."
+      : placement.startsWith("BEFORE:")
+        ? `Before ${cataloguePlans[0]?.displayName ?? "the first plan"}`
+        : `After ${cataloguePlans.find((cataloguePlan) => placement === `AFTER:${cataloguePlan.id}`)?.displayName ?? "the selected plan"}`;
+
+  function canNavigateTo(targetStep: number): boolean {
+    if (targetStep <= step) return true;
+    if (targetStep > step + 1) return false;
+    return step !== 5 || economicsPassed;
+  }
 
   function addEvent() {
     if (events.length >= 5) return;
@@ -358,8 +467,30 @@ export function MerchantPricingPlanBuilder({
     );
   }
 
+  function updateHighlight(
+    index: number,
+    update: Partial<MerchantPricingBuilderHighlight>,
+  ) {
+    setHighlights((current) =>
+      current.map((highlight, highlightIndex) =>
+        highlightIndex === index ? { ...highlight, ...update } : highlight,
+      ),
+    );
+  }
+
+  function moveHighlight(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= highlights.length) return;
+    setHighlights((current) => {
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
   function validTranslationJson(): string {
     if (translationResult?.valid) return translationJson;
+    if (retainedTemplate) return JSON.stringify(retainedTemplate);
     return (
       translationJson ||
       JSON.stringify(
@@ -367,6 +498,7 @@ export function MerchantPricingPlanBuilder({
           planHandle: handle,
           planName: name,
           englishDescription: description,
+          highlights,
         }),
       )
     );
@@ -387,14 +519,16 @@ export function MerchantPricingPlanBuilder({
           "Catalogue placement",
           "Shopify pricing",
           "Usage events",
-          "English description",
+          "Merchant content",
           "Portfolio economics",
           "Translations & review",
         ].map((label, index) => (
           <button
             key={label}
             type="button"
-            onClick={() => setStep(index)}
+            onClick={() => {
+              if (canNavigateTo(index)) setStep(index);
+            }}
             className={`rounded-md border px-2 py-2 text-left text-xs font-semibold ${step === index ? "border-[var(--brand-700)] bg-[var(--brand-50)] text-[var(--brand-800)]" : "border-gray-200 text-gray-600"}`}
           >
             {index + 1} {label}
@@ -463,10 +597,14 @@ export function MerchantPricingPlanBuilder({
       ) : null}
       {step === 1 ? (
         <section className="space-y-3">
-          <p className="text-sm text-gray-600">
-            Create placement is explicit and resolved against a fresh ordered
-            catalogue read.
-          </p>
+          <label className="text-sm font-medium text-gray-700">
+            Where should this plan appear?
+            <p className="mt-1 font-normal text-gray-600">
+              Choose where this plan should appear in the pricing list merchants
+              see. This order is also used when Moda compares this plan with the
+              other plans.
+            </p>
+          </label>
           <select
             className={inputClass}
             value={placement}
@@ -474,11 +612,11 @@ export function MerchantPricingPlanBuilder({
             onChange={(event) => setPlacement(event.target.value)}
           >
             {!cataloguePlans.length ? (
-              <option value="ONLY">ONLY: empty catalogue</option>
+              <option value="ONLY">This will be the first plan.</option>
             ) : null}
             {cataloguePlans.length ? (
               <option value={`BEFORE:${cataloguePlans[0].id}`}>
-                BEFORE: {cataloguePlans[0].displayName}
+                Before {cataloguePlans[0].displayName}
               </option>
             ) : null}
             {cataloguePlans.map((cataloguePlan) => (
@@ -486,11 +624,11 @@ export function MerchantPricingPlanBuilder({
                 key={cataloguePlan.id}
                 value={`AFTER:${cataloguePlan.id}`}
               >
-                AFTER: {cataloguePlan.displayName}
+                After {cataloguePlan.displayName}
               </option>
             ))}
             {plan ? (
-              <option value="UNCHANGED">UNCHANGED: preserve position</option>
+              <option value="UNCHANGED">Keep current position</option>
             ) : null}
           </select>
           {plan ? (
@@ -730,17 +868,89 @@ export function MerchantPricingPlanBuilder({
         </section>
       ) : null}
       {step === 4 ? (
-        <label className="block text-sm font-medium text-gray-700">
-          English merchant description
-          <textarea
-            className={`${inputClass} mt-1`}
-            rows={6}
-            maxLength={2000}
-            required
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
+        <section className="space-y-5">
+          <label className="block text-sm font-medium text-gray-700">
+            English merchant description
+            <textarea
+              className={`${inputClass} mt-1`}
+              rows={6}
+              maxLength={2000}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </label>
+          {highlights.map((highlight, index) => (
+            <div
+              key={highlight.contentKey}
+              className="space-y-3 rounded-md border border-gray-200 p-3"
+            >
+              <label className="block text-sm font-medium text-gray-700">
+                Highlight title
+                <input
+                  className={inputClass}
+                  maxLength={120}
+                  value={highlight.title}
+                  onChange={(event) =>
+                    updateHighlight(index, { title: event.target.value })
+                  }
+                />
+              </label>
+              <label className="block text-sm font-medium text-gray-700">
+                Highlight description
+                <textarea
+                  className={inputClass}
+                  maxLength={500}
+                  rows={3}
+                  value={highlight.description}
+                  onChange={(event) =>
+                    updateHighlight(index, { description: event.target.value })
+                  }
+                />
+              </label>
+              <div className="flex flex-wrap gap-3 text-sm font-semibold">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => moveHighlight(index, -1)}
+                >
+                  Move up
+                </button>
+                <button
+                  type="button"
+                  disabled={index === highlights.length - 1}
+                  onClick={() => moveHighlight(index, 1)}
+                >
+                  Move down
+                </button>
+                <button
+                  type="button"
+                  className="text-red-700"
+                  onClick={() =>
+                    setHighlights((current) =>
+                      current.filter(
+                        (_, highlightIndex) => highlightIndex !== index,
+                      ),
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setHighlights((current) => [
+                ...current,
+                { contentKey: crypto.randomUUID(), title: "", description: "" },
+              ])
+            }
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold"
+          >
+            + Add highlight
+          </button>
+        </section>
       ) : null}
       {step === 5 ? (
         <section className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -801,35 +1011,99 @@ export function MerchantPricingPlanBuilder({
           planHandle={handle}
           planName={name}
           englishDescription={description}
-          initialRawJson={translationJson === "" ? undefined : translationJson}
+          highlights={highlights}
+          initialRawJson={
+            translationJson ||
+            (retainedTemplate ? JSON.stringify(retainedTemplate) : undefined)
+          }
           onChange={(rawJson, result) => {
             setTranslationJson(rawJson);
             setTranslationResult(result);
           }}
         />
       ) : null}
-      <label className="block text-sm font-medium text-gray-700">
-        Admin reason
-        <textarea
-          className={`${inputClass} mt-1`}
-          rows={2}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          required
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={
-          !description.trim() ||
-          economicsState.invalid ||
-          !economicsPreview.every((result) => result.status === "PASS") ||
-          (step === 6 && !translationResult?.valid)
-        }
-        className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {plan ? "Save MerchantPricing plan" : "Create MerchantPricing plan"}
-      </button>
+      {step === 6 ? (
+        <section className="space-y-2 rounded-md border border-gray-200 p-4 text-sm">
+          <h3 className="font-semibold">Final review</h3>
+          <p>
+            {name} ({handle})
+          </p>
+          <p>Catalogue placement: {placementLabel}</p>
+          <p>
+            Recurring pricing: {recurring} {currency}
+          </p>
+          <p>Allowance: {credits} recovery credits</p>
+          <p>Usage events: {events.length}</p>
+          <ul className="list-disc pl-5">
+            {events.map((event) => (
+              <li key={event.eventHandle}>
+                {event.adminLabel}: {event.pricingMode} pricing
+                {event.pricingMode === "FIXED"
+                  ? ` at ${event.fixedUnitAmount ?? ""} ${currency}`
+                  : ` across ${event.tiers?.length ?? 0} tiers`}
+              </li>
+            ))}
+          </ul>
+          <p>English merchant description: {description}</p>
+          <ul className="list-disc pl-5">
+            {highlights.map((highlight) => (
+              <li key={highlight.contentKey}>
+                {highlight.title}: {highlight.description}
+              </li>
+            ))}
+          </ul>
+          <p>Portfolio economics: {economicsPassed ? "PASS" : "NOT PASS"}</p>
+          <p>
+            Translation state:{" "}
+            {translationsRetained
+              ? "20/20 retained"
+              : translationResult?.valid
+                ? "20/20 validated"
+                : "Not validated"}
+          </p>
+        </section>
+      ) : null}
+      {step === 6 ? (
+        <label className="block text-sm font-medium text-gray-700">
+          Admin reason
+          <textarea
+            className={`${inputClass} mt-1`}
+            rows={2}
+            maxLength={2000}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+      ) : null}
+      {step === 6 ? (
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {plan ? "Save MerchantPricing plan" : "Create MerchantPricing plan"}
+        </button>
+      ) : null}
+      <div className="flex justify-between gap-3">
+        <button
+          type="button"
+          disabled={step === 0}
+          onClick={() => setStep((current) => Math.max(0, current - 1))}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          Back
+        </button>
+        {step < 6 ? (
+          <button
+            type="button"
+            disabled={!canNavigateTo(step + 1)}
+            onClick={() => setStep((current) => current + 1)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            Next
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }
