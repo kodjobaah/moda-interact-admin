@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { test } from "node:test";
@@ -54,6 +54,13 @@ function assertMissing(path) {
   assert.equal(existsSync(resolve(root, path)), false);
 }
 
+function sourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(directory, entry.name);
+    return entry.isDirectory() ? sourceFiles(path) : [path];
+  });
+}
+
 test("superseded economics application surfaces are deleted", () => {
   for (const path of [
     "src/app/actions/billing-economics.ts",
@@ -62,6 +69,16 @@ test("superseded economics application surfaces are deleted", () => {
     "src/lib/admin/billing-plan-guardrail.ts",
   ])
     assertMissing(path);
+});
+
+test("deleted legacy economics symbols have no source references", () => {
+  const source = sourceFiles(resolve(root, "src"))
+    .map((path) => readFileSync(path, "utf8"))
+    .join("\n");
+  assert.doesNotMatch(
+    source,
+    /mutateUpgradeEdgeAction|recordEconomicsSnapshotAction|getBillingEconomicsControls|BillingEconomicsControls/,
+  );
 });
 
 test("policy threshold is bounded and persisted through the existing policy action", () => {
