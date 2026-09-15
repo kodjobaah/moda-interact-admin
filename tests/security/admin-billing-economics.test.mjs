@@ -1,18 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { test } from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const action = readFileSync(
-  resolve(root, "src/app/actions/billing-economics.ts"),
-  "utf8",
-);
-const validation = readFileSync(
-  resolve(root, "src/lib/admin/billing-economics-validation.ts"),
-  "utf8",
-);
 const policyValidation = readFileSync(
   resolve(root, "src/lib/admin/billing-control-validation.ts"),
   "utf8",
@@ -25,13 +17,51 @@ const policyAction = readFileSync(
   resolve(root, "src/app/actions/billing-controls.ts"),
   "utf8",
 );
+const controlsPage = readFileSync(
+  resolve(root, "src/app/(protected)/billing/controls/page.tsx"),
+  "utf8",
+);
+const billingPage = readFileSync(
+  resolve(root, "src/app/(protected)/billing/page.tsx"),
+  "utf8",
+);
+const shell = readFileSync(
+  resolve(root, "src/components/admin/admin-shell.tsx"),
+  "utf8",
+);
+const tenantDirectory = readFileSync(
+  resolve(root, "src/app/(protected)/page.tsx"),
+  "utf8",
+);
+const searchInput = readFileSync(
+  resolve(root, "src/components/admin/search-input.tsx"),
+  "utf8",
+);
+const merchantPricingEconomics = readFileSync(
+  resolve(root, "src/lib/admin/merchant-pricing-economics.ts"),
+  "utf8",
+);
+const guardrail = readFileSync(
+  resolve(root, "src/lib/admin/upgrade-economics-guardrail.ts"),
+  "utf8",
+);
+const guardrailTests = readFileSync(
+  resolve(root, "tests/unit/upgrade-economics-guardrail.test.ts"),
+  "utf8",
+);
 
-test("economics mutations are SUPER_ADMIN-only and use durable plan ids", () => {
-  assert.match(action, /requirePlatformAdminMutation/);
-  assert.match(action, /principal\.role !== "SUPER_ADMIN"/);
-  assert.match(action, /billingPlan\.findUnique/);
-  assert.match(action, /billingUpgradeEconomicsEdge\.create/);
-  assert.match(action, /billingEconomicsSnapshot\.create/);
+function assertMissing(path) {
+  assert.equal(existsSync(resolve(root, path)), false);
+}
+
+test("superseded economics application surfaces are deleted", () => {
+  for (const path of [
+    "src/app/actions/billing-economics.ts",
+    "src/lib/admin/billing-economics.ts",
+    "src/lib/admin/billing-economics-validation.ts",
+    "src/lib/admin/billing-plan-guardrail.ts",
+  ])
+    assertMissing(path);
 });
 
 test("policy threshold is bounded and persisted through the existing policy action", () => {
@@ -44,40 +74,62 @@ test("policy threshold is bounded and persisted through the existing policy acti
   assert.match(controls, /name="minimumUpgradePremiumBps"/);
 });
 
-test("edge and snapshot actions enforce drift, append-only evidence, and safe pricing input", () => {
-  assert.match(validation, /input\.lowerPlanId === input\.higherPlanId/);
-  assert.match(
-    validation,
-    /input\.lowerEdge\?\.active \|\| input\.higherEdge\?\.active/,
-  );
-  assert.match(validation, /input\.higherAllowance <= input\.lowerAllowance/);
-  assert.match(
-    action,
-    /validateEconomicsSnapshotAgainstPlan\(plan, values\)/,
-  );
-  assert.match(validation, /Shopify plan handle does not match/);
-  assert.match(validation, /Recovery-credit pack enablement does not match/);
-  assert.match(validation, /Recovery-credit pack size does not match/);
-  assert.match(validation, /Recovery-credit pack event handle does not match/);
-  assert.match(action, /billingEconomicsSnapshot\.create/);
+test("retained controls remove the legacy economics forms", () => {
+  for (const source of [controlsPage, billingPage]) {
+    assert.doesNotMatch(
+      source,
+      /BillingEconomicsControls|getBillingEconomicsControls/,
+    );
+  }
+  assert.doesNotMatch(controls, /Upgrade ladder/);
+  assert.doesNotMatch(controls, /Verified Shopify App Pricing economics/);
   assert.doesNotMatch(
-    action,
-    /appSubscriptionCreate|appPurchaseOneTimeCreate|shopify.*mutation/i,
+    controls,
+    /mutateUpgradeEdgeAction|recordEconomicsSnapshotAction/,
   );
-  assert.doesNotMatch(action, /token|secret|password|accessToken/i);
-  assert.match(
-    validation,
-    /Only the final usage pricing tier may be open-ended/,
-  );
-  assert.match(validation, /unsupported fields/);
+  assert.match(controlsPage, /PlatformBillingControls/);
 });
 
-test("the UI labels snapshots as verified evidence and exposes exact edge controls", () => {
+test("retained platform policy persists the bounded premium threshold", () => {
+  assert.match(policyValidation, /minimumUpgradePremiumBps/);
+  assert.match(policyValidation, /10_000/);
   assert.match(
-    controls,
-    /Verified Shopify App Pricing economics used by Moda&apos;s Admin\s+guardrail/,
+    policyAction,
+    /minimumUpgradePremiumBps: values\.minimumUpgradePremiumBps/,
   );
-  assert.match(controls, /Shopify remains the charging authority/);
-  assert.match(controls, /mutateUpgradeEdgeAction/);
-  assert.match(controls, /recordEconomicsSnapshotAction/);
+  assert.match(controls, /name="minimumUpgradePremiumBps"/);
+});
+
+test("generic economics guardrail remains live for MerchantPricing", () => {
+  assert.match(guardrail, /export function validateSinglePackShopifyEconomics/);
+  assert.match(guardrailTests, /validateSinglePackShopifyEconomics/);
+  assert.match(merchantPricingEconomics, /minimumUpgradePremiumBps/);
+});
+
+test("AdminShell only renders supplied headers and tenant search stays on the directory", () => {
+  assert.match(shell, /header\?: ReactNode/);
+  assert.match(shell, /\{header \? \(/);
+  assert.doesNotMatch(shell, /SearchInput|search\?: string/);
+  assert.match(tenantDirectory, /import \{ SearchInput \}/);
+  assert.match(tenantDirectory, /header=\{/);
+  assert.match(tenantDirectory, /<SearchInput defaultValue=\{search\} \/>/);
+  assert.match(searchInput, /<form action="\/" method="get"/);
+  assert.match(searchInput, /name="q"/);
+});
+
+test("non-directory pages do not wire tenant SearchInput", () => {
+  for (const path of [
+    "src/app/(protected)/billing/page.tsx",
+    "src/app/(protected)/billing/controls/page.tsx",
+    "src/app/(protected)/promotions/page.tsx",
+    "src/app/(protected)/promotions/[campaignId]/page.tsx",
+    "src/app/(protected)/merchant-support/page.tsx",
+    "src/app/(protected)/observability/page.tsx",
+    "src/app/(protected)/observability/queues/page.tsx",
+  ]) {
+    assert.doesNotMatch(
+      readFileSync(resolve(root, path), "utf8"),
+      /SearchInput|search\.tenantsPlaceholder/,
+    );
+  }
 });

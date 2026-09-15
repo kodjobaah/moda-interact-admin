@@ -34,12 +34,8 @@ import {
   type SearchParamRecord,
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
-import {
-  BillingEconomicsControls,
-  PlatformBillingControls,
-} from "@/components/admin/billing-controls";
+import { PlatformBillingControls } from "@/components/admin/billing-controls";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
-import { getBillingEconomicsControls } from "@/lib/admin/billing-economics";
 import {
   RecoveryCreditRefundDrawer,
   RecoveryCreditRefundQueue,
@@ -84,8 +80,6 @@ export default async function BillingPage({ searchParams }: PageProps) {
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
       : null;
   const policy = view === "controls" ? await getPlatformBillingPolicy() : null;
-  const economics =
-    view === "controls" ? await getBillingEconomicsControls() : null;
   const overview = view === "overview" ? await getBillingOverview() : null;
   const packs =
     view === "packs"
@@ -159,9 +153,6 @@ export default async function BillingPage({ searchParams }: PageProps) {
         ) : null}
         {view === "controls" && policy ? (
           <PlatformBillingControls policy={policy} />
-        ) : null}
-        {view === "controls" && economics ? (
-          <BillingEconomicsControls data={economics} />
         ) : null}
         {view === "plans" &&
         (params.drawer === "register-plan" || selectedPlan) ? (
