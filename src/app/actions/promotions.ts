@@ -317,16 +317,6 @@ export async function importPromotionTranslationsAction(
     });
     if (!parsed.valid || !parsed.package)
       throw new Error(parsed.issues.map((entry) => entry.message).join("; "));
-    const result = await transaction.promotionCampaign.updateMany({
-      where: {
-        id: existing.id,
-        status: PromotionCampaignStatus.DRAFT,
-        version: existing.version,
-      },
-      data: { version: { increment: 1 } },
-    });
-    if (result.count !== 1)
-      throw new Error("Promotion campaign changed; reload and retry.");
     await transaction.promotionCampaignTranslation.deleteMany({
       where: { promotionCampaignId: existing.id },
     });
@@ -340,6 +330,16 @@ export async function importPromotionTranslationsAction(
         }),
       ),
     });
+    const result = await transaction.promotionCampaign.updateMany({
+      where: {
+        id: existing.id,
+        status: PromotionCampaignStatus.DRAFT,
+        version: existing.version,
+      },
+      data: { version: { increment: 1 } },
+    });
+    if (result.count !== 1)
+      throw new Error("Promotion campaign changed; reload and retry.");
   });
   revalidatePath("/promotions");
   revalidatePath(`/promotions?edit=${encodeURIComponent(campaignId)}`);

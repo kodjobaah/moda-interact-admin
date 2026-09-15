@@ -124,6 +124,33 @@ test("rejects changed source, wrong campaign, and formulas without evaluating th
   );
 });
 
+test("rejects changed worksheet order and non-exact metadata rows", async () => {
+  const wrongSheet = await bytesWith((workbook) => {
+    workbook.getWorksheet("Instructions")!.name = "Guide";
+  });
+  const wrongSheetResult = await parsePromotionTranslationWorkbook(
+    wrongSheet,
+    expected,
+  );
+  assert.ok(
+    wrongSheetResult.workbookIssues.some(
+      ({ code }) => code === "UNEXPECTED_WORKSHEET",
+    ),
+  );
+  const extraMetadata = await bytesWith((workbook) => {
+    workbook.getWorksheet("_meta")!.addRow(["unexpected", "value"]);
+  });
+  const extraMetadataResult = await parsePromotionTranslationWorkbook(
+    extraMetadata,
+    expected,
+  );
+  assert.ok(
+    extraMetadataResult.workbookIssues.some(
+      ({ code }) => code === "WORKBOOK_VERSION_MISMATCH",
+    ),
+  );
+});
+
 test("incomplete canonical packages stay invalid until all 20 locales are complete", () => {
   const template = buildPromotionTranslationTemplate(expected);
   const result = parseCompletedPromotionTranslationPackage(

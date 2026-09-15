@@ -160,15 +160,6 @@ export async function parsePromotionTranslationWorkbook(
   translationResult: PromotionTranslationParseResult | null;
 }> {
   const issues: PromotionTranslationWorkbookIssue[] = [];
-  if (bytes.byteLength > PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES) {
-    addIssue(issues, "INVALID_XLSX", "The workbook exceeds the 2 MiB limit.");
-    return {
-      workbookValid: false,
-      workbookIssues: issues,
-      canonicalRawJson: null,
-      translationResult: null,
-    };
-  }
   const ExcelJS = await loadTranslationWorkbookExcelJS();
   const workbook = new ExcelJS.Workbook();
   try {
@@ -190,6 +181,15 @@ export async function parsePromotionTranslationWorkbook(
       translationResult: null,
     };
   }
+  if (bytes.byteLength > PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES) {
+    addIssue(issues, "INVALID_XLSX", "The workbook exceeds the 2 MiB limit.");
+    return {
+      workbookValid: false,
+      workbookIssues: issues,
+      canonicalRawJson: null,
+      translationResult: null,
+    };
+  }
   const actualNames = workbook.worksheets.map((sheet) => sheet.name);
   if (
     JSON.stringify(actualNames) !==
@@ -197,7 +197,7 @@ export async function parsePromotionTranslationWorkbook(
   )
     addIssue(
       issues,
-      "MISSING_WORKSHEET",
+      "UNEXPECTED_WORKSHEET",
       "Worksheets must be ordered Instructions, Translations, _meta.",
     );
   for (const name of PROMOTION_TRANSLATION_WORKBOOK_SHEETS)
@@ -208,6 +208,18 @@ export async function parsePromotionTranslationWorkbook(
         `Missing worksheet: ${name}.`,
         name,
       );
+  if (
+    issues.some(
+      ({ code }) =>
+        code === "UNEXPECTED_WORKSHEET" || code === "MISSING_WORKSHEET",
+    )
+  )
+    return {
+      workbookValid: false,
+      workbookIssues: issues,
+      canonicalRawJson: null,
+      translationResult: null,
+    };
   const meta = workbook.getWorksheet("_meta");
   const translations = workbook.getWorksheet("Translations");
   if (!meta || !translations)
@@ -217,9 +229,47 @@ export async function parsePromotionTranslationWorkbook(
       canonicalRawJson: null,
       translationResult: null,
     };
+  const metadataRows = [
+    ["workbookKind", "moda-interact-promotion-translations"],
+    ["workbookSchemaVersion", 1],
+    ["campaignId", expected.campaignId.trim()],
+    ["campaignInternalName", expected.campaignInternalName.trim()],
+    ["sourceLocale", "en"],
+    ["sourceMerchantTitle", expected.sourceMerchantTitle.trim()],
+    ["sourceMerchantDescription", expected.sourceMerchantDescription.trim()],
+    [
+      "localeOrder",
+      JSON.stringify(TRANSLATION_WORKBOOK_LOCALES.map(({ locale }) => locale)),
+    ],
+  ] as const;
+  if (meta.rowCount !== metadataRows.length)
+    addIssue(
+      issues,
+      "WORKBOOK_VERSION_MISMATCH",
+      "The _meta sheet must contain exactly eight ordered key/value rows.",
+      "_meta",
+    );
+  metadataRows.forEach(([key], index) => {
+    if (valueAt(meta, `A${index + 1}`) !== key)
+      addIssue(
+        issues,
+        "WORKBOOK_VERSION_MISMATCH",
+        `Unexpected metadata key at A${index + 1}.`,
+        "_meta",
+        `A${index + 1}`,
+      );
+  });
+  if (issues.some(({ code }) => code === "WORKBOOK_VERSION_MISMATCH"))
+    return {
+      workbookValid: false,
+      workbookIssues: issues,
+      canonicalRawJson: null,
+      translationResult: null,
+    };
   const metadata = new Map<string, unknown>();
-  for (let row = 1; row <= 8; row += 1)
-    metadata.set(String(valueAt(meta, `A${row}`)), valueAt(meta, `B${row}`));
+  metadataRows.forEach(([key], index) =>
+    metadata.set(key, valueAt(meta, `B${index + 1}`)),
+  );
   if (metadata.get("workbookKind") !== "moda-interact-promotion-translations")
     addIssue(
       issues,
