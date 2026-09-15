@@ -1,0 +1,50 @@
+export const MERCHANT_PRICING_LOCALES = [
+  "cs",
+  "da",
+  "de",
+  "en",
+  "es",
+  "fi",
+  "fr",
+  "it",
+  "ja",
+  "ko",
+  "nb",
+  "nl",
+  "pl",
+  "pt-BR",
+  "pt-PT",
+  "sv",
+  "th",
+  "tr",
+  "zh-Hans",
+  "zh-Hant",
+] as const;
+
+export type MerchantPricingLocale = (typeof MERCHANT_PRICING_LOCALES)[number];
+
+export const MERCHANT_PRICING_LOCALE_LABELS: Record<
+  MerchantPricingLocale,
+  string
+> = {
+  cs: "Czech",
+  da: "Danish",
+  de: "German",
+  en: "English",
+  es: "Spanish",
+  fi: "Finnish",
+  fr: "French",
+  it: "Italian",
+  ja: "Japanese",
+  ko: "Korean",
+  nb: "Norwegian Bokmål",
+  nl: "Dutch",
+  pl: "Polish",
+  "pt-BR": "Portuguese (Brazil)",
+  "pt-PT": "Portuguese (Portugal)",
+  sv: "Swedish",
+  th: "Thai",
+  tr: "Turkish",
+  "zh-Hans": "Chinese (Simplified)",
+  "zh-Hant": "Chinese (Traditional)",
+};
