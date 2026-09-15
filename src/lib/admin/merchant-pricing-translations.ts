@@ -9,28 +9,53 @@ export type MerchantPricingTranslationIssue = {
   locale?: string;
   message: string;
 };
-
+export type MerchantPricingTranslationHighlight = {
+  title: string;
+  description: string;
+};
+export type MerchantPricingTranslationHighlightSource = {
+  contentKey: string;
+  title: string;
+  description: string;
+};
+export type MerchantPricingStoredTranslation = {
+  locale: string;
+  merchantDescription: string;
+  highlights: MerchantPricingTranslationHighlightSource[];
+};
 export type MerchantPricingTranslationPackage = {
   _meta: {
-    schemaVersion: 1;
+    schemaVersion: 2;
     planHandle: string;
     planName: string;
     sourceLocale: "en";
   };
-  translations: Record<MerchantPricingLocale, { description: string }>;
+  translations: Record<
+    MerchantPricingLocale,
+    {
+      description: string;
+      highlights: Record<string, MerchantPricingTranslationHighlight>;
+    }
+  >;
 };
-
 export type MerchantPricingTranslationParseResult = {
   valid: boolean;
   completeCount: number;
   issues: MerchantPricingTranslationIssue[];
   package?: MerchantPricingTranslationPackage;
 };
-
-type ExpectedTranslation = {
+export type MerchantPricingTranslationExpected = {
   planHandle: string;
   planName: string;
   englishDescription: string;
+  highlights?: MerchantPricingTranslationHighlightSource[];
+};
+type TemplateOptions = MerchantPricingTranslationExpected & {
+  previous?: {
+    englishDescription: string;
+    highlights: MerchantPricingTranslationHighlightSource[];
+    translations: MerchantPricingStoredTranslation[];
+  };
 };
 
 const ROOT_KEYS = ["_meta", "translations"] as const;
@@ -40,54 +65,87 @@ const META_KEYS = [
   "planName",
   "sourceLocale",
 ] as const;
-const LOCALE_KEYS = ["description"] as const;
-
-function keys(value: object): string[] {
-  return Object.keys(value);
-}
-
-function hasExactKeys(value: object, expected: readonly string[]): boolean {
-  const actual = keys(value);
-  return (
-    actual.length === expected.length &&
-    expected.every((key) => actual.includes(key))
-  );
-}
-
-function issue(
+const LOCALE_KEYS = ["description", "highlights"] as const;
+const normalized = (value: string) => value.trim();
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+const keys = (value: object) => Object.keys(value);
+const hasExactKeys = (value: object, expected: readonly string[]) =>
+  keys(value).length === expected.length &&
+  expected.every((key) => keys(value).includes(key));
+const makeIssue = (
   code: string,
   path: string,
   message: string,
   locale?: string,
-): MerchantPricingTranslationIssue {
-  return { code, path, ...(locale ? { locale } : {}), message };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function normalized(value: string): string {
-  return value.trim();
-}
+): MerchantPricingTranslationIssue => ({
+  code,
+  path,
+  ...(locale ? { locale } : {}),
+  message,
+});
 
 export function buildMerchantPricingTranslationTemplate({
   planHandle,
   planName,
   englishDescription,
-}: ExpectedTranslation): MerchantPricingTranslationPackage {
-  const translations = {} as Record<
-    MerchantPricingLocale,
-    { description: string }
-  >;
+  highlights,
+  previous,
+}: TemplateOptions): MerchantPricingTranslationPackage {
+  highlights ??= [];
+  const previousByLocale = new Map(
+    (previous?.translations ?? []).map((translation) => [
+      translation.locale,
+      translation,
+    ]),
+  );
+  const previousSources = new Map(
+    (previous?.highlights ?? []).map((highlight) => [
+      highlight.contentKey,
+      highlight,
+    ]),
+  );
+  const descriptionUnchanged =
+    previous !== undefined &&
+    normalized(previous.englishDescription) === normalized(englishDescription);
+  const translations = {} as MerchantPricingTranslationPackage["translations"];
   for (const locale of MERCHANT_PRICING_LOCALES) {
+    const stored = previousByLocale.get(locale);
     translations[locale] = {
-      description: locale === "en" ? normalized(englishDescription) : "",
+      description:
+        descriptionUnchanged && stored
+          ? stored.merchantDescription
+          : locale === "en"
+            ? normalized(englishDescription)
+            : "",
+      highlights: Object.fromEntries(
+        highlights.map((highlight) => {
+          const oldSource = previousSources.get(highlight.contentKey);
+          const unchanged =
+            oldSource !== undefined &&
+            normalized(oldSource.title) === normalized(highlight.title) &&
+            normalized(oldSource.description) ===
+              normalized(highlight.description);
+          const oldValue = stored?.highlights.find(
+            (candidate) => candidate.contentKey === highlight.contentKey,
+          );
+          return [
+            highlight.contentKey,
+            unchanged && oldValue
+              ? { title: oldValue.title, description: oldValue.description }
+              : {
+                  title: locale === "en" ? normalized(highlight.title) : "",
+                  description:
+                    locale === "en" ? normalized(highlight.description) : "",
+                },
+          ];
+        }),
+      ),
     };
   }
   return {
     _meta: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       planHandle: normalized(planHandle),
       planName: normalized(planName),
       sourceLocale: "en",
@@ -98,8 +156,9 @@ export function buildMerchantPricingTranslationTemplate({
 
 export function parseCompletedMerchantPricingTranslationPackage(
   rawJsonText: string,
-  expected: ExpectedTranslation,
+  expected: MerchantPricingTranslationExpected,
 ): MerchantPricingTranslationParseResult {
+  const expectedHighlights = expected.highlights ?? [];
   const issues: MerchantPricingTranslationIssue[] = [];
   let parsed: unknown;
   try {
@@ -109,7 +168,7 @@ export function parseCompletedMerchantPricingTranslationPackage(
       valid: false,
       completeCount: 0,
       issues: [
-        issue(
+        makeIssue(
           "INVALID_JSON",
           "$",
           "The translation package is not valid JSON.",
@@ -117,72 +176,47 @@ export function parseCompletedMerchantPricingTranslationPackage(
       ],
     };
   }
-
-  if (!isRecord(parsed)) {
+  if (!isRecord(parsed))
     return {
       valid: false,
       completeCount: 0,
       issues: [
-        issue(
-          "INVALID_ROOT",
+        makeIssue(
+          "INVALID_JSON",
           "$",
           "The translation package root must be an object.",
         ),
       ],
     };
-  }
-  if (!hasExactKeys(parsed, ROOT_KEYS)) {
-    for (const key of keys(parsed)) {
-      if (!ROOT_KEYS.includes(key as (typeof ROOT_KEYS)[number])) {
-        issues.push(
-          issue("UNEXPECTED_ROOT_FIELD", `$.${key}`, "Unexpected root field."),
-        );
-      }
-    }
-    for (const key of ROOT_KEYS) {
-      if (!(key in parsed))
-        issues.push(
-          issue("INVALID_ROOT", `$.${key}`, "Required root field is missing."),
-        );
-    }
-  }
-
-  const meta = parsed._meta;
-  if (!isRecord(meta)) {
+  if (!hasExactKeys(parsed, ROOT_KEYS))
     issues.push(
-      issue("INVALID_META", "$._meta", "The _meta field must be an object."),
+      makeIssue(
+        "INVALID_JSON",
+        "$",
+        "The package must contain exactly _meta and translations.",
+      ),
     );
-  } else {
-    for (const key of keys(meta)) {
-      if (!META_KEYS.includes(key as (typeof META_KEYS)[number])) {
-        issues.push(
-          issue("INVALID_META", `$._meta.${key}`, "Unexpected metadata field."),
-        );
-      }
-    }
-    if (!hasExactKeys(meta, META_KEYS)) {
-      for (const key of META_KEYS) {
-        if (!(key in meta))
-          issues.push(
-            issue(
-              "INVALID_META",
-              `$._meta.${key}`,
-              "Required metadata field is missing.",
-            ),
-          );
-      }
-    }
-    if (meta.schemaVersion !== 1)
+  const meta = parsed._meta;
+  if (!isRecord(meta) || !hasExactKeys(meta, META_KEYS))
+    issues.push(
+      makeIssue(
+        "INVALID_JSON",
+        "$._meta",
+        "Metadata must contain exactly the required fields.",
+      ),
+    );
+  else {
+    if (meta.schemaVersion !== 2)
       issues.push(
-        issue(
+        makeIssue(
           "UNSUPPORTED_SCHEMA_VERSION",
           "$._meta.schemaVersion",
-          "schemaVersion must be 1.",
+          "schemaVersion must be 2.",
         ),
       );
     if (meta.planHandle !== normalized(expected.planHandle))
       issues.push(
-        issue(
+        makeIssue(
           "PLAN_HANDLE_MISMATCH",
           "$._meta.planHandle",
           "Plan handle does not match the current draft.",
@@ -190,7 +224,7 @@ export function parseCompletedMerchantPricingTranslationPackage(
       );
     if (meta.planName !== normalized(expected.planName))
       issues.push(
-        issue(
+        makeIssue(
           "PLAN_NAME_MISMATCH",
           "$._meta.planName",
           "Plan name does not match the current draft.",
@@ -198,124 +232,200 @@ export function parseCompletedMerchantPricingTranslationPackage(
       );
     if (meta.sourceLocale !== "en")
       issues.push(
-        issue(
-          "SOURCE_LOCALE_INVALID",
+        makeIssue(
+          "INVALID_JSON",
           "$._meta.sourceLocale",
           "sourceLocale must be en.",
         ),
       );
   }
-
   const translations = parsed.translations;
+  const expectedKeys = new Set(
+    expectedHighlights.map((highlight) => highlight.contentKey),
+  );
   const completeLocales = new Set<string>();
-  if (!isRecord(translations)) {
+  if (!isRecord(translations))
     issues.push(
-      issue(
-        "INVALID_TRANSLATIONS_OBJECT",
+      makeIssue(
+        "INVALID_JSON",
         "$.translations",
         "translations must be an object.",
       ),
     );
-  } else {
-    for (const locale of MERCHANT_PRICING_LOCALES) {
-      if (!(locale in translations)) {
+  else {
+    for (const locale of MERCHANT_PRICING_LOCALES)
+      if (!(locale in translations))
         issues.push(
-          issue(
+          makeIssue(
             "MISSING_LOCALE",
             `$.translations.${locale}`,
             "Required locale is missing.",
             locale,
           ),
         );
-      }
-    }
-    for (const locale of keys(translations)) {
-      if (!MERCHANT_PRICING_LOCALES.includes(locale as MerchantPricingLocale)) {
+    for (const locale of keys(translations))
+      if (!MERCHANT_PRICING_LOCALES.includes(locale as MerchantPricingLocale))
         issues.push(
-          issue(
+          makeIssue(
             "UNEXPECTED_LOCALE",
             `$.translations.${locale}`,
             "Locale is not supported.",
             locale,
           ),
         );
-      }
-    }
     for (const locale of MERCHANT_PRICING_LOCALES) {
       const value = translations[locale];
-      if (!isRecord(value)) {
+      const before = issues.length;
+      if (!isRecord(value) || !hasExactKeys(value, LOCALE_KEYS)) {
         issues.push(
-          issue(
-            "INVALID_LOCALE_OBJECT",
+          makeIssue(
+            "INVALID_JSON",
             `$.translations.${locale}`,
-            "Locale value must be an object.",
+            "Locale must contain exactly description and highlights.",
             locale,
           ),
         );
         continue;
-      }
-      if (!hasExactKeys(value, LOCALE_KEYS)) {
-        for (const key of keys(value)) {
-          if (!LOCALE_KEYS.includes(key as (typeof LOCALE_KEYS)[number])) {
-            issues.push(
-              issue(
-                "UNEXPECTED_LOCALE_FIELD",
-                `$.translations.${locale}.${key}`,
-                "Unexpected locale field.",
-                locale,
-              ),
-            );
-          }
-        }
       }
       const description = value.description;
-      if (typeof description !== "string") {
+      if (typeof description !== "string" || !normalized(description))
         issues.push(
-          issue(
-            "DESCRIPTION_EMPTY",
-            `$.translations.${locale}.description`,
-            "Description must be a non-empty string.",
-            locale,
-          ),
-        );
-        continue;
-      }
-      const normalizedDescription = normalized(description);
-      if (!normalizedDescription)
-        issues.push(
-          issue(
+          makeIssue(
             "DESCRIPTION_EMPTY",
             `$.translations.${locale}.description`,
             "Description must not be empty.",
             locale,
           ),
         );
-      if (normalizedDescription.length > 2000)
+      else if (normalized(description).length > 2000)
         issues.push(
-          issue(
+          makeIssue(
             "DESCRIPTION_TOO_LONG",
             `$.translations.${locale}.description`,
             "Description must be at most 2000 characters.",
             locale,
           ),
         );
-      if (normalizedDescription) completeLocales.add(locale);
       if (
         locale === "en" &&
-        normalizedDescription !== normalized(expected.englishDescription)
-      ) {
+        normalized(String(description ?? "")) !==
+          normalized(expected.englishDescription)
+      )
         issues.push(
-          issue(
+          makeIssue(
             "ENGLISH_SOURCE_MISMATCH",
-            `$.translations.${locale}.description`,
+            `$.translations.en.description`,
             "English description does not match the current draft.",
             locale,
           ),
         );
+      const highlightValues = value.highlights;
+      if (!isRecord(highlightValues)) {
+        issues.push(
+          makeIssue(
+            "INVALID_JSON",
+            `$.translations.${locale}.highlights`,
+            "highlights must be an object.",
+            locale,
+          ),
+        );
+        continue;
       }
+      for (const contentKey of expectedKeys)
+        if (!(contentKey in highlightValues))
+          issues.push(
+            makeIssue(
+              "MISSING_HIGHLIGHT",
+              `$.translations.${locale}.highlights.${contentKey}`,
+              "Highlight translation is missing.",
+              locale,
+            ),
+          );
+      for (const contentKey of keys(highlightValues))
+        if (!expectedKeys.has(contentKey))
+          issues.push(
+            makeIssue(
+              "UNEXPECTED_HIGHLIGHT",
+              `$.translations.${locale}.highlights.${contentKey}`,
+              "Highlight is not in the current draft.",
+              locale,
+            ),
+          );
+      for (const source of expectedHighlights) {
+        const candidate = highlightValues[source.contentKey];
+        if (
+          !isRecord(candidate) ||
+          !hasExactKeys(candidate, ["title", "description"])
+        ) {
+          issues.push(
+            makeIssue(
+              "INVALID_JSON",
+              `$.translations.${locale}.highlights.${source.contentKey}`,
+              "Highlight must contain exactly title and description.",
+              locale,
+            ),
+          );
+          continue;
+        }
+        const title = candidate.title;
+        const descriptionValue = candidate.description;
+        if (typeof title !== "string" || !normalized(title))
+          issues.push(
+            makeIssue(
+              "HIGHLIGHT_TITLE_EMPTY",
+              `$.translations.${locale}.highlights.${source.contentKey}.title`,
+              "Highlight title must not be empty.",
+              locale,
+            ),
+          );
+        else if (normalized(title).length > 120)
+          issues.push(
+            makeIssue(
+              "HIGHLIGHT_TITLE_TOO_LONG",
+              `$.translations.${locale}.highlights.${source.contentKey}.title`,
+              "Highlight title must be at most 120 characters.",
+              locale,
+            ),
+          );
+        if (
+          typeof descriptionValue !== "string" ||
+          !normalized(descriptionValue)
+        )
+          issues.push(
+            makeIssue(
+              "HIGHLIGHT_DESCRIPTION_EMPTY",
+              `$.translations.${locale}.highlights.${source.contentKey}.description`,
+              "Highlight description must not be empty.",
+              locale,
+            ),
+          );
+        else if (normalized(descriptionValue).length > 500)
+          issues.push(
+            makeIssue(
+              "HIGHLIGHT_DESCRIPTION_TOO_LONG",
+              `$.translations.${locale}.highlights.${source.contentKey}.description`,
+              "Highlight description must be at most 500 characters.",
+              locale,
+            ),
+          );
+        if (
+          locale === "en" &&
+          (normalized(String(title ?? "")) !== normalized(source.title) ||
+            normalized(String(descriptionValue ?? "")) !==
+              normalized(source.description))
+        )
+          issues.push(
+            makeIssue(
+              "HIGHLIGHT_ENGLISH_SOURCE_MISMATCH",
+              `$.translations.en.highlights.${source.contentKey}`,
+              "English highlight content does not match the current draft.",
+              locale,
+            ),
+          );
+      }
+      if (issues.length === before) completeLocales.add(locale);
     }
   }
-
   if (issues.length)
     return { valid: false, completeCount: completeLocales.size, issues };
   return {

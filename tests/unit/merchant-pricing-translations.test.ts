@@ -9,6 +9,13 @@ const expected = {
   planHandle: "starter",
   planName: "Starter",
   englishDescription: "English description",
+  highlights: [
+    {
+      contentKey: "550e8400-e29b-41d4-a716-446655440000",
+      title: "Included capacity",
+      description: "100 monthly recovery conversations.",
+    },
+  ],
 };
 
 function completePackage() {
@@ -23,6 +30,18 @@ function completePackage() {
             locale === "en"
               ? expected.englishDescription
               : `Description ${locale}`,
+          highlights: {
+            [expected.highlights[0].contentKey]: {
+              title:
+                locale === "en"
+                  ? expected.highlights[0].title
+                  : `Title ${locale}`,
+              description:
+                locale === "en"
+                  ? expected.highlights[0].description
+                  : `Highlight ${locale}`,
+            },
+          },
         },
       ]),
     ),
@@ -64,6 +83,11 @@ test("generates the exact ordered 20-locale template", () => {
     ).length,
     19,
   );
+  assert.equal(
+    template.translations.en.highlights[expected.highlights[0].contentKey]
+      .title,
+    expected.highlights[0].title,
+  );
 });
 
 test("accepts a completed package and rejects aliases and structural mismatches", () => {
@@ -91,18 +115,27 @@ test("accepts a completed package and rejects aliases and structural mismatches"
 test("returns all bounded validation issues in canonical order", () => {
   const raw = JSON.stringify({
     _meta: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       planHandle: "other",
       planName: "Other",
-      sourceLocale: "fr",
-      extra: true,
+      sourceLocale: "en",
     },
-    translations: { en: { description: "wrong", extra: true } },
+    translations: {
+      en: {
+        description: "wrong",
+        highlights: {
+          [expected.highlights[0].contentKey]: {
+            title: "Wrong title",
+            description: "Wrong description",
+          },
+        },
+      },
+    },
     extra: true,
   });
   const result = parseCompletedMerchantPricingTranslationPackage(raw, expected);
   assert.equal(result.valid, false);
-  assert.equal(result.issues[0].code, "UNEXPECTED_ROOT_FIELD");
+  assert.equal(result.issues[0].code, "INVALID_JSON");
   assert.ok(
     result.issues.some(({ code }) => code === "UNSUPPORTED_SCHEMA_VERSION"),
   );

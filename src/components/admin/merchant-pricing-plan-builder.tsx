@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant-pricing-builder-payload";
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
 import { parseMoneyToMinorUnits } from "@/lib/admin/merchant-pricing-builder-payload";
@@ -62,6 +63,20 @@ function initialEvents(plan?: MerchantPricingPlanWithChildren): BuilderEvent[] {
       })),
     })) ?? []
   );
+}
+
+function initialHighlights(
+  plan?: MerchantPricingPlanWithChildren,
+): MerchantPricingBuilderHighlight[] {
+  return (plan?.highlights ?? []).map((highlight) => ({
+    contentKey: highlight.contentKey,
+    title:
+      highlight.translations.find((translation) => translation.locale === "en")
+        ?.merchantTitle ?? "",
+    description:
+      highlight.translations.find((translation) => translation.locale === "en")
+        ?.merchantDescription ?? "",
+  }));
 }
 
 function toEconomicsPlan(
@@ -135,6 +150,9 @@ export function MerchantPricingPlanBuilder({
   );
   const [reason, setReason] = useState("");
   const [events, setEvents] = useState<BuilderEvent[]>(initialEvents(plan));
+  const [highlights, setHighlights] = useState<
+    MerchantPricingBuilderHighlight[]
+  >(initialHighlights(plan));
   const [translationJson, setTranslationJson] = useState(
     plan ? JSON.stringify({}) : "",
   );
@@ -155,15 +173,21 @@ export function MerchantPricingPlanBuilder({
       currency: currency.toUpperCase(),
       recurringAmount: recurring,
       placement,
+      catalogueOrderSnapshot: plan
+        ? null
+        : cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
       englishDescription: description,
       reason,
       usageEvents: events,
+      highlights,
     };
   }, [
     credits,
+    cataloguePlans,
     currency,
     description,
     events,
+    highlights,
     featured,
     handle,
     isActive,
@@ -358,6 +382,27 @@ export function MerchantPricingPlanBuilder({
     );
   }
 
+  function updateHighlight(
+    index: number,
+    update: Partial<MerchantPricingBuilderHighlight>,
+  ) {
+    setHighlights((current) =>
+      current.map((highlight, highlightIndex) =>
+        highlightIndex === index ? { ...highlight, ...update } : highlight,
+      ),
+    );
+  }
+
+  function moveHighlight(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= highlights.length) return;
+    setHighlights((current) => {
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
   function validTranslationJson(): string {
     if (translationResult?.valid) return translationJson;
     return (
@@ -387,7 +432,7 @@ export function MerchantPricingPlanBuilder({
           "Catalogue placement",
           "Shopify pricing",
           "Usage events",
-          "English description",
+          "Merchant content",
           "Portfolio economics",
           "Translations & review",
         ].map((label, index) => (
@@ -474,11 +519,11 @@ export function MerchantPricingPlanBuilder({
             onChange={(event) => setPlacement(event.target.value)}
           >
             {!cataloguePlans.length ? (
-              <option value="ONLY">ONLY: empty catalogue</option>
+              <option value="ONLY">This will be the first plan.</option>
             ) : null}
             {cataloguePlans.length ? (
               <option value={`BEFORE:${cataloguePlans[0].id}`}>
-                BEFORE: {cataloguePlans[0].displayName}
+                Before {cataloguePlans[0].displayName}
               </option>
             ) : null}
             {cataloguePlans.map((cataloguePlan) => (
@@ -486,11 +531,11 @@ export function MerchantPricingPlanBuilder({
                 key={cataloguePlan.id}
                 value={`AFTER:${cataloguePlan.id}`}
               >
-                AFTER: {cataloguePlan.displayName}
+                After {cataloguePlan.displayName}
               </option>
             ))}
             {plan ? (
-              <option value="UNCHANGED">UNCHANGED: preserve position</option>
+              <option value="UNCHANGED">Keep current position</option>
             ) : null}
           </select>
           {plan ? (
@@ -730,17 +775,89 @@ export function MerchantPricingPlanBuilder({
         </section>
       ) : null}
       {step === 4 ? (
-        <label className="block text-sm font-medium text-gray-700">
-          English merchant description
-          <textarea
-            className={`${inputClass} mt-1`}
-            rows={6}
-            maxLength={2000}
-            required
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
+        <section className="space-y-5">
+          <label className="block text-sm font-medium text-gray-700">
+            English merchant description
+            <textarea
+              className={`${inputClass} mt-1`}
+              rows={6}
+              maxLength={2000}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </label>
+          {highlights.map((highlight, index) => (
+            <div
+              key={highlight.contentKey}
+              className="space-y-3 rounded-md border border-gray-200 p-3"
+            >
+              <label className="block text-sm font-medium text-gray-700">
+                Highlight title
+                <input
+                  className={inputClass}
+                  maxLength={120}
+                  value={highlight.title}
+                  onChange={(event) =>
+                    updateHighlight(index, { title: event.target.value })
+                  }
+                />
+              </label>
+              <label className="block text-sm font-medium text-gray-700">
+                Highlight description
+                <textarea
+                  className={inputClass}
+                  maxLength={500}
+                  rows={3}
+                  value={highlight.description}
+                  onChange={(event) =>
+                    updateHighlight(index, { description: event.target.value })
+                  }
+                />
+              </label>
+              <div className="flex flex-wrap gap-3 text-sm font-semibold">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => moveHighlight(index, -1)}
+                >
+                  Move up
+                </button>
+                <button
+                  type="button"
+                  disabled={index === highlights.length - 1}
+                  onClick={() => moveHighlight(index, 1)}
+                >
+                  Move down
+                </button>
+                <button
+                  type="button"
+                  className="text-red-700"
+                  onClick={() =>
+                    setHighlights((current) =>
+                      current.filter(
+                        (_, highlightIndex) => highlightIndex !== index,
+                      ),
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setHighlights((current) => [
+                ...current,
+                { contentKey: crypto.randomUUID(), title: "", description: "" },
+              ])
+            }
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold"
+          >
+            + Add highlight
+          </button>
+        </section>
       ) : null}
       {step === 5 ? (
         <section className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -801,6 +918,7 @@ export function MerchantPricingPlanBuilder({
           planHandle={handle}
           planName={name}
           englishDescription={description}
+          highlights={highlights}
           initialRawJson={translationJson === "" ? undefined : translationJson}
           onChange={(rawJson, result) => {
             setTranslationJson(rawJson);
@@ -808,28 +926,34 @@ export function MerchantPricingPlanBuilder({
           }}
         />
       ) : null}
-      <label className="block text-sm font-medium text-gray-700">
-        Admin reason
-        <textarea
-          className={`${inputClass} mt-1`}
-          rows={2}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          required
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={
-          !description.trim() ||
-          economicsState.invalid ||
-          !economicsPreview.every((result) => result.status === "PASS") ||
-          (step === 6 && !translationResult?.valid)
-        }
-        className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {plan ? "Save MerchantPricing plan" : "Create MerchantPricing plan"}
-      </button>
+      {step === 6 ? (
+        <label className="block text-sm font-medium text-gray-700">
+          Admin reason
+          <textarea
+            className={`${inputClass} mt-1`}
+            rows={2}
+            maxLength={2000}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+      ) : null}
+      {step === 6 ? (
+        <button
+          type="submit"
+          disabled={
+            !description.trim() ||
+            !reason.trim() ||
+            reason.trim().length > 2000 ||
+            economicsState.invalid ||
+            !economicsPreview.every((result) => result.status === "PASS") ||
+            !translationResult?.valid
+          }
+          className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {plan ? "Save MerchantPricing plan" : "Create MerchantPricing plan"}
+        </button>
+      ) : null}
     </form>
   );
 }

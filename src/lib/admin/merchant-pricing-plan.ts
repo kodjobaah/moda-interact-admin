@@ -1,6 +1,8 @@
 import type {
   MerchantPricingPlan,
   MerchantPricingPlanTranslation,
+  MerchantPricingPlanHighlight,
+  MerchantPricingPlanHighlightTranslation,
   MerchantPricingUsageEvent,
   MerchantPricingUsageTier,
 } from "@prisma/client";
@@ -13,6 +15,11 @@ import type {
 
 export type MerchantPricingPlanWithChildren = MerchantPricingPlan & {
   translations: MerchantPricingPlanTranslation[];
+  highlights: Array<
+    MerchantPricingPlanHighlight & {
+      translations: MerchantPricingPlanHighlightTranslation[];
+    }
+  >;
   usageEvents: Array<
     MerchantPricingUsageEvent & { tiers: MerchantPricingUsageTier[] }
   >;
@@ -20,6 +27,10 @@ export type MerchantPricingPlanWithChildren = MerchantPricingPlan & {
 
 const merchantPricingInclude = {
   translations: { orderBy: { locale: "asc" as const } },
+  highlights: {
+    orderBy: { position: "asc" as const },
+    include: { translations: { orderBy: { locale: "asc" as const } } },
+  },
   usageEvents: {
     orderBy: { position: "asc" as const },
     include: { tiers: { orderBy: { position: "asc" as const } } },

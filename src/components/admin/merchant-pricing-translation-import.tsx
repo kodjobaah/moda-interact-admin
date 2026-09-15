@@ -6,6 +6,7 @@ import {
   parseCompletedMerchantPricingTranslationPackage,
   type MerchantPricingTranslationParseResult,
 } from "@/lib/admin/merchant-pricing-translations";
+import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant-pricing-builder-payload";
 
 const MAX_TRANSLATION_BYTES = 262144;
 const inputClass =
@@ -15,12 +16,14 @@ export function MerchantPricingTranslationImport({
   planHandle,
   planName,
   englishDescription,
+  highlights,
   initialRawJson,
   onChange,
 }: {
   planHandle: string;
   planName: string;
   englishDescription: string;
+  highlights: MerchantPricingBuilderHighlight[];
   initialRawJson?: string;
   onChange: (
     rawJson: string,
@@ -35,9 +38,10 @@ export function MerchantPricingTranslationImport({
             planHandle,
             planName,
             englishDescription,
+            highlights,
           })
         : null,
-    [englishDescription, planHandle, planName, rawJson],
+    [englishDescription, highlights, planHandle, planName, rawJson],
   );
 
   useEffect(() => {
@@ -54,6 +58,7 @@ export function MerchantPricingTranslationImport({
       planHandle,
       planName,
       englishDescription,
+      highlights,
     });
     const blob = new Blob([JSON.stringify(template, null, 2)], {
       type: "application/json",
