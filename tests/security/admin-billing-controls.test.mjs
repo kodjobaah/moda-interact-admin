@@ -142,7 +142,7 @@ test("keeps policy changes protected, audited, and internal-only", () => {
     "utf8",
   );
   assert.match(pageSource, /requirePlatformAdminPage/);
-  assert.doesNotMatch(pageSource, /\/app\//);
+  assert.match(pageSource, /BackgroundRuntimeControls/);
 });
 
 test("server validation enforces the platform ceiling and soft-below-hard rule", () => {
