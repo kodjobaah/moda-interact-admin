@@ -16,6 +16,8 @@ function form(values: Record<string, string>): FormData {
 const common = {
   intent: "create",
   name: "Spring recovery offer",
+  merchantTitle: "Recover more",
+  merchantDescription: "Recover more conversations.",
   quantity: "10",
   startsAt: "2026-10-01T09:00",
   expiresAt: "2026-10-31T09:00",
@@ -26,7 +28,9 @@ test("GLOBAL campaigns reject target ids", () => {
     () => validatePromotionTarget("GLOBAL", "plan-1", null),
     /target does not match/i,
   );
-  assert.doesNotThrow(() => parsePromotionCampaignForm(form({ ...common, scope: "GLOBAL" })));
+  assert.doesNotThrow(() =>
+    parsePromotionCampaignForm(form({ ...common, scope: "GLOBAL" })),
+  );
 });
 
 test("PLAN and SHOP campaigns require exactly one durable target", () => {
@@ -35,36 +39,57 @@ test("PLAN and SHOP campaigns require exactly one durable target", () => {
     /target does not match/i,
   );
   assert.throws(
-    () => parsePromotionCampaignForm(form({ ...common, scope: "SHOP", targetPlanId: "plan-1", targetShopId: "shop-1" })),
+    () =>
+      parsePromotionCampaignForm(
+        form({
+          ...common,
+          scope: "SHOP",
+          targetPlanId: "plan-1",
+          targetShopId: "shop-1",
+        }),
+      ),
     /target does not match/i,
   );
-  assert.doesNotThrow(() => parsePromotionCampaignForm(form({ ...common, scope: "SHOP", targetShopId: "shop-1" })));
+  assert.doesNotThrow(() =>
+    parsePromotionCampaignForm(
+      form({ ...common, scope: "SHOP", targetShopId: "shop-1" }),
+    ),
+  );
 });
 
 test("quantity and campaign window are validated server-side", () => {
   assert.throws(
-    () => parsePromotionCampaignForm(form({ ...common, scope: "GLOBAL", quantity: "0" })),
+    () =>
+      parsePromotionCampaignForm(
+        form({ ...common, scope: "GLOBAL", quantity: "0" }),
+      ),
     /positive integer/i,
   );
   assert.throws(
-    () => parsePromotionCampaignForm(form({ ...common, scope: "GLOBAL", expiresAt: "2026-09-01T09:00" })),
+    () =>
+      parsePromotionCampaignForm(
+        form({ ...common, scope: "GLOBAL", expiresAt: "2026-09-01T09:00" }),
+      ),
     /after the start/i,
   );
 });
 
 test("persisted campaign terms use the same quantity, window, and target validation", async () => {
-  const { validatePromotionCampaignTerms } = await import("../../src/lib/admin/promotion-validation.ts");
+  const { validatePromotionCampaignTerms } =
+    await import("../../src/lib/admin/promotion-validation.ts");
   assert.throws(
-    () => validatePromotionCampaignTerms({
-      name: "Campaign",
-      merchantDescription: null,
-      scope: "GLOBAL",
-      quantity: 0,
-      targetPlanId: null,
-      targetShopId: null,
-      startsAt: new Date("2026-10-01T09:00:00Z"),
-      expiresAt: new Date("2026-10-31T09:00:00Z"),
-    }),
+    () =>
+      validatePromotionCampaignTerms({
+        name: "Campaign",
+        merchantTitle: "Campaign title",
+        merchantDescription: null,
+        scope: "GLOBAL",
+        quantity: 0,
+        targetPlanId: null,
+        targetShopId: null,
+        startsAt: new Date("2026-10-01T09:00:00Z"),
+        expiresAt: new Date("2026-10-31T09:00:00Z"),
+      }),
     /positive integer/i,
   );
 });
@@ -73,12 +98,28 @@ test("reopen requires an expiry after the start and in the future", () => {
   const startsAt = new Date("2026-10-01T09:00:00Z");
   const now = new Date("2026-10-15T09:00:00Z");
   assert.throws(
-    () => validatePromotionCampaignReopen(startsAt, new Date("2026-10-01T09:00:00Z"), now),
+    () =>
+      validatePromotionCampaignReopen(
+        startsAt,
+        new Date("2026-10-01T09:00:00Z"),
+        now,
+      ),
     /after the start/i,
   );
   assert.throws(
-    () => validatePromotionCampaignReopen(startsAt, new Date("2026-10-14T09:00:00Z"), now),
+    () =>
+      validatePromotionCampaignReopen(
+        startsAt,
+        new Date("2026-10-14T09:00:00Z"),
+        now,
+      ),
     /future/i,
   );
-  assert.doesNotThrow(() => validatePromotionCampaignReopen(startsAt, new Date("2026-10-31T09:00:00Z"), now));
+  assert.doesNotThrow(() =>
+    validatePromotionCampaignReopen(
+      startsAt,
+      new Date("2026-10-31T09:00:00Z"),
+      now,
+    ),
+  );
 });
