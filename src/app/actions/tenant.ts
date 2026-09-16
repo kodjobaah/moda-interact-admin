@@ -7,6 +7,7 @@ import { requirePlatformAdminMutation } from '@/lib/auth/platform-admin';
 import { logAdminSecurityEvent } from '@/lib/auth/audit';
 import { prisma } from '@/lib/prisma';
 import { runProtectedTenantAction } from '@/lib/auth/tenant-action';
+import { ensureDevelopmentPlatformAdmin } from '@/lib/auth/development-platform-admin';
 import {
   parseRecoveryPolicySnapshot,
   policySnapshot,
@@ -80,9 +81,10 @@ export async function updateTenantAction(formData: FormData) {
   );
 }
 
-function parseBoolean(value: FormDataEntryValue | null, field: string): boolean {
-  if (value === 'true') return true;
-  if (value === 'false') return false;
+function parseBoolean(values: FormDataEntryValue[], field: string): boolean {
+  if (values.length === 1 && values[0] === 'false') return false;
+  if (values.length === 2 && values.includes('false') && values.includes('true')) return true;
+  if (values.length === 1 && values[0] === 'true') return true;
   throw new Error(`${field} must be true or false.`);
 }
 
@@ -97,7 +99,11 @@ function parseOptionalDate(value: FormDataEntryValue | null): Date | null {
 }
 
 function parsePolicySnapshot(formData: FormData): RecoveryPolicySnapshot {
-  const recoveryDelayMinutes = Number(formData.get('recoveryDelayMinutes'));
+  const rawDelay = formData.get('recoveryDelayMinutes');
+  if (typeof rawDelay !== 'string' || !rawDelay.trim()) {
+    throw new Error('Recovery delay is required.');
+  }
+  const recoveryDelayMinutes = Number(rawDelay);
   const recoveryOfferMode = formData.get('recoveryOfferMode');
   const fixedShopifyDiscountId = formData.get('fixedShopifyDiscountId');
   const followUpDelayMinutes = formData.get('followUpDelayMinutes');
@@ -108,7 +114,7 @@ function parsePolicySnapshot(formData: FormData): RecoveryPolicySnapshot {
       typeof fixedShopifyDiscountId === 'string' && fixedShopifyDiscountId
         ? fixedShopifyDiscountId
         : null,
-    followUpEnabled: parseBoolean(formData.get('followUpEnabled'), 'Follow-up enabled'),
+    followUpEnabled: parseBoolean(formData.getAll('followUpEnabled'), 'Follow-up enabled'),
     followUpDelayMinutes:
       followUpDelayMinutes === null || followUpDelayMinutes === ''
         ? null
@@ -136,15 +142,21 @@ export async function upsertTenantRecoveryPolicyOverrideAction(formData: FormDat
     const policy = parsePolicySnapshot(formData);
     const expiresAt = parseOptionalDate(formData.get('expiresAt'));
     const returnTo = safeReturnTo(formData.get('returnTo'));
-    const adminId = (await requirePlatformAdminMutation()).id;
+    const principal = await requirePlatformAdminMutation();
 
     await prisma.$transaction(async (transaction) => {
+      await ensureDevelopmentPlatformAdmin(transaction, principal);
+      const admin = await transaction.platformAdmin.findUnique({ where: { id: principal.id } });
+      if (!admin || !admin.active || admin.role !== 'SUPER_ADMIN') {
+        throw new Error('SUPER_ADMIN access is required.');
+      }
       const shop = await transaction.shop.findUnique({
         where: { id: shopId },
         select: { id: true },
       });
       if (!shop) throw new Error('Tenant not found.');
 
+      const now = new Date();
       if (policy.recoveryOfferMode === 'FIXED') {
         if (!policy.fixedShopifyDiscountId) throw new Error('A fixed discount is required.');
         const discount = await transaction.shopifyDiscount.findFirst({
@@ -152,9 +164,10 @@ export async function upsertTenantRecoveryPolicyOverrideAction(formData: FormDat
             id: policy.fixedShopifyDiscountId,
             shopId,
             isAvailable: true,
+            providerStatus: 'ACTIVE',
             fixedSelectable: true,
-            OR: [{ startsAt: null }, { startsAt: { lte: new Date() } }],
-            AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] }],
+            OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+            AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
           },
           select: { id: true },
         });
@@ -170,17 +183,17 @@ export async function upsertTenantRecoveryPolicyOverrideAction(formData: FormDat
       await transaction.shopRecoveryPolicyOverrideAuditEvent.create({
         data: {
           shopId,
-          platformAdminId: adminId,
+          platformAdminId: admin.id,
           action: 'UPSERT',
           reason: reason.trim(),
-          beforeValue: before ? (policySnapshot(before) as Prisma.InputJsonValue) : undefined,
-          afterValue: policySnapshot(policy) as Prisma.InputJsonValue,
+          beforeValue: before ? (policySnapshot(before, before.expiresAt) as Prisma.InputJsonValue) : undefined,
+          afterValue: policySnapshot(policy, expiresAt) as Prisma.InputJsonValue,
         },
       });
       await transaction.shopRecoveryPolicyOverride.upsert({
         where: { shopId },
-        create: { shopId, ...policy, reason: reason.trim(), expiresAt, updatedByPlatformAdminId: adminId },
-        update: { ...policy, reason: reason.trim(), expiresAt, updatedByPlatformAdminId: adminId },
+        create: { shopId, ...policy, reason: reason.trim(), expiresAt, updatedByPlatformAdminId: admin.id },
+        update: { ...policy, reason: reason.trim(), expiresAt, updatedByPlatformAdminId: admin.id },
       });
     });
 
@@ -198,17 +211,22 @@ export async function clearTenantRecoveryPolicyOverrideAction(formData: FormData
     if (typeof reason !== 'string' || reason.trim().length < 1 || reason.trim().length > 1000) {
       throw new Error('A reason between 1 and 1000 characters is required.');
     }
-    const adminId = (await requirePlatformAdminMutation()).id;
+    const principal = await requirePlatformAdminMutation();
     await prisma.$transaction(async (transaction) => {
+      await ensureDevelopmentPlatformAdmin(transaction, principal);
+      const admin = await transaction.platformAdmin.findUnique({ where: { id: principal.id } });
+      if (!admin || !admin.active || admin.role !== 'SUPER_ADMIN') {
+        throw new Error('SUPER_ADMIN access is required.');
+      }
       const before = await transaction.shopRecoveryPolicyOverride.findUnique({ where: { shopId } });
       if (!before) throw new Error('No active recovery-policy override exists.');
       await transaction.shopRecoveryPolicyOverrideAuditEvent.create({
         data: {
           shopId,
-          platformAdminId: adminId,
+          platformAdminId: admin.id,
           action: 'CLEAR',
           reason: reason.trim(),
-          beforeValue: policySnapshot(before) as Prisma.InputJsonValue,
+          beforeValue: policySnapshot(before, before.expiresAt) as Prisma.InputJsonValue,
           afterValue: Prisma.JsonNull,
         },
       });

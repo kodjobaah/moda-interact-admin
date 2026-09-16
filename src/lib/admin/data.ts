@@ -292,32 +292,24 @@ export async function getTenantDetail(
         followUpDelayMinutes: row.recoveryPolicyOverride.followUpDelayMinutes,
       }
     : null;
+  const catalogueCurrent = row.discountCatalogue?.status === "CURRENT";
+  const runningDiscountWhere = catalogueCurrent
+    ? {
+        shopId,
+        isAvailable: true,
+        providerStatus: "ACTIVE",
+        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
+      }
+    : { id: "__no_current_catalogue__" };
+  const fixedSelectableWhere = catalogueCurrent
+    ? { ...runningDiscountWhere, fixedSelectable: true }
+    : { id: "__no_current_catalogue__" };
   const [runningDiscountCount, fixedSelectableCount, selectableDiscounts] = await Promise.all([
-    prisma.shopifyDiscount.count({
-      where: {
-        shopId,
-        isAvailable: true,
-        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
-      },
-    }),
-    prisma.shopifyDiscount.count({
-      where: {
-        shopId,
-        isAvailable: true,
-        fixedSelectable: true,
-        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
-      },
-    }),
+    prisma.shopifyDiscount.count({ where: runningDiscountWhere }),
+    prisma.shopifyDiscount.count({ where: fixedSelectableWhere }),
     prisma.shopifyDiscount.findMany({
-      where: {
-        shopId,
-        isAvailable: true,
-        fixedSelectable: true,
-        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
-      },
+      where: fixedSelectableWhere,
       orderBy: { title: "asc" },
       select: { id: true, title: true },
     }),

@@ -4,6 +4,7 @@ import {
 } from "@modainteract/moda-interact-shared/recovery-policy";
 
 export type RecoveryPolicySnapshot = Omit<EffectiveRecoveryPolicy, "source">;
+export type RecoveryPolicyAuditSnapshot = RecoveryPolicySnapshot & { expiresAt: string | null };
 
 export function parseRecoveryPolicySnapshot(
   value: RecoveryPolicySnapshot,
@@ -27,12 +28,16 @@ export function effectiveRecoveryPolicy(
   });
 }
 
-export function policySnapshot(value: RecoveryPolicySnapshot): Record<string, unknown> {
+export function policySnapshot(
+  value: RecoveryPolicySnapshot,
+  expiresAt: Date | null = null,
+): RecoveryPolicyAuditSnapshot {
   return {
     recoveryDelayMinutes: value.recoveryDelayMinutes,
     recoveryOfferMode: value.recoveryOfferMode,
     fixedShopifyDiscountId: value.fixedShopifyDiscountId,
     followUpEnabled: value.followUpEnabled,
     followUpDelayMinutes: value.followUpDelayMinutes,
+    expiresAt: expiresAt?.toISOString() ?? null,
   };
 }

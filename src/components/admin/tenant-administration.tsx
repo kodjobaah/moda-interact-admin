@@ -1,5 +1,4 @@
 import {
-  clearTenantRecoveryPolicyOverrideAction,
   updateTenantAction,
   upsertTenantRecoveryPolicyOverrideAction,
 } from "@/app/actions/tenant";
@@ -7,6 +6,7 @@ import { formatDateTime } from "@/lib/admin/format";
 import type { TenantDetail } from "@/lib/admin/types";
 import { adminI18n, adminStatusLabel } from "@/i18n";
 import { TenantBillingControls } from "./billing-controls";
+import { TenantRecoveryPolicyClearForm } from "./tenant-recovery-policy-clear-form";
 
 export function TenantAdministration({
   tenant,
@@ -155,8 +155,9 @@ export function TenantAdministration({
           <label className="flex items-center gap-2 text-sm"><input type="hidden" name="followUpEnabled" value="false" /><input name="followUpEnabled" type="checkbox" value="true" defaultChecked={tenant.recoveryPolicy.effective.followUpEnabled} /><span>Enable no-response follow-up</span></label>
           <label className="text-sm">Expires at (optional)<input className="mt-1 w-full rounded-md border border-gray-300 p-2" name="expiresAt" type="datetime-local" defaultValue={tenant.recoveryPolicy.overrideExpiresAt?.toISOString().slice(0, 16) ?? ""} /></label>
           <label className="text-sm md:col-span-2">Reason<textarea className="mt-1 w-full rounded-md border border-gray-300 p-2" name="reason" minLength={1} maxLength={1000} required placeholder="Explain this tenant-specific override." /></label>
-          <div className="flex flex-wrap gap-2 md:col-span-2"><button type="submit" className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-xs font-semibold text-white">Save override</button>{tenant.recoveryPolicy.override ? <ClearOverrideForm shopId={tenant.id} returnTo={returnTo} /> : null}</div>
+          <div className="flex flex-wrap gap-2 md:col-span-2"><button type="submit" className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-xs font-semibold text-white">Save override</button></div>
         </form>
+        {tenant.recoveryPolicy.override ? <TenantRecoveryPolicyClearForm shopId={tenant.id} returnTo={returnTo} /> : null}
         {tenant.recoveryPolicy.overrideReason ? <p className="mt-3 text-xs text-gray-500">Current override reason: {tenant.recoveryPolicy.overrideReason}</p> : null}
       </div>
       <TenantBillingControls
@@ -168,15 +169,10 @@ export function TenantAdministration({
     </div>
   );
 }
-
 function PolicyColumn({ title, policy }: { title: string; policy: TenantDetail["recoveryPolicy"]["merchant"] | null }) {
   return <div className="rounded-md border border-gray-200 p-3"><h5 className="text-xs font-semibold text-gray-500">{title}</h5>{policy ? <dl className="mt-2 space-y-1 text-sm"><Metric label="Delay" value={`${policy.recoveryDelayMinutes} min`} /><Metric label="Offer" value={policy.recoveryOfferMode} /><Metric label="Fixed discount" value={policy.fixedShopifyDiscountId ?? "None"} /><Metric label="Follow-up" value={policy.followUpEnabled ? `${policy.followUpDelayMinutes ?? "?"} min` : "Off"} /></dl> : <p className="mt-2 text-sm text-gray-500">None</p>}</div>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
   return <div><dt className="text-xs text-gray-500">{label}</dt><dd className="font-medium text-gray-900">{value}</dd></div>;
-}
-
-function ClearOverrideForm({ shopId, returnTo }: { shopId: string; returnTo: string }) {
-  return <form action={clearTenantRecoveryPolicyOverrideAction} className="flex items-center gap-2"><input type="hidden" name="shopId" value={shopId} /><input type="hidden" name="returnTo" value={returnTo} /><input className="rounded-md border border-gray-300 p-2 text-xs" name="reason" minLength={1} maxLength={1000} placeholder="Clear reason" required /><button type="submit" className="rounded-md border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700">Clear override</button></form>;
 }
