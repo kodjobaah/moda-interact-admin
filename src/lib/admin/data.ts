@@ -18,6 +18,7 @@ import type {
 } from "./types";
 import { customerName } from "./format";
 import { getTenantBillingControls } from "./billing-controls";
+import { effectiveRecoveryPolicy } from "./recovery-policy";
 
 const ACTIVE_RECOVERY_STATUSES: CheckoutRecoveryStatus[] = [
   CheckoutRecoveryStatus.DETECTED,
@@ -227,7 +228,28 @@ export async function getTenantDetail(
         select: { brandName: true, squareLogoUrl: true, logoUrl: true },
       },
       settings: {
-        select: { onboardingCompleted: true, recoveryDelayMinutes: true },
+        select: {
+          onboardingCompleted: true,
+          recoveryDelayMinutes: true,
+          recoveryOfferMode: true,
+          fixedShopifyDiscountId: true,
+          followUpEnabled: true,
+          followUpDelayMinutes: true,
+        },
+      },
+      recoveryPolicyOverride: {
+        select: {
+          recoveryDelayMinutes: true,
+          recoveryOfferMode: true,
+          fixedShopifyDiscountId: true,
+          followUpEnabled: true,
+          followUpDelayMinutes: true,
+          expiresAt: true,
+          reason: true,
+        },
+      },
+      discountCatalogue: {
+        select: { status: true, lastSuccessfulSyncAt: true },
       },
       subscription: {
         select: {
@@ -253,6 +275,60 @@ export async function getTenantDetail(
   const billingControls = await getTenantBillingControls(shopId);
   if (!billingControls) return null;
 
+  const now = new Date();
+  const merchant = {
+    recoveryDelayMinutes: row.settings?.recoveryDelayMinutes ?? 30,
+    recoveryOfferMode: row.settings?.recoveryOfferMode ?? "NONE",
+    fixedShopifyDiscountId: row.settings?.fixedShopifyDiscountId ?? null,
+    followUpEnabled: row.settings?.followUpEnabled ?? false,
+    followUpDelayMinutes: row.settings?.followUpDelayMinutes ?? null,
+  } as const;
+  const override = row.recoveryPolicyOverride
+    ? {
+        recoveryDelayMinutes: row.recoveryPolicyOverride.recoveryDelayMinutes,
+        recoveryOfferMode: row.recoveryPolicyOverride.recoveryOfferMode,
+        fixedShopifyDiscountId: row.recoveryPolicyOverride.fixedShopifyDiscountId,
+        followUpEnabled: row.recoveryPolicyOverride.followUpEnabled,
+        followUpDelayMinutes: row.recoveryPolicyOverride.followUpDelayMinutes,
+      }
+    : null;
+  const [runningDiscountCount, fixedSelectableCount, selectableDiscounts] = await Promise.all([
+    prisma.shopifyDiscount.count({
+      where: {
+        shopId,
+        isAvailable: true,
+        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
+      },
+    }),
+    prisma.shopifyDiscount.count({
+      where: {
+        shopId,
+        isAvailable: true,
+        fixedSelectable: true,
+        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
+      },
+    }),
+    prisma.shopifyDiscount.findMany({
+      where: {
+        shopId,
+        isAvailable: true,
+        fixedSelectable: true,
+        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
+      },
+      orderBy: { title: "asc" },
+      select: { id: true, title: true },
+    }),
+  ]);
+  const effective = effectiveRecoveryPolicy(
+    merchant,
+    override,
+    row.recoveryPolicyOverride?.expiresAt ?? null,
+    now,
+  );
+
   return {
     id: row.id,
     domain: row.domain,
@@ -264,6 +340,31 @@ export async function getTenantDetail(
     planName: subscription?.plan?.name ?? null,
     planHandle: subscription?.observedShopifyPlanHandle ?? null,
     recoveryDelayMinutes: row.settings?.recoveryDelayMinutes ?? null,
+    recoveryPolicy: {
+      merchant,
+      override,
+      effective: {
+        recoveryDelayMinutes: effective.recoveryDelayMinutes,
+        recoveryOfferMode: effective.recoveryOfferMode,
+        fixedShopifyDiscountId: effective.fixedShopifyDiscountId,
+        followUpEnabled: effective.followUpEnabled,
+        followUpDelayMinutes: effective.followUpDelayMinutes,
+        source: effective.source,
+      },
+      overrideExpiresAt: row.recoveryPolicyOverride?.expiresAt ?? null,
+      overrideExpired: Boolean(
+        row.recoveryPolicyOverride?.expiresAt &&
+        row.recoveryPolicyOverride.expiresAt <= now,
+      ),
+      overrideReason: row.recoveryPolicyOverride?.reason ?? null,
+      catalogue: {
+        status: row.discountCatalogue?.status ?? "UNAVAILABLE",
+        lastSuccessfulSyncAt: row.discountCatalogue?.lastSuccessfulSyncAt ?? null,
+        runningDiscountCount,
+        fixedSelectableCount,
+        selectableDiscounts,
+      },
+    },
     onboardingCompleted: row.settings?.onboardingCompleted ?? false,
     subscriptionStatus: subscription?.status ?? null,
     currentPeriodStart: subscription?.currentPeriodStart ?? null,
@@ -388,6 +489,8 @@ export async function getCustomerRecoveries(input: {
     select: {
       id: true,
       detectedAt: true,
+      generation: true,
+      lastExternalActivityAt: true,
       totalPrice: true,
       currency: true,
       status: true,
@@ -436,6 +539,8 @@ export async function getRecoveryDetail(input: {
       checkoutToken: true,
       checkoutUrl: true,
       detectedAt: true,
+      generation: true,
+      lastExternalActivityAt: true,
       totalPrice: true,
       currency: true,
       status: true,
@@ -514,6 +619,8 @@ export async function getRecoveryDetail(input: {
     checkoutToken: recovery.checkoutToken,
     checkoutUrl: safeHttpUrl(recovery.checkoutUrl),
     detectedAt: recovery.detectedAt,
+    generation: recovery.generation,
+    lastExternalActivityAt: recovery.lastExternalActivityAt,
     totalPrice: decimalToString(recovery.totalPrice),
     currency: recovery.currency,
     status: recovery.status,

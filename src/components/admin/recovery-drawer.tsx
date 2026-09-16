@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { formatMoney } from '@/lib/admin/format';
+import { formatDateTime, formatMoney } from '@/lib/admin/format';
 import { withParamUpdates } from '@/lib/admin/query';
 import type { RecoveryDetail } from '@/lib/admin/types';
 import { Icon } from './icons';
@@ -52,6 +52,10 @@ export function RecoveryDrawer({
               </span>
               <StatusBadge value={recovery.outcome ?? recovery.status} />
             </div>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-500">
+              <div><dt>Generation</dt><dd className="font-semibold text-gray-800">{recovery.generation}</dd></div>
+              <div><dt>Last external activity</dt><dd className="font-semibold text-gray-800">{formatDateTime(recovery.lastExternalActivityAt)}</dd></div>
+            </dl>
           </div>
           <Link
             href={closeHref}

@@ -258,6 +258,7 @@ export type TenantListItem = {
 export type TenantDetail = TenantListItem & {
   uninstalledAt: Date | null;
   recoveryDelayMinutes: number | null;
+  recoveryPolicy: TenantRecoveryPolicy;
   onboardingCompleted: boolean;
   subscriptionStatus: string | null;
   currentPeriodStart: Date | null;
@@ -265,6 +266,30 @@ export type TenantDetail = TenantListItem & {
   defaultOutboundSoftLimit: number;
   defaultOutboundHardLimit: number;
   billingControls: TenantBillingControls;
+};
+
+export type RecoveryPolicyValues = {
+  recoveryDelayMinutes: number;
+  recoveryOfferMode: "NONE" | "FIXED" | "AI_BEST_APPLICABLE";
+  fixedShopifyDiscountId: string | null;
+  followUpEnabled: boolean;
+  followUpDelayMinutes: number | null;
+};
+
+export type TenantRecoveryPolicy = {
+  merchant: RecoveryPolicyValues;
+  override: RecoveryPolicyValues | null;
+  effective: RecoveryPolicyValues & { source: "MERCHANT" | "ADMIN_OVERRIDE" };
+  overrideExpiresAt: Date | null;
+  overrideExpired: boolean;
+  overrideReason: string | null;
+  catalogue: {
+    status: string;
+    lastSuccessfulSyncAt: Date | null;
+    runningDiscountCount: number;
+    fixedSelectableCount: number;
+    selectableDiscounts: Array<{ id: string; title: string }>;
+  };
 };
 
 export type TenantBillingControls = {
@@ -339,6 +364,8 @@ export type RecoveryDetail = {
   checkoutToken: string;
   checkoutUrl: string | null;
   detectedAt: Date;
+  generation: number;
+  lastExternalActivityAt: Date;
   totalPrice: string | null;
   currency: string | null;
   status: string;
