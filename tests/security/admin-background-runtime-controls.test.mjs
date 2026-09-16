@@ -32,6 +32,16 @@ test("controls remain readable for non-super admins and expose no legacy economi
   assert.doesNotMatch(page, /Upgrade ladder|Verified Shopify/);
 });
 
+test("scopes fleet-wide copy to Worker throughput and queue saves", () => {
+  const queueIntro = "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap.";
+  const convergence = "Fleet-wide queue limits converge without redeploying workers.";
+  assert.match(component, /title === "Worker throughput"/);
+  assert.equal(component.includes(queueIntro), true);
+  assert.equal(validation.includes(convergence), true);
+  assert.match(component, /changedQueueConcurrency/);
+  assert.equal(component.includes('section === "ADVANCED" ? (\n        <p'), false);
+});
+
 test("abuse windows are copy, not editable fields", () => {
   assert.match(component, /Window lengths are fixed by the application/);
   assert.match(validation, /Sender limit — 1 minute/);

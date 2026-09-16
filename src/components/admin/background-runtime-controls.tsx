@@ -8,6 +8,7 @@ import {
   runtimeFieldDisplayRange,
   runtimeFieldDisplayValue,
   runtimeFieldInputStep,
+  runtimeControlsSuccessMessage,
   RUNTIME_FIELDS,
   type RuntimeSection,
 } from "@/lib/admin/background-runtime-control-validation";
@@ -17,6 +18,16 @@ const tabs: Array<{ value: RuntimeSection; label: string }> = [
   { value: "OPERATIONAL", label: "Operational" },
   { value: "ADVANCED", label: "Advanced" },
   { value: "ABUSE_PROTECTION", label: "Abuse Protection" },
+];
+
+const queueConcurrencyFields = [
+  "checkoutQueueGlobalConcurrency",
+  "orderQueueGlobalConcurrency",
+  "pendingRecoveryQueueGlobalConcurrency",
+  "recoveryResumeQueueGlobalConcurrency",
+  "whatsappQueueGlobalConcurrency",
+  "merchantCommunicationsQueueGlobalConcurrency",
+  "billingSubscriptionQueueGlobalConcurrency",
 ];
 
 const inputClass =
@@ -86,17 +97,20 @@ function RuntimeGroup({
   draft,
   canMutate,
   onChange,
+  intro,
 }: {
   title: string;
   fields: ReturnType<typeof fieldsForSection>[number][];
   draft: Draft;
   canMutate: boolean;
   onChange: (key: string, value: string) => void;
+  intro?: string;
 }) {
   return (
     <details open className="rounded-lg border border-gray-200 bg-white">
       <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-950">{title}</summary>
       <div className="px-4 pb-2">
+        {intro ? <p className="border-l-4 border-sky-400 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">{intro}</p> : null}
         <div className="hidden border-t border-gray-100 py-3 text-xs font-semibold uppercase tracking-normal text-gray-500 md:grid md:grid-cols-[minmax(13rem,1fr)_minmax(10rem,14rem)_minmax(15rem,1.4fr)] md:gap-3">
           <span>Setting</span>
           <span>Value</span>
@@ -137,7 +151,8 @@ function TabForm({
         onSaved(section, draft);
         setInitialDraft({ ...draft });
         setReason("");
-        return { ok: true, message: "Runtime controls updated. The committed values are shared by all worker replicas. Running work is not interrupted; workers adopt the new configuration automatically." };
+        const changedQueueConcurrency = queueConcurrencyFields.some((key) => draft[key] !== initialDraft[key]);
+        return { ok: true, message: runtimeControlsSuccessMessage(changedQueueConcurrency) };
       } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : "Runtime controls could not be saved." };
       }
@@ -180,11 +195,6 @@ function TabForm({
           These controls affect platform protection from excessive WhatsApp traffic. Window lengths are fixed by the application; only the allowed message/turn counts are editable.
         </p>
       ) : null}
-      {section === "ADVANCED" ? (
-        <p className="border-l-4 border-sky-400 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-          These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap.
-        </p>
-      ) : null}
       {groups.map(([title, keys]) => (
         <RuntimeGroup
           key={title}
@@ -193,6 +203,7 @@ function TabForm({
           draft={draft}
           canMutate={canMutate}
           onChange={updateDraft}
+          intro={title === "Worker throughput" ? "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap." : undefined}
         />
       ))}
       {section === "ADVANCED" ? (

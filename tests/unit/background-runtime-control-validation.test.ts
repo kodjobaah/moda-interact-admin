@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   ALL_RUNTIME_FIELDS,
   parseRuntimeControlsForm,
+  runtimeControlsSuccessMessage,
   validateRuntimeConfig,
 } from "../../src/lib/admin/background-runtime-control-validation.ts";
 
@@ -40,4 +41,12 @@ test("requires a reason with the database audit bound", async () => {
   const source = await import("../../src/lib/admin/background-runtime-control-validation.ts");
   assert.throws(() => source.parseReason(new FormData().get("reason")), /reason/i);
   assert.throws(() => source.parseReason("x".repeat(1001)), /1000/);
+});
+
+test("adds convergence copy only when queue concurrency changed", () => {
+  const queueMessage = runtimeControlsSuccessMessage(true);
+  const nonQueueMessage = runtimeControlsSuccessMessage(false);
+  assert.match(queueMessage, /Fleet-wide queue limits converge without redeploying workers\./);
+  assert.doesNotMatch(nonQueueMessage, /Fleet-wide queue limits converge without redeploying workers\./);
+  assert.match(nonQueueMessage, /Runtime controls updated\. The committed values are shared by all worker replicas\./);
 });

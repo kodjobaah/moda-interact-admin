@@ -3,6 +3,13 @@ export const RUNTIME_CONFLICT_MESSAGE =
 export const RUNTIME_MISSING_MESSAGE =
   "Background runtime configuration is missing.";
 
+export function runtimeControlsSuccessMessage(changedQueueConcurrency: boolean): string {
+  const message = "Runtime controls updated. The committed values are shared by all worker replicas. Running work is not interrupted; workers adopt the new configuration automatically.";
+  return changedQueueConcurrency
+    ? `${message} Fleet-wide queue limits converge without redeploying workers.`
+    : message;
+}
+
 export type RuntimeSection = "OPERATIONAL" | "ADVANCED" | "ABUSE_PROTECTION";
 export type RuntimeConfigValues = Record<string, number> & {
   version: number;
