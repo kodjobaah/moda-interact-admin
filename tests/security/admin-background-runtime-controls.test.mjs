@@ -48,3 +48,18 @@ test("abuse windows are copy, not editable fields", () => {
   assert.match(validation, /Sender limit — 10 minutes/);
   assert.doesNotMatch(component, /windowLength|redisKey/);
 });
+
+test("checkout recovery lifetime is an audited operational control", () => {
+  assert.match(validation, /checkoutRecoveryLifetimeDays/);
+  assert.match(validation, /Checkout recovery lifetime/);
+  assert.match(validation, /days.*1, 90, 21/);
+  assert.match(action, /"checkoutRecoveryLifetimeDays"/);
+  assert.match(action, /expectedVersion/);
+  assert.match(action, /reason/);
+  assert.match(action, /beforeValue/);
+  assert.match(action, /afterValue/);
+  assert.doesNotMatch(action, /checkoutRecovery\.(update|updateMany|delete|deleteMany)/);
+  assert.match(component, /defaults to 21 days/);
+  assert.match(component, /platform-wide control/);
+  assert.match(component, /retains recovery, conversation, and message history/);
+});

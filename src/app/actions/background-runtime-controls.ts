@@ -120,6 +120,7 @@ function fieldBelongsToSection(key: string, section: RuntimeSection): boolean {
       "recoveryRepairIntervalSeconds",
       "recoveryRepairShopBatchSize",
       "recoveryResumeBatchSize",
+      "checkoutRecoveryLifetimeDays",
       "translationReconciliationIntervalSeconds",
       "translationBatchMaxRequests",
       "conversationQuietWindowMs",
