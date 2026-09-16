@@ -24,7 +24,16 @@ test("converts human seconds to exact milliseconds and enforces ranges", () => {
   assert.equal(next.conversationMaxSettleWindowMs, 10000);
 
   form.set("conversationQuietWindowMs", "0.249");
-  assert.throws(() => parseRuntimeControlsForm(form, "OPERATIONAL", current));
+  assert.throws(
+    () => parseRuntimeControlsForm(form, "OPERATIONAL", current),
+    /Wait after customer message must be between 0\.25 and 10 seconds\./,
+  );
+  form.set("conversationQuietWindowMs", "2.5");
+  form.set("conversationMaxSettleWindowMs", "30.001");
+  assert.throws(
+    () => parseRuntimeControlsForm(form, "OPERATIONAL", current),
+    /Maximum message settle time must be between 1 and 30 seconds\./,
+  );
 });
 
 test("enforces cross-field abuse and retry relationships", () => {

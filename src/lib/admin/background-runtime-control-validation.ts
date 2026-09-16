@@ -200,7 +200,10 @@ export function validateRuntimeConfig(values: Record<string, number>): void {
   for (const field of ALL_RUNTIME_FIELDS) {
     const value = values[field.key];
     if (!Number.isSafeInteger(value) || value < field.min || value > field.max) {
-      throw new Error(`${field.label} must be between ${field.min} and ${field.max} ${field.unit}.`);
+      const min = field.displayMin ?? runtimeFieldDisplayValue(field, field.min);
+      const max = field.displayMax ?? runtimeFieldDisplayValue(field, field.max);
+      const unit = field.displayUnit ?? field.unit;
+      throw new Error(`${field.label} must be between ${min} and ${max} ${unit}.`);
     }
   }
   for (const [left, right, message] of CROSS_FIELD_RULES) {
