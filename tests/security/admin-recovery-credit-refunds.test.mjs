@@ -35,14 +35,25 @@ test("refund drawer is read-only for REQUESTED and uses progressive evidence dis
   assert.match(component, /readyForProcessing/);
   assert.match(component, /automaticCorrectionUsageEventId/);
   assert.match(component, /automaticSafetyWarning/);
+  assert.match(component, /isAutomaticCompleted/);
+  assert.match(component, /isManualCompleted/);
+  assert.match(component, /isManualFallback/);
+  assert.match(component, /status === RecoveryCreditRefundStatus\.COMPLETED/);
+  assert.match(component, /providerActionKind === null/);
+  assert.match(component, /providerActionKind === RecoveryCreditProviderActionKind\.REFUND/);
+  assert.match(component, /providerActionKind === RecoveryCreditProviderActionKind\.CREDIT/);
   assert.match(component, /completedAutomatic/);
   assert.match(component, /completedManual/);
+  assert.match(component, /automaticCorrection\?\.shopifyReportState === "REPORTED"/);
+  assert.match(component, /awaitingReconciliation/);
+  assert.match(component, /manualRequired/);
   assert.match(component, /recordRecoveryCreditProviderEvidenceAction/);
   assert.match(component, /status !== RecoveryCreditRefundStatus\.PROVIDER_ACTION_REQUIRED/);
   assert.match(component, /automaticCorrectionUsageEventId !== null/);
   assert.match(component, /<details/);
   assert.match(component, /purchaseProvenance/);
-  assert.match(component, /view: "events", eventId: refund\.automaticCorrectionUsageEventId/);
+  assert.match(component, /buildUrl\("\/billing", \{ view: "events", eventId: refund\.automaticCorrectionUsageEventId \}\)/);
+  assert.doesNotMatch(component, /buildUrl\("\/billing", \{ \.\.\.params, view: "events"/);
   const legacyLockAction = ["lockRecoveryCredit", "Refund", "Action"].join("");
   const legacyRejectAction = ["rejectRecoveryCredit", "Refund", "Action"].join("");
   assert.equal(component.includes(legacyLockAction), false);
@@ -53,4 +64,16 @@ test("refund drawer is read-only for REQUESTED and uses progressive evidence dis
   assert.equal(component.includes(["Lock", " provider action"].join("")), false);
   assert.equal(component.includes(["Reject", " request"].join("")), false);
   assert.equal(component.toLowerCase().includes(["mark", " complete"].join("")), false);
+  assert.match(component, /refundText\("description"\)/);
+  for (const field of [
+    "providerValuationConfirmedAt",
+    "purchaseCreditsGrantedSnapshot",
+    "currentAmountAtRequestSnapshot",
+    "reservedAmountAtRequestSnapshot",
+    "availableAmountAtRequestSnapshot",
+    "requestedByShopifyUserId",
+    "sourceMessage\\?\\.id",
+  ]) assert.match(component, new RegExp(field));
+  assert.match(component, /manualEvidence = manualCompleted \|\|/);
+  assert.match(component, /refund\.status === RecoveryCreditRefundStatus\.NEEDS_ATTENTION/);
 });
