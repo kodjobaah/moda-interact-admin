@@ -34,6 +34,11 @@ const refundSelect = {
   finalCreditQuantity: true,
   expectedProviderAmount: true,
   expectedProviderCurrency: true,
+  automaticCorrectionUsageEventId: true,
+  providerUsageQuantityBeforeCorrection: true,
+  providerUsageCostBeforeCorrection: true,
+  expectedProviderUsageQuantityAfterCorrection: true,
+  expectedProviderUsageCostAfterCorrection: true,
   providerReference: true,
   providerActionKind: true,
   providerAmount: true,
@@ -73,7 +78,7 @@ function queueStatus(row: Pick<RefundRow, "status" | "purchase">): RecoveryCredi
     row.purchase.reservedAmount === 0 &&
     row.purchase.currentAmount > 0
   ) {
-    return "READY_FOR_PROVIDER_ACTION";
+    return "READY_FOR_REFUND_PROCESSING";
   }
   if (
     row.purchase.status === RecoveryCreditPurchaseStatus.WITHDRAWN &&
@@ -110,6 +115,12 @@ function baseProjection(row: RefundRow): RecoveryCreditRefundItem {
     finalCreditQuantity: row.finalCreditQuantity,
     expectedProviderAmount: decimalValue(row.expectedProviderAmount),
     expectedProviderCurrency: row.expectedProviderCurrency,
+    automaticCorrectionUsageEventId: row.automaticCorrectionUsageEventId,
+    providerUsageQuantityBeforeCorrection: decimalValue(row.providerUsageQuantityBeforeCorrection),
+    providerUsageCostBeforeCorrection: decimalValue(row.providerUsageCostBeforeCorrection),
+    expectedProviderUsageQuantityAfterCorrection: decimalValue(row.expectedProviderUsageQuantityAfterCorrection),
+    expectedProviderUsageCostAfterCorrection: decimalValue(row.expectedProviderUsageCostAfterCorrection),
+    automaticCorrection: null,
     providerReference: row.providerReference,
     providerActionKind: row.providerActionKind,
     providerAmount: decimalValue(row.providerAmount),
@@ -130,7 +141,7 @@ function boundedPage(page: number, pageSize: number) {
 
 function statusWhere(status: RecoveryCreditRefundQueueStatus): Prisma.RecoveryCreditRefundWhereInput {
   if (status === "ALL") return {};
-  if (status === "READY_FOR_PROVIDER_ACTION") {
+  if (status === "READY_FOR_REFUND_PROCESSING") {
     return {
       status: RecoveryCreditRefundStatus.REQUESTED,
       purchase: { status: RecoveryCreditPurchaseStatus.WITHDRAWN, reservedAmount: 0, currentAmount: { gt: 0 } },
@@ -186,7 +197,7 @@ export async function getRecoveryCreditRefunds(input: {
   await requirePlatformAdminRead();
   const status = input.status ?? "ALL";
   const allowed: RecoveryCreditRefundQueueStatus[] = [
-    "ALL", "REQUESTED", "READY_FOR_PROVIDER_ACTION", "WAITING_FOR_RESERVATIONS",
+    "ALL", "REQUESTED", "READY_FOR_REFUND_PROCESSING", "WAITING_FOR_RESERVATIONS",
     "PROVIDER_ACTION_REQUIRED", "NEEDS_ATTENTION", "COMPLETED", "REJECTED", "CANCELLED",
   ];
   if (!allowed.includes(status)) throw new Error("Unsupported recovery-credit refund status");
@@ -211,6 +222,18 @@ export async function getRecoveryCreditRefundDetail(id: string): Promise<Recover
     where: { id },
     select: {
       ...refundSelect,
+      automaticCorrectionUsageEvent: {
+        select: {
+          id: true,
+          quantity: true,
+          shopifyReportState: true,
+          shopifyEventHandle: true,
+          shopifyIdempotencyKey: true,
+          reportAttemptCount: true,
+          lastReportAttemptAt: true,
+          reportedAt: true,
+        },
+      },
       approvedAt: true,
       holdAppliedAt: true,
       providerConfirmedAt: true,
@@ -271,6 +294,12 @@ export async function getRecoveryCreditRefundDetail(id: string): Promise<Recover
       providerPriceSnapshot: row.purchase.providerPriceSnapshot,
       billingPeriod: row.purchase.billingPeriod,
     },
+    automaticCorrection: row.automaticCorrectionUsageEvent
+      ? {
+          ...row.automaticCorrectionUsageEvent,
+          quantity: row.automaticCorrectionUsageEvent.quantity.toString(),
+        }
+      : null,
     reservations: row.purchase.purchasedReservations,
     refundHistory: row.purchase.refunds.map((refund) => ({
       ...refund,

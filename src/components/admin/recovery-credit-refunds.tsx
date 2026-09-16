@@ -6,7 +6,7 @@ import type {
   RecoveryCreditRefundItem,
   RecoveryCreditRefundQueueStatus,
 } from "@/lib/admin/types";
-import { lockRecoveryCreditRefundAction, recordRecoveryCreditProviderEvidenceAction, rejectRecoveryCreditRefundAction } from "@/app/actions/recovery-credit-refunds";
+import { recordRecoveryCreditProviderEvidenceAction } from "@/app/actions/recovery-credit-refunds";
 import { buildUrl, withParamUpdates } from "@/lib/admin/query";
 import { adminI18n } from "@/i18n";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
@@ -14,7 +14,7 @@ import { Pagination } from "./pagination";
 
 const statuses: RecoveryCreditRefundQueueStatus[] = [
   "REQUESTED",
-  "READY_FOR_PROVIDER_ACTION",
+  "READY_FOR_REFUND_PROCESSING",
   "WAITING_FOR_RESERVATIONS",
   "PROVIDER_ACTION_REQUIRED",
   "NEEDS_ATTENTION",
@@ -24,7 +24,12 @@ const statuses: RecoveryCreditRefundQueueStatus[] = [
 ];
 
 function label(status: string) {
-  return status.replaceAll("_", " ");
+  const key = `billing.refund.status.${status}`;
+  return adminI18n.t(key) === key ? status.replaceAll("_", " ") : adminI18n.t(key);
+}
+
+function refundText(key: string) {
+  return adminI18n.t(`billing.refund.${key}`);
 }
 
 function DetailList({ items }: { items: Array<[string, string | number | null]> }) {
@@ -42,43 +47,37 @@ function DetailList({ items }: { items: Array<[string, string | number | null]> 
 
 function stateNotice(refund: RecoveryCreditRefundItem) {
   if (refund.queueStatus === "WAITING_FOR_RESERVATIONS") {
-    return "Waiting for in-flight conversations to settle. Provider refund action must not start yet.";
+    return refundText("waitingForReservations");
   }
-  if (refund.queueStatus === "READY_FOR_PROVIDER_ACTION") {
-    return "Ready for provider action. Final credit quantity will be locked by the settlement workflow from the live current amount.";
+  if (refund.queueStatus === "READY_FOR_REFUND_PROCESSING") {
+    return refundText("readyForProcessing");
   }
-  if (refund.status === "REQUESTED") {
-    return "Data integrity attention: this request is not in a valid withdrawn-purchase state.";
+  if (refund.status === "REQUESTED" && refund.automaticCorrectionUsageEventId === null) {
+    return refundText("awaitingAssessment");
+  }
+  if (refund.status === RecoveryCreditRefundStatus.NEEDS_ATTENTION) {
+    return refundText("needsAttention");
+  }
+  if (refund.automaticCorrectionUsageEventId !== null) {
+    return refund.status === RecoveryCreditRefundStatus.COMPLETED
+      ? refundText("completedAutomatic")
+      : refundText("automaticInProgress");
+  }
+  if (refund.status === RecoveryCreditRefundStatus.COMPLETED) {
+    return refundText("completedManual");
   }
   return null;
 }
 
-function SettlementActions({ refund }: { refund: RecoveryCreditRefundDetail }) {
-  if (refund.status === RecoveryCreditRefundStatus.REQUESTED) {
-    return (
-      <div className="mt-8 border-t border-gray-200 pt-6">
-        <h3 className="text-sm font-semibold text-gray-950">Settlement controls</h3>
-        <div className="mt-3 flex flex-wrap gap-3">
-          <form action={async (formData) => { await lockRecoveryCreditRefundAction(refund.id, String(formData.get("reason") ?? "")); }} className="flex flex-wrap gap-2">
-            <input name="reason" required maxLength={1000} placeholder="Lock reason" className="rounded-md border border-gray-300 p-2 text-sm" />
-            <button type="submit" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white">Lock provider action</button>
-          </form>
-          <form action={async (formData) => { await rejectRecoveryCreditRefundAction(refund.id, String(formData.get("reason") ?? "")); }} className="flex flex-wrap gap-2">
-            <input name="reason" required maxLength={1000} placeholder="Rejection reason" className="rounded-md border border-gray-300 p-2 text-sm" />
-            <button type="submit" className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700">Reject request</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-  if (refund.status !== RecoveryCreditRefundStatus.PROVIDER_ACTION_REQUIRED && refund.status !== RecoveryCreditRefundStatus.NEEDS_ATTENTION) return null;
+function SettlementActions({ refund, canSettle }: { refund: RecoveryCreditRefundDetail; canSettle: boolean }) {
+  if (!canSettle || refund.status !== RecoveryCreditRefundStatus.PROVIDER_ACTION_REQUIRED || refund.automaticCorrectionUsageEventId !== null) return null;
   return <ProviderEvidenceForm refund={refund} />;
 }
 
 function ProviderEvidenceForm({ refund }: { refund: RecoveryCreditRefundDetail }) {
   return (
     <div className="mt-8 border-t border-gray-200 pt-6">
-      <h3 className="text-sm font-semibold text-gray-950">Provider settlement evidence</h3>
+      <h3 className="text-sm font-semibold text-gray-950">{refundText("manualEvidence")}</h3>
       <form action={async (formData) => {
         await recordRecoveryCreditProviderEvidenceAction({
           refundId: refund.id,
@@ -96,8 +95,8 @@ function ProviderEvidenceForm({ refund }: { refund: RecoveryCreditRefundDetail }
         <input name="providerReference" required maxLength={512} defaultValue={refund.providerReference ?? ""} placeholder="Provider reference" className="rounded-md border border-gray-300 p-2 text-sm" />
         <input name="providerAmount" required defaultValue={refund.providerAmount ?? refund.expectedProviderAmount ?? ""} placeholder="Provider amount" className="rounded-md border border-gray-300 p-2 text-sm" />
         <input name="providerCurrency" required maxLength={3} defaultValue={refund.providerCurrency ?? refund.expectedProviderCurrency ?? ""} placeholder="Provider currency" className="rounded-md border border-gray-300 p-2 text-sm" />
-        <label className="flex items-center gap-2 text-sm text-gray-700 sm:col-span-2"><input name="confirmed" type="checkbox" required /> I confirm this provider action and evidence.</label>
-        <button type="submit" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white sm:col-span-2">Record provider evidence</button>
+        <label className="flex items-center gap-2 text-sm text-gray-700 sm:col-span-2"><input name="confirmed" type="checkbox" required /> {refundText("confirmProviderAction")}</label>
+        <button type="submit" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white sm:col-span-2">{refundText("recordProviderEvidence")}</button>
       </form>
     </div>
   );
@@ -142,7 +141,7 @@ export function RecoveryCreditRefundQueue({
             </tbody>
           </table>
         </div>
-      ) : <p className="px-5 py-8 text-sm text-gray-500">No refund requests match the current filter.</p>}
+      ) : <p className="px-5 py-8 text-sm text-gray-500">{refundText("noMatching")}</p>}
       <Pagination pathname="/billing" params={params} page={refunds.page} totalPages={refunds.totalPages} totalItems={refunds.totalItems} pageParam="refundPage" countKey="pagination.items" resetParams={["refundPage"]} />
     </section>
   );
@@ -159,62 +158,31 @@ export function RecoveryCreditRefundDrawer({
 }) {
   const notice = stateNotice(refund);
   const providerSnapshot = JSON.stringify(refund.purchase.providerPriceSnapshot)?.slice(0, 2000) ?? null;
+  const automatic = refund.automaticCorrectionUsageEventId !== null;
+  const manual = refund.status === RecoveryCreditRefundStatus.PROVIDER_ACTION_REQUIRED && !automatic;
   return (
     <AdminDetailDrawer title="Refund request details" closeHref={withParamUpdates("/billing", params, { refundId: null })}>
-      {notice ? <p className={`mb-6 rounded-md p-4 text-sm ${refund.queueStatus === "READY_FOR_PROVIDER_ACTION" ? "bg-blue-50 text-blue-900" : "bg-amber-50 text-amber-900"}`}>{notice}</p> : null}
+      {notice ? <p className="mb-6 rounded-md bg-amber-50 p-4 text-sm text-amber-900">{notice}</p> : null}
+      {automatic && refund.status === RecoveryCreditRefundStatus.PROVIDER_ACTION_REQUIRED ? <p className="mb-6 rounded-md bg-red-50 p-4 text-sm text-red-900">{refundText("automaticSafetyWarning")}</p> : null}
+      <h3 className="text-sm font-semibold text-gray-950">{refundText("settlementSummary")}</h3>
       <DetailList items={[
         ["Refund ID", refund.id],
         ["Shop", refund.shop.domain],
         ["Request status", label(refund.status)],
         ["Queue status", label(refund.queueStatus)],
-        ["Source", refund.source],
-        ["Requested by Shopify user", refund.requestedByShopifyUserId],
-        ["Purchase ID", refund.purchase.id],
-        ["Purchase status", label(refund.purchase.status)],
-        ["Purchase created", adminI18n.formatDateTime(refund.purchase.createdAt)],
-        ["Purchase activated", refund.purchase.activatedAt ? adminI18n.formatDateTime(refund.purchase.activatedAt) : null],
-        ["Credits granted at request", refund.purchaseCreditsGrantedSnapshot],
-        ["Current amount at request", refund.currentAmountAtRequestSnapshot],
-        ["Reserved at request", refund.reservedAmountAtRequestSnapshot],
-        ["Available at request", refund.availableAmountAtRequestSnapshot],
-        ["Current purchase amount", refund.purchase.currentAmount],
-        ["Current reserved amount", refund.purchase.reservedAmount],
-        ["Current unreserved amount", refund.purchase.currentAmount - refund.purchase.reservedAmount],
-        ["Purchase amount / currency", refund.purchase.providerPurchaseAmount ? `${refund.purchase.providerPurchaseAmount} ${refund.purchase.providerPurchaseCurrency ?? ""}` : null],
-        ["Purchase provider amount snapshot", `${refund.purchaseProviderAmountSnapshot} ${refund.purchaseProviderCurrencySnapshot}`],
-        ["Billing period snapshot", refund.billingPeriodIdSnapshot],
-        ["Provider subscription snapshot", refund.providerSubscriptionIdSnapshot],
-        ["Plan handle snapshot", refund.planHandleSnapshot],
-        ["Event handle snapshot", refund.eventHandleSnapshot],
-        ["Billing period", refund.purchase.billingPeriod ? `${refund.purchase.billingPeriod.planNameSnapshot ?? "Unnamed plan"} (${adminI18n.formatDateTime(refund.purchase.billingPeriod.periodStart)} - ${adminI18n.formatDateTime(refund.purchase.billingPeriod.periodEnd)})` : null],
-        ["Plan provenance", refund.purchase.planName],
-        ["Usage quantity before", refund.purchase.providerUsageQuantityBeforeSnapshot],
-        ["Usage cost before", `${refund.purchase.providerUsageCostBeforeSnapshot} ${refund.purchase.providerUsageCostCurrencyBeforeSnapshot}`],
-        ["Usage quantity after", refund.purchase.providerUsageQuantityAfterSnapshot],
-        ["Usage cost after", refund.purchase.providerUsageCostAfterSnapshot ? `${refund.purchase.providerUsageCostAfterSnapshot} ${refund.purchase.providerUsageCostCurrencyAfterSnapshot ?? ""}` : null],
-        ["Provider valuation confirmed", refund.purchase.providerValuationConfirmedAt ? adminI18n.formatDateTime(refund.purchase.providerValuationConfirmedAt) : null],
-        ["Provider price evidence", providerSnapshot],
-        ["Reason", refund.reason],
-        ["Support context message", refund.sourceMessage?.id ?? null],
-      ]} />
-      <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">Reservations still linked to this purchase</h3>
-      <p className="mt-2 text-sm text-gray-600">{refund.reservations.length ? refund.reservations.map((reservation) => `${reservation.quantity} ${label(reservation.status)}`).join(" · ") : "No reservations in the bounded history."}</p>
-      <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">Refund workflow history</h3>
-      <div className="mt-2 space-y-2 text-sm text-gray-600">
-        {refund.refundHistory.length ? refund.refundHistory.map((entry) => (
-          <p key={entry.id}>{adminI18n.formatDateTime(entry.createdAt)} · {label(entry.status)} · {entry.finalCreditQuantity ?? "quantity not locked"} credits · {entry.providerAmount ? `${entry.providerAmount} ${entry.providerCurrency ?? ""}` : "provider amount not recorded"} · {entry.reason ?? "no reason recorded"}</p>
-        )) : <p>No prior refund history.</p>}
-      </div>
-      <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">Frozen settlement evidence</h3>
-      <DetailList items={[
-        ["Final credit quantity", refund.finalCreditQuantity],
+        ["Final refundable credits", refund.finalCreditQuantity],
         ["Expected provider amount", refund.expectedProviderAmount ? `${refund.expectedProviderAmount} ${refund.expectedProviderCurrency ?? ""}` : null],
-        ["Recorded provider action", refund.providerActionKind],
-        ["Provider reference", refund.providerReference],
-        ["Recorded provider amount", refund.providerAmount ? `${refund.providerAmount} ${refund.providerCurrency ?? ""}` : null],
+        ["Purchase ID", refund.purchase.id],
+        ["Original plan handle", refund.planHandleSnapshot],
+        ["Original event handle", refund.eventHandleSnapshot],
       ]} />
-      {canSettle ? <SettlementActions refund={refund} /> : null}
-      <p className="mt-6 rounded-md bg-gray-50 p-4 text-xs text-gray-600">The current plan or top-up price is evidence only; the exact purchase value is the refund authority. Provider settlement is manual through Shopify Partner Dashboard or Support.</p>
+      <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">{refundText("settlementRoute")}</h3>
+      <p className="mt-2 text-sm text-gray-700">{automatic ? refundText("routeAutomatic") : manual ? refundText("routeManual") : refundText("routePending")}</p>
+      {automatic ? <div className="mt-4"><h3 className="text-sm font-semibold text-gray-950">{refundText("automaticEvidence")}</h3><DetailList items={[["Correction UsageEvent ID", refund.automaticCorrection?.id ?? refund.automaticCorrectionUsageEventId], ["Correction quantity", refund.automaticCorrection?.quantity ?? null], ["Shopify report state", refund.automaticCorrection?.shopifyReportState ?? null], ["Provider quantity before correction", refund.providerUsageQuantityBeforeCorrection], ["Provider cost before correction", refund.providerUsageCostBeforeCorrection], ["Expected provider quantity after correction", refund.expectedProviderUsageQuantityAfterCorrection], ["Expected provider cost after correction", refund.expectedProviderUsageCostAfterCorrection], ["Expected refund amount/currency", refund.expectedProviderAmount ? `${refund.expectedProviderAmount} ${refund.expectedProviderCurrency ?? ""}` : null], ["Last report attempt", refund.automaticCorrection?.lastReportAttemptAt ? adminI18n.formatDateTime(refund.automaticCorrection.lastReportAttemptAt) : null], ["Reported at", refund.automaticCorrection?.reportedAt ? adminI18n.formatDateTime(refund.automaticCorrection.reportedAt) : null]]} /><Link className="mt-4 inline-block font-semibold text-[var(--brand-700)] hover:underline" href={buildUrl("/billing", { ...params, view: "events", eventId: refund.automaticCorrectionUsageEventId })}>{refundText("viewAppEvent")}</Link></div> : null}
+      <details className="mt-8 border-t border-gray-200 pt-6"><summary className="cursor-pointer text-sm font-semibold text-gray-950">{refundText("purchaseProvenance")}</summary><div className="mt-4"><DetailList items={[["Billing period snapshot", refund.billingPeriodIdSnapshot], ["Provider subscription snapshot", refund.providerSubscriptionIdSnapshot], ["Plan handle snapshot", refund.planHandleSnapshot], ["Event handle snapshot", refund.eventHandleSnapshot], ["Purchase provider amount/currency", `${refund.purchaseProviderAmountSnapshot} ${refund.purchaseProviderCurrencySnapshot}`], ["Usage quantity before", refund.purchase.providerUsageQuantityBeforeSnapshot], ["Usage cost before", `${refund.purchase.providerUsageCostBeforeSnapshot} ${refund.purchase.providerUsageCostCurrencyBeforeSnapshot}`], ["Usage quantity after", refund.purchase.providerUsageQuantityAfterSnapshot], ["Usage cost after", refund.purchase.providerUsageCostAfterSnapshot ? `${refund.purchase.providerUsageCostAfterSnapshot} ${refund.purchase.providerUsageCostCurrencyAfterSnapshot ?? ""}` : null], ["Provider price evidence", providerSnapshot], ["Support context", refund.sourceMessage?.id ?? null]]} /></div></details>
+      <details className="mt-8 border-t border-gray-200 pt-6"><summary className="cursor-pointer text-sm font-semibold text-gray-950">Reservations and history</summary><div className="mt-4 space-y-2 text-sm text-gray-600"><p>{refund.reservations.length ? refund.reservations.map((reservation) => `${reservation.quantity} ${label(reservation.status)}`).join(" · ") : "No reservations in the bounded history."}</p>{refund.refundHistory.map((entry) => <p key={entry.id}>{adminI18n.formatDateTime(entry.createdAt)} · {label(entry.status)} · {entry.finalCreditQuantity ?? "quantity not locked"} credits · {entry.providerAmount ? `${entry.providerAmount} ${entry.providerCurrency ?? ""}` : "provider amount not recorded"}</p>)}</div></details>
+      <h3 className="mt-8 border-t border-gray-200 pt-6 text-sm font-semibold text-gray-950">{refundText("manualEvidence")}</h3><DetailList items={[["Recorded provider action", refund.providerActionKind], ["Provider reference", refund.providerReference], ["Recorded provider amount", refund.providerAmount ? `${refund.providerAmount} ${refund.providerCurrency ?? ""}` : null]]} />
+      <SettlementActions refund={refund} canSettle={canSettle} />
     </AdminDetailDrawer>
   );
 }
