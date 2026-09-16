@@ -104,7 +104,7 @@ test("retained controls remove the legacy economics forms", () => {
     controls,
     /mutateUpgradeEdgeAction|recordEconomicsSnapshotAction/,
   );
-  assert.match(controlsPage, /PlatformBillingControls/);
+  assert.match(controlsPage, /BackgroundRuntimeControls/);
 });
 
 test("retained platform policy persists the bounded premium threshold", () => {
