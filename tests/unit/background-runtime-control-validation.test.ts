@@ -9,8 +9,27 @@ import {
 
 test("covers every DATABASE-004 editable field exactly once", () => {
   const keys = ALL_RUNTIME_FIELDS.map((field) => field.key);
-  assert.equal(keys.length, 41);
+  assert.equal(keys.length, 42);
   assert.equal(new Set(keys).size, keys.length);
+});
+
+test("validates checkout recovery lifetime as whole days from 1 through 90", () => {
+  const current = Object.fromEntries(ALL_RUNTIME_FIELDS.map((field) => [field.key, field.defaultValue]));
+  const form = new FormData();
+  for (const field of ALL_RUNTIME_FIELDS) {
+    const displayValue = field.displayMultiplier ? current[field.key] / field.displayMultiplier : current[field.key];
+    form.set(field.key, String(displayValue));
+  }
+
+  assert.equal(current.checkoutRecoveryLifetimeDays, 21);
+  for (const value of ["1", "90"]) {
+    form.set("checkoutRecoveryLifetimeDays", value);
+    assert.equal(parseRuntimeControlsForm(form, "OPERATIONAL", current).checkoutRecoveryLifetimeDays, Number(value));
+  }
+  for (const value of ["0", "91", "1.5", "21.0"]) {
+    form.set("checkoutRecoveryLifetimeDays", value);
+    assert.throws(() => parseRuntimeControlsForm(form, "OPERATIONAL", current));
+  }
 });
 
 test("converts human seconds to exact milliseconds and enforces ranges", () => {
