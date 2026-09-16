@@ -160,6 +160,15 @@ export async function parsePromotionTranslationWorkbook(
   translationResult: PromotionTranslationParseResult | null;
 }> {
   const issues: PromotionTranslationWorkbookIssue[] = [];
+  if (bytes.byteLength > PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES) {
+    addIssue(issues, "INVALID_XLSX", "The workbook exceeds the 2 MiB limit.");
+    return {
+      workbookValid: false,
+      workbookIssues: issues,
+      canonicalRawJson: null,
+      translationResult: null,
+    };
+  }
   const ExcelJS = await loadTranslationWorkbookExcelJS();
   const workbook = new ExcelJS.Workbook();
   try {
@@ -174,15 +183,6 @@ export async function parsePromotionTranslationWorkbook(
       "INVALID_XLSX",
       "The uploaded file is not a readable XLSX workbook.",
     );
-    return {
-      workbookValid: false,
-      workbookIssues: issues,
-      canonicalRawJson: null,
-      translationResult: null,
-    };
-  }
-  if (bytes.byteLength > PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES) {
-    addIssue(issues, "INVALID_XLSX", "The workbook exceeds the 2 MiB limit.");
     return {
       workbookValid: false,
       workbookIssues: issues,

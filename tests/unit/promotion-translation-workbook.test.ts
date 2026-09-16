@@ -7,6 +7,7 @@ import {
 import {
   buildPromotionTranslationWorkbook,
   parsePromotionTranslationWorkbook,
+  PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES,
 } from "../../src/lib/admin/promotion-translation-workbook.ts";
 import { TRANSLATION_WORKBOOK_LOCALES } from "../../src/lib/admin/translation-workbook-common.ts";
 
@@ -87,6 +88,17 @@ test("round-trips complete translations and preserves existing valid values", as
   assert.equal(result.translationResult?.completeCount, 20);
   const parsed = JSON.parse(result.canonicalRawJson!);
   assert.equal(parsed.translations.ja.merchantTitle, "Title ja");
+});
+
+test("rejects oversized input before attempting XLSX parsing", async () => {
+  const result = await parsePromotionTranslationWorkbook(
+    new ArrayBuffer(PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES + 1),
+    expected,
+  );
+  assert.deepEqual(result.workbookIssues[0], {
+    code: "INVALID_XLSX",
+    message: "The workbook exceeds the 2 MiB limit.",
+  });
 });
 
 test("rejects changed source, wrong campaign, and formulas without evaluating them", async () => {
