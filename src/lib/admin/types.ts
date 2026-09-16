@@ -69,7 +69,7 @@ export type RecoveryCreditPurchaseItem = {
 export type RecoveryCreditRefundQueueStatus =
   | "ALL"
   | "REQUESTED"
-  | "READY_FOR_PROVIDER_ACTION"
+  | "READY_FOR_REFUND_PROCESSING"
   | "WAITING_FOR_RESERVATIONS"
   | "PROVIDER_ACTION_REQUIRED"
   | "NEEDS_ATTENTION"
@@ -109,6 +109,21 @@ export type RecoveryCreditRefundItem = {
   finalCreditQuantity: number | null;
   expectedProviderAmount: string | null;
   expectedProviderCurrency: string | null;
+  automaticCorrectionUsageEventId: string | null;
+  providerUsageQuantityBeforeCorrection: string | null;
+  providerUsageCostBeforeCorrection: string | null;
+  expectedProviderUsageQuantityAfterCorrection: string | null;
+  expectedProviderUsageCostAfterCorrection: string | null;
+  automaticCorrection: {
+    id: string;
+    quantity: string;
+    shopifyReportState: string;
+    shopifyEventHandle: string | null;
+    shopifyIdempotencyKey: string | null;
+    reportAttemptCount: number;
+    lastReportAttemptAt: Date | null;
+    reportedAt: Date | null;
+  } | null;
   providerReference: string | null;
   providerActionKind: string | null;
   providerAmount: string | null;

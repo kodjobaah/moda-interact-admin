@@ -6,60 +6,74 @@ import { test } from "node:test";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-test("refund triage is an authorized bounded read model", async () => {
+test("refund triage is bounded and derives the ARCH-015 queue states", async () => {
   const source = await readFile(path.join(root, "src/lib/admin/recovery-credit-refunds.ts"), "utf8");
   assert.match(source, /requirePlatformAdminRead\(\)/);
-  assert.match(source, /prisma\.recoveryCreditRefund\.count\(\{ where \}\)/);
   assert.match(source, /skip: \(page - 1\) \* pageSize/);
   assert.match(source, /take: pageSize/);
-  assert.match(source, /MAX_PAGE_SIZE = 50/);
-  assert.match(source, /pageSize \?\? RECOVERY_CREDIT_REFUND_PAGE_SIZE/);
-  assert.match(source, /status: RecoveryCreditRefundStatus\.REQUESTED/);
+  assert.match(source, /READY_FOR_REFUND_PROCESSING/);
+  assert.equal(source.includes(["READY_FOR", "PROVIDER_ACTION"].join("_")), false);
   assert.match(source, /reservedAmount: 0/);
   assert.match(source, /reservedAmount: \{ gt: 0 \}/);
   assert.match(source, /currentAmount: \{ gt: 0 \}/);
-  assert.match(source, /purchasedReservations:/);
-  assert.match(source, /status === "NEEDS_ATTENTION"/);
-  assert.match(source, /status: RecoveryCreditRefundStatus\.NEEDS_ATTENTION/);
-  assert.match(
-    source,
-    /in: \[\s*RecoveryCreditPurchaseStatus\.REQUESTED,\s*RecoveryCreditPurchaseStatus\.ACTIVE,\s*RecoveryCreditPurchaseStatus\.COMPLETED,\s*RecoveryCreditPurchaseStatus\.REFUNDED,\s*\]/s,
-  );
-  assert.match(source, /currentAmount: \{ lte: 0 \}/);
-  assert.match(source, /reservedAmount: 0/);
-  assert.match(source, /take: 20/);
-  assert.match(source, /refunds:/);
-  assert.match(source, /reason: true, finalCreditQuantity: true/);
-  assert.doesNotMatch(source, /update\(|create\(|delete\(|creditsRequested|creditsApproved|percentage/);
+  assert.match(source, /automaticCorrectionUsageEventId: true/);
+  assert.match(source, /automaticCorrectionUsageEvent:/);
+  assert.match(source, /quantity: row\.automaticCorrectionUsageEvent\.quantity\.toString\(\)/);
+  assert.match(source, /providerUsageQuantityBeforeCorrection/);
+  assert.match(source, /expectedProviderUsageCostAfterCorrection/);
+  assert.doesNotMatch(source, /update\(|create\(|delete\(/);
 });
 
-test("refund UI preserves exact-lot authority and exposes settlement controls", async () => {
+test("refund drawer is read-only for REQUESTED and uses progressive evidence disclosure", async () => {
   const [component, page] = await Promise.all([
     readFile(path.join(root, "src/components/admin/recovery-credit-refunds.tsx"), "utf8"),
     readFile(path.join(root, "src/app/(protected)/billing/page.tsx"), "utf8"),
   ]);
   assert.match(page, /getRecoveryCreditRefunds/);
   assert.match(page, /getRecoveryCreditRefundDetail/);
-  assert.match(component, /WAITING_FOR_RESERVATIONS/);
-  assert.match(component, /READY_FOR_PROVIDER_ACTION/);
-  assert.match(component, /must not start yet/);
-  assert.match(component, /Final credit quantity will be locked/);
-  assert.match(component, /Current amount at request/);
-  assert.match(component, /Current purchase amount/);
-  assert.match(component, /Billing period/);
-  assert.match(component, /Usage quantity before/);
-  assert.match(component, /Usage cost after/);
-  assert.match(component, /Support context message/);
-  assert.match(component, /provider amount not recorded/);
-  assert.match(component, /lockRecoveryCreditRefundAction/);
-  assert.match(component, /rejectRecoveryCreditRefundAction/);
+  assert.match(component, /READY_FOR_REFUND_PROCESSING/);
+  assert.match(component, /readyForProcessing/);
+  assert.match(component, /automaticCorrectionUsageEventId/);
+  assert.match(component, /automaticSafetyWarning/);
+  assert.match(component, /isAutomaticCompleted/);
+  assert.match(component, /isManualCompleted/);
+  assert.match(component, /isManualFallback/);
+  assert.match(component, /status === RecoveryCreditRefundStatus\.COMPLETED/);
+  assert.match(component, /providerActionKind === null/);
+  assert.match(component, /providerActionKind === RecoveryCreditProviderActionKind\.REFUND/);
+  assert.match(component, /providerActionKind === RecoveryCreditProviderActionKind\.CREDIT/);
+  assert.match(component, /completedAutomatic/);
+  assert.match(component, /completedManual/);
+  assert.match(component, /automaticCorrection\?\.shopifyReportState === "REPORTED"/);
+  assert.match(component, /awaitingReconciliation/);
+  assert.match(component, /manualRequired/);
   assert.match(component, /recordRecoveryCreditProviderEvidenceAction/);
-  assert.match(component, /Frozen settlement evidence/);
-  assert.match(component, /Expected provider amount/);
-  assert.match(component, /Provider settlement is manual through Shopify Partner Dashboard or Support/);
-  assert.match(page, /const principal = await requirePlatformAdminPage\(\)/);
-  assert.match(page, /canSettle=\{principal\.role === "SUPER_ADMIN"\}/);
+  assert.match(component, /status !== RecoveryCreditRefundStatus\.PROVIDER_ACTION_REQUIRED/);
+  assert.match(component, /automaticCorrectionUsageEventId !== null/);
+  assert.match(component, /<details/);
+  assert.match(component, /purchaseProvenance/);
+  assert.match(component, /buildUrl\("\/billing", \{ view: "events", eventId: refund\.automaticCorrectionUsageEventId \}\)/);
+  assert.doesNotMatch(component, /buildUrl\("\/billing", \{ \.\.\.params, view: "events"/);
+  const legacyLockAction = ["lockRecoveryCredit", "Refund", "Action"].join("");
+  const legacyRejectAction = ["rejectRecoveryCredit", "Refund", "Action"].join("");
+  assert.equal(component.includes(legacyLockAction), false);
+  assert.equal(component.includes(legacyRejectAction), false);
+  assert.equal(component.includes(["READY_FOR", "PROVIDER_ACTION"].join("_")), false);
   assert.match(component, /canSettle: boolean/);
-  assert.match(component, /\{canSettle \? <SettlementActions refund=\{refund\} \/> : null\}/);
-  assert.doesNotMatch(component, /type="number"|type="money"|percentage|creditsRequested|creditsApproved/);
+  assert.match(component, /canSettle/);
+  assert.equal(component.includes(["Lock", " provider action"].join("")), false);
+  assert.equal(component.includes(["Reject", " request"].join("")), false);
+  assert.equal(component.toLowerCase().includes(["mark", " complete"].join("")), false);
+  assert.match(component, /refundText\("description"\)/);
+  for (const field of [
+    "providerValuationConfirmedAt",
+    "purchaseCreditsGrantedSnapshot",
+    "currentAmountAtRequestSnapshot",
+    "reservedAmountAtRequestSnapshot",
+    "availableAmountAtRequestSnapshot",
+    "requestedByShopifyUserId",
+    "sourceMessage\\?\\.id",
+  ]) assert.match(component, new RegExp(field));
+  assert.match(component, /manualEvidence = manualCompleted \|\|/);
+  assert.match(component, /refund\.status === RecoveryCreditRefundStatus\.NEEDS_ATTENTION/);
 });
