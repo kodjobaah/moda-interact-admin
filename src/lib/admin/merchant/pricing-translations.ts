@@ -1,7 +1,7 @@
 import {
   MERCHANT_PRICING_LOCALES,
   type MerchantPricingLocale,
-} from "./merchant-pricing-locales.ts";
+} from "../merchant-pricing-locales.ts";
 
 export type MerchantPricingTranslationIssue = {
   code: string;
@@ -214,22 +214,7 @@ export function parseCompletedMerchantPricingTranslationPackage(
           "schemaVersion must be 2.",
         ),
       );
-    if (meta.planHandle !== normalized(expected.planHandle))
-      issues.push(
-        makeIssue(
-          "PLAN_HANDLE_MISMATCH",
-          "$._meta.planHandle",
-          "Plan handle does not match the current draft.",
-        ),
-      );
-    if (meta.planName !== normalized(expected.planName))
-      issues.push(
-        makeIssue(
-          "PLAN_NAME_MISMATCH",
-          "$._meta.planName",
-          "Plan name does not match the current draft.",
-        ),
-      );
+
     if (meta.sourceLocale !== "en")
       issues.push(
         makeIssue(
@@ -428,10 +413,19 @@ export function parseCompletedMerchantPricingTranslationPackage(
   }
   if (issues.length)
     return { valid: false, completeCount: completeLocales.size, issues };
+  const parsedPackage = parsed as MerchantPricingTranslationPackage;
+
   return {
     valid: true,
     completeCount: completeLocales.size,
     issues: [],
-    package: parsed as MerchantPricingTranslationPackage,
+    package: {
+      ...parsedPackage,
+      _meta: {
+        ...parsedPackage._meta,
+        planHandle: normalized(expected.planHandle),
+        planName: normalized(expected.planName),
+      },
+    },
   };
 }

@@ -8,7 +8,7 @@ import {
   findCheapestMerchantUsageCombination,
   type MerchantPricingEconomicsPlan,
   type MerchantPricingUsageOffer,
-} from "../../src/lib/admin/merchant-pricing-economics.ts";
+} from "../../src/lib/admin/merchant/pricing-economics.ts";
 import { validateSinglePackShopifyEconomics } from "../../src/lib/admin/upgrade-economics-guardrail.ts";
 
 function fixed(

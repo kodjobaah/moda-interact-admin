@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import type {
   MerchantPricingEconomicsPlan,
   MerchantPricingUsageOffer,
-} from "./merchant-pricing-economics";
+} from "./pricing-economics";
 
 export type MerchantPricingPlanWithChildren = MerchantPricingPlan & {
   translations: MerchantPricingPlanTranslation[];

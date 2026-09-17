@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   buildMerchantPricingTranslationTemplate,
   parseCompletedMerchantPricingTranslationPackage,
-} from "../../src/lib/admin/merchant-pricing-translations.ts";
+} from "../../src/lib/admin/merchant/pricing-translations.ts";
 
 const expected = {
   planHandle: "starter",

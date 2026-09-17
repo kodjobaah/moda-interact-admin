@@ -6,8 +6,8 @@ import {
   parseMoneyToMinorUnits,
   projectMerchantPricingCatalogueOrder,
   resolveMerchantPricingPreviewPosition,
-} from "../../src/lib/admin/merchant-pricing-builder-payload.ts";
-import { findUnboundedZeroCostEventLabel } from "../../src/lib/admin/merchant-pricing-builder-presentation.ts";
+} from "../../src/lib/admin/merchant/pricing-builder-payload.ts";
+import { findUnboundedZeroCostEventLabel } from "../../src/lib/admin/merchant/pricing-builder-presentation.ts";
 
 function payload(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({

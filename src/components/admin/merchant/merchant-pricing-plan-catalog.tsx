@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
-import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
+import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
+import { MerchantPricingPlanDeleteButton } from "./merchant-pricing-plan-delete-button";
 import { adminI18n } from "@/i18n";
 
 export function MerchantPricingPlanCatalog({
@@ -106,6 +107,13 @@ export function MerchantPricingPlanCatalog({
                 >
                   {plan.isActive ? "Deactivate" : "Activate"}
                 </button>
+                {plan.planKind === "PAID_METERED" ? (
+                  <MerchantPricingPlanDeleteButton
+                    id={plan.id}
+                    displayName={plan.displayName}
+                    disabled={plan.isActive}
+                  />
+                ) : null}
               </form>
             </div>
           </article>

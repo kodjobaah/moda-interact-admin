@@ -5,8 +5,8 @@ import type {
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
-import { MerchantPricingPlanBuilder } from "./merchant-pricing-plan-builder";
-import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
+import { MerchantPricingPlanBuilder } from "./merchant/merchant-pricing-plan-builder";
+import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
 
 function DetailList({
   items,

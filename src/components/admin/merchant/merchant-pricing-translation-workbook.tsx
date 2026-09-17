@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant-pricing-builder-payload";
+import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant/pricing-builder-payload";
 import {
   buildMerchantPricingTranslationWorkbook,
   MERCHANT_PRICING_TRANSLATION_WORKBOOK_MAX_BYTES,
@@ -17,7 +17,7 @@ import {
 import type {
   MerchantPricingTranslationPackage,
   MerchantPricingTranslationParseResult,
-} from "@/lib/admin/merchant-pricing-translations";
+} from "@/lib/admin/merchant/pricing-translations";
 
 function filename(handle: string): string {
   const sanitized = handle.replace(/[^A-Za-z0-9._-]/g, "-");

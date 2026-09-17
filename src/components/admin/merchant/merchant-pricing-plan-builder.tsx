@@ -1,158 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant-pricing-builder-payload";
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
-import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant-pricing-plan";
-import { parseMoneyToMinorUnits } from "@/lib/admin/merchant-pricing-builder-payload";
-import { resolveMerchantPricingPreviewPosition } from "@/lib/admin/merchant-pricing-builder-payload";
-import { projectMerchantPricingCatalogueOrder } from "@/lib/admin/merchant-pricing-builder-payload";
-import {
-  evaluateMerchantPricingPortfolio,
-  type MerchantPricingEconomicsPlan,
-  type MerchantPricingPairResult,
-} from "@/lib/admin/merchant-pricing-economics";
-import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant-pricing-builder-presentation";
+import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant/pricing-builder-payload";
+import { parseMoneyToMinorUnits } from "@/lib/admin/merchant/pricing-builder-payload";
+import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant/pricing-builder-presentation";
+import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
 import {
   buildMerchantPricingTranslationTemplate,
   type MerchantPricingTranslationParseResult,
-} from "@/lib/admin/merchant-pricing-translations";
+} from "@/lib/admin/merchant/pricing-translations";
+import {
+  addBuilderTier,
+  type BuilderEvent,
+  createEmptyBuilderEvent,
+  evaluateBuilderEconomics,
+  formatBuilderEventPrice,
+  formatMinorUnits,
+  hasUnboundedZeroCostFixedEvent,
+  initialEvents,
+  initialHighlights,
+  merchantPricingBuilderMerchantContentValid,
+  merchantPricingBuilderRequiredFieldsValid,
+  merchantPricingBuilderTranslationsRetained,
+  minorUnitsToMoney,
+  moveBuilderEvent,
+  moveBuilderHighlight,
+  serializeBuilderEvent,
+  updateBuilderEvent,
+  updateBuilderHighlight,
+  updateBuilderTier,
+  ZERO_COST_USAGE_EVENT_MESSAGE,
+} from "@/lib/admin/merchant/pricing-plan-builder";
+import { presentMerchantPricingEconomicsResult } from "@/lib/admin/merchant/pricing-economics-presentation";
+import { useMemo, useRef, useState } from "react";
 import { MerchantPricingTranslationWorkbook } from "./merchant-pricing-translation-workbook";
+import { MerchantPricingPlanSubmitButton } from "./merchant-pricing-plan-submit-button";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white p-2 text-sm";
-type BuilderEvent = {
-  adminLabel: string;
-  eventHandle: string;
-  creditsGrantedPerUnit: number;
-  maximumUnitsPerBillingPeriod: number | null;
-  pricingMode: "FIXED" | "GRADUATED" | "VOLUME";
-  fixedUnitAmount?: string;
-  tiers?: Array<{
-    upTo: number | null;
-    amountPerUnit: string;
-    flatAmount: string;
-  }>;
-};
-
-function minorUnitsToMoney(value: number): string {
-  return `${Math.floor(value / 100)}.${String(value % 100).padStart(2, "0")}`;
-}
-
-function formatMinorUnits(value: number | undefined, currency: string): string {
-  return value === undefined
-    ? "N/A"
-    : new Intl.NumberFormat(undefined, {
-        style: "currency",
-        currency,
-      }).format(value / 100);
-}
-
-function formatBuilderEventPrice(
-  event: BuilderEvent,
-  currency: string,
-): string {
-  try {
-    return formatMinorUnits(
-      parseMoneyToMinorUnits(event.fixedUnitAmount ?? "0"),
-      currency,
-    );
-  } catch {
-    return "Invalid price";
-  }
-}
-
-const ZERO_COST_USAGE_EVENT_MESSAGE =
-  "This usage event gives recovery credits for free but has no usage limit. Enter a price greater than 0 or set a maximum number of uses per billing period.";
-
-function hasUnboundedZeroCostFixedEvent(event: BuilderEvent): boolean {
-  if (
-    event.pricingMode !== "FIXED" ||
-    event.creditsGrantedPerUnit <= 0 ||
-    event.maximumUnitsPerBillingPeriod !== null
-  )
-    return false;
-  try {
-    return parseMoneyToMinorUnits(event.fixedUnitAmount ?? "") === 0;
-  } catch {
-    return false;
-  }
-}
-
-function serializeBuilderEvent(event: BuilderEvent): BuilderEvent {
-  if (event.pricingMode === "FIXED") {
-    const { tiers: _tiers, ...fixedEvent } = event;
-    return fixedEvent;
-  }
-  const { fixedUnitAmount: _fixedUnitAmount, ...tieredEvent } = event;
-  return tieredEvent;
-}
-
-function initialEvents(plan?: MerchantPricingPlanWithChildren): BuilderEvent[] {
-  return (
-    plan?.usageEvents.map((event) => ({
-      adminLabel: event.adminLabel,
-      eventHandle: event.eventHandle,
-      creditsGrantedPerUnit: event.creditsGrantedPerUnit,
-      maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
-      pricingMode: event.pricingMode,
-      fixedUnitAmount: minorUnitsToMoney(event.fixedUnitAmountMinor ?? 0),
-      tiers: event.tiers.map((tier) => ({
-        upTo: tier.upTo,
-        amountPerUnit: minorUnitsToMoney(tier.amountPerUnitMinor),
-        flatAmount: minorUnitsToMoney(tier.flatAmountMinor),
-      })),
-    })) ?? []
-  );
-}
-
-function initialHighlights(
-  plan?: MerchantPricingPlanWithChildren,
-): MerchantPricingBuilderHighlight[] {
-  return (plan?.highlights ?? []).map((highlight) => ({
-    contentKey: highlight.contentKey,
-    title:
-      highlight.translations.find((translation) => translation.locale === "en")
-        ?.merchantTitle ?? "",
-    description:
-      highlight.translations.find((translation) => translation.locale === "en")
-        ?.merchantDescription ?? "",
-  }));
-}
-
-function toEconomicsPlan(
-  plan: MerchantPricingPlanWithChildren,
-): MerchantPricingEconomicsPlan {
-  return {
-    id: plan.id,
-    shopifyPlanHandle: plan.shopifyPlanHandle,
-    name: plan.displayName,
-    includedRecoveryCredits: plan.includedRecoveryCredits,
-    recurringAmountMinor: plan.recurringAmountMinor,
-    currency: plan.currency,
-    usageEvents: plan.usageEvents.map((event) => ({
-      eventHandle: event.eventHandle,
-      creditsGrantedPerUnit: event.creditsGrantedPerUnit,
-      maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
-      pricing:
-        event.pricingMode === "FIXED"
-          ? {
-              mode: "FIXED" as const,
-              currency: event.currency,
-              unitAmountMinor: event.fixedUnitAmountMinor ?? 0,
-            }
-          : {
-              mode: event.pricingMode,
-              currency: event.currency,
-              tiers: event.tiers.map((tier) => ({
-                upTo: tier.upTo,
-                amountPerUnitMinor: tier.amountPerUnitMinor,
-                flatAmountMinor: tier.flatAmountMinor,
-              })),
-            },
-    })),
-  };
-}
 
 export function MerchantPricingPlanBuilder({
   plan,
@@ -163,11 +48,17 @@ export function MerchantPricingPlanBuilder({
   cataloguePlans?: MerchantPricingPlanWithChildren[];
   minimumUpgradePremiumBps?: number;
 }) {
+  const nextEventKeyRef = useRef(0);
   const [step, setStep] = useState(0);
   const [name, setName] = useState(plan?.displayName ?? "");
   const [handle, setHandle] = useState(plan?.shopifyPlanHandle ?? "");
+  const hasFreePlan = cataloguePlans.some(
+    (cataloguePlan) => cataloguePlan.planKind === "FREE",
+  );
+  const freePlanAlreadyExists = hasFreePlan && plan?.planKind !== "FREE";
+
   const [planKind, setPlanKind] = useState<"FREE" | "PAID_METERED">(
-    plan?.planKind ?? "FREE",
+    plan?.planKind ?? (hasFreePlan ? "PAID_METERED" : "FREE"),
   );
   const [isActive, setIsActive] = useState(plan?.isActive ?? true);
   const [featured, setFeatured] = useState(plan?.featured ?? false);
@@ -179,8 +70,8 @@ export function MerchantPricingPlanBuilder({
   const [placement, setPlacement] = useState(
     plan
       ? "UNCHANGED"
-      : cataloguePlans[0]
-        ? `BEFORE:${cataloguePlans[0].id}`
+      : cataloguePlans.length
+        ? `AFTER:${cataloguePlans[cataloguePlans.length - 1].id}`
         : "ONLY",
   );
   const [description, setDescription] = useState(
@@ -197,6 +88,23 @@ export function MerchantPricingPlanBuilder({
   const [translationJson, setTranslationJson] = useState("");
   const [translationResult, setTranslationResult] =
     useState<MerchantPricingTranslationParseResult | null>(null);
+  const merchantContentValid = merchantPricingBuilderMerchantContentValid({
+    description,
+    highlights,
+  });
+
+  const economicsState = evaluateBuilderEconomics({
+    plan,
+    cataloguePlans,
+    handle,
+    name,
+    credits,
+    recurring,
+    currency,
+    events,
+    placement,
+    minimumUpgradePremiumBps,
+  });
 
   const payload = useMemo(() => {
     return {
@@ -237,115 +145,6 @@ export function MerchantPricingPlanBuilder({
     reason,
     recurring,
   ]);
-
-  const economicsState = useMemo(() => {
-    let recurringAmountMinor: number;
-    try {
-      recurringAmountMinor = parseMoneyToMinorUnits(recurring);
-    } catch {
-      return { results: [] as MerchantPricingPairResult[], invalid: true };
-    }
-    let usageEvents: Array<{
-      event: BuilderEvent;
-      pricing: MerchantPricingEconomicsPlan["usageEvents"][number]["pricing"];
-    }>;
-    try {
-      usageEvents = events.map((event) => {
-        if (event.pricingMode === "FIXED") {
-          return {
-            event,
-            pricing: {
-              mode: "FIXED" as const,
-              currency: currency.trim().toUpperCase(),
-              unitAmountMinor: parseMoneyToMinorUnits(
-                event.fixedUnitAmount ?? "",
-              ),
-            },
-          };
-        }
-        return {
-          event,
-          pricing: {
-            mode: event.pricingMode,
-            currency: currency.trim().toUpperCase(),
-            tiers: (event.tiers ?? []).map((tier) => ({
-              upTo: tier.upTo,
-              amountPerUnitMinor: parseMoneyToMinorUnits(tier.amountPerUnit),
-              flatAmountMinor: parseMoneyToMinorUnits(tier.flatAmount),
-            })),
-          },
-        };
-      });
-    } catch {
-      return { results: [] as MerchantPricingPairResult[], invalid: true };
-    }
-    const previewPosition = plan
-      ? plan.cataloguePosition
-      : resolveMerchantPricingPreviewPosition(
-          placement,
-          cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
-        );
-    if (previewPosition === null) {
-      return { results: [] as MerchantPricingPairResult[], invalid: true };
-    }
-    const candidate: MerchantPricingEconomicsPlan = {
-      id: plan?.id ?? `candidate:${handle.trim()}`,
-      shopifyPlanHandle: handle.trim(),
-      name: name.trim(),
-      includedRecoveryCredits: Number(credits),
-      recurringAmountMinor,
-      currency: currency.trim().toUpperCase(),
-      usageEvents: usageEvents.map(({ event, pricing }) => ({
-        eventHandle: event.eventHandle.trim(),
-        creditsGrantedPerUnit: event.creditsGrantedPerUnit,
-        maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
-        pricing,
-      })),
-    };
-    const projectedIds = projectMerchantPricingCatalogueOrder(
-      cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
-      candidate.id,
-      previewPosition,
-      plan?.id,
-    );
-    const plansByCatalogueId = new Map(
-      cataloguePlans.map((cataloguePlan) => [
-        cataloguePlan.id,
-        toEconomicsPlan(cataloguePlan),
-      ]),
-    );
-    plansByCatalogueId.set(candidate.id, candidate);
-    const ordered = projectedIds
-      .map((id) => ({
-        plan: plansByCatalogueId.get(id)!,
-        source: cataloguePlans.find((cataloguePlan) => cataloguePlan.id === id),
-        id,
-      }))
-      .filter(({ source, id }) => id === candidate.id || source?.isActive);
-    const plansById = Object.fromEntries(
-      ordered.map(({ plan: orderedPlan }) => [orderedPlan.id, orderedPlan]),
-    );
-    return {
-      results: evaluateMerchantPricingPortfolio({
-        orderedPlanIds: ordered.map(({ plan: orderedPlan }) => orderedPlan.id),
-        plansById,
-        minimumUpgradePremiumBps,
-      }),
-      invalid: false,
-    };
-  }, [
-    cataloguePlans,
-    credits,
-    currency,
-    events,
-    handle,
-    minimumUpgradePremiumBps,
-    name,
-    plan,
-    placement,
-    recurring,
-  ]);
-
   const economicsPreview = economicsState.results;
   const unboundedZeroCostEventLabel = findUnboundedZeroCostEventLabel(
     events,
@@ -354,21 +153,30 @@ export function MerchantPricingPlanBuilder({
   const economicsPassed =
     !economicsState.invalid &&
     economicsPreview.every((result) => result.status === "PASS");
-  const requiredFieldsValid =
-    Boolean(handle.trim()) &&
-    Boolean(name.trim()) &&
-    /^[A-Z]{3}$/.test(currency.trim().toUpperCase()) &&
-    Number.isSafeInteger(Number(credits)) &&
-    Number(credits) >= 0 &&
-    Boolean(description.trim()) &&
-    description.trim().length <= 2000 &&
-    events.every(
-      (event) =>
-        Boolean(event.adminLabel.trim()) &&
-        Boolean(event.eventHandle.trim()) &&
-        Number.isSafeInteger(event.creditsGrantedPerUnit) &&
-        event.creditsGrantedPerUnit >= 1,
-    );
+  const presentedEconomics = economicsPreview.map((result) => ({
+    result,
+    presentation: presentMerchantPricingEconomicsResult({
+      result,
+      lowerPlan: economicsState.plansById[result.lowerPlanId],
+      higherPlan: economicsState.plansById[result.higherPlanId],
+      minimumUpgradePremiumBps,
+    }),
+  }));
+  const failedEconomics = presentedEconomics.filter(
+    ({ result }) => result.status !== "PASS",
+  );
+
+  const passedEconomics = presentedEconomics.filter(
+    ({ result }) => result.status === "PASS",
+  );
+  const requiredFieldsValid = merchantPricingBuilderRequiredFieldsValid({
+    handle,
+    name,
+    currency,
+    credits,
+    description,
+    events,
+  });
   const retainedTemplate = plan
     ? buildMerchantPricingTranslationTemplate({
         planHandle: handle,
@@ -397,26 +205,11 @@ export function MerchantPricingPlanBuilder({
         },
       })
     : null;
-  const translationsRetained =
-    Boolean(plan) &&
-    (
-      plan?.translations.find((translation) => translation.locale === "en")
-        ?.merchantDescription ?? ""
-    ).trim() === description.trim() &&
-    plan?.highlights.length === highlights.length &&
-    highlights.every((highlight) => {
-      const previous = plan?.highlights.find(
-        (candidate) => candidate.contentKey === highlight.contentKey,
-      );
-      const previousEnglish = previous?.translations.find(
-        (translation) => translation.locale === "en",
-      );
-      return (
-        previousEnglish?.merchantTitle.trim() === highlight.title.trim() &&
-        previousEnglish?.merchantDescription.trim() ===
-          highlight.description.trim()
-      );
-    });
+  const translationsRetained = merchantPricingBuilderTranslationsRetained(
+    plan,
+    description,
+    highlights,
+  );
 
   const canSubmit =
     requiredFieldsValid &&
@@ -436,31 +229,31 @@ export function MerchantPricingPlanBuilder({
   function canNavigateTo(targetStep: number): boolean {
     if (targetStep <= step) return true;
     if (targetStep > step + 1) return false;
-    if (step === 3 && events.some(hasUnboundedZeroCostFixedEvent)) return false;
-    return step !== 5 || economicsPassed;
+
+    if (step === 3 && events.some(hasUnboundedZeroCostFixedEvent)) {
+      return false;
+    }
+
+    if (step === 4 && !merchantContentValid) {
+      return false;
+    }
+
+    if (step === 5 && !economicsPassed) {
+      return false;
+    }
+
+    return true;
   }
 
   function addEvent() {
     if (events.length >= 5) return;
-    setEvents([
-      ...events,
-      {
-        adminLabel: "",
-        eventHandle: "",
-        creditsGrantedPerUnit: 1,
-        maximumUnitsPerBillingPeriod: null,
-        pricingMode: "FIXED",
-        fixedUnitAmount: "0",
-      },
-    ]);
-  }
 
+    const clientKey = `new-usage-event-${nextEventKeyRef.current++}`;
+
+    setEvents((current) => [...current, createEmptyBuilderEvent(clientKey)]);
+  }
   function moveEvent(index: number, direction: -1 | 1) {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= events.length) return;
-    const next = [...events];
-    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-    setEvents(next);
+    setEvents((current) => moveBuilderEvent(current, index, direction));
   }
 
   function updateTier(
@@ -468,70 +261,31 @@ export function MerchantPricingPlanBuilder({
     tierIndex: number,
     update: Partial<NonNullable<BuilderEvent["tiers"]>[number]>,
   ) {
-    setEvents(
-      events.map((event, currentEventIndex) =>
-        currentEventIndex === eventIndex
-          ? {
-              ...event,
-              tiers: (event.tiers ?? []).map((tier, currentTierIndex) =>
-                currentTierIndex === tierIndex ? { ...tier, ...update } : tier,
-              ),
-            }
-          : event,
-      ),
+    setEvents((current) =>
+      updateBuilderTier(current, eventIndex, tierIndex, update),
     );
   }
 
   function addTier(eventIndex: number) {
-    const event = events[eventIndex];
-    if (
-      !event ||
-      event.pricingMode === "FIXED" ||
-      (event.tiers?.length ?? 0) >= 6
-    )
-      return;
-    setEvents(
-      events.map((candidate, index) =>
-        index === eventIndex
-          ? {
-              ...candidate,
-              tiers: [
-                ...(candidate.tiers ?? []),
-                { upTo: null, amountPerUnit: "0", flatAmount: "0" },
-              ],
-            }
-          : candidate,
-      ),
-    );
+    setEvents((current) => addBuilderTier(current, eventIndex));
   }
 
-  function updateEvent(index: number, update: Partial<BuilderEvent>) {
-    setEvents(
-      events.map((event, eventIndex) =>
-        eventIndex === index ? { ...event, ...update } : event,
-      ),
-    );
+  function updateEvent(
+    index: number,
+    update: Partial<Omit<BuilderEvent, "clientKey">>,
+  ) {
+    setEvents((current) => updateBuilderEvent(current, index, update));
   }
 
   function updateHighlight(
     index: number,
     update: Partial<MerchantPricingBuilderHighlight>,
   ) {
-    setHighlights((current) =>
-      current.map((highlight, highlightIndex) =>
-        highlightIndex === index ? { ...highlight, ...update } : highlight,
-      ),
-    );
+    setHighlights((current) => updateBuilderHighlight(current, index, update));
   }
 
   function moveHighlight(index: number, direction: -1 | 1) {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= highlights.length) return;
-    setHighlights((current) => {
-      const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
+    setHighlights((current) => moveBuilderHighlight(current, index, direction));
   }
 
   function validTranslationJson(): string {
@@ -609,7 +363,9 @@ export function MerchantPricingPlanBuilder({
                 setPlanKind(event.target.value as "FREE" | "PAID_METERED")
               }
             >
-              <option value="FREE">FREE</option>
+              <option value="FREE" disabled={freePlanAlreadyExists}>
+                FREE
+              </option>
               <option value="PAID_METERED">PAID_METERED</option>
             </select>
           </label>
@@ -659,11 +415,6 @@ export function MerchantPricingPlanBuilder({
           >
             {!cataloguePlans.length ? (
               <option value="ONLY">This will be the first plan.</option>
-            ) : null}
-            {cataloguePlans.length ? (
-              <option value={`BEFORE:${cataloguePlans[0].id}`}>
-                Before {cataloguePlans[0].displayName}
-              </option>
             ) : null}
             {cataloguePlans.map((cataloguePlan) => (
               <option
@@ -728,7 +479,7 @@ export function MerchantPricingPlanBuilder({
           </div>
           {events.map((event, index) => (
             <div
-              key={`${event.eventHandle}-${index}`}
+              key={event.clientKey}
               className="space-y-3 rounded-md border border-gray-200 p-3"
             >
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1026,29 +777,46 @@ export function MerchantPricingPlanBuilder({
           >
             + Add highlight
           </button>
+
+          {!merchantContentValid ? (
+            <p className="text-sm font-medium text-red-700">
+              Enter the English merchant description. If you add a highlight,
+              both its title and description are required before continuing.
+            </p>
+          ) : null}
         </section>
       ) : null}
       {step === 5 ? (
-        <section className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <section
+          className={`space-y-3 rounded-md border p-4 text-sm ${
+            economicsPassed
+              ? "border-green-200 bg-green-50 text-green-900"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
+        >
           <div>
-            <h3 className="font-semibold">Portfolio economics</h3>
+            <h3 className="font-semibold">
+              {economicsPassed
+                ? "Portfolio economics passed"
+                : "This pricing configuration cannot be saved"}
+            </h3>
+
             <p className="mt-2">
-              Every ordered lower-to-higher comparison must pass before save.
+              {economicsPassed
+                ? "All required plan comparisons satisfy the pricing policy."
+                : "One or more required plan comparisons need attention before you can continue."}
             </p>
           </div>
-          {economicsPreview.length ? (
+
+          {failedEconomics.length ? (
             <ul className="space-y-2">
-              {economicsPreview.map((result) => (
+              {failedEconomics.map(({ result, presentation }) => (
                 <li
                   key={`${result.lowerPlanId}-${result.higherPlanId}`}
-                  className="rounded border border-amber-200 bg-white p-2"
+                  className="rounded border border-amber-200 bg-white p-3"
                 >
-                  <div className="font-semibold">
-                    {result.lowerPlanId} to {result.higherPlanId}:{" "}
-                    {result.status}
-                  </div>
                   {result.code === "UNBOUNDED_ZERO_COST_USAGE_EVENT" ? (
-                    <div>
+                    <div className="space-y-1">
                       <h4 className="font-semibold">
                         Usage-event pricing needs attention
                       </h4>
@@ -1061,46 +829,89 @@ export function MerchantPricingPlanBuilder({
                       </p>
                     </div>
                   ) : (
-                    <div>{result.message}</div>
+                    <div className="space-y-1">
+                      <h4 className="font-semibold">{presentation.title}</h4>
+
+                      <p>{presentation.description}</p>
+
+                      {presentation.guidance ? (
+                        <p>
+                          <span className="font-semibold">What to change:</span>{" "}
+                          {presentation.guidance}
+                        </p>
+                      ) : null}
+                    </div>
                   )}
-                  <details className="text-xs">
-                    <summary>Show technical details</summary>
-                    <div>
+
+                  <details className="mt-2 text-xs">
+                    <summary>Technical details</summary>
+
+                    <div className="mt-1">
                       {result.lowerPlanId} to {result.higherPlanId}; additional
                       credits: {result.additionalCreditsNeeded}; code:{" "}
                       {result.code}; status: {result.status}
                     </div>
+
+                    <div>
+                      Quantities:{" "}
+                      {result.summary.length
+                        ? result.summary
+                            .map(
+                              (row) =>
+                                `${row.eventHandle} x${row.quantity} (${row.creditsGranted} credits, ${row.costMinor} minor)`,
+                            )
+                            .join(", ")
+                        : "none"}
+                    </div>
+
+                    <div>
+                      Stay + top-up:{" "}
+                      {formatMinorUnits(result.stayAndTopUpCostMinor, currency)}
+                      ; higher recurring:{" "}
+                      {formatMinorUnits(result.upgradeCostMinor, currency)};
+                      premium:{" "}
+                      {Number.isFinite(result.premiumBps)
+                        ? `${result.premiumBps} bps`
+                        : "infinity/not applicable"}
+                    </div>
                   </details>
-                  <div className="text-xs">
-                    Quantities:{" "}
-                    {result.summary.length
-                      ? result.summary
-                          .map(
-                            (row) =>
-                              `${row.eventHandle} x${row.quantity} (${row.creditsGranted} credits, ${row.costMinor} minor)`,
-                          )
-                          .join(", ")
-                      : "none"}
-                  </div>
-                  <div className="text-xs">
-                    Stay + top-up:{" "}
-                    {formatMinorUnits(result.stayAndTopUpCostMinor, currency)};
-                    higher recurring:{" "}
-                    {formatMinorUnits(result.upgradeCostMinor, currency)};
-                    premium:{" "}
-                    {Number.isFinite(result.premiumBps)
-                      ? `${result.premiumBps} bps`
-                      : "infinity/not applicable"}
-                  </div>
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : null}
+
+          {passedEconomics.length ? (
+            <details className="rounded border border-gray-200 bg-white p-3 text-gray-700">
+              <summary className="cursor-pointer font-medium">
+                {passedEconomics.length}{" "}
+                {passedEconomics.length === 1 ? "comparison" : "comparisons"}{" "}
+                passed
+              </summary>
+
+              <ul className="mt-2 space-y-1 text-xs">
+                {passedEconomics.map(({ result }) => {
+                  const lowerPlan =
+                    economicsState.plansById[result.lowerPlanId];
+                  const higherPlan =
+                    economicsState.plansById[result.higherPlanId];
+
+                  return (
+                    <li key={`${result.lowerPlanId}-${result.higherPlanId}`}>
+                      {lowerPlan?.name ?? result.lowerPlanId} →{" "}
+                      {higherPlan?.name ?? result.higherPlanId}
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+          ) : null}
+
+          {!economicsPreview.length ? (
             <p>No active plan pair requires comparison yet.</p>
-          )}
+          ) : null}
         </section>
       ) : null}
-      {step === 6 ? (
+      <div className={step === 6 ? "" : "hidden"}>
         <MerchantPricingTranslationWorkbook
           planHandle={handle}
           canonicalTemplate={
@@ -1119,7 +930,7 @@ export function MerchantPricingPlanBuilder({
             setTranslationResult(result);
           }}
         />
-      ) : null}
+      </div>
       {step === 6 ? (
         <section className="space-y-2 rounded-md border border-gray-200 p-4 text-sm">
           <h3 className="font-semibold">Final review</h3>
@@ -1134,7 +945,7 @@ export function MerchantPricingPlanBuilder({
           <p>Usage events: {events.length}</p>
           <ul className="list-disc pl-5">
             {events.map((event) => (
-              <li key={event.eventHandle}>
+              <li key={event.clientKey}>
                 {event.adminLabel}: {event.creditsGrantedPerUnit} credits per
                 event
                 {event.pricingMode === "FIXED"
@@ -1175,13 +986,10 @@ export function MerchantPricingPlanBuilder({
         </label>
       ) : null}
       {step === 6 ? (
-        <button
-          type="submit"
+        <MerchantPricingPlanSubmitButton
           disabled={!canSubmit}
-          className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {plan ? "Save MerchantPricing plan" : "Create MerchantPricing plan"}
-        </button>
+          isUpdate={Boolean(plan)}
+        />
       ) : null}
       <div className="flex justify-between gap-3">
         <button

@@ -1,5 +1,5 @@
 import { AdminShell } from "@/components/admin/admin-shell";
-import { MerchantPricingPlanCatalog } from "@/components/admin/merchant-pricing-plan-catalog";
+import { MerchantPricingPlanCatalog } from "@/components/admin/merchant/merchant-pricing-plan-catalog";
 import { BillingTabs, type BillingView } from "@/components/admin/billing-tabs";
 import {
   BillingEventDrawer,
@@ -14,7 +14,7 @@ import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import {
   getMerchantPricingPlanById,
   getMerchantPricingPlans,
-} from "@/lib/admin/merchant-pricing-plan";
+} from "@/lib/admin/merchant/pricing-plan";
 import {
   getBillingLedger,
   getBillingLedgerItem,
@@ -66,6 +66,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const view = allowedViews.includes(rawView ?? "overview")
     ? (rawView ?? "overview")
     : "overview";
+  const pricingError = firstParam(rawParams.pricingError);
   const rawState = firstParam(rawParams.state);
   const state = Object.values(ShopifyReportState).includes(
     rawState as ShopifyReportState,
@@ -139,6 +140,15 @@ export default async function BillingPage({ searchParams }: PageProps) {
           </p>
         </div>
         <BillingTabs current={view} params={params} />
+        {view === "plans" && pricingError ? (
+          <div
+            role="alert"
+            className="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          >
+            <p className="font-semibold">Plan could not be activated</p>
+            <p className="mt-1">{pricingError}</p>
+          </div>
+        ) : null}
         {view === "overview" && overview ? (
           <BillingOverviewCards overview={overview} />
         ) : null}

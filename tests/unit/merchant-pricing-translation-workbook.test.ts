@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   buildMerchantPricingTranslationTemplate,
   type MerchantPricingTranslationPackage,
-} from "../../src/lib/admin/merchant-pricing-translations.ts";
+} from "../../src/lib/admin/merchant/pricing-translations.ts";
 import {
   buildMerchantPricingTranslationWorkbook,
   MERCHANT_PRICING_TRANSLATION_WORKBOOK_MIME,

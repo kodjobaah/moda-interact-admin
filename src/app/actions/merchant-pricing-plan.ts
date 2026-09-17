@@ -7,6 +7,7 @@ import {
   MerchantPricingUsagePricingMode,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import {
   DEVELOPMENT_PLATFORM_ADMIN,
@@ -19,18 +20,19 @@ import {
   type MerchantPricingBuilderEvent,
   type MerchantPricingBuilderPayload,
   projectMerchantPricingCatalogueOrder,
-} from "@/lib/admin/merchant-pricing-builder-payload";
+} from "@/lib/admin/merchant/pricing-builder-payload";
 import {
   assertMerchantPricingPortfolioPass,
   evaluateMerchantPricingPortfolio,
+  MerchantPricingPairResult,
   type MerchantPricingEconomicsPlan,
-} from "@/lib/admin/merchant-pricing-economics";
+} from "@/lib/admin/merchant/pricing-economics";
 import {
   merchantPricingDescription,
   toMerchantPricingEconomicsPlan,
   type MerchantPricingPlanWithChildren,
-} from "@/lib/admin/merchant-pricing-plan";
-import { parseCompletedMerchantPricingTranslationPackage } from "@/lib/admin/merchant-pricing-translations";
+} from "@/lib/admin/merchant/pricing-plan";
+import { parseCompletedMerchantPricingTranslationPackage } from "@/lib/admin/merchant/pricing-translations";
 
 const merchantPricingInclude = {
   translations: true,
@@ -196,7 +198,7 @@ function projectedPortfolio(
   proposedPosition: number,
   minimumUpgradePremiumBps: number,
   isCreate: boolean,
-): void {
+): MerchantPricingPairResult[] {
   const projectedIds = projectMerchantPricingCatalogueOrder(
     rows.map((row) => row.id),
     proposed.id,
@@ -214,12 +216,12 @@ function projectedPortfolio(
   const plansById = Object.fromEntries(
     ordered.map(({ plan }) => [plan.id, plan]),
   );
-  const results = evaluateMerchantPricingPortfolio({
+
+  return evaluateMerchantPricingPortfolio({
     orderedPlanIds: ordered.map(({ plan }) => plan.id),
     plansById,
     minimumUpgradePremiumBps,
   });
-  assertMerchantPricingPortfolioPass(results);
 }
 
 function placementIndex(
@@ -270,6 +272,71 @@ export async function mutateMerchantPricingPlanAction(
   const intent = formData.get("intent");
   const adminId = await auditAdminId(principal);
 
+  if (intent === "delete") {
+    const id = formData.get("id");
+
+    if (typeof id !== "string" || !id) {
+      actionError("A MerchantPricing plan id is required.");
+    }
+
+    await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.merchantPricingPlan.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          displayName: true,
+          planKind: true,
+          isActive: true,
+          cataloguePosition: true,
+        },
+      });
+
+      if (!existing) {
+        actionError("MerchantPricing plan not found.");
+      }
+
+      if (existing.planKind === MerchantPricingPlanKind.FREE) {
+        actionError(
+          "The FREE plan cannot be deleted. Edit or deactivate it instead.",
+        );
+      }
+
+      if (existing.isActive) {
+        actionError("Deactivate this pricing plan before deleting it.");
+      }
+
+      await transaction.merchantPricingPlan.delete({
+        where: { id: existing.id },
+      });
+
+      await transaction.merchantPricingPlan.updateMany({
+        where: {
+          cataloguePosition: {
+            gt: existing.cataloguePosition,
+          },
+        },
+        data: {
+          cataloguePosition: {
+            decrement: 1,
+          },
+        },
+      });
+
+      await transaction.billingAuditEvent.create({
+        data: {
+          action: "PLAN_CATALOG_CHANGED",
+          platformAdminId: adminId,
+          reason: `Deleted MerchantPricing plan "${existing.displayName}" from catalogue`,
+          relatedEntityType: "MerchantPricingPlan",
+          relatedEntityId: existing.id,
+        },
+      });
+    });
+
+    revalidatePath("/billing");
+    redirect("/billing?view=plans");
+  }
+
   if (intent === "toggle") {
     const id = formData.get("id");
     const reason = formData.get("reason");
@@ -281,7 +348,7 @@ export async function mutateMerchantPricingPlanAction(
       reason.trim().length > 2000
     )
       actionError("A reason is required and must be at most 2000 characters.");
-    await prisma.$transaction(async (transaction) => {
+    const toggleResult = await prisma.$transaction(async (transaction) => {
       const existing = await transaction.merchantPricingPlan.findUnique({
         where: { id },
         include: merchantPricingInclude,
@@ -296,7 +363,7 @@ export async function mutateMerchantPricingPlanAction(
           where: { id: "default" },
           select: { minimumUpgradePremiumBps: true },
         });
-        projectedPortfolio(
+        const results = projectedPortfolio(
           rows,
           toMerchantPricingEconomicsPlan(
             existing as MerchantPricingPlanWithChildren,
@@ -305,6 +372,14 @@ export async function mutateMerchantPricingPlanAction(
           policy?.minimumUpgradePremiumBps ?? 2000,
           false,
         );
+
+        const failure = results.find((result) => result.status !== "PASS");
+
+        if (failure) {
+          return {
+            validationError: failure.message,
+          };
+        }
       }
       const updated = await transaction.merchantPricingPlan.update({
         where: { id },
@@ -320,8 +395,16 @@ export async function mutateMerchantPricingPlanAction(
         },
       });
     });
+
+    if (toggleResult?.validationError) {
+      redirect(
+        `/billing?view=plans&pricingError=${encodeURIComponent(
+          toggleResult.validationError,
+        )}`,
+      );
+    }
     revalidatePath("/billing");
-    return;
+    redirect("/billing?view=plans");
   }
 
   const payload = parsePayload(formData);
@@ -343,6 +426,34 @@ export async function mutateMerchantPricingPlanAction(
     if (existing && existing.shopifyPlanHandle !== payload.shopifyPlanHandle)
       actionError("Shopify plan handles are immutable.");
     const isCreate = !existing;
+    const existingFreePlan = rows.find(
+      (row) => row.planKind === MerchantPricingPlanKind.FREE,
+    );
+
+    if (
+      payload.planKind === "FREE" &&
+      existingFreePlan &&
+      existingFreePlan.id !== existing?.id
+    ) {
+      actionError("Only one FREE plan is allowed in the pricing catalogue.");
+    }
+
+    if (
+      existing?.planKind === MerchantPricingPlanKind.FREE &&
+      payload.planKind !== "FREE"
+    ) {
+      actionError("The FREE plan cannot be changed to a paid plan.");
+    }
+
+    if (
+      existing &&
+      existing.planKind !== MerchantPricingPlanKind.FREE &&
+      payload.planKind === "FREE"
+    ) {
+      actionError(
+        "A paid pricing tier cannot be converted into the FREE plan.",
+      );
+    }
     if (
       isCreate &&
       (payload.catalogueOrderSnapshot === null ||
@@ -357,6 +468,23 @@ export async function mutateMerchantPricingPlanAction(
     const position = isCreate
       ? placementIndex(payload.placement, rows)
       : existing.cataloguePosition;
+
+    if (payload.planKind === "FREE" && position !== 0) {
+      actionError(
+        "The FREE plan must be the first plan in the pricing catalogue.",
+      );
+    }
+
+    if (
+      payload.planKind !== "FREE" &&
+      existingFreePlan &&
+      position <= existingFreePlan.cataloguePosition
+    ) {
+      actionError(
+        "Paid pricing tiers must appear after the FREE plan in the pricing catalogue.",
+      );
+    }
+
     const contentChanged =
       isCreate || translatableContentChanged(existing, payload);
     const translations = contentChanged
@@ -370,15 +498,17 @@ export async function mutateMerchantPricingPlanAction(
       where: { id: "default" },
       select: { minimumUpgradePremiumBps: true },
     });
-    projectedPortfolio(
-      rows,
-      candidateFromPayload(
-        payload,
-        existing?.id ?? `candidate:${payload.shopifyPlanHandle}`,
+    assertMerchantPricingPortfolioPass(
+      projectedPortfolio(
+        rows,
+        candidateFromPayload(
+          payload,
+          existing?.id ?? `candidate:${payload.shopifyPlanHandle}`,
+        ),
+        position,
+        policy?.minimumUpgradePremiumBps ?? 2000,
+        isCreate,
       ),
-      position,
-      policy?.minimumUpgradePremiumBps ?? 2000,
-      isCreate,
     );
 
     if (isCreate) {
@@ -533,4 +663,7 @@ export async function mutateMerchantPricingPlanAction(
     }
   });
   revalidatePath("/billing");
+  if (intent === "create") {
+    redirect("/billing?view=plans");
+  }
 }

@@ -14,7 +14,7 @@ import {
   type MerchantPricingTranslationHighlightSource,
   type MerchantPricingTranslationPackage,
   type MerchantPricingTranslationParseResult,
-} from "./merchant-pricing-translations.ts";
+} from "./merchant/pricing-translations.ts";
 
 export const MERCHANT_PRICING_TRANSLATION_WORKBOOK_SCHEMA_VERSION = 1;
 export const MERCHANT_PRICING_TRANSLATION_WORKBOOK_MAX_BYTES =
@@ -329,22 +329,7 @@ export async function parseMerchantPricingTranslationWorkbook(
       "_meta",
       "B3",
     );
-  if (metadata.get("planHandle") !== expected.planHandle.trim())
-    addIssue(
-      issues,
-      "PLAN_HANDLE_MISMATCH",
-      "Workbook plan handle does not match the current draft.",
-      "_meta",
-      "B4",
-    );
-  if (metadata.get("planName") !== expected.planName.trim())
-    addIssue(
-      issues,
-      "PLAN_NAME_MISMATCH",
-      "Workbook plan name does not match the current draft.",
-      "_meta",
-      "B5",
-    );
+
   if (metadata.get("sourceLocale") !== "en")
     addIssue(
       issues,
