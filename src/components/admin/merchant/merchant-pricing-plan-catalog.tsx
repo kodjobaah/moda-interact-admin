@@ -14,10 +14,10 @@ export function MerchantPricingPlanCatalog({
       <section className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <div>
           <h2 className="text-lg font-semibold text-gray-950">
-            MerchantPricing catalogue
+            Merchant Pricing catalogue
           </h2>
           <p className="mt-1 text-sm text-gray-600">
-            ARCH-014 informational merchant pricing plans.
+           Create and manage your merchant pricing plans.
           </p>
         </div>
         <Link

@@ -8,6 +8,10 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
+import {
+  DEVELOPMENT_PLATFORM_ADMIN,
+  ensureDevelopmentPlatformAdmin,
+} from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
 import { mutatePromotionCampaignLifecycle } from "@/lib/admin/promotion-campaign-lifecycle";
 import {
@@ -23,15 +27,19 @@ async function auditAdminId(
   principal: Awaited<ReturnType<typeof requirePlatformAdminMutation>>,
 ): Promise<string> {
   if (!principal.developmentBypass) return principal.id;
-  const admin = await prisma.platformAdmin.findFirst({
-    where: { active: true, role: "SUPER_ADMIN" },
-    select: { id: true },
+
+  return prisma.$transaction(async (transaction) => {
+    await ensureDevelopmentPlatformAdmin(transaction, principal);
+    const developmentAdmin = await transaction.platformAdmin.findUnique({
+      where: { id: DEVELOPMENT_PLATFORM_ADMIN.id },
+      select: { id: true },
+    });
+    if (!developmentAdmin)
+      throw new Error(
+        "A provisioned SUPER_ADMIN is required for campaign mutations.",
+      );
+    return developmentAdmin.id;
   });
-  if (!admin)
-    throw new Error(
-      "A provisioned SUPER_ADMIN is required for campaign mutations.",
-    );
-  return admin.id;
 }
 
 function requireSuperAdmin(
