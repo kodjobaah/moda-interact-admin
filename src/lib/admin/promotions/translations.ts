@@ -1,4 +1,6 @@
-import { TRANSLATION_WORKBOOK_LOCALES } from "./translation-workbook-common.ts";
+import { TRANSLATION_WORKBOOK_LOCALES } from "../translation-workbook-common.ts";
+
+export const NEW_PROMOTION_TRANSLATION_CAMPAIGN_ID = "NEW_PROMOTION_CAMPAIGN";
 
 export type PromotionTranslationIssue = {
   code: string;

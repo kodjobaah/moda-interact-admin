@@ -18,7 +18,7 @@ const policyAction = readFileSync(
   "utf8",
 );
 const controlsPage = readFileSync(
-  resolve(root, "src/app/(protected)/billing/controls/page.tsx"),
+  resolve(root, "src/app/(protected)/system-controls/background-runtime/page.tsx"),
   "utf8",
 );
 const billingPage = readFileSync(
@@ -38,7 +38,7 @@ const searchInput = readFileSync(
   "utf8",
 );
 const merchantPricingEconomics = readFileSync(
-  resolve(root, "src/lib/admin/merchant-pricing-economics.ts"),
+  resolve(root, "src/lib/admin/merchant/pricing-economics.ts"),
   "utf8",
 );
 const guardrail = readFileSync(
@@ -137,7 +137,8 @@ test("AdminShell only renders supplied headers and tenant search stays on the di
 test("non-directory pages do not wire tenant SearchInput", () => {
   for (const path of [
     "src/app/(protected)/billing/page.tsx",
-    "src/app/(protected)/billing/controls/page.tsx",
+    "src/app/(protected)/system-controls/platform-policy/page.tsx",
+    "src/app/(protected)/system-controls/background-runtime/page.tsx",
     "src/app/(protected)/promotions/page.tsx",
     "src/app/(protected)/promotions/[campaignId]/page.tsx",
     "src/app/(protected)/merchant-support/page.tsx",

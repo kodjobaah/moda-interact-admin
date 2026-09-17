@@ -39,6 +39,31 @@ test("sidebar exposes the approved nested Observability navigation", async () =>
   assert.doesNotMatch(queuePageSource, /href="\/observability"/);
 });
 
+
+test("sidebar exposes nested System Controls navigation", async () => {
+  const sidebarSource = await readSource("src/components/admin/sidebar.tsx");
+  const shellSource = await readSource("src/components/admin/admin-shell.tsx");
+  const policyPageSource = await readSource(
+    "src/app/(protected)/system-controls/platform-policy/page.tsx",
+  );
+  const runtimePageSource = await readSource(
+    "src/app/(protected)/system-controls/background-runtime/page.tsx",
+  );
+
+  assert.match(sidebarSource, /href="\/system-controls\/platform-policy"/);
+  assert.match(sidebarSource, /nav\.systemControls/);
+  assert.match(sidebarSource, /nav\.platformPolicy/);
+  assert.match(sidebarSource, /nav\.backgroundRuntime/);
+  assert.match(
+    sidebarSource,
+    /active === "platform-policy" \|\| active === "background-runtime"/,
+  );
+  assert.match(shellSource, /\| "platform-policy"/);
+  assert.match(shellSource, /\| "background-runtime"/);
+  assert.match(policyPageSource, /<AdminShell active="platform-policy">/);
+  assert.match(runtimePageSource, /<AdminShell active="background-runtime">/);
+});
+
 test("sidebar uses a stable desktop rail and bottom administrator treatment", async () => {
   const sidebarSource = await readSource("src/components/admin/sidebar.tsx");
   const shellSource = await readSource("src/components/admin/admin-shell.tsx");

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { adminI18n } from "@/i18n";
 import { buildUrl } from "@/lib/admin/query";
 
-type BillingView = "overview" | "plans" | "packs" | "refunds" | "events" | "controls";
+type BillingView = "overview" | "plans" | "packs" | "refunds" | "events";
 
 const tabs: Array<{ value: BillingView; label: string }> = [
   { value: "overview", label: "billing.tab.overview" },
@@ -10,7 +10,6 @@ const tabs: Array<{ value: BillingView; label: string }> = [
   { value: "packs", label: "billing.tab.recoveryPacks" },
   { value: "refunds", label: "billing.tab.refundRequests" },
   { value: "events", label: "billing.tab.appEvents" },
-  { value: "controls", label: "billing.tab.controls" },
 ];
 
 const relevantParams: Record<BillingView, string[]> = {
@@ -19,7 +18,6 @@ const relevantParams: Record<BillingView, string[]> = {
   packs: ["packPage", "packStatus", "purchaseId"],
   refunds: ["refundPage", "refundStatus", "refundId"],
   events: ["eventPage", "state", "shopId", "from", "to", "eventId"],
-  controls: [],
 };
 
 export function BillingTabs({

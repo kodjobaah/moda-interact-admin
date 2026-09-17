@@ -108,7 +108,7 @@ export async function mutateBackgroundRuntimeControlsAction(
     });
   });
 
-  revalidatePath("/billing/controls");
+  revalidatePath("/system-controls/background-runtime");
 }
 
 function fieldBelongsToSection(key: string, section: RuntimeSection): boolean {

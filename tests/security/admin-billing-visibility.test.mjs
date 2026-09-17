@@ -306,16 +306,27 @@ test("tenant billing reports period message usage and ignores expired override c
   assert.match(tenant, /billing\.overrideExpired/);
 });
 
-test("Admin-002 controls remain wired alongside the overview and ledger", async () => {
-  const page = await readFile(
-    path.join(repositoryRoot, "src/app/(protected)/billing/page.tsx"),
-    "utf8",
-  );
+test("platform policy is presented under System Controls instead of Billing Plans", async () => {
+  const [billingPage, policyPage] = await Promise.all([
+    readFile(
+      path.join(repositoryRoot, "src/app/(protected)/billing/page.tsx"),
+      "utf8",
+    ),
+    readFile(
+      path.join(
+        repositoryRoot,
+        "src/app/(protected)/system-controls/platform-policy/page.tsx",
+      ),
+      "utf8",
+    ),
+  ]);
 
-  assert.match(page, /MerchantPricingPlanCatalog/);
-  assert.match(page, /PlatformBillingControls/);
-  assert.match(page, /getPlatformBillingPolicy/);
-  assert.doesNotMatch(page, /<<<<<<<|=======|>>>>>>>/);
+  assert.match(billingPage, /MerchantPricingPlanCatalog/);
+  assert.doesNotMatch(billingPage, /PlatformPolicyControls/);
+  assert.match(billingPage, /getPlatformBillingPolicy/);
+  assert.match(policyPage, /PlatformPolicyControls/);
+  assert.match(policyPage, /getPlatformBillingPolicy/);
+  assert.doesNotMatch(`${billingPage}\n${policyPage}`, /<<<<<<<|=======|>>>>>>>/);
 });
 
 test("first-production tenant billing exposes no allowance-adjustment compatibility key", async () => {

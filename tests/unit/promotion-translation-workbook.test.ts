@@ -3,12 +3,12 @@ import test from "node:test";
 import {
   buildPromotionTranslationTemplate,
   parseCompletedPromotionTranslationPackage,
-} from "../../src/lib/admin/promotion-translations.ts";
+} from "../../src/lib/admin/promotions/translations.ts";
 import {
   buildPromotionTranslationWorkbook,
   parsePromotionTranslationWorkbook,
   PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES,
-} from "../../src/lib/admin/promotion-translation-workbook.ts";
+} from "../../src/lib/admin/promotions/translation-workbook.ts";
 import { TRANSLATION_WORKBOOK_LOCALES } from "../../src/lib/admin/translation-workbook-common.ts";
 
 const expected = {

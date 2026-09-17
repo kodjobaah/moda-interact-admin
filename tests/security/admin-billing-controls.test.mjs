@@ -138,11 +138,12 @@ test("keeps policy changes protected, audited, and internal-only", () => {
     "This value is snapshotted only when a merchant receives its first verified subscription activation. Changing it does not reset or increase existing merchants' lifetime grants.",
   );
   const pageSource = readFileSync(
-    resolve(root, "src/app/(protected)/billing/controls/page.tsx"),
+    resolve(root, "src/app/(protected)/system-controls/platform-policy/page.tsx"),
     "utf8",
   );
   assert.match(pageSource, /requirePlatformAdminPage/);
-  assert.match(pageSource, /BackgroundRuntimeControls/);
+  assert.match(pageSource, /PlatformPolicyControls/);
+  assert.match(pageSource, /<AdminShell active="platform-policy">/);
 });
 
 test("server validation enforces the platform ceiling and soft-below-hard rule", () => {

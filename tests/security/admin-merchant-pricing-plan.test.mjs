@@ -43,7 +43,7 @@ test("ARCH-014 implementation modules do not use operational plan or economics s
     "src/lib/admin/merchant-pricing-translations.ts",
     "src/components/admin/merchant-pricing-plan-catalog.tsx",
     "src/components/admin/merchant-pricing-plan-builder.tsx",
-    "src/components/admin/merchant-pricing-translation-workbook.tsx",
+    "src/components/admin/merchant/merchant-pricing-translation-workbook.tsx",
   ];
   const contents = await Promise.all(paths.map(source));
   const combined = contents.join("\n");
@@ -108,18 +108,22 @@ test("usage-event builder exposes currency-aware labels and blocks unbounded fre
 
 test("translation workbook keeps schema-v2 guidance and upload failures non-destructive", async () => {
   const workbook = await source(
-    "src/components/admin/merchant-pricing-translation-workbook.tsx",
+    "src/components/admin/merchant/merchant-pricing-translation-workbook.tsx",
+  );
+  const dropzone = await source(
+    "src/components/admin/translation-workbook-dropzone.tsx",
   );
   assert.match(workbook, /Download pre-populated translation spreadsheet/);
   assert.match(workbook, /processSelectedTranslationWorkbook/);
-  assert.match(workbook, /Drop your completed \.xlsx spreadsheet here/);
-  assert.match(workbook, /Choose spreadsheet/);
-  assert.match(workbook, /type="file"/);
+  assert.match(workbook, /TranslationWorkbookDropzone/);
+  assert.match(dropzone, /Drop your completed \.xlsx spreadsheet here/);
+  assert.match(dropzone, /Choose spreadsheet/);
+  assert.match(dropzone, /type="file"/);
   assert.match(
-    workbook,
-    /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/,
+    dropzone,
+    /\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/,
   );
-  assert.match(workbook, /Upload one spreadsheet at a time\./);
+  assert.match(dropzone, /Upload one spreadsheet at a time\./);
   assert.match(workbook, /The translation spreadsheet is larger than 2 MiB\./);
   assert.match(workbook, /Choose an Excel workbook ending in \.xlsx\./);
   assert.match(workbook, /The translation spreadsheet could not be read\./);
@@ -152,4 +156,27 @@ test("final review uses the exact human-readable fixed usage-event summary", asy
     builder,
     /event · \{event\.pricingMode === "FIXED" \? "fixed price"/,
   );
+});
+
+test("MerchantPricing catalogue pagination is database-backed and drawer context stays lean", async () => {
+  const pricing = await source("src/lib/admin/merchant/pricing-plan.ts");
+  const page = await source("src/app/(protected)/billing/page.tsx");
+  const catalogue = await source(
+    "src/components/admin/merchant/merchant-pricing-plan-catalog.tsx",
+  );
+
+  assert.match(pricing, /MERCHANT_PRICING_CATALOGUE_PAGE_SIZES = \[5, 10, 20, 50\]/);
+  assert.match(pricing, /merchantPricingPlan\.count\(\)/);
+  assert.match(pricing, /skip: \(page - 1\) \* pageSize/);
+  assert.match(pricing, /take: pageSize/);
+  assert.match(pricing, /export async function getMerchantPricingCatalogueContext/);
+  assert.match(pricing, /where: \{ isActive: true \}/);
+  assert.match(pricing, /translations: \[\]/);
+  assert.match(pricing, /highlights: \[\]/);
+  assert.match(page, /page: positiveInt\(rawParams\.planPage\)/);
+  assert.match(page, /pageSize: positiveInt\(rawParams\.planPageSize, 5\)/);
+  assert.match(page, /const cataloguePlans = planDrawerOpen/);
+  assert.match(catalogue, /plans\.items\.map/);
+  assert.match(catalogue, /name="planPageSize"/);
+  assert.match(catalogue, /pageParam="planPage"/);
 });

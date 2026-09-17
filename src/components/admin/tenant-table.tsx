@@ -35,7 +35,7 @@ export function TenantTable({
 }: {
   tenants: PageResult<TenantListItem>;
   selectedTenant: TenantDetail | null;
-  tab: "admin" | "logs" | "billing";
+  tab: "admin" | "recovery" | "logs" | "billing";
   customers: PageResult<CustomerListItem> | null;
   customerSearch: string;
   selectedCustomer: CustomerListItem | null;

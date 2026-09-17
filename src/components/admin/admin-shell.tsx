@@ -14,7 +14,9 @@ export async function AdminShell({
     | "queues"
     | "merchant-support"
     | "billing"
-    | "promotions";
+    | "promotions"
+    | "platform-policy"
+    | "background-runtime";
   header?: ReactNode;
   children: ReactNode;
 }) {

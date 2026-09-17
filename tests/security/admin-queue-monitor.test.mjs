@@ -276,10 +276,9 @@ test('queue overview waits for cold readers before requesting active counts', as
   }
 });
 
-test('queue overview preserves bounded fail-fast settings and unavailable containment styles', async () => {
+test('queue overview preserves bounded fail-fast settings for observability consumers', async () => {
   const queueSource = await readFile(sourcePath('src/lib/admin/queue-monitor.ts'), 'utf8');
   const cardSource = await readFile(sourcePath('src/components/admin/kpi-card.tsx'), 'utf8');
-  const pageSource = await readFile(sourcePath('src/app/(protected)/page.tsx'), 'utf8');
 
   assert.match(queueSource, /enableOfflineQueue: false/);
   assert.match(queueSource, /maxRetriesPerRequest: 1/);
@@ -288,14 +287,14 @@ test('queue overview preserves bounded fail-fast settings and unavailable contai
   assert.doesNotMatch(queueSource, /cachedOverviewRedis|overview.*RedisReader/);
   assert.match(cardSource, /min-w-0/);
   assert.match(cardSource, /break-words/);
-  assert.match(pageSource, /status=\{queue\.active === null\}/);
 });
 
-test('Tenant Directory keeps queue unavailability isolated from tenant data', async () => {
+test('Tenant Directory is independent from transient queue state', async () => {
   const pageSource = await readFile(sourcePath('src/app/(protected)/page.tsx'), 'utf8');
-  assert.match(pageSource, /readQueueOverviewSnapshot/);
-  assert.match(pageSource, /Unavailable/);
   assert.match(pageSource, /getTenantDirectory/);
+  assert.doesNotMatch(pageSource, /readQueueOverviewSnapshot/);
+  assert.doesNotMatch(pageSource, /QueueMonitorUnavailableError/);
+  assert.doesNotMatch(pageSource, /adminQueueLabel/);
 });
 
 test('detailed queue monitor presents a compact five-queue table with read-only selection', async () => {

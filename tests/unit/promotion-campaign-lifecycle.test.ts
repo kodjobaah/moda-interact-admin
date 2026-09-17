@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mutatePromotionCampaignLifecycle } from "../../src/lib/admin/promotion-campaign-lifecycle.ts";
+import { mutatePromotionCampaignLifecycle } from "../../src/lib/admin/promotions/lifecycle.ts";
 
 type TestTransaction = {
   calls: Array<
@@ -125,6 +125,49 @@ test("reopening CLOSED appends REOPENED before EXPIRY_CHANGED", async () => {
   ]);
   assert.deepEqual(transaction.calls.map((call) => call.kind), ["findUnique", "updateMany", "eventCreate", "eventCreate"]);
   assert.deepEqual(Object.keys(transaction.updates[0]!.data).sort(), ["expiresAt", "status", "version"]);
+});
+
+
+test("reopening a CLOSED campaign with a future expiry preserves that expiry", async () => {
+  const futureExpiry = new Date("2026-09-20T00:00:00.000Z");
+  const transaction = transactionFor({
+    ...base,
+    status: "CLOSED" as const,
+    expiresAt: futureExpiry,
+  });
+
+  await mutatePromotionCampaignLifecycle(
+    transaction as never,
+    { id: base.id, intent: "reopen", adminId: "admin-1" },
+    now,
+  );
+
+  assert.deepEqual(transaction.updates[0], {
+    where: { id: base.id, status: "CLOSED", version: 3 },
+    data: { status: "ACTIVE", version: { increment: 1 } },
+  });
+  assert.deepEqual(transaction.events, [
+    { campaignId: base.id, kind: "REOPENED", platformAdminId: "admin-1" },
+  ]);
+  assert.deepEqual(transaction.calls.map((call) => call.kind), [
+    "findUnique",
+    "updateMany",
+    "eventCreate",
+  ]);
+});
+
+test("reopening an expired CLOSED campaign still requires a future expiry", async () => {
+  const transaction = transactionFor({ ...base, status: "CLOSED" as const });
+  await assert.rejects(
+    mutatePromotionCampaignLifecycle(
+      transaction as never,
+      { id: base.id, intent: "reopen", adminId: "admin-1" },
+      now,
+    ),
+    /has expired; choose a new future expiry/,
+  );
+  assert.equal(transaction.updates.length, 0);
+  assert.equal(transaction.events.length, 0);
 });
 
 test("stale compare-and-set writes no lifecycle audit event", async () => {

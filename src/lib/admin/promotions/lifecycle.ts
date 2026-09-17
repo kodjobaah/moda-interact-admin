@@ -3,7 +3,7 @@ import {
   PromotionCampaignStatus,
   type Prisma,
 } from "@prisma/client";
-import { validatePromotionCampaignReopen } from "./promotion-validation.ts";
+import { validatePromotionCampaignReopen } from "./validation.ts";
 
 type PromotionTransaction = Prisma.TransactionClient;
 
@@ -34,13 +34,23 @@ export async function mutatePromotionCampaignLifecycle(
       (existing.status !== PromotionCampaignStatus.ACTIVE || existing.expiresAt > now)) {
     throw new Error("Only expired active or closed campaigns can be reopened.");
   }
-  if (!input.expiresAt) throw new Error("A new expiry time is required.");
-  validatePromotionCampaignReopen(existing.startsAt, input.expiresAt, now);
 
+  const requiresNewExpiry = existing.expiresAt <= now;
+  if (requiresNewExpiry && !input.expiresAt) {
+    throw new Error("This campaign has expired; choose a new future expiry.");
+  }
+  if (input.expiresAt) {
+    validatePromotionCampaignReopen(existing.startsAt, input.expiresAt, now);
+  }
+
+  const requestedExpiry = input.expiresAt;
+  const expiryChanged =
+    Boolean(requestedExpiry) &&
+    requestedExpiry!.getTime() !== existing.expiresAt.getTime();
   const result = await transaction.promotionCampaign.updateMany({
     where: { id: existing.id, status: existing.status, version: existing.version },
     data: {
-      expiresAt: input.expiresAt,
+      ...(expiryChanged ? { expiresAt: requestedExpiry } : {}),
       ...(existing.status === PromotionCampaignStatus.CLOSED ? { status: PromotionCampaignStatus.ACTIVE } : {}),
       version: { increment: 1 },
     },
@@ -51,13 +61,15 @@ export async function mutatePromotionCampaignLifecycle(
       data: { campaignId: existing.id, kind: PromotionCampaignEventType.REOPENED, platformAdminId: input.adminId },
     });
   }
-  await transaction.promotionCampaignEvent.create({
-    data: {
-      campaignId: existing.id,
-      kind: PromotionCampaignEventType.EXPIRY_CHANGED,
-      oldExpiresAt: existing.expiresAt,
-      newExpiresAt: input.expiresAt,
-      platformAdminId: input.adminId,
-    },
-  });
+  if (expiryChanged) {
+    await transaction.promotionCampaignEvent.create({
+      data: {
+        campaignId: existing.id,
+        kind: PromotionCampaignEventType.EXPIRY_CHANGED,
+        oldExpiresAt: existing.expiresAt,
+        newExpiresAt: requestedExpiry!,
+        platformAdminId: input.adminId,
+      },
+    });
+  }
 }

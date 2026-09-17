@@ -13,7 +13,9 @@
     "test": "node --test tests/observability/*.test.mjs tests/security/*.test.mjs",
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
-    "admin:provision": "node scripts/provision-platform-admin.mjs"
+    "admin:provision": "node scripts/provision-platform-admin.mjs",
+    "admin:seed-promotions": "node scripts/seed-promotion-test-data.mjs",
+    "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear"
   },
   "dependencies": {
     "@modainteract/moda-interact-shared": "0.12.1",

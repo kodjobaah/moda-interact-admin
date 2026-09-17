@@ -8,10 +8,6 @@ import {
 } from "@/components/admin/recovery-drawer";
 import { TenantTable } from "@/components/admin/tenant-table";
 import {
-  QueueMonitorUnavailableError,
-  readQueueOverviewSnapshot,
-} from "@/lib/admin/queue-monitor";
-import {
   getCustomerRecoveries,
   getRecoveryDetail,
   getTenantCustomers,
@@ -32,7 +28,7 @@ import type {
   RecoveryCreditPurchaseItem,
   RecoveryListItem,
 } from "@/lib/admin/types";
-import { adminI18n, adminQueueLabel } from "@/i18n";
+import { adminI18n } from "@/i18n";
 import {
   cleanSearch,
   firstParam,
@@ -65,7 +61,10 @@ export default async function Home({ searchParams }: PageProps) {
   const tenantPage = positiveInt(rawParams.page);
   const tenantId = firstParam(rawParams.tenant) ?? null;
   const rawTab = firstParam(rawParams.tab);
-  const tab = rawTab === "logs" || rawTab === "billing" ? rawTab : "admin";
+  const tab =
+    rawTab === "recovery" || rawTab === "logs" || rawTab === "billing"
+      ? rawTab
+      : "admin";
   const rawBillingView = firstParam(rawParams.billingView);
   const billingView: BillingView = billingViews.includes(
     rawBillingView as BillingView,
@@ -93,12 +92,6 @@ export default async function Home({ searchParams }: PageProps) {
     search,
   });
 
-  let queueOverview = null;
-  try {
-    queueOverview = await readQueueOverviewSnapshot();
-  } catch (error) {
-    if (!(error instanceof QueueMonitorUnavailableError)) throw error;
-  }
 
   const selectedTenant = tenantId ? await getTenantDetail(tenantId) : null;
   const tenantBilling =
@@ -195,53 +188,46 @@ export default async function Home({ searchParams }: PageProps) {
         </div>
 
         <section
-          className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6"
+          className="mb-8"
           aria-label={adminI18n.t("tenant.platformSummary")}
         >
-          <KpiCard
-            label={adminI18n.t("tenant.activeTenants")}
-            value={adminI18n.formatNumber(directory.kpis.activeTenants)}
-          />
-          <KpiCard
-            label={adminI18n.t("tenant.activeRecoveries")}
-            value={adminI18n.formatNumber(directory.kpis.activeRecoveries)}
-            accent
-          />
-          {(
-            queueOverview?.queues ?? [
-              {
-                queueName: "checkout-events",
-                labelKey: "queue.checkoutEvents",
-                active: null,
-              },
-              {
-                queueName: "order-events",
-                labelKey: "queue.orderEvents",
-                active: null,
-              },
-              {
-                queueName: "pending-recovery-candidates",
-                labelKey: "queue.pendingRecoveries",
-                active: null,
-              },
-              {
-                queueName: "whatsapp-events",
-                labelKey: "queue.whatsappEvents",
-                active: null,
-              },
-            ]
-          ).map((queue) => (
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                {adminI18n.t("tenant.platformSummary")}
+              </h2>
+              <p className="mt-1 text-xs text-gray-500">
+                {adminI18n.t("tenant.platformSummaryHelp")}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <KpiCard
-              key={queue.queueName}
-              label={adminQueueLabel(queue.queueName)}
-              value={
-                queue.active === null
-                  ? adminI18n.t("empty.unavailable")
-                  : adminI18n.formatNumber(queue.active)
-              }
-              status={queue.active === null}
+              label={adminI18n.t("tenant.activeTenants")}
+              value={adminI18n.formatNumber(directory.kpis.activeTenants)}
             />
-          ))}
+            <KpiCard
+              label={adminI18n.t("tenant.activeRecoveries")}
+              value={adminI18n.formatNumber(directory.kpis.activeRecoveries)}
+              accent
+            />
+            <KpiCard
+              label={adminI18n.t("tenant.pendingRecoveries")}
+              value={adminI18n.formatNumber(directory.kpis.pendingRecoveries)}
+            />
+            <KpiCard
+              label={adminI18n.t("tenant.recoveredCheckouts")}
+              value={adminI18n.formatNumber(directory.kpis.recoveredCheckouts)}
+            />
+            <KpiCard
+              label={adminI18n.t("tenant.recoveryConversations")}
+              value={adminI18n.formatNumber(directory.kpis.recoveryConversations)}
+            />
+            <KpiCard
+              label={adminI18n.t("tenant.recoveryMessages")}
+              value={adminI18n.formatNumber(directory.kpis.recoveryMessages)}
+            />
+          </div>
         </section>
 
         <TenantTable

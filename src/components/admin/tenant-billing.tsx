@@ -4,6 +4,7 @@ import type {
   PageResult,
   RecoveryCreditPurchaseItem,
   TenantBilling,
+  TenantDetail,
 } from "@/lib/admin/types";
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
@@ -12,6 +13,7 @@ import {
   BillingEventDrawer,
   RecoveryCreditPurchaseDrawer,
 } from "./billing-drawers";
+import { TenantBillingControls } from "./billing-controls";
 
 type BillingView = "overview" | "usage" | "shopify" | "activity";
 
@@ -491,6 +493,7 @@ function Activity({
 }
 
 export function TenantBillingView({
+  tenant,
   billing,
   params,
   billingView,
@@ -499,6 +502,7 @@ export function TenantBillingView({
   selectedPurchase,
   selectedEvent,
 }: {
+  tenant: TenantDetail;
   billing: TenantBilling;
   params: Record<string, string>;
   billingView: BillingView;
@@ -510,7 +514,17 @@ export function TenantBillingView({
   return (
     <div>
       <BillingTabs view={billingView} params={params} />
-      {billingView === "overview" ? <Overview billing={billing} /> : null}
+      {billingView === "overview" ? (
+        <div className="space-y-6">
+          <Overview billing={billing} />
+          <TenantBillingControls
+            shopId={tenant.id}
+            controls={tenant.billingControls}
+            defaultSoftLimit={tenant.defaultOutboundSoftLimit}
+            defaultHardLimit={tenant.defaultOutboundHardLimit}
+          />
+        </div>
+      ) : null}
       {billingView === "usage" ? <Usage billing={billing} /> : null}
       {billingView === "shopify" ? <Shopify billing={billing} /> : null}
       {billingView === "activity" && packs && events ? (

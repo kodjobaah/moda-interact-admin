@@ -12,8 +12,9 @@ test("global billing exposes URL-backed views with overview fallback", async () 
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-tabs.tsx"),
   ]);
-  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*"controls",\s*\]/);
-  assert.match(page, /rawView.*rawParams\.view/);
+  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*\]/);
+  assert.match(page, /rawRequestedView = firstParam\(rawParams\.view\)/);
+  assert.match(page, /rawRequestedView === "controls"/);
   assert.match(page, /: "overview"/);
   assert.match(tabs, /<Link/);
   assert.match(tabs, /aria-current/);
@@ -23,10 +24,13 @@ test("billing route loads only the selected view and selected detail", async () 
   const page = await read("src/app/(protected)/billing/page.tsx");
   assert.doesNotMatch(page, /Promise\.all\(\[\s*getBillingPlans/);
   assert.match(page, /view === "overview" \? await getBillingOverview\(\)/);
-  assert.match(page, /view === "plans" \? await getMerchantPricingPlans\(\)/);
+  assert.match(
+    page,
+    /view === "plans"\s*\n\s*\? await getMerchantPricingPlans\(\{[\s\S]*planPage[\s\S]*planPageSize[\s\S]*\}\)/,
+  );
   assert.match(page, /view === "packs"\s*\n\s*\? await getRecoveryCreditPurchases/);
   assert.match(page, /view === "events"\s*\n\s*\? await getBillingLedger/);
-  assert.match(page, /view === "controls" \? await getPlatformBillingPolicy\(\)/);
+  assert.doesNotMatch(page, /view === "controls" \? await getPlatformBillingPolicy\(\)/);
   assert.match(page, /getMerchantPricingPlanById/);
   assert.match(page, /getRecoveryCreditPurchaseDetail/);
   assert.match(page, /getBillingLedgerItem/);
@@ -56,17 +60,23 @@ test("overview and plans use progressive disclosure", async () => {
   const [page, overview, catalogue, drawers] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-overview.tsx"),
-    read("src/components/admin/merchant-pricing-plan-catalog.tsx"),
+    read("src/components/admin/merchant/merchant-pricing-plan-catalog.tsx"),
     read("src/components/admin/billing-drawers.tsx"),
   ]);
   assert.match(page, /view === "overview" && overview/);
   assert.match(page, /view === "plans" && plans/);
   assert.doesNotMatch(overview, /providerResponseSummary.*<\/td>/s);
   assert.doesNotMatch(overview, /<BillingPlanCatalog/);
-  assert.match(page, /<MerchantPricingPlanCatalog plans=\{plans\} \/>/);
+  assert.match(
+    page,
+    /<MerchantPricingPlanCatalog plans=\{plans\} params=\{params\} \/>/,
+  );
+  assert.match(catalogue, /name="planPageSize"/);
+  assert.match(catalogue, /pageParam="planPage"/);
+  assert.match(catalogue, /MERCHANT_PRICING_CATALOGUE_PAGE_SIZES/);
   assert.match(drawers, /export function MerchantPricingPlanDrawer/);
   assert.match(catalogue, /mutateMerchantPricingPlanAction/);
-  assert.match(catalogue, /drawer=register-plan/);
+  assert.match(catalogue, /drawer: "register-plan"/);
   assert.doesNotMatch(`${page}\n${drawers}`, /BillingPlanCatalog|BillingPlanDrawer/);
 });
 
@@ -113,14 +123,17 @@ test("global billing visible labels use the translation catalogue", async () => 
   assert.doesNotMatch(`${page}\n${tabs}\n${packs}\n${drawers}`, />\s*(Overview|Plans|Recovery packs|App Events|Controls|Details|Status)\s*</);
 });
 
-test("controls remain isolated to the controls view and existing mutation security stays intact", async () => {
-  const [page, controls, security] = await Promise.all([
+test("platform policy is isolated from Billing Plans and existing mutation security stays intact", async () => {
+  const [billingPage, policyPage, controls, security] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
+    read("src/app/(protected)/system-controls/platform-policy/page.tsx"),
     read("src/components/admin/billing-controls.tsx"),
     read("tests/security/admin-merchant-pricing-plan.test.mjs"),
   ]);
-  assert.match(page, /view === "controls" && policy/);
-  assert.match(page, /<PlatformBillingControls policy=\{policy\}/);
+  assert.doesNotMatch(billingPage, /PlatformPolicyControls|view === "controls" && policy/);
+  assert.match(billingPage, /redirect\("\/system-controls\/platform-policy"\)/);
+  assert.match(policyPage, /<PlatformPolicyControls policy=\{policy\}/);
+  assert.match(policyPage, /<AdminShell active="platform-policy">/);
   assert.match(controls, /mutatePlatformBillingPolicyAction/);
   assert.match(security, /mutateMerchantPricingPlanAction|requirePlatformAdmin/);
 });

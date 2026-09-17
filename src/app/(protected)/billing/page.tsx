@@ -12,6 +12,7 @@ import {
 } from "@/components/admin/billing-recovery-packs";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import {
+  getMerchantPricingCatalogueContext,
   getMerchantPricingPlanById,
   getMerchantPricingPlans,
 } from "@/lib/admin/merchant/pricing-plan";
@@ -34,8 +35,8 @@ import {
   type SearchParamRecord,
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
-import { PlatformBillingControls } from "@/components/admin/billing-controls";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
+import { redirect } from "next/navigation";
 import {
   RecoveryCreditRefundDrawer,
   RecoveryCreditRefundQueue,
@@ -54,15 +55,19 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const principal = await requirePlatformAdminPage();
   const rawParams = await searchParams;
   const params = paramsToRecord(rawParams);
+  const rawRequestedView = firstParam(rawParams.view);
+  if (rawRequestedView === "controls") {
+    redirect("/system-controls/platform-policy");
+  }
+
   const allowedViews: BillingView[] = [
     "overview",
     "plans",
     "packs",
     "refunds",
     "events",
-    "controls",
   ];
-  const rawView = firstParam(rawParams.view) as BillingView | undefined;
+  const rawView = rawRequestedView as BillingView | undefined;
   const view = allowedViews.includes(rawView ?? "overview")
     ? (rawView ?? "overview")
     : "overview";
@@ -73,14 +78,24 @@ export default async function BillingPage({ searchParams }: PageProps) {
   )
     ? (rawState as ShopifyReportState)
     : undefined;
-  const plans = view === "plans" ? await getMerchantPricingPlans() : null;
-  const plansPolicy =
-    view === "plans" ? await getPlatformBillingPolicy() : null;
+  const plans =
+    view === "plans"
+      ? await getMerchantPricingPlans({
+          page: positiveInt(rawParams.planPage),
+          pageSize: positiveInt(rawParams.planPageSize, 5),
+        })
+      : null;
   const selectedPlan =
     view === "plans" && firstParam(rawParams.planId)
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
       : null;
-  const policy = view === "controls" ? await getPlatformBillingPolicy() : null;
+  const planDrawerOpen =
+    view === "plans" &&
+    (params.drawer === "register-plan" || Boolean(selectedPlan));
+  const plansPolicy = planDrawerOpen ? await getPlatformBillingPolicy() : null;
+  const cataloguePlans = planDrawerOpen
+    ? await getMerchantPricingCatalogueContext()
+    : null;
   const overview = view === "overview" ? await getBillingOverview() : null;
   const packs =
     view === "packs"
@@ -153,7 +168,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <BillingOverviewCards overview={overview} />
         ) : null}
         {view === "plans" && plans ? (
-          <MerchantPricingPlanCatalog plans={plans} />
+          <MerchantPricingPlanCatalog plans={plans} params={params} />
         ) : null}
         {view === "packs" && packs ? (
           <BillingRecoveryPacks purchases={packs} params={params} />
@@ -161,14 +176,11 @@ export default async function BillingPage({ searchParams }: PageProps) {
         {view === "events" && ledger ? (
           <BillingLedger ledger={ledger} params={params} />
         ) : null}
-        {view === "controls" && policy ? (
-          <PlatformBillingControls policy={policy} />
-        ) : null}
         {view === "plans" &&
         (params.drawer === "register-plan" || selectedPlan) ? (
           <MerchantPricingPlanDrawer
             plan={selectedPlan ?? undefined}
-            cataloguePlans={plans ?? []}
+            cataloguePlans={cataloguePlans ?? []}
             minimumUpgradePremiumBps={
               plansPolicy?.minimumUpgradePremiumBps ?? 2000
             }

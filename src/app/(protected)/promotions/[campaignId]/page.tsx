@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
-import { getPromotionReport } from "@/lib/admin/promotion-report";
+import { getPromotionReport } from "@/lib/admin/promotions/report";
 
 export const dynamic = "force-dynamic";
 

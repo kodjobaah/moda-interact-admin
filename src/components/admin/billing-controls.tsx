@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   mutatePlatformBillingPolicyAction,
   mutateShopBillingOverrideAction,
@@ -40,7 +39,7 @@ function OverrideSelect({
   );
 }
 
-export function PlatformBillingControls({
+export function PlatformPolicyControls({
   policy,
 }: {
   policy: {
@@ -54,22 +53,22 @@ export function PlatformBillingControls({
 }) {
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-950">
-            {adminI18n.t("billingControls.platformTitle")}
-          </h2>
-          <p className="mt-1 text-sm text-gray-600">
-            {adminI18n.t("billingControls.platformDescription")}
-          </p>
-        </div>
-        <Link
-          className="text-sm font-semibold text-[var(--brand-700)] hover:underline"
-          href="/billing?view=overview"
-        >
-          {adminI18n.t("billingControls.backToCatalog")}
-        </Link>
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-[var(--brand-900)]">
+          {adminI18n.t("billingControls.platformTitle")}
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+          {adminI18n.t("billingControls.platformDescription")}
+        </p>
       </div>
+      {!policy ? (
+        <p
+          role="status"
+          className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          Platform policy is not configured yet. Enter the values below to create it.
+        </p>
+      ) : null}
       <form action={mutatePlatformBillingPolicyAction} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
@@ -177,108 +176,214 @@ export function TenantBillingControls({
   const expired = Boolean(
     override?.expiresAt && override.expiresAt < new Date(),
   );
+  const activeOverride = override && !expired ? override : null;
+  const effectiveSoftLimit = activeOverride?.outboundSoftLimit ?? defaultSoftLimit;
+  const effectiveHardLimit = activeOverride?.outboundHardLimit ?? defaultHardLimit;
+  const overrideState = !override
+    ? "Using plan defaults"
+    : expired
+      ? "Override expired"
+      : "Override active";
+
+  const booleanOverrideLabel = (value: boolean | null | undefined) =>
+    value === null || value === undefined
+      ? adminI18n.t("billingControls.inherit")
+      : value
+        ? adminI18n.t("billingControls.enabled")
+        : adminI18n.t("billingControls.disabled");
+
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <h4 className="mb-1 text-lg font-semibold text-gray-950">
-          {adminI18n.t("billingControls.shopTitle")}
-        </h4>
-        <p className="mb-5 text-sm text-gray-600">
-          {adminI18n.t("billingControls.shopDescription")}
-        </p>
-        {expired ? (
-          <p className="mb-4 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
-            {adminI18n.t("billingControls.expired")}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-950">
+              {adminI18n.t("billingControls.shopTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {adminI18n.t("billingControls.shopDescription")}
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              expired
+                ? "bg-amber-50 text-amber-800"
+                : override
+                  ? "bg-blue-50 text-blue-700"
+                  : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            {overrideState}
+          </span>
+        </div>
+
+        <dl className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div>
+            <dt className="text-xs font-medium text-gray-500">
+              {adminI18n.t("billingControls.softLimit")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">
+              {effectiveSoftLimit}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">
+              {adminI18n.t("billingControls.hardLimit")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">
+              {effectiveHardLimit}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">
+              {adminI18n.t("billingControls.recoveryCeiling")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">
+              {activeOverride?.recoverySafetyCeiling ??
+                adminI18n.t("billingControls.inherit")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">
+              {adminI18n.t("billingControls.pauseNewRecoveries")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">
+              {booleanOverrideLabel(activeOverride?.pauseNewRecoveries)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">
+              {adminI18n.t("billingControls.pauseAutomatedWhatsapp")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">
+              {booleanOverrideLabel(activeOverride?.pauseAutomatedWhatsapp)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">
+              {adminI18n.t("billingControls.expiry")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">
+              {activeOverride?.expiresAt
+                ? adminI18n.formatDateTime(activeOverride.expiresAt)
+                : adminI18n.t("empty.notRecorded")}
+            </dd>
+          </div>
+        </dl>
+
+        {override?.reason ? (
+          <p className="mt-4 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            <span className="font-semibold text-gray-800">
+              {adminI18n.t("billingControls.reason")}:
+            </span>{" "}
+            {override.reason}
           </p>
         ) : null}
-        <form action={mutateShopBillingOverrideAction} className="space-y-4">
-          <input type="hidden" name="shopId" value={shopId} />
-          <div className="grid gap-4 sm:grid-cols-3">
+
+        <details className="mt-5 border-t border-gray-100 pt-4">
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--brand-700)]">
+            Edit shop billing controls
+          </summary>
+          {expired ? (
+            <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+              {adminI18n.t("billingControls.expired")}
+            </p>
+          ) : null}
+          <form action={mutateShopBillingOverrideAction} className="mt-4 space-y-4">
+            <input type="hidden" name="shopId" value={shopId} />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="text-sm font-medium text-gray-700">
+                {adminI18n.t("billingControls.softLimit")}
+                <input
+                  className={inputClass}
+                  type="number"
+                  min="1"
+                  name="outboundSoftLimit"
+                  defaultValue={override?.outboundSoftLimit ?? ""}
+                  placeholder={String(defaultSoftLimit)}
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                {adminI18n.t("billingControls.hardLimit")}
+                <input
+                  className={inputClass}
+                  type="number"
+                  min="1"
+                  name="outboundHardLimit"
+                  defaultValue={override?.outboundHardLimit ?? ""}
+                  placeholder={String(defaultHardLimit)}
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                {adminI18n.t("billingControls.recoveryCeiling")}
+                <input
+                  className={inputClass}
+                  type="number"
+                  min="1"
+                  name="recoverySafetyCeiling"
+                  defaultValue={override?.recoverySafetyCeiling ?? ""}
+                />
+              </label>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <OverrideSelect
+                name="pauseNewRecoveries"
+                label={adminI18n.t("billingControls.pauseNewRecoveries")}
+                value={override?.pauseNewRecoveries ?? null}
+              />
+              <OverrideSelect
+                name="pauseAutomatedWhatsapp"
+                label={adminI18n.t("billingControls.pauseAutomatedWhatsapp")}
+                value={override?.pauseAutomatedWhatsapp ?? null}
+              />
+              <label className="text-sm font-medium text-gray-700">
+                {adminI18n.t("billingControls.expiry")}
+                <input
+                  className={inputClass}
+                  type="date"
+                  name="expiresAt"
+                  defaultValue={dateValue(override?.expiresAt ?? null)}
+                />
+              </label>
+            </div>
             <label className="text-sm font-medium text-gray-700">
-              {adminI18n.t("billingControls.softLimit")}
-              <input
+              {adminI18n.t("billingControls.reason")}
+              <textarea
                 className={inputClass}
-                type="number"
-                min="1"
-                name="outboundSoftLimit"
-                defaultValue={override?.outboundSoftLimit ?? ""}
-                placeholder={String(defaultSoftLimit)}
+                name="reason"
+                rows={2}
+                required
+                defaultValue=""
+                placeholder="Explain why these tenant-specific billing controls are required."
               />
             </label>
-            <label className="text-sm font-medium text-gray-700">
-              {adminI18n.t("billingControls.hardLimit")}
-              <input
-                className={inputClass}
-                type="number"
-                min="1"
-                name="outboundHardLimit"
-                defaultValue={override?.outboundHardLimit ?? ""}
-                placeholder={String(defaultHardLimit)}
-              />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              {adminI18n.t("billingControls.recoveryCeiling")}
-              <input
-                className={inputClass}
-                type="number"
-                min="1"
-                name="recoverySafetyCeiling"
-                defaultValue={override?.recoverySafetyCeiling ?? ""}
-              />
-            </label>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <OverrideSelect
-              name="pauseNewRecoveries"
-              label={adminI18n.t("billingControls.pauseNewRecoveries")}
-              value={override?.pauseNewRecoveries ?? null}
-            />
-            <OverrideSelect
-              name="pauseAutomatedWhatsapp"
-              label={adminI18n.t("billingControls.pauseAutomatedWhatsapp")}
-              value={override?.pauseAutomatedWhatsapp ?? null}
-            />
-            <label className="text-sm font-medium text-gray-700">
-              {adminI18n.t("billingControls.expiry")}
-              <input
-                className={inputClass}
-                type="date"
-                name="expiresAt"
-                defaultValue={dateValue(override?.expiresAt ?? null)}
-              />
-            </label>
-          </div>
-          <label className="text-sm font-medium text-gray-700">
-            {adminI18n.t("billingControls.reason")}
-            <textarea
-              className={inputClass}
-              name="reason"
-              rows={2}
-              required
-              defaultValue={override?.reason ?? ""}
-            />
-          </label>
-          <button
-            className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
-            type="submit"
-          >
-            {adminI18n.t("billingControls.saveShop")}
-          </button>
-        </form>
+            <button
+              className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
+              type="submit"
+            >
+              {adminI18n.t("billingControls.saveShop")}
+            </button>
+          </form>
+        </details>
       </section>
+
       <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <h4 className="mb-1 text-lg font-semibold text-gray-950">
-          {adminI18n.t("billingControls.allowanceTitle")}
-        </h4>
-        <p className="mb-4 text-sm text-gray-600">
-          {adminI18n.t("billingControls.allowanceDescription")}
-        </p>
-        <dl className="mb-5 grid gap-4 sm:grid-cols-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-gray-950">
+              {adminI18n.t("billingControls.allowanceTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {adminI18n.t("billingControls.allowanceDescription")}
+            </p>
+          </div>
+        </div>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <dt className="text-xs text-gray-500">
               {adminI18n.t("billingControls.baseAllowance")}
             </dt>
-            <dd className="text-lg font-semibold">
+            <dd className="mt-1 text-lg font-semibold">
               {allowance.grantedAllowance ??
                 adminI18n.t("billingControls.notApplicable")}
             </dd>
@@ -287,7 +392,7 @@ export function TenantBillingControls({
             <dt className="text-xs text-gray-500">
               {adminI18n.t("billing.remaining")}
             </dt>
-            <dd className="text-lg font-semibold">
+            <dd className="mt-1 text-lg font-semibold">
               {allowance.remaining ??
                 adminI18n.t("billingControls.notApplicable")}
             </dd>
@@ -296,13 +401,13 @@ export function TenantBillingControls({
             <dt className="text-xs text-gray-500">
               {adminI18n.t("billingControls.committed")}
             </dt>
-            <dd className="text-lg font-semibold">{allowance.committed}</dd>
+            <dd className="mt-1 text-lg font-semibold">{allowance.committed}</dd>
           </div>
           <div>
             <dt className="text-xs text-gray-500">
               {adminI18n.t("billingControls.reserved")}
             </dt>
-            <dd className="text-lg font-semibold">{allowance.reserved}</dd>
+            <dd className="mt-1 text-lg font-semibold">{allowance.reserved}</dd>
           </div>
         </dl>
       </section>

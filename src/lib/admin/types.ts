@@ -9,6 +9,10 @@ export type PageResult<T> = {
 export type PlatformKpis = {
   activeTenants: number;
   activeRecoveries: number;
+  pendingRecoveries: number;
+  recoveredCheckouts: number;
+  recoveryConversations: number;
+  recoveryMessages: number;
 };
 
 export type BillingOverview = {

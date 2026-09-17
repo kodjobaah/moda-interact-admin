@@ -80,7 +80,7 @@ export async function mutatePlatformBillingPolicyAction(
     });
   });
   revalidatePath("/billing");
-  revalidatePath("/billing/controls");
+  revalidatePath("/system-controls/platform-policy");
 }
 
 export async function mutateShopBillingOverrideAction(

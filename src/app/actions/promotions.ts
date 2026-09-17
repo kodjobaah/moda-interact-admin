@@ -13,14 +13,17 @@ import {
   ensureDevelopmentPlatformAdmin,
 } from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
-import { mutatePromotionCampaignLifecycle } from "@/lib/admin/promotion-campaign-lifecycle";
+import { mutatePromotionCampaignLifecycle } from "@/lib/admin/promotions/lifecycle";
 import {
   parsePromotionCampaignForm,
   validatePromotionCampaignTerms,
   validatePromotionTarget,
   type PromotionCampaignFormValues,
-} from "@/lib/admin/promotion-validation";
-import { parseCompletedPromotionTranslationPackage } from "@/lib/admin/promotion-translations";
+} from "@/lib/admin/promotions/validation";
+import {
+  NEW_PROMOTION_TRANSLATION_CAMPAIGN_ID,
+  parseCompletedPromotionTranslationPackage,
+} from "@/lib/admin/promotions/translations";
 import { TRANSLATION_WORKBOOK_LOCALES } from "@/lib/admin/translation-workbook-common";
 
 async function auditAdminId(
@@ -47,6 +50,29 @@ function requireSuperAdmin(
 ): void {
   if (principal.role !== "SUPER_ADMIN")
     throw new Error("SUPER_ADMIN access is required.");
+}
+
+export type PromotionCampaignReactivationActionState =
+  | { ok: true }
+  | { ok: false; message: string }
+  | null;
+
+export async function reactivatePromotionCampaignAction(
+  _previousState: PromotionCampaignReactivationActionState,
+  formData: FormData,
+): Promise<PromotionCampaignReactivationActionState> {
+  try {
+    await mutatePromotionCampaignAction(formData);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Promotion campaign could not be reactivated.",
+    };
+  }
 }
 
 async function resolveTarget(
@@ -83,14 +109,6 @@ function campaignData(values: PromotionCampaignFormValues) {
     targetShopId: values.targetShopId,
     startsAt: values.startsAt,
     expiresAt: values.expiresAt,
-  };
-}
-
-function translationData(values: PromotionCampaignFormValues) {
-  return {
-    locale: "en",
-    merchantTitle: values.merchantTitle,
-    merchantDescription: values.merchantDescription ?? "",
   };
 }
 
@@ -209,10 +227,7 @@ export async function mutatePromotionCampaignAction(
           ? String(formData.get("expiresAt"))
           : "";
       const expiresAt = rawExpiresAt ? new Date(rawExpiresAt) : undefined;
-      if (
-        intent === "reopen" &&
-        (!expiresAt || Number.isNaN(expiresAt.getTime()))
-      ) {
+      if (expiresAt && Number.isNaN(expiresAt.getTime())) {
         throw new Error("Expiry time is invalid.");
       }
       await mutatePromotionCampaignLifecycle(transaction, {
@@ -223,10 +238,46 @@ export async function mutatePromotionCampaignAction(
       });
     });
     revalidatePath("/promotions");
+    if (intent === "reopen") {
+      const returnTo = formData.get("returnTo");
+      if (
+        typeof returnTo === "string" &&
+        returnTo.startsWith("/promotions") &&
+        !returnTo.startsWith("//")
+      ) {
+        redirect(returnTo);
+      }
+    }
     return;
   }
 
   const values = parsePromotionCampaignForm(formData);
+  const rawTranslation = formData.get("translationJson");
+  const translationCampaignId =
+    values.intent === "create"
+      ? NEW_PROMOTION_TRANSLATION_CAMPAIGN_ID
+      : values.id;
+  if (!translationCampaignId || typeof rawTranslation !== "string") {
+    throw new Error(
+      "Complete and upload all 20 merchant translations before saving this campaign.",
+    );
+  }
+  const parsedTranslations = parseCompletedPromotionTranslationPackage(
+    rawTranslation,
+    {
+      campaignId: translationCampaignId,
+      campaignInternalName: values.name,
+      sourceMerchantTitle: values.merchantTitle,
+      sourceMerchantDescription: values.merchantDescription ?? "",
+    },
+  );
+  if (!parsedTranslations.valid || !parsedTranslations.package) {
+    throw new Error(
+      parsedTranslations.issues.map((entry) => entry.message).join("; ") ||
+        "Complete and upload all 20 merchant translations before saving this campaign.",
+    );
+  }
+  const completedTranslations = parsedTranslations.package.translations;
   let createdId: string | null = null;
 
   await prisma.$transaction(async (transaction) => {
@@ -235,7 +286,15 @@ export async function mutatePromotionCampaignAction(
       const campaign = await transaction.promotionCampaign.create({
         data: {
           ...campaignData(values),
-          translations: { create: translationData(values) },
+          translations: {
+            create: Object.entries(completedTranslations).map(
+              ([locale, value]) => ({
+                locale,
+                merchantTitle: value.merchantTitle,
+                merchantDescription: value.merchantDescription,
+              }),
+            ),
+          },
           status: PromotionCampaignStatus.DRAFT,
           createdByPlatformAdminId: adminId,
         },
@@ -254,7 +313,7 @@ export async function mutatePromotionCampaignAction(
     if (!values.id) throw new Error("A campaign id is required.");
     const existing = await transaction.promotionCampaign.findUnique({
       where: { id: values.id },
-      include: { translations: true },
+      select: { id: true, status: true, version: true },
     });
     if (!existing) throw new Error("Promotion campaign not found.");
     if (existing.status !== PromotionCampaignStatus.DRAFT) {
@@ -262,14 +321,6 @@ export async function mutatePromotionCampaignAction(
         "Activated campaign terms are immutable; create a new campaign.",
       );
     }
-    const currentEnglish = existing.translations.find(
-      (translation) => translation.locale === "en",
-    );
-    const sourceChanged =
-      !currentEnglish ||
-      currentEnglish.merchantTitle.trim() !== values.merchantTitle.trim() ||
-      currentEnglish.merchantDescription.trim() !==
-        (values.merchantDescription ?? "").trim();
     const result = await transaction.promotionCampaign.updateMany({
       where: {
         id: existing.id,
@@ -280,75 +331,19 @@ export async function mutatePromotionCampaignAction(
     });
     if (result.count !== 1)
       throw new Error("Promotion campaign changed; reload and retry.");
-    if (sourceChanged) {
-      await transaction.promotionCampaignTranslation.deleteMany({
-        where: { promotionCampaignId: existing.id },
-      });
-      await transaction.promotionCampaignTranslation.create({
-        data: { promotionCampaignId: existing.id, ...translationData(values) },
-      });
-    }
-  });
-  revalidatePath("/promotions");
-  if (createdId) redirect(`/promotions?edit=${encodeURIComponent(createdId)}`);
-}
 
-export async function importPromotionTranslationsAction(
-  formData: FormData,
-): Promise<void> {
-  const principal = await requirePlatformAdminMutation();
-  requireSuperAdmin(principal);
-  const campaignId =
-    typeof formData.get("campaignId") === "string"
-      ? String(formData.get("campaignId")).trim()
-      : "";
-  const raw = formData.get("translationJson");
-  if (!campaignId || typeof raw !== "string")
-    throw new Error("A completed translation workbook is required.");
-  await prisma.$transaction(async (transaction) => {
-    const existing = await transaction.promotionCampaign.findUnique({
-      where: { id: campaignId },
-      include: { translations: true },
-    });
-    if (!existing) throw new Error("Promotion campaign not found.");
-    if (existing.status !== PromotionCampaignStatus.DRAFT)
-      throw new Error("Only draft campaigns can import translations.");
-    const parsed = parseCompletedPromotionTranslationPackage(raw, {
-      campaignId: existing.id,
-      campaignInternalName: existing.name,
-      sourceMerchantTitle:
-        existing.translations.find((translation) => translation.locale === "en")
-          ?.merchantTitle ?? "",
-      sourceMerchantDescription:
-        existing.translations.find((translation) => translation.locale === "en")
-          ?.merchantDescription ?? "",
-    });
-    if (!parsed.valid || !parsed.package)
-      throw new Error(parsed.issues.map((entry) => entry.message).join("; "));
     await transaction.promotionCampaignTranslation.deleteMany({
       where: { promotionCampaignId: existing.id },
     });
     await transaction.promotionCampaignTranslation.createMany({
-      data: Object.entries(parsed.package.translations).map(
-        ([locale, value]) => ({
-          promotionCampaignId: existing.id,
-          locale,
-          merchantTitle: value.merchantTitle,
-          merchantDescription: value.merchantDescription,
-        }),
-      ),
+      data: Object.entries(completedTranslations).map(([locale, value]) => ({
+        promotionCampaignId: existing.id,
+        locale,
+        merchantTitle: value.merchantTitle,
+        merchantDescription: value.merchantDescription,
+      })),
     });
-    const result = await transaction.promotionCampaign.updateMany({
-      where: {
-        id: existing.id,
-        status: PromotionCampaignStatus.DRAFT,
-        version: existing.version,
-      },
-      data: { version: { increment: 1 } },
-    });
-    if (result.count !== 1)
-      throw new Error("Promotion campaign changed; reload and retry.");
   });
   revalidatePath("/promotions");
-  revalidatePath(`/promotions?edit=${encodeURIComponent(campaignId)}`);
+  if (createdId) redirect(`/promotions?campaignId=${encodeURIComponent(createdId)}`);
 }

@@ -9,7 +9,7 @@ const action = fs.readFileSync(
   "utf8",
 );
 const validation = fs.readFileSync(
-  path.join(root, "src/lib/admin/promotion-validation.ts"),
+  path.join(root, "src/lib/admin/promotions/validation.ts"),
   "utf8",
 );
 const page = fs.readFileSync(
@@ -21,31 +21,63 @@ const sidebar = fs.readFileSync(
   "utf8",
 );
 const form = fs.readFileSync(
-  path.join(root, "src/components/admin/promotion-campaign-form.tsx"),
+  path.join(root, "src/components/admin/promotions/promotion-campaign-form.tsx"),
+  "utf8",
+);
+const catalog = fs.readFileSync(
+  path.join(root, "src/components/admin/promotions/promotion-campaign-catalog.tsx"),
+  "utf8",
+);
+const campaignActions = fs.readFileSync(
+  path.join(root, "src/components/admin/promotions/promotion-campaign-actions.tsx"),
+  "utf8",
+);
+const reactivation = fs.readFileSync(
+  path.join(root, "src/components/admin/promotions/promotion-campaign-reactivation.tsx"),
+  "utf8",
+);
+const reactivationDrawer = fs.readFileSync(
+  path.join(root, "src/components/admin/promotions/promotion-campaign-reactivation-drawer.tsx"),
+  "utf8",
+);
+const filters = fs.readFileSync(
+  path.join(root, "src/components/admin/promotions/promotion-campaign-filters.tsx"),
+  "utf8",
+);
+const drawer = fs.readFileSync(
+  path.join(root, "src/components/admin/promotions/promotion-campaign-drawer.tsx"),
   "utf8",
 );
 const data = fs.readFileSync(
-  path.join(root, "src/lib/admin/promotions.ts"),
+  path.join(root, "src/lib/admin/promotions/campaigns.ts"),
   "utf8",
 );
 const catalogue = fs.readFileSync(
-  path.join(root, "src/lib/admin/promotion-catalogue.ts"),
+  path.join(root, "src/lib/admin/promotions/catalogue.ts"),
   "utf8",
 );
 const lifecycle = fs.readFileSync(
-  path.join(root, "src/lib/admin/promotion-campaign-lifecycle.ts"),
+  path.join(root, "src/lib/admin/promotions/lifecycle.ts"),
   "utf8",
 );
 const report = fs.readFileSync(
-  path.join(root, "src/lib/admin/promotion-report.ts"),
+  path.join(root, "src/lib/admin/promotions/report.ts"),
   "utf8",
 );
 const reportModel = fs.readFileSync(
-  path.join(root, "src/lib/admin/promotion-report-model.ts"),
+  path.join(root, "src/lib/admin/promotions/report-model.ts"),
   "utf8",
 );
 const reportPage = fs.readFileSync(
   path.join(root, "src/app/(protected)/promotions/[campaignId]/page.tsx"),
+  "utf8",
+);
+const promotionTranslations = fs.readFileSync(
+  path.join(root, "src/components/admin/promotions/promotion-translation-workbook.tsx"),
+  "utf8",
+);
+const translationDropzone = fs.readFileSync(
+  path.join(root, "src/components/admin/translation-workbook-dropzone.tsx"),
   "utf8",
 );
 
@@ -62,7 +94,7 @@ test("the promotions page gates target and campaign loading at the SUPER_ADMIN b
     page,
     /if \(principal\.role !== "SUPER_ADMIN"\) redirect\("\/"\)/,
   );
-  const dataLoad = page.indexOf("const [{ plans, shops }, campaigns]");
+  const dataLoad = page.indexOf("const campaignsPromise = getPromotionCampaigns");
   assert.ok(page.indexOf('principal.role !== "SUPER_ADMIN"') < dataLoad);
 });
 
@@ -102,18 +134,12 @@ test("activation re-reads drafts, writes ACTIVATED evidence, and freezes terms",
   assert.match(action, /version: \{ increment: 1 \}/);
 });
 
-test("activation form submits only the transition command", () => {
-  const activationStart = form.indexOf(
-    "export function ActivatePromotionCampaignForm",
-  );
-  const activationEnd = form.indexOf(
-    "export function ClosePromotionCampaignForm",
-  );
-  const activationForm = form.slice(activationStart, activationEnd);
-  assert.match(activationForm, /name="intent"/);
-  assert.match(activationForm, /name="id"/);
+test("catalogue lifecycle actions submit transition commands without commercial terms", () => {
+  assert.match(campaignActions, /intent: "activate" \| "close"/);
+  assert.match(campaignActions, /name="intent"/);
+  assert.match(campaignActions, /name="id"/);
   assert.doesNotMatch(
-    activationForm,
+    campaignActions,
     /name="(name|scope|quantity|targetPlanId|targetShopId|startsAt|expiresAt)"/,
   );
 });
@@ -141,8 +167,20 @@ test("campaign activation never grants merchant credits or mutates selection cap
 
 test("campaign history records creation and the UI exposes draft editing only", () => {
   assert.match(action, /kind: PromotionCampaignEventType\.CREATED/);
-  assert.match(page, /campaign\.status === "DRAFT"/);
+  assert.match(campaignActions, /const canEdit = campaign\.status === "DRAFT"/);
+  assert.match(campaignActions, /Edit campaign/);
   assert.match(page, /Create optional merchant offers/);
+});
+
+test("promotion draft form rejects duplicate in-flight submissions synchronously", () => {
+  assert.match(form, /useFormStatus/);
+  assert.match(form, /form\.dataset\.submitting === "true"/);
+  assert.match(form, /event\.preventDefault\(\)/);
+  assert.match(form, /form\.dataset\.submitting = "true"/);
+  assert.match(form, /delete form\.dataset\.submitting/);
+  assert.match(form, /disabled=\{pending \|\| disabled\}/);
+  assert.match(form, /"Creating…"/);
+  assert.match(form, /"Saving…"/);
 });
 
 test("catalogue retains lifecycle rows and derives bounded running state", () => {
@@ -151,10 +189,14 @@ test("catalogue retains lifecycle rows and derives bounded running state", () =>
   assert.match(data, /lastLifecycleChange/);
   assert.match(catalogue, /now < campaign\.expiresAt/);
   assert.match(catalogue, /return "SCHEDULED"/);
-  assert.match(data, /filters\.state/);
-  assert.match(page, /name="state"/);
-  assert.match(page, /name="scope"/);
-  assert.match(page, /name="target"/);
+  assert.match(data, /promotionCampaign\.count/);
+  assert.match(data, /skip: \(page - 1\) \* pageSize/);
+  assert.match(data, /take: pageSize/);
+  assert.match(catalogue, /case "RUNNING"/);
+  assert.match(catalogue, /expiresAt: \{ gt: now \}/);
+  assert.match(filters, /name="state"/);
+  assert.match(filters, /name="scope"/);
+  assert.match(filters, /name="target"/);
 });
 
 test("close and reopen are SUPER_ADMIN-only versioned audited mutations", () => {
@@ -181,14 +223,81 @@ test("close and reopen are SUPER_ADMIN-only versioned audited mutations", () => 
   assert.doesNotMatch(action, /promotionCampaign\.(delete|deleteMany)/);
 });
 
-test("lifecycle forms expose close/reopen without allowing commercial-term edits", () => {
-  assert.match(form, /ClosePromotionCampaignForm/);
-  assert.match(form, /ReopenPromotionCampaignForm/);
-  assert.match(form, /name="expiresAt"\s+type="datetime-local"/);
+test("catalogue lifecycle controls use edit/activate/deactivate/reactivate semantics", () => {
+  assert.match(campaignActions, /Edit campaign/);
+  assert.match(campaignActions, /label="Activate"/);
+  assert.match(campaignActions, /label="Deactivate"/);
+  assert.match(campaignActions, /Close draft/);
+  assert.match(campaignActions, /Reactivate/);
+  assert.match(campaignActions, /drawer: "reactivate"/);
+  assert.match(reactivation, /name="expiresAt"/);
+  assert.match(reactivation, /type="datetime-local"/);
+  assert.match(reactivation, /required=\{requiresNewExpiry\}/);
+  assert.match(reactivation, /Leave this blank to keep the current expiry/);
+  assert.match(reactivation, /reactivatePromotionCampaignAction/);
+  assert.match(reactivation, /role="alert"/);
+  assert.match(reactivation, /Save and reactivate/);
+  assert.match(reactivation, /Reactivate/);
   assert.doesNotMatch(
-    form.slice(form.indexOf("export function ReopenPromotionCampaignForm")),
-    /name="(quantity|scope|targetPlanId|targetShopId)"/,
+    reactivation,
+    /name="(quantity|scope|targetPlanId|targetShopId|startsAt)"/,
   );
+  assert.match(reactivationDrawer, /AdminDetailDrawer/);
+  assert.match(page, /drawerMode === "reactivate"/);
+  assert.match(page, /PromotionCampaignReactivationDrawer/);
+  assert.match(action, /returnTo\.startsWith\("\/promotions"\)/);
+});
+
+test("promotion translations use the shared drag-and-drop workbook control", () => {
+  assert.match(promotionTranslations, /TranslationWorkbookDropzone/);
+  assert.match(
+    promotionTranslations,
+    /already contains all 20 supported languages, the English merchant title/,
+  );
+  assert.match(
+    translationDropzone,
+    /Drop your completed \.xlsx spreadsheet here/,
+  );
+  assert.match(translationDropzone, /Choose spreadsheet/);
+  assert.match(translationDropzone, /Upload one spreadsheet at a time\./);
+});
+
+test("promotion draft and all translations are saved atomically", () => {
+  assert.match(form, /name="translationJson"/);
+  assert.match(form, /NEW_PROMOTION_TRANSLATION_CAMPAIGN_ID/);
+  assert.match(form, /translationsReady/);
+  assert.match(
+    form,
+    /Complete and upload all 20 merchant translations before saving/,
+  );
+  assert.doesNotMatch(promotionTranslations, /<form action=/);
+  assert.doesNotMatch(action, /importPromotionTranslationsAction/);
+  assert.match(action, /parseCompletedPromotionTranslationPackage/);
+  assert.match(action, /Object\.entries\(completedTranslations\)/);
+  assert.match(
+    action,
+    /promotionCampaign\.create\([\s\S]*translations: \{[\s\S]*create:/,
+  );
+  assert.match(action, /promotionCampaignTranslation\.createMany/);
+});
+
+test("promotion catalogue uses a URL-driven drawer and bounded server pagination", () => {
+  assert.match(page, /PromotionCampaignDrawer/);
+  assert.match(page, /const drawerMode = firstParam\(rawParams\.drawer\)/);
+  assert.match(page, /const register = drawerMode === "create"/);
+  assert.match(page, /firstParam\(rawParams\.campaignId\)/);
+  assert.match(page, /getPromotionCampaignById/);
+  assert.match(drawer, /AdminDetailDrawer/);
+  assert.match(drawer, /size="wide"/);
+  assert.match(catalog, /max-h-\[calc\(100vh-20rem\)\]/);
+  assert.match(catalog, /overflow-y-auto/);
+  assert.match(catalog, /sticky bottom-0/);
+  assert.match(catalog, /<Pagination/);
+  assert.match(catalog, /Campaigns per page/);
+  assert.match(catalog, /PROMOTION_CATALOGUE_PAGE_SIZES/);
+  assert.match(catalog, /Pagination/);
+  assert.match(catalogue, /\[5, 10, 20, 50\]/);
+  assert.doesNotMatch(data, /\.filter\(\s*\(campaign\)/);
 });
 
 test("campaign reports are SUPER_ADMIN-only, bounded, and read-only", () => {

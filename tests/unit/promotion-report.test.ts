@@ -4,7 +4,7 @@ import {
   normalizePromotionReportPage,
   normalizePromotionReportSearch,
   projectPromotionMerchantRow,
-} from "../../src/lib/admin/promotion-report-model.ts";
+} from "../../src/lib/admin/promotions/report-model.ts";
 
 const selectedAt = new Date("2026-01-01T00:00:00Z");
 const reselectedAt = new Date("2026-01-03T00:00:00Z");

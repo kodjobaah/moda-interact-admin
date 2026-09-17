@@ -6,7 +6,7 @@ import { test } from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const action = readFileSync(resolve(root, "src/app/actions/tenant.ts"), "utf8");
-const component = readFileSync(resolve(root, "src/components/admin/tenant-administration.tsx"), "utf8");
+const component = readFileSync(resolve(root, "src/components/admin/tenant-recovery-settings.tsx"), "utf8");
 const clearComponent = readFileSync(resolve(root, "src/components/admin/tenant-recovery-policy-clear-form.tsx"), "utf8");
 const data = readFileSync(resolve(root, "src/lib/admin/data.ts"), "utf8");
 
@@ -30,7 +30,7 @@ test("tenant recovery overrides are SUPER_ADMIN-only, complete, and audited", ()
 test("tenant UI shows merchant, override, effective, catalogue, and clear surfaces", () => {
   assert.match(component, /Merchant configured/);
   assert.match(component, /Admin override/);
-  assert.match(component, /Effective/);
+  assert.match(component, /tenant\.effective|effectiveRecoveryPolicy/);
   assert.match(component, /lastSuccessfulSyncAt|Last successful sync/);
   assert.match(clearComponent, /Clear override/);
   assert.match(clearComponent, /window\.confirm/);

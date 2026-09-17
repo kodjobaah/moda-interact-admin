@@ -7,10 +7,10 @@ import {
   PROMOTION_REPORT_PAGE_SIZE,
   projectPromotionMerchantRow,
   type PromotionMerchantRow,
-} from "@/lib/admin/promotion-report-model";
+} from "@/lib/admin/promotions/report-model";
 
-export { PROMOTION_REPORT_PAGE_SIZE } from "@/lib/admin/promotion-report-model";
-export type { PromotionMerchantRow } from "@/lib/admin/promotion-report-model";
+export { PROMOTION_REPORT_PAGE_SIZE } from "@/lib/admin/promotions/report-model";
+export type { PromotionMerchantRow } from "@/lib/admin/promotions/report-model";
 
 export type PromotionReportFilters = {
   page?: number;

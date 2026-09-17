@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const action = readFileSync(resolve(root, "src/app/actions/background-runtime-controls.ts"), "utf8");
 const component = readFileSync(resolve(root, "src/components/admin/background-runtime-controls.tsx"), "utf8");
 const validation = readFileSync(resolve(root, "src/lib/admin/background-runtime-control-validation.ts"), "utf8");
-const page = readFileSync(resolve(root, "src/app/(protected)/billing/controls/page.tsx"), "utf8");
+const page = readFileSync(resolve(root, "src/app/(protected)/system-controls/background-runtime/page.tsx"), "utf8");
 
 test("runtime mutations are SUPER_ADMIN-only and version fenced", () => {
   assert.match(action, /requirePlatformAdminMutation/);
@@ -21,7 +21,7 @@ test("runtime mutations are SUPER_ADMIN-only and version fenced", () => {
   assert.match(action, /RUNTIME_MISSING_MESSAGE/);
 });
 
-test("controls remain readable for non-super admins and expose no legacy economics", () => {
+test("background runtime controls remain readable for non-super admins and expose no legacy economics", () => {
   assert.match(action, /requirePlatformAdminRead/);
   assert.match(component, /canMutate/);
   assert.match(component, /Operational/);
@@ -29,6 +29,7 @@ test("controls remain readable for non-super admins and expose no legacy economi
   assert.match(component, /Abuse Protection/);
   assert.match(component, /System-managed settings/);
   assert.match(component, /fleet-wide/);
+  assert.match(page, /<AdminShell active="background-runtime">/);
   assert.doesNotMatch(page, /Upgrade ladder|Verified Shopify/);
 });
 

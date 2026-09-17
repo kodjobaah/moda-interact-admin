@@ -256,7 +256,7 @@ export function BackgroundRuntimeControls({ config }: { config: BackgroundRuntim
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-[var(--brand-900)]">Runtime Controls</h1>
+        <h1 className="text-2xl font-bold text-[var(--brand-900)]">Background Runtime</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">Change how background processing behaves without redeploying workers. Changes are shared across all worker replicas.</p>
       </header>
       <div role="tablist" aria-label="Runtime control classification" className="hidden gap-2 border-b border-gray-200 md:flex">

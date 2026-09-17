@@ -158,16 +158,52 @@ export async function getTenantDirectory(input: {
       }
     : {};
 
-  const [totalItems, activeTenants, activeRecoveries] = await Promise.all([
+  const [
+    totalItems,
+    activeTenants,
+    recoveryStatusCounts,
+    recoveryConversations,
+    recoveryMessages,
+  ] = await Promise.all([
     prisma.shop.count({ where }),
     prisma.shop.count({ where: { status: "ACTIVE" } }),
-    prisma.checkoutRecovery.count({
+    prisma.checkoutRecovery.groupBy({
+      by: ["status"],
+      where: { shop: { status: "ACTIVE" } },
+      _count: { _all: true },
+    }),
+    prisma.conversation.count({
       where: {
-        status: { in: ACTIVE_RECOVERY_STATUSES },
-        shop: { status: "ACTIVE" },
+        type: "RECOVERY",
+        checkoutRecovery: { shop: { status: "ACTIVE" } },
+      },
+    }),
+    prisma.conversationMessage.count({
+      where: {
+        conversation: {
+          type: "RECOVERY",
+          checkoutRecovery: { shop: { status: "ACTIVE" } },
+        },
       },
     }),
   ]);
+
+  const recoveryCountByStatus = new Map(
+    recoveryStatusCounts.map((row) => [row.status, row._count._all]),
+  );
+  const countRecoveries = (...statuses: CheckoutRecoveryStatus[]) =>
+    statuses.reduce(
+      (total, status) => total + (recoveryCountByStatus.get(status) ?? 0),
+      0,
+    );
+  const activeRecoveries = countRecoveries(...ACTIVE_RECOVERY_STATUSES);
+  const pendingRecoveries = countRecoveries(
+    CheckoutRecoveryStatus.DETECTED,
+    CheckoutRecoveryStatus.MESSAGE_SENT,
+  );
+  const recoveredCheckouts = countRecoveries(
+    CheckoutRecoveryStatus.COMPLETED,
+  );
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(page, totalPages);
   const rows = await prisma.shop.findMany({
@@ -208,7 +244,14 @@ export async function getTenantDirectory(input: {
 
   return {
     tenants: pageResult(tenants, safePage, pageSize, totalItems),
-    kpis: { activeTenants, activeRecoveries },
+    kpis: {
+      activeTenants,
+      activeRecoveries,
+      pendingRecoveries,
+      recoveredCheckouts,
+      recoveryConversations,
+      recoveryMessages,
+    },
   };
 }
 

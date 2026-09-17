@@ -5,7 +5,7 @@ import {
   parsePromotionCampaignForm,
   validatePromotionCampaignReopen,
   validatePromotionTarget,
-} from "../../src/lib/admin/promotion-validation.ts";
+} from "../../src/lib/admin/promotions/validation.ts";
 
 function form(values: Record<string, string>): FormData {
   const result = new FormData();
@@ -76,7 +76,7 @@ test("quantity and campaign window are validated server-side", () => {
 
 test("persisted campaign terms use the same quantity, window, and target validation", async () => {
   const { validatePromotionCampaignTerms } =
-    await import("../../src/lib/admin/promotion-validation.ts");
+    await import("../../src/lib/admin/promotions/validation.ts");
   assert.throws(
     () =>
       validatePromotionCampaignTerms({

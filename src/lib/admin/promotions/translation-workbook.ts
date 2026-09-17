@@ -3,14 +3,14 @@ import {
   TRANSLATION_WORKBOOK_LOCALES,
   TRANSLATION_WORKBOOK_MAX_BYTES,
   TRANSLATION_WORKBOOK_MIME,
-} from "./translation-workbook-common.ts";
+} from "../translation-workbook-common.ts";
 import {
   buildPromotionTranslationTemplate,
   parseCompletedPromotionTranslationPackage,
   type PromotionTranslationExpected,
   type PromotionTranslationPackage,
   type PromotionTranslationParseResult,
-} from "./promotion-translations.ts";
+} from "./translations.ts";
 
 export const PROMOTION_TRANSLATION_WORKBOOK_SCHEMA_VERSION = 1;
 export const PROMOTION_TRANSLATION_WORKBOOK_MAX_BYTES =

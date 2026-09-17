@@ -9,7 +9,15 @@ export function Sidebar({
   administratorRole,
   grafanaHref,
 }: {
-  active: "tenants" | "observability" | "queues" | "merchant-support" | "billing" | "promotions";
+  active:
+    | "tenants"
+    | "observability"
+    | "queues"
+    | "merchant-support"
+    | "billing"
+    | "promotions"
+    | "platform-policy"
+    | "background-runtime";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -18,6 +26,8 @@ export function Sidebar({
   const selected =
     "border border-[var(--brand-200)] bg-white text-[var(--brand-900)] shadow-sm";
   const idle = "text-[var(--brand-800)] hover:bg-white/60";
+  const systemControlsActive =
+    active === "platform-policy" || active === "background-runtime";
   const observabilityActive = active === "observability" || active === "queues";
 
   return (
@@ -72,6 +82,35 @@ export function Sidebar({
             Promotions
           </Link>
         ) : null}
+        <div>
+          <Link
+            href="/system-controls/platform-policy"
+            aria-current={systemControlsActive ? "page" : undefined}
+            className={`${base} ${systemControlsActive ? selected : idle}`}
+          >
+            <Icon name="shield" className="h-5 w-5 text-[var(--brand-600)]" />
+            <span className="flex-1">{adminI18n.t("nav.systemControls")}</span>
+            <Icon name="chevron-down" className="h-4 w-4" />
+          </Link>
+          {systemControlsActive ? (
+            <div className="ml-8 mt-1 space-y-1 border-l border-[var(--brand-300)] pl-3">
+              <Link
+                href="/system-controls/platform-policy"
+                aria-current={active === "platform-policy" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "platform-policy" ? selected : idle}`}
+              >
+                {adminI18n.t("nav.platformPolicy")}
+              </Link>
+              <Link
+                href="/system-controls/background-runtime"
+                aria-current={active === "background-runtime" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "background-runtime" ? selected : idle}`}
+              >
+                {adminI18n.t("nav.backgroundRuntime")}
+              </Link>
+            </div>
+          ) : null}
+        </div>
         <div>
           <Link
             href="/observability/queues"

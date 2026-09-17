@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { TranslationWorkbookDropzone } from "@/components/admin/translation-workbook-dropzone";
 import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant/pricing-builder-payload";
 import {
   buildMerchantPricingTranslationWorkbook,
@@ -80,14 +81,12 @@ export function MerchantPricingTranslationWorkbook({
 }) {
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [workbookIssues, setWorkbookIssues] = useState<
     MerchantPricingTranslationWorkbookIssue[]
   >([]);
   const [result, setResult] =
     useState<MerchantPricingTranslationParseResult | null>(null);
   const [uploadedBytes, setUploadedBytes] = useState<ArrayBuffer | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const onChangeRef = useRef(onChange);
 
   useEffect(() => {
@@ -221,51 +220,10 @@ export function MerchantPricingTranslationWorkbook({
       >
         Download pre-populated translation spreadsheet
       </button>
-      <div
-        className="rounded-md border border-gray-300 bg-white p-4 text-center text-sm"
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setIsDragging(false);
-          if (event.dataTransfer.files.length !== 1) {
-            setUploadError("Upload one spreadsheet at a time.");
-            return;
-          }
-          void processSelectedTranslationWorkbook(event.dataTransfer.files[0]);
-        }}
-      >
-        <p className="font-semibold">
-          Upload completed translation spreadsheet
-        </p>
-        <p className="mt-1">Drop your completed .xlsx spreadsheet here</p>
-        <p>or</p>
-        <button
-          type="button"
-          className={`mt-1 rounded-md border px-3 py-2 font-semibold ${isDragging ? "border-[var(--brand-700)]" : "border-gray-400"}`}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          Choose spreadsheet
-        </button>
-        <input
-          ref={fileInputRef}
-          className="sr-only"
-          type="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void processSelectedTranslationWorkbook(file);
-            event.target.value = "";
-          }}
-        />
-        <p className="mt-2 text-xs text-gray-600">
-          .xlsx only · maximum size 2 MiB
-        </p>
-      </div>
+      <TranslationWorkbookDropzone
+        onFile={processSelectedTranslationWorkbook}
+        onSelectionError={setUploadError}
+      />
       {uploadError ? (
         <p className="text-sm font-semibold text-red-700">{uploadError}</p>
       ) : null}
