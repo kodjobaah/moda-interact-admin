@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { Prisma } from "@prisma/client";
 import {
   derivePromotionCatalogueState,
   normalizePromotionTargetQuery,
@@ -12,6 +13,13 @@ const startsAt = new Date("2026-09-20T00:00:00.000Z");
 const expiresAt = new Date("2026-10-01T00:00:00.000Z");
 const now = new Date("2026-09-13T00:00:00.000Z");
 
+function andClauses(
+  where: Prisma.PromotionCampaignWhereInput,
+): Prisma.PromotionCampaignWhereInput[] {
+  if (!where.AND) return [];
+  return Array.isArray(where.AND) ? where.AND : [where.AND];
+}
+
 test("derives all five catalogue states from status and the time window", () => {
   assert.equal(derivePromotionCatalogueState({ status: "DRAFT", startsAt, expiresAt }, now), "DRAFT");
   assert.equal(derivePromotionCatalogueState({ status: "ACTIVE", startsAt, expiresAt }, now), "SCHEDULED");
@@ -22,8 +30,9 @@ test("derives all five catalogue states from status and the time window", () => 
 
 test("projects visible target names and domains into a bounded case-insensitive query", () => {
   const where = promotionCatalogueWhere({ scope: "PLAN", target: " Growth " }, now);
-  assert.deepEqual(where.AND?.[0], { scope: "PLAN" });
-  const search = where.AND?.[1];
+  const clauses = andClauses(where);
+  assert.deepEqual(clauses[0], { scope: "PLAN" });
+  const search = clauses[1];
   assert.ok(search && "OR" in search);
   if (!search || !("OR" in search)) throw new Error("Search filter missing.");
   assert.deepEqual(search.OR?.slice(0, 3), [
@@ -35,14 +44,15 @@ test("projects visible target names and domains into a bounded case-insensitive 
 
 test("bounds target input server-side while preserving exact scope filtering", () => {
   const where = promotionCatalogueWhere({ scope: "SHOP", target: `  ${"x".repeat(300)}  ` }, now);
-  assert.deepEqual(where.AND?.[0], { scope: "SHOP" });
-  const search = where.AND?.[1];
+  const clauses = andClauses(where);
+  assert.deepEqual(clauses[0], { scope: "SHOP" });
+  const search = clauses[1];
   assert.ok(search && "OR" in search);
   if (!search || !("OR" in search)) throw new Error("Search filter missing.");
   const nameFilter = search.OR?.[0];
-  assert.ok(nameFilter && "name" in nameFilter);
-  if (!nameFilter || !("name" in nameFilter)) throw new Error("Name filter missing.");
-  assert.equal(nameFilter.name?.contains.length, 255);
+  assert.deepEqual(nameFilter, {
+    name: { contains: "x".repeat(255), mode: "insensitive" },
+  });
 });
 
 test("state filters are projected into the database query before pagination", () => {

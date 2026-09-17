@@ -1,4 +1,5 @@
 import type {
+  Prisma,
   PromotionCampaignEventType,
   PromotionCampaignStatus,
   PromotionTargetScope,
@@ -123,12 +124,12 @@ const campaignSummarySelect = {
   createdAt: true,
   createdByPlatformAdmin: { select: { displayName: true, email: true } },
   events: {
-    orderBy: [{ createdAt: "desc" as const }],
+    orderBy: [{ createdAt: "desc" }],
     take: 5,
     select: { kind: true, createdAt: true },
   },
   _count: { select: { translations: true } },
-} as const;
+} satisfies Prisma.PromotionCampaignSelect;
 
 export async function getPromotionCampaigns(
   filters: PromotionCampaignFilters = {},
