@@ -5,6 +5,7 @@ import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant/prici
 import { parseMoneyToMinorUnits } from "@/lib/admin/merchant/pricing-builder-payload";
 import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant/pricing-builder-presentation";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
+import { assessMerchantPricingEconomicsOverride } from "@/lib/admin/merchant/pricing-economics-override";
 import {
   buildMerchantPricingTranslationTemplate,
   type MerchantPricingTranslationParseResult,
@@ -32,7 +33,7 @@ import {
   ZERO_COST_USAGE_EVENT_MESSAGE,
 } from "@/lib/admin/merchant/pricing-plan-builder";
 import { presentMerchantPricingEconomicsResult } from "@/lib/admin/merchant/pricing-economics-presentation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MerchantPricingTranslationWorkbook } from "./merchant-pricing-translation-workbook";
 import { MerchantPricingPlanSubmitButton } from "./merchant-pricing-plan-submit-button";
 
@@ -81,6 +82,10 @@ export function MerchantPricingPlanBuilder({
       : "",
   );
   const [reason, setReason] = useState("");
+  const [economicsOverrideEnabled, setEconomicsOverrideEnabled] =
+    useState(false);
+
+  const [economicsOverrideReason, setEconomicsOverrideReason] = useState("");
   const [events, setEvents] = useState<BuilderEvent[]>(initialEvents(plan));
   const [highlights, setHighlights] = useState<
     MerchantPricingBuilderHighlight[]
@@ -88,6 +93,42 @@ export function MerchantPricingPlanBuilder({
   const [translationJson, setTranslationJson] = useState("");
   const [translationResult, setTranslationResult] =
     useState<MerchantPricingTranslationParseResult | null>(null);
+
+  const economicsConfigurationKey = useMemo(
+    () =>
+      JSON.stringify({
+        handle: handle.trim(),
+        credits,
+        currency: currency.trim().toUpperCase(),
+        recurring,
+        placement,
+        minimumUpgradePremiumBps,
+        usageEvents: events.map(serializeBuilderEvent),
+      }),
+    [
+      handle,
+      credits,
+      currency,
+      recurring,
+      placement,
+      minimumUpgradePremiumBps,
+      events,
+    ],
+  );
+
+  const previousEconomicsConfigurationKeyRef = useRef(
+    economicsConfigurationKey,
+  );
+
+  useEffect(() => {
+    if (
+      previousEconomicsConfigurationKeyRef.current !== economicsConfigurationKey
+    ) {
+      setEconomicsOverrideEnabled(false);
+
+      previousEconomicsConfigurationKeyRef.current = economicsConfigurationKey;
+    }
+  }, [economicsConfigurationKey]);
   const merchantContentValid = merchantPricingBuilderMerchantContentValid({
     description,
     highlights,
@@ -153,6 +194,26 @@ export function MerchantPricingPlanBuilder({
   const economicsPassed =
     !economicsState.invalid &&
     economicsPreview.every((result) => result.status === "PASS");
+
+  const economicsOverrideAssessment = assessMerchantPricingEconomicsOverride(
+    economicsPreview,
+    economicsState.invalid,
+  );
+
+  const economicsOverrideAvailable =
+    economicsOverrideAssessment.kind === "OVERRIDEABLE";
+
+  const economicsOverrideReasonValid =
+    Boolean(economicsOverrideReason.trim()) &&
+    economicsOverrideReason.trim().length <= 2000;
+
+  const economicsOverrideReady =
+    economicsOverrideAvailable &&
+    economicsOverrideEnabled &&
+    economicsOverrideReasonValid;
+
+  const economicsSatisfied = economicsPassed || economicsOverrideReady;
+
   const presentedEconomics = economicsPreview.map((result) => ({
     result,
     presentation: presentMerchantPricingEconomicsResult({
@@ -215,7 +276,7 @@ export function MerchantPricingPlanBuilder({
     requiredFieldsValid &&
     Boolean(reason.trim()) &&
     reason.trim().length <= 2000 &&
-    economicsPassed &&
+    economicsSatisfied &&
     (translationsRetained || Boolean(translationResult?.valid));
 
   const placementLabel = plan
@@ -238,7 +299,7 @@ export function MerchantPricingPlanBuilder({
       return false;
     }
 
-    if (step === 5 && !economicsPassed) {
+    if (step === 5 && !economicsSatisfied) {
       return false;
     }
 
@@ -312,6 +373,17 @@ export function MerchantPricingPlanBuilder({
         type="hidden"
         name="translationJson"
         value={validTranslationJson()}
+      />
+      <input
+        type="hidden"
+        name="economicsOverrideRequested"
+        value={economicsOverrideReady ? "true" : "false"}
+      />
+
+      <input
+        type="hidden"
+        name="economicsOverrideReason"
+        value={economicsOverrideReady ? economicsOverrideReason.trim() : ""}
       />
       <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {[
@@ -906,8 +978,84 @@ export function MerchantPricingPlanBuilder({
             </details>
           ) : null}
 
-          {!economicsPreview.length ? (
+          {economicsPreview.length ? (
+            <ul className="space-y-2">
+              {economicsPreview.map((result) => (
+                <li
+                  key={`${result.lowerPlanId}-${result.higherPlanId}`}
+                  className="rounded border border-amber-200 bg-white p-2"
+                >
+                  {/* existing economics result content */}
+                </li>
+              ))}
+            </ul>
+          ) : (
             <p>No active plan pair requires comparison yet.</p>
+          )}
+
+          {economicsOverrideAssessment.kind === "OVERRIDEABLE" ? (
+            <div className="space-y-3 rounded-md border border-amber-300 bg-white p-4">
+              <div>
+                <p className="font-semibold text-amber-900">
+                  Economics policy override available
+                </p>
+
+                <p className="mt-1 text-sm text-amber-800">
+                  These failures are commercial-policy exceptions and may be
+                  overridden by a SUPER_ADMIN.
+                </p>
+              </div>
+
+              <label className="flex items-start gap-2 text-sm font-medium text-gray-800">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={economicsOverrideEnabled}
+                  onChange={(event) =>
+                    setEconomicsOverrideEnabled(event.target.checked)
+                  }
+                />
+
+                <span>
+                  Override the portfolio economics policy for this pricing
+                  configuration
+                </span>
+              </label>
+
+              {economicsOverrideEnabled ? (
+                <label className="block text-sm font-medium text-gray-700">
+                  Override reason
+                  <textarea
+                    className={`${inputClass} mt-1`}
+                    rows={3}
+                    maxLength={2000}
+                    value={economicsOverrideReason}
+                    onChange={(event) =>
+                      setEconomicsOverrideReason(event.target.value)
+                    }
+                    placeholder="Explain why this commercial exception is being approved."
+                  />
+                  {!economicsOverrideReason.trim() ? (
+                    <span className="mt-1 block text-sm font-medium text-red-700">
+                      An override reason is required.
+                    </span>
+                  ) : null}
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+
+          {economicsOverrideAssessment.kind === "HARD_FAIL" &&
+          !economicsPassed ? (
+            <div className="rounded-md border border-red-300 bg-red-50 p-4">
+              <p className="font-semibold text-red-800">
+                This economics failure cannot be overridden.
+              </p>
+
+              <p className="mt-1 text-sm text-red-700">
+                Correct the pricing configuration before continuing.
+              </p>
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -962,7 +1110,24 @@ export function MerchantPricingPlanBuilder({
               </li>
             ))}
           </ul>
-          <p>Portfolio economics: {economicsPassed ? "PASS" : "NOT PASS"}</p>
+          <p>
+            Portfolio economics:{" "}
+            {economicsPassed
+              ? "PASS"
+              : economicsOverrideReady
+                ? "OVERRIDE REQUESTED"
+                : "NOT PASS"}
+          </p>
+
+          {economicsOverrideReady ? (
+            <>
+              <p>
+                Override failures:{" "}
+                {economicsOverrideAssessment.failureCodes.join(", ")}
+              </p>
+              <p>Override reason: {economicsOverrideReason.trim()}</p>
+            </>
+          ) : null}
           <p>
             Translation state:{" "}
             {translationsRetained
