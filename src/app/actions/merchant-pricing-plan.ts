@@ -686,6 +686,16 @@ export async function mutateMerchantPricingPlanAction(
       let overrideUpdate: EconomicsOverrideState | null = null;
 
       if (!existing.isActive) {
+        if (
+          existing.planKind === MerchantPricingPlanKind.PAID_METERED &&
+          !existing.shopifyRecoveryUsageEventHandle?.trim()
+        ) {
+          return {
+            validationError:
+              "A dedicated recovery usage-event handle is required before a paid pricing plan can be activated.",
+          };
+        }
+
         const rows = await transaction.merchantPricingPlan.findMany({
           include: merchantPricingInclude,
           orderBy: { cataloguePosition: "asc" },

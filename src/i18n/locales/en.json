@@ -328,7 +328,7 @@
   "billingControls.reason": "Mutation reason",
   "billingControls.savePlatform": "Save platform controls",
   "billingControls.shopTitle": "Shop billing controls",
-  "billingControls.shopDescription": "Apply a bounded, auditable override to this shop. Leave numeric fields blank to inherit plan defaults.",
+  "billingControls.shopDescription": "Apply a bounded, auditable override to this shop. Leave numeric fields blank to inherit platform defaults.",
   "billingControls.softLimit": "Outbound soft limit",
   "billingControls.hardLimit": "Outbound hard limit",
   "billingControls.recoveryCeiling": "Recovery safety ceiling",

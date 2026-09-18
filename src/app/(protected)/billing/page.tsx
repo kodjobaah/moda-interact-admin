@@ -211,6 +211,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <MerchantPricingPlanDrawer
             plan={selectedPlan ?? undefined}
             cataloguePlans={cataloguePlans ?? []}
+            featureCatalogue={features ?? []}
             minimumUpgradePremiumBps={
               plansPolicy?.minimumUpgradePremiumBps ?? 2000
             }

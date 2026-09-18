@@ -194,8 +194,12 @@ export function TenantBillingControls({
   const activeOverride = override && !expired ? override : null;
   const effectiveSoftLimit = activeOverride?.outboundSoftLimit ?? defaultSoftLimit;
   const effectiveHardLimit = activeOverride?.outboundHardLimit ?? defaultHardLimit;
+  const effectiveTerminalMessageReservedSlots =
+    activeOverride?.terminalMessageReservedSlots ??
+    controls.platform?.terminalMessageReservedSlots ??
+    "Not configured";
   const overrideState = !override
-    ? "Using plan defaults"
+    ? "Using platform defaults"
     : expired
       ? "Override expired"
       : "Override active";
@@ -221,7 +225,7 @@ export function TenantBillingControls({
           </div>
           <div>
             <dt className="text-xs font-medium text-gray-500">Terminal message reserve</dt>
-            <dd className="mt-1 text-sm font-semibold text-gray-900">{activeOverride?.terminalMessageReservedSlots ?? adminI18n.t("billingControls.inherit")}</dd>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">{effectiveTerminalMessageReservedSlots}</dd>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${

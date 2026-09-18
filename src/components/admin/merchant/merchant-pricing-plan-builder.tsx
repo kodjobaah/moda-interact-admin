@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin/merchant/pricing-builder-payload";
 import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant/pricing-builder-presentation";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
+import type { Feature } from "@prisma/client";
 import { assessMerchantPricingEconomicsOverride } from "@/lib/admin/merchant/pricing-economics-override";
 import {
   buildMerchantPricingTranslationTemplate,
@@ -46,10 +47,12 @@ const inputClass =
 export function MerchantPricingPlanBuilder({
   plan,
   cataloguePlans = [],
+  featureCatalogue = [],
   minimumUpgradePremiumBps = 2000,
 }: {
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
+  featureCatalogue?: Feature[];
   minimumUpgradePremiumBps?: number;
 }) {
   const nextEventKeyRef = useRef(0);
@@ -71,7 +74,7 @@ export function MerchantPricingPlanBuilder({
     plan?.shopifyRecoveryUsageEventHandle ?? "",
   );
   const [supportedFeatureKeys, setSupportedFeatureKeys] = useState<string[]>(
-    plan?.features.filter(({ feature }) => feature.active).map(({ feature }) => feature.key) ?? [],
+    plan?.features.map(({ feature }) => feature.key) ?? [],
   );
   const [currency, setCurrency] = useState(plan?.currency ?? "USD");
   const [recurring, setRecurring] = useState(
@@ -600,8 +603,10 @@ export function MerchantPricingPlanBuilder({
               System-required features are always included. Inactive mapped features remain selected until the catalogue feature is reactivated.
             </p>
           </div>
-          {plan?.features.map(({ feature }) => feature).concat(
-            cataloguePlans.flatMap((cataloguePlan) => cataloguePlan.features.map(({ feature }) => feature)),
+          {featureCatalogue.filter((feature) =>
+            feature.active || plan?.features.some(({ feature: mappedFeature }) => mappedFeature.id === feature.id),
+          ).concat(
+            plan?.features.map(({ feature }) => feature) ?? [],
           ).filter((feature, index, all) => all.findIndex((candidate) => candidate.id === feature.id) === index).map((feature) => {
             const checked = supportedFeatureKeys.includes(feature.key);
             const locked = feature.systemRequired || !feature.active;
