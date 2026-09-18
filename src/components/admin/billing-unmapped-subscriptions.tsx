@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { BillingPlanFeatureIdentifier } from "@prisma/client";
 import { resolveUnmappedSubscriptionAction } from "@/app/actions/billing-unmapped-subscriptions";
 import type {
   UnmappedResolutionState,
@@ -10,13 +9,6 @@ import type { PageResult } from "@/lib/admin/types";
 import { buildUrl, withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
 import { Pagination } from "./pagination";
-
-const FEATURE_LABELS: Record<BillingPlanFeatureIdentifier, string> = {
-  CHECKOUT_RECOVERY: "Checkout recovery",
-  AI_CONVERSATIONS: "AI conversations",
-  PRODUCT_SEARCH: "Product search",
-  ORDER_SUPPORT: "Order support",
-};
 
 function resolutionLabel(state: UnmappedResolutionState): string {
   switch (state) {
@@ -290,7 +282,6 @@ export function UnmappedSubscriptionDrawer({
   });
 
   const cataloguePlan = detail.cataloguePlan;
-  const runtimeDefaults = detail.runtimeDefaults;
   const shopifyContract = detail.shopifyContract;
   const contractVerified = shopifyContract?.status === "VERIFIED";
 
@@ -453,7 +444,7 @@ export function UnmappedSubscriptionDrawer({
           </section>
         ) : null}
 
-        {cataloguePlan?.isActive && runtimeDefaults ? (
+        {cataloguePlan?.isActive ? (
           <form
             action={resolveUnmappedSubscriptionAction}
             className="space-y-5 rounded-lg border border-gray-200 bg-gray-50 p-5"
@@ -466,99 +457,30 @@ export function UnmappedSubscriptionDrawer({
                 Operational mapping
               </h3>
               <p className="mt-1 text-sm text-gray-600">
-                {runtimeDefaults.source === "CURRENT_MAPPING"
-                  ? "Existing operational values are pre-filled for review."
-                  : runtimeDefaults.source === "SAME_KIND_TEMPLATE"
-                    ? "Safety defaults are pre-filled from another active plan of the same kind. Review them before saving."
-                    : "No same-kind operational plan exists, so conservative system defaults are pre-filled. Review them before saving."}
+                The BillingPlan is projected deterministically from the active
+                MerchantPricing catalogue plan after the verified Shopify
+                contract check.
               </p>
             </div>
 
-            {cataloguePlan.usageEvents.length ? (
-              <label className="block text-sm font-medium text-gray-700">
-                Primary operational Shopify usage-event handle
-                <select
-                  name="shopifyUsageEventHandle"
-                  required
-                  defaultValue={runtimeDefaults.shopifyUsageEventHandle ?? ""}
-                  className="mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
-                >
-                  <option value="" disabled>
-                    Select a verified usage meter
-                  </option>
-                  {cataloguePlan.usageEvents.map((event) => (
-                    <option key={event.eventHandle} value={event.eventHandle}>
-                      {event.adminLabel} — {event.eventHandle}
-                    </option>
-                  ))}
-                </select>
-                <span className="mt-1 block text-xs font-normal text-gray-500">
-                  FREE and paid subscriptions may both have usage meters. Only handles verified against the current Shopify subscription are eligible.
-                </span>
-              </label>
-            ) : (
-              <div className="rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-700">
-                This catalogue plan has no usage meter, and Shopify must also report no usage meter for validation to pass.
+            <dl className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Recovery usage-event handle
+                </dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {cataloguePlan.shopifyRecoveryUsageEventHandle ?? "None"}
+                </dd>
               </div>
-            )}
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <label className="text-sm font-medium text-gray-700">
-                Default outbound soft limit
-                <input
-                  type="number"
-                  name="defaultOutboundSoftLimit"
-                  min="1"
-                  required
-                  defaultValue={runtimeDefaults.defaultOutboundSoftLimit}
-                  className="mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Default outbound hard limit
-                <input
-                  type="number"
-                  name="defaultOutboundHardLimit"
-                  min="2"
-                  required
-                  defaultValue={runtimeDefaults.defaultOutboundHardLimit}
-                  className="mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Terminal message reserved slots
-                <input
-                  type="number"
-                  name="terminalMessageReservedSlots"
-                  min="1"
-                  required
-                  defaultValue={runtimeDefaults.terminalMessageReservedSlots}
-                  className="mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
-                />
-              </label>
-            </div>
-
-            <fieldset className="rounded-md border border-gray-200 bg-white p-4">
-              <legend className="px-1 text-sm font-semibold text-gray-900">
-                Enabled features
-              </legend>
-              <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                {Object.values(BillingPlanFeatureIdentifier).map((feature) => (
-                  <label
-                    key={feature}
-                    className="flex items-center gap-2 text-sm text-gray-700"
-                  >
-                    <input
-                      type="checkbox"
-                      name="features"
-                      value={feature}
-                      defaultChecked={runtimeDefaults.features.includes(feature)}
-                    />
-                    {FEATURE_LABELS[feature]}
-                  </label>
-                ))}
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Supported catalogue features
+                </dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {cataloguePlan.features.join(", ") || "None"}
+                </dd>
               </div>
-            </fieldset>
+            </dl>
 
             <label className="block text-sm font-medium text-gray-700">
               Resolution reason

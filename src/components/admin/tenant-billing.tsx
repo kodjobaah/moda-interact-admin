@@ -207,9 +207,9 @@ function Usage({ billing }: { billing: TenantBilling }) {
           <Value
             label={adminI18n.t("billing.hardLimit")}
             value={
-              billing.planDefaultOutboundHardLimit === null
+              billing.platformDefaultOutboundHardLimit === null
                 ? adminI18n.t("empty.unavailable")
-                : adminI18n.formatNumber(billing.planDefaultOutboundHardLimit)
+                : adminI18n.formatNumber(billing.platformDefaultOutboundHardLimit)
             }
           />
           <Value

@@ -29,6 +29,9 @@ function payload(overrides: Record<string, unknown> = {}) {
     reason: "initial catalogue",
     usageEvents: [],
     highlights: [],
+    shopifyRecoveryUsageEventHandle: null,
+    supportedFeatureKeys: [],
+    materializedAt: null,
     ...overrides,
   });
 }
@@ -60,6 +63,7 @@ test("derives allowance period and preserves UI event order without browser posi
   const parsed = parseMerchantPricingBuilderPayload(
     payload({
       planKind: "PAID_METERED",
+      shopifyRecoveryUsageEventHandle: "recovery-meter",
       allowancePeriod: "EVERY_30_DAYS",
       usageEvents: [
         {
@@ -161,6 +165,9 @@ test("rejects duplicate events, too many events, invalid tiers, unbounded zero-c
 test("normalizes decimal usage prices and resolves explicit preview placement", () => {
   const parsed = parseMerchantPricingBuilderPayload(
     payload({
+      planKind: "PAID_METERED",
+      shopifyRecoveryUsageEventHandle: "recovery-meter",
+      allowancePeriod: "EVERY_30_DAYS",
       recurringAmount: "35.5",
       usageEvents: [
         {

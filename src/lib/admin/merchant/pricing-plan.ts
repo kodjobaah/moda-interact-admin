@@ -1,4 +1,5 @@
 import type {
+  Feature,
   MerchantPricingPlan,
   MerchantPricingPlanTranslation,
   MerchantPricingPlanHighlight,
@@ -15,6 +16,7 @@ import type {
 } from "./pricing-economics";
 
 export type MerchantPricingPlanWithChildren = MerchantPricingPlan & {
+  features: Array<{ feature: Feature }>;
   translations: MerchantPricingPlanTranslation[];
   highlights: Array<
     MerchantPricingPlanHighlight & {
@@ -34,6 +36,10 @@ export type MerchantPricingPlanPageInput = {
 };
 
 const merchantPricingInclude = {
+  features: {
+    include: { feature: true },
+    orderBy: { featureId: "asc" as const },
+  },
   translations: { orderBy: { locale: "asc" as const } },
   highlights: {
     orderBy: { position: "asc" as const },
@@ -104,6 +110,7 @@ export async function getMerchantPricingCatalogueContext(): Promise<
   const [plans, activeUsageEvents] = await Promise.all([
     prisma.merchantPricingPlan.findMany({
       orderBy: [{ cataloguePosition: "asc" }, { id: "asc" }],
+      include: { features: { include: { feature: true } } },
     }),
     prisma.merchantPricingPlan.findMany({
       where: { isActive: true },

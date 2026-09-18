@@ -9,20 +9,23 @@ export async function getPlatformBillingPolicy() {
 
 export async function getTenantBillingControls(shopId: string) {
   await requirePlatformAdminRead();
-  const shop = await prisma.shop.findUnique({
-    where: { id: shopId },
-    select: {
-      billingPolicyOverride: true,
-      entitlementCounters: {
-        where: { counter: EntitlementCounter.LIFETIME_FREE_RECOVERY_CREDITS },
-        select: {
-          grantedQuantity: true,
-          committedQuantity: true,
-          reservedQuantity: true,
+  const [shop, platform] = await Promise.all([
+    prisma.shop.findUnique({
+      where: { id: shopId },
+      select: {
+        billingPolicyOverride: true,
+        entitlementCounters: {
+          where: { counter: EntitlementCounter.LIFETIME_FREE_RECOVERY_CREDITS },
+          select: {
+            grantedQuantity: true,
+            committedQuantity: true,
+            reservedQuantity: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.platformBillingPolicy.findUnique({ where: { id: "default" } }),
+  ]);
 
   if (!shop) return null;
   const counter = shop.entitlementCounters[0];
@@ -32,6 +35,13 @@ export async function getTenantBillingControls(shopId: string) {
 
   return {
     override: shop.billingPolicyOverride,
+    platform: platform
+      ? {
+          defaultOutboundSoftLimit: platform.defaultOutboundSoftLimit,
+          defaultOutboundHardLimit: platform.defaultOutboundHardLimit,
+          terminalMessageReservedSlots: platform.terminalMessageReservedSlots,
+        }
+      : null,
     allowance: {
       grantedAllowance,
       committed,

@@ -37,6 +37,8 @@ import {
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
+import { getFeatureCatalogue } from "@/lib/admin/feature-catalogue";
+import { FeatureCatalogue } from "@/components/admin/feature-catalogue";
 import { redirect } from "next/navigation";
 import { getUnmappedSubscriptionDetail, getUnmappedSubscriptions } from "@/lib/admin/unmapped-subscriptions";
 import {
@@ -88,6 +90,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
           pageSize: positiveInt(rawParams.planPageSize, 5),
         })
       : null;
+  const features = view === "plans" ? await getFeatureCatalogue() : null;
   const selectedPlan =
     view === "plans" && firstParam(rawParams.planId)
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
@@ -184,7 +187,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <BillingOverviewCards overview={overview} />
         ) : null}
         {view === "plans" && plans ? (
-          <MerchantPricingPlanCatalog plans={plans} params={params} />
+          <div className="space-y-6">
+            <FeatureCatalogue features={features ?? []} />
+            <MerchantPricingPlanCatalog plans={plans} params={params} />
+          </div>
         ) : null}
         {view === "packs" && packs ? (
           <BillingRecoveryPacks purchases={packs} params={params} />

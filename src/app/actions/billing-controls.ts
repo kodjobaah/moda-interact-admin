@@ -55,12 +55,18 @@ export async function mutatePlatformBillingPolicyAction(
         absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
         defaultWarningPercent: values.defaultWarningPercent,
         lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
+        defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
+        defaultOutboundHardLimit: values.defaultOutboundHardLimit,
+        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
         minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
       },
       update: {
         globalPauseNewRecoveries: values.globalPauseNewRecoveries,
         globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
         absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
+        defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
+        defaultOutboundHardLimit: values.defaultOutboundHardLimit,
+        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
         defaultWarningPercent: values.defaultWarningPercent,
         lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
         version: { increment: 1 },
@@ -99,8 +105,7 @@ export async function mutateShopBillingOverrideAction(
             select: {
               plan: {
                 select: {
-                  defaultOutboundSoftLimit: true,
-                  defaultOutboundHardLimit: true,
+                  id: true,
                 },
               },
             },
@@ -136,11 +141,9 @@ export async function mutateShopBillingOverrideAction(
       );
     }
     const effectiveHard =
-      values.outboundHardLimit ??
-      shop.subscription.plan.defaultOutboundHardLimit;
+      values.outboundHardLimit ?? platform.defaultOutboundHardLimit;
     const effectiveSoft =
-      values.outboundSoftLimit ??
-      shop.subscription.plan.defaultOutboundSoftLimit;
+      values.outboundSoftLimit ?? platform.defaultOutboundSoftLimit;
     if (effectiveSoft >= effectiveHard) {
       throw new Error(
         "The effective soft limit must be below the effective hard limit.",
@@ -154,6 +157,14 @@ export async function mutateShopBillingOverrideAction(
         "Recovery safety ceiling cannot exceed the platform hard ceiling.",
       );
     }
+    const effectiveTerminalReserved =
+      values.terminalMessageReservedSlots ??
+      platform.terminalMessageReservedSlots;
+    if (effectiveTerminalReserved < 1 || effectiveTerminalReserved >= effectiveHard) {
+      throw new Error(
+        "Terminal message reserved slots must be at least 1 and lower than the effective hard limit.",
+      );
+    }
 
     const after = await transaction.shopBillingPolicyOverride.upsert({
       where: { shopId: values.shopId },
@@ -164,6 +175,7 @@ export async function mutateShopBillingOverrideAction(
         pauseNewRecoveries: values.pauseNewRecoveries,
         pauseAutomatedWhatsapp: values.pauseAutomatedWhatsapp,
         recoverySafetyCeiling: values.recoverySafetyCeiling,
+        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
         expiresAt: values.expiresAt,
         reason: values.reason,
         updatedByPlatformAdminId: adminId,
@@ -174,6 +186,7 @@ export async function mutateShopBillingOverrideAction(
         pauseNewRecoveries: values.pauseNewRecoveries,
         pauseAutomatedWhatsapp: values.pauseAutomatedWhatsapp,
         recoverySafetyCeiling: values.recoverySafetyCeiling,
+        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
         expiresAt: values.expiresAt,
         reason: values.reason,
         updatedByPlatformAdminId: adminId,

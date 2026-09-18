@@ -38,6 +38,13 @@ export type BuilderEconomicsState = {
   plansById: Record<string, MerchantPricingEconomicsPlan>;
 };
 
+export function recoveryMeterValid(
+  planKind: "FREE" | "PAID_METERED",
+  handle: string | null | undefined,
+): boolean {
+  return planKind === "FREE" ? !handle?.trim() : Boolean(handle?.trim());
+}
+
 export type EvaluateBuilderEconomicsInput = {
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans: MerchantPricingPlanWithChildren[];
@@ -335,6 +342,8 @@ export function merchantPricingBuilderRequiredFieldsValid({
   credits,
   description,
   events,
+  recoveryUsageEventHandle,
+  planKind,
 }: {
   handle: string;
   name: string;
@@ -342,6 +351,8 @@ export function merchantPricingBuilderRequiredFieldsValid({
   credits: number;
   description: string;
   events: BuilderEvent[];
+  recoveryUsageEventHandle: string;
+  planKind: "FREE" | "PAID_METERED";
 }): boolean {
   return (
     Boolean(handle.trim()) &&
@@ -351,6 +362,7 @@ export function merchantPricingBuilderRequiredFieldsValid({
     Number(credits) >= 0 &&
     Boolean(description.trim()) &&
     description.trim().length <= 2000 &&
+    recoveryMeterValid(planKind, recoveryUsageEventHandle) &&
     events.every(
       (event) =>
         Boolean(event.adminLabel.trim()) &&

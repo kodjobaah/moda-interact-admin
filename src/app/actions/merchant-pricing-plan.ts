@@ -37,6 +37,10 @@ import {
 import { parseCompletedMerchantPricingTranslationPackage } from "@/lib/admin/merchant/pricing-translations";
 
 const merchantPricingInclude = {
+  features: {
+    include: { feature: true },
+    orderBy: { featureId: "asc" as const },
+  },
   translations: true,
   highlights: {
     orderBy: { position: "asc" as const },
@@ -601,12 +605,19 @@ export async function mutateMerchantPricingPlanAction(
           displayName: true,
           planKind: true,
           isActive: true,
+          materializedAt: true,
           cataloguePosition: true,
         },
       });
 
       if (!existing) {
         actionError("MerchantPricing plan not found.");
+      }
+
+      if (existing.materializedAt) {
+        actionError(
+          "This pricing plan has been materialised for operational billing and cannot be deleted. Deactivate it instead.",
+        );
       }
 
       if (existing.planKind === MerchantPricingPlanKind.FREE) {
@@ -785,10 +796,21 @@ export async function mutateMerchantPricingPlanAction(
     !existing &&
     rows.some((row) => row.shopifyPlanHandle === payload.shopifyPlanHandle)
   ) {
-    actionError("A plan with this Shopify handle already exists.");
+    actionError(
+      "A MerchantPricing plan with this Shopify handle already exists. Handles cannot be reused, including when the existing plan is inactive.",
+    );
   }
   if (existing && existing.shopifyPlanHandle !== payload.shopifyPlanHandle) {
     actionError("Shopify plan handles are immutable.");
+  }
+
+  if (
+    existing?.materializedAt &&
+    existing.planKind !== payload.planKind
+  ) {
+    actionError(
+      "The plan kind cannot be changed after this pricing plan has been materialised.",
+    );
   }
 
   const isCreate = !existing;
@@ -957,6 +979,39 @@ export async function mutateMerchantPricingPlanAction(
         : JSON.stringify(beforeOverrideSnapshot) !==
           JSON.stringify(afterOverrideSnapshot);
 
+      const activeFeatures = await transaction.feature.findMany({
+        where: { active: true },
+        select: { id: true, key: true, systemRequired: true },
+      });
+      const existingFeatureMappings = existing
+        ? await transaction.merchantPricingPlanFeature.findMany({
+            where: { merchantPricingPlanId: existing.id },
+            include: { feature: { select: { id: true, key: true, active: true } } },
+          })
+        : [];
+      const requestedFeatures = await transaction.feature.findMany({
+        where: { key: { in: payload.supportedFeatureKeys } },
+        select: { id: true, key: true, active: true },
+      });
+      if (requestedFeatures.length !== payload.supportedFeatureKeys.length)
+        actionError("One or more selected features do not exist.");
+      if (requestedFeatures.some((feature) => !feature.active))
+        actionError("Inactive features must be reactivated before they can be newly selected.");
+      const requestedKeys = new Set(payload.supportedFeatureKeys);
+      if (requestedKeys.size !== payload.supportedFeatureKeys.length)
+        actionError("Supported feature keys must be unique.");
+      const desiredFeatureIds = [
+        ...new Set([
+          ...activeFeatures
+            .filter((feature) => feature.systemRequired)
+            .map((feature) => feature.id),
+          ...existingFeatureMappings
+            .filter(({ feature }) => !feature.active)
+            .map(({ feature }) => feature.id),
+          ...requestedFeatures.map((feature) => feature.id),
+        ]),
+      ];
+
       if (isCreate) {
         for (const row of [...rows]
           .reverse()
@@ -974,6 +1029,9 @@ export async function mutateMerchantPricingPlanAction(
             planKind: payload.planKind as MerchantPricingPlanKind,
             isActive: payload.isActive,
             cataloguePosition: position,
+            shopifyRecoveryUsageEventHandle:
+              payload.shopifyRecoveryUsageEventHandle,
+            materializedAt: null,
             featured: payload.featured,
             includedRecoveryCredits: payload.includedRecoveryCredits,
             allowancePeriod:
@@ -1012,6 +1070,9 @@ export async function mutateMerchantPricingPlanAction(
                 eventData(event, eventPosition, payload.currency),
               ),
             },
+            features: {
+              create: desiredFeatureIds.map((featureId) => ({ featureId })),
+            },
           },
         });
 
@@ -1042,6 +1103,8 @@ export async function mutateMerchantPricingPlanAction(
         data: {
           displayName: payload.name,
           planKind: payload.planKind as MerchantPricingPlanKind,
+          shopifyRecoveryUsageEventHandle:
+            payload.shopifyRecoveryUsageEventHandle,
           isActive: payload.isActive,
           featured: payload.featured,
           includedRecoveryCredits: payload.includedRecoveryCredits,
@@ -1092,8 +1155,47 @@ export async function mutateMerchantPricingPlanAction(
                 },
               }
             : {}),
+            features: {
+              deleteMany: {},
+              create: desiredFeatureIds.map((featureId) => ({ featureId })),
+            },
         },
       });
+
+        if (existing.materializedAt) {
+          const billingPlan = await transaction.billingPlan.findUnique({
+            where: { shopifyPlanHandle: existing.shopifyPlanHandle },
+            include: { features: true },
+          });
+          if (!billingPlan)
+            actionError(
+              "The durable pricing plan has no matching operational BillingPlan; the edit was aborted.",
+            );
+          await transaction.billingPlan.update({
+            where: { id: billingPlan.id },
+            data: {
+              name: payload.name,
+              shopifyUsageEventHandle:
+                payload.planKind === "FREE"
+                  ? null
+                  : payload.shopifyRecoveryUsageEventHandle!.trim(),
+              includedRecoveryConversationAllowance:
+                payload.planKind === "FREE"
+                  ? null
+                  : payload.includedRecoveryCredits,
+              features: {
+                deleteMany: { featureId: { notIn: desiredFeatureIds } },
+                upsert: desiredFeatureIds.map((featureId) => ({
+                  where: {
+                    planId_featureId: { planId: billingPlan.id, featureId },
+                  },
+                  create: { featureId, enabled: true },
+                  update: { enabled: true },
+                })),
+              },
+            },
+          });
+        }
 
       if (overrideAuditRequired) {
         await auditEconomicsOverrideChange(
