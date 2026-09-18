@@ -209,6 +209,7 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "billing.tab.recoveryPacks",
   "billing.tab.refundRequests",
   "billing.tab.appEvents",
+  "billing.tab.unmapped",
   "billing.tab.usage",
   "billing.tab.shopify",
   "billing.tab.activity",

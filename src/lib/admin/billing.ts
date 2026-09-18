@@ -300,6 +300,7 @@ export async function getTenantBilling(
   const subscription = await prisma.subscription.findUnique({
     where: { shopId },
     select: {
+      id: true,
       observedShopifyPlanHandle: true,
       status: true,
       currentPeriodStart: true,

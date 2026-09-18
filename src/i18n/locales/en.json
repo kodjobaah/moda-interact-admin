@@ -209,6 +209,7 @@
   "billing.tab.recoveryPacks": "Recovery packs",
   "billing.tab.refundRequests": "Refund requests",
   "billing.tab.appEvents": "App Events",
+  "billing.tab.unmapped": "Unmapped subscriptions",
   "billing.tab.usage": "Usage",
   "billing.tab.shopify": "Shopify",
   "billing.tab.activity": "Activity",

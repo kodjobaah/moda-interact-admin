@@ -192,6 +192,7 @@ export type RecoveryCreditRefundDetail = RecoveryCreditRefundItem & {
 
 export type TenantBilling = {
   subscription: {
+    id: string;
     observedShopifyPlanHandle: string | null;
     status: string;
     currentPeriodStart: Date | null;

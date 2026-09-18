@@ -8,15 +8,34 @@ import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { buildUrl } from "@/lib/admin/query";
 import { Pagination } from "./pagination";
 
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+function Metric({
+  label,
+  value,
+  href,
+  actionLabel,
+}: {
+  label: string;
+  value: string | number;
+  href?: string;
+  actionLabel?: string;
+}) {
+  const content = (
+    <div
+      className={`rounded-lg border border-gray-200 bg-white p-4 shadow-sm ${href ? "transition hover:border-[var(--brand-300)] hover:shadow-md" : ""}`}
+    >
       <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         {label}
       </p>
       <p className="mt-2 text-2xl font-bold text-[var(--brand-900)]">{value}</p>
+      {actionLabel ? (
+        <p className="mt-2 text-xs font-semibold text-[var(--brand-700)]">
+          {actionLabel}
+        </p>
+      ) : null}
     </div>
   );
+
+  return href ? <Link href={href}>{content}</Link> : content;
 }
 
 export function BillingOverviewCards({
@@ -52,6 +71,8 @@ export function BillingOverviewCards({
       <Metric
         label={adminI18n.t("billing.unmappedSubscriptions")}
         value={adminI18n.formatNumber(overview.planDistribution.unmapped)}
+        href="/billing?view=unmapped"
+        actionLabel="Review and resolve"
       />
       <Metric
         label={adminI18n.t("billing.syncErrors")}

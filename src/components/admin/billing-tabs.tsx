@@ -2,7 +2,13 @@ import Link from "next/link";
 import { adminI18n } from "@/i18n";
 import { buildUrl } from "@/lib/admin/query";
 
-type BillingView = "overview" | "plans" | "packs" | "refunds" | "events";
+type BillingView =
+  | "overview"
+  | "plans"
+  | "packs"
+  | "refunds"
+  | "events"
+  | "unmapped";
 
 const tabs: Array<{ value: BillingView; label: string }> = [
   { value: "overview", label: "billing.tab.overview" },
@@ -10,6 +16,7 @@ const tabs: Array<{ value: BillingView; label: string }> = [
   { value: "packs", label: "billing.tab.recoveryPacks" },
   { value: "refunds", label: "billing.tab.refundRequests" },
   { value: "events", label: "billing.tab.appEvents" },
+  { value: "unmapped", label: "billing.tab.unmapped" },
 ];
 
 const relevantParams: Record<BillingView, string[]> = {
@@ -18,6 +25,7 @@ const relevantParams: Record<BillingView, string[]> = {
   packs: ["packPage", "packStatus", "purchaseId"],
   refunds: ["refundPage", "refundStatus", "refundId"],
   events: ["eventPage", "state", "shopId", "from", "to", "eventId"],
+  unmapped: ["unmappedPage", "subscriptionId", "mappingResolved"],
 };
 
 export function BillingTabs({

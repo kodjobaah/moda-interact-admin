@@ -1,6 +1,7 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import { MerchantPricingPlanCatalog } from "@/components/admin/merchant/merchant-pricing-plan-catalog";
 import { BillingTabs, type BillingView } from "@/components/admin/billing-tabs";
+import { BillingUnmappedSubscriptions, UnmappedSubscriptionDrawer } from "@/components/admin/billing-unmapped-subscriptions";
 import {
   BillingEventDrawer,
   MerchantPricingPlanDrawer,
@@ -37,6 +38,7 @@ import {
 import { ShopifyReportState } from "@prisma/client";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
 import { redirect } from "next/navigation";
+import { getUnmappedSubscriptionDetail, getUnmappedSubscriptions } from "@/lib/admin/unmapped-subscriptions";
 import {
   RecoveryCreditRefundDrawer,
   RecoveryCreditRefundQueue,
@@ -66,6 +68,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
     "packs",
     "refunds",
     "events",
+    "unmapped",
   ];
   const rawView = rawRequestedView as BillingView | undefined;
   const view = allowedViews.includes(rawView ?? "overview")
@@ -142,6 +145,19 @@ export default async function BillingPage({ searchParams }: PageProps) {
     view === "events" && firstParam(rawParams.eventId)
       ? await getBillingLedgerItem(firstParam(rawParams.eventId) as string)
       : null;
+  const unmapped =
+    view === "unmapped"
+      ? await getUnmappedSubscriptions({
+          page: positiveInt(rawParams.unmappedPage),
+          pageSize: 20,
+        })
+      : null;
+  const selectedUnmapped =
+    view === "unmapped" && firstParam(rawParams.subscriptionId)
+      ? await getUnmappedSubscriptionDetail(
+          firstParam(rawParams.subscriptionId) as string,
+        )
+      : null;
 
   return (
     <AdminShell active="billing">
@@ -176,6 +192,14 @@ export default async function BillingPage({ searchParams }: PageProps) {
         {view === "events" && ledger ? (
           <BillingLedger ledger={ledger} params={params} />
         ) : null}
+        {view === "unmapped" && firstParam(rawParams.mappingResolved) ? (
+          <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            Operational mapping repaired. Reconciliation has been requested; Shopify remains authoritative until the subscription is re-projected.
+          </div>
+        ) : null}
+        {view === "unmapped" && unmapped ? (
+          <BillingUnmappedSubscriptions subscriptions={unmapped} params={params} />
+        ) : null}
         {view === "plans" &&
         (params.drawer === "register-plan" || selectedPlan) ? (
           <MerchantPricingPlanDrawer
@@ -206,6 +230,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
         ) : null}
         {view === "events" && selectedEvent ? (
           <BillingEventDrawer event={selectedEvent} params={params} />
+        ) : null}
+        {view === "unmapped" && selectedUnmapped ? (
+          <UnmappedSubscriptionDrawer detail={selectedUnmapped} params={params} />
         ) : null}
       </div>
     </AdminShell>
