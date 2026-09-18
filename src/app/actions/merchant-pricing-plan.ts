@@ -831,7 +831,9 @@ export async function mutateMerchantPricingPlanAction(
   }
 
   const position = isCreate
-    ? placementIndex(payload.placement, rows)
+    ? payload.planKind === "FREE"
+      ? 0
+      : placementIndex(payload.placement, rows)
     : existing.cataloguePosition;
 
   if (payload.planKind === "FREE" && position !== 0) {

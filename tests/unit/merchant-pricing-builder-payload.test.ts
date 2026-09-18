@@ -5,6 +5,7 @@ import {
   parseMerchantPricingBuilderPayload,
   parseMoneyToMinorUnits,
   projectMerchantPricingCatalogueOrder,
+  resolveMerchantPricingCreatePlacement,
   resolveMerchantPricingPreviewPosition,
 } from "../../src/lib/admin/merchant/pricing-builder-payload.ts";
 import { findUnboundedZeroCostEventLabel } from "../../src/lib/admin/merchant/pricing-builder-presentation.ts";
@@ -195,6 +196,18 @@ test("normalizes decimal usage prices and resolves explicit preview placement", 
   assert.equal(
     resolveMerchantPricingPreviewPosition("AFTER:missing", ["first", "last"]),
     null,
+  );
+});
+
+test("derives legal default placement from plan kind", () => {
+  assert.equal(resolveMerchantPricingCreatePlacement("FREE", []), "ONLY");
+  assert.equal(
+    resolveMerchantPricingCreatePlacement("FREE", ["first", "last"]),
+    "BEFORE:first",
+  );
+  assert.equal(
+    resolveMerchantPricingCreatePlacement("PAID_METERED", ["first", "last"]),
+    "AFTER:last",
   );
 });
 

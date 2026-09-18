@@ -2,7 +2,10 @@
 
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
 import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant/pricing-builder-payload";
-import { parseMoneyToMinorUnits } from "@/lib/admin/merchant/pricing-builder-payload";
+import {
+  parseMoneyToMinorUnits,
+  resolveMerchantPricingCreatePlacement,
+} from "@/lib/admin/merchant/pricing-builder-payload";
 import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant/pricing-builder-presentation";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
 import { assessMerchantPricingEconomicsOverride } from "@/lib/admin/merchant/pricing-economics-override";
@@ -68,13 +71,19 @@ export function MerchantPricingPlanBuilder({
   const [recurring, setRecurring] = useState(
     plan ? minorUnitsToMoney(plan.recurringAmountMinor) : "0",
   );
-  const [placement, setPlacement] = useState(
+  const cataloguePlanIds = useMemo(
+    () => cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
+    [cataloguePlans],
+  );
+  const [placement, setPlacement] = useState(() =>
     plan
       ? "UNCHANGED"
-      : cataloguePlans.length
-        ? `AFTER:${cataloguePlans[cataloguePlans.length - 1].id}`
-        : "ONLY",
+      : resolveMerchantPricingCreatePlacement(planKind, cataloguePlanIds),
   );
+  const effectivePlacement =
+    !plan && planKind === "FREE"
+      ? resolveMerchantPricingCreatePlacement("FREE", cataloguePlanIds)
+      : placement;
   const [description, setDescription] = useState(
     plan
       ? (plan.translations.find((translation) => translation.locale === "en")
@@ -101,7 +110,7 @@ export function MerchantPricingPlanBuilder({
         credits,
         currency: currency.trim().toUpperCase(),
         recurring,
-        placement,
+        placement: effectivePlacement,
         minimumUpgradePremiumBps,
         usageEvents: events.map(serializeBuilderEvent),
       }),
@@ -110,7 +119,7 @@ export function MerchantPricingPlanBuilder({
       credits,
       currency,
       recurring,
-      placement,
+      effectivePlacement,
       minimumUpgradePremiumBps,
       events,
     ],
@@ -143,7 +152,7 @@ export function MerchantPricingPlanBuilder({
     recurring,
     currency,
     events,
-    placement,
+    placement: effectivePlacement,
     minimumUpgradePremiumBps,
   });
 
@@ -160,7 +169,7 @@ export function MerchantPricingPlanBuilder({
       billingPeriod: "EVERY_30_DAYS",
       currency: currency.toUpperCase(),
       recurringAmount: recurring,
-      placement,
+      placement: effectivePlacement,
       catalogueOrderSnapshot: plan
         ? null
         : cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
@@ -182,7 +191,7 @@ export function MerchantPricingPlanBuilder({
     name,
     plan,
     planKind,
-    placement,
+    effectivePlacement,
     reason,
     recurring,
   ]);
@@ -281,11 +290,21 @@ export function MerchantPricingPlanBuilder({
 
   const placementLabel = plan
     ? `Current position (${plan.cataloguePosition + 1})`
-    : placement === "ONLY"
+    : effectivePlacement === "ONLY"
       ? "This will be the first plan."
-      : placement.startsWith("BEFORE:")
-        ? `Before ${cataloguePlans[0]?.displayName ?? "the first plan"}`
-        : `After ${cataloguePlans.find((cataloguePlan) => placement === `AFTER:${cataloguePlan.id}`)?.displayName ?? "the selected plan"}`;
+      : effectivePlacement.startsWith("BEFORE:")
+        ? `First — before ${cataloguePlans[0]?.displayName ?? "the first plan"}`
+        : `After ${cataloguePlans.find((cataloguePlan) => effectivePlacement === `AFTER:${cataloguePlan.id}`)?.displayName ?? "the selected plan"}`;
+
+  function handlePlanKindChange(nextPlanKind: "FREE" | "PAID_METERED") {
+    setPlanKind(nextPlanKind);
+
+    if (plan) return;
+
+    setPlacement(
+      resolveMerchantPricingCreatePlacement(nextPlanKind, cataloguePlanIds),
+    );
+  }
 
   function canNavigateTo(targetStep: number): boolean {
     if (targetStep <= step) return true;
@@ -432,7 +451,9 @@ export function MerchantPricingPlanBuilder({
               className={inputClass}
               value={planKind}
               onChange={(event) =>
-                setPlanKind(event.target.value as "FREE" | "PAID_METERED")
+                handlePlanKindChange(
+                  event.target.value as "FREE" | "PAID_METERED",
+                )
               }
             >
               <option value="FREE" disabled={freePlanAlreadyExists}>
@@ -481,25 +502,35 @@ export function MerchantPricingPlanBuilder({
           </label>
           <select
             className={inputClass}
-            value={placement}
-            disabled={Boolean(plan)}
+            value={effectivePlacement}
+            disabled={Boolean(plan) || planKind === "FREE"}
             onChange={(event) => setPlacement(event.target.value)}
           >
-            {!cataloguePlans.length ? (
-              <option value="ONLY">This will be the first plan.</option>
-            ) : null}
-            {cataloguePlans.map((cataloguePlan) => (
-              <option
-                key={cataloguePlan.id}
-                value={`AFTER:${cataloguePlan.id}`}
-              >
-                After {cataloguePlan.displayName}
-              </option>
-            ))}
             {plan ? (
               <option value="UNCHANGED">Keep current position</option>
-            ) : null}
+            ) : !cataloguePlans.length ? (
+              <option value="ONLY">This will be the first plan.</option>
+            ) : planKind === "FREE" ? (
+              <option value={`BEFORE:${cataloguePlans[0].id}`}>
+                First — before {cataloguePlans[0].displayName}
+              </option>
+            ) : (
+              cataloguePlans.map((cataloguePlan) => (
+                <option
+                  key={cataloguePlan.id}
+                  value={`AFTER:${cataloguePlan.id}`}
+                >
+                  After {cataloguePlan.displayName}
+                </option>
+              ))
+            )}
           </select>
+          {!plan && planKind === "FREE" && cataloguePlans.length ? (
+            <p className="text-sm text-gray-600">
+              The FREE plan must be the first plan in the catalogue, so it will
+              be inserted before {cataloguePlans[0].displayName}.
+            </p>
+          ) : null}
           {plan ? (
             <p className="text-sm text-gray-600">
               Current position: {plan.cataloguePosition}

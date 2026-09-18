@@ -109,6 +109,17 @@ export function parseMoneyToMinorUnits(value: unknown): number {
   return minor;
 }
 
+export function resolveMerchantPricingCreatePlacement(
+  planKind: "FREE" | "PAID_METERED",
+  catalogueIds: string[],
+): "ONLY" | `BEFORE:${string}` | `AFTER:${string}` {
+  if (catalogueIds.length === 0) return "ONLY";
+
+  return planKind === "FREE"
+    ? `BEFORE:${catalogueIds[0]}`
+    : `AFTER:${catalogueIds[catalogueIds.length - 1]}`;
+}
+
 export function resolveMerchantPricingPreviewPosition(
   placement: string,
   catalogueIds: string[],
