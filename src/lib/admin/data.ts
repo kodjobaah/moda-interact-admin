@@ -303,8 +303,6 @@ export async function getTenantDetail(
           plan: {
             select: {
               name: true,
-              defaultOutboundSoftLimit: true,
-              defaultOutboundHardLimit: true,
             },
           },
         },
@@ -405,9 +403,9 @@ export async function getTenantDetail(
     currentPeriodStart: subscription?.currentPeriodStart ?? null,
     currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
     defaultOutboundSoftLimit:
-      subscription?.plan?.defaultOutboundSoftLimit ?? 10,
+      billingControls.platform?.defaultOutboundSoftLimit ?? 10,
     defaultOutboundHardLimit:
-      subscription?.plan?.defaultOutboundHardLimit ?? 20,
+      billingControls.platform?.defaultOutboundHardLimit ?? 20,
     billingControls,
   };
 }

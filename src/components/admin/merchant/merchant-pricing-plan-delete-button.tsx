@@ -7,10 +7,12 @@ export function MerchantPricingPlanDeleteButton({
   id,
   displayName,
   disabled,
+  durable = false,
 }: {
   id: string;
   displayName: string;
   disabled: boolean;
+  durable?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -40,7 +42,9 @@ export function MerchantPricingPlanDeleteButton({
       disabled={disabled || pending}
       onClick={handleDelete}
       title={
-        disabled
+        durable
+          ? "This pricing plan is durable and cannot be deleted. Deactivate it instead."
+          : disabled
           ? "Deactivate this paid plan before deleting it."
           : `Delete ${displayName}`
       }

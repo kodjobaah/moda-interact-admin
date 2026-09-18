@@ -49,6 +49,9 @@ export function PlatformPolicyControls({
     defaultWarningPercent: number;
     lifetimeFreeRecoveryAllowance: number;
     minimumUpgradePremiumBps: number;
+    defaultOutboundSoftLimit: number;
+    defaultOutboundHardLimit: number;
+    terminalMessageReservedSlots: number;
   } | null;
 }) {
   return (
@@ -81,6 +84,18 @@ export function PlatformPolicyControls({
               defaultValue={policy?.absoluteOutboundHardLimit ?? ""}
               required
             />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Default outbound soft limit
+            <input className={inputClass} type="number" min="1" name="defaultOutboundSoftLimit" defaultValue={policy?.defaultOutboundSoftLimit ?? ""} required />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Default outbound hard limit
+            <input className={inputClass} type="number" min="2" name="defaultOutboundHardLimit" defaultValue={policy?.defaultOutboundHardLimit ?? ""} required />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Terminal message reserved slots
+            <input className={inputClass} type="number" min="1" name="terminalMessageReservedSlots" defaultValue={policy?.terminalMessageReservedSlots ?? ""} required />
           </label>
           <label className="text-sm font-medium text-gray-700">
             Minimum stay+top-up premium above next-plan upgrade
@@ -179,8 +194,12 @@ export function TenantBillingControls({
   const activeOverride = override && !expired ? override : null;
   const effectiveSoftLimit = activeOverride?.outboundSoftLimit ?? defaultSoftLimit;
   const effectiveHardLimit = activeOverride?.outboundHardLimit ?? defaultHardLimit;
+  const effectiveTerminalMessageReservedSlots =
+    activeOverride?.terminalMessageReservedSlots ??
+    controls.platform?.terminalMessageReservedSlots ??
+    "Not configured";
   const overrideState = !override
-    ? "Using plan defaults"
+    ? "Using platform defaults"
     : expired
       ? "Override expired"
       : "Override active";
@@ -203,6 +222,10 @@ export function TenantBillingControls({
             <p className="mt-1 text-sm text-gray-600">
               {adminI18n.t("billingControls.shopDescription")}
             </p>
+          </div>
+          <div>
+            <dt className="text-xs font-medium text-gray-500">Terminal message reserve</dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">{effectiveTerminalMessageReservedSlots}</dd>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -323,6 +346,10 @@ export function TenantBillingControls({
                   name="recoverySafetyCeiling"
                   defaultValue={override?.recoverySafetyCeiling ?? ""}
                 />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Terminal message reserved slots
+                <input className={inputClass} type="number" min="1" name="terminalMessageReservedSlots" defaultValue={override?.terminalMessageReservedSlots ?? ""} placeholder="Inherit platform default" />
               </label>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">

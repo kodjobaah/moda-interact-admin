@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin/merchant/pricing-builder-payload";
 import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant/pricing-builder-presentation";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
+import type { Feature } from "@prisma/client";
 import { assessMerchantPricingEconomicsOverride } from "@/lib/admin/merchant/pricing-economics-override";
 import {
   buildMerchantPricingTranslationTemplate,
@@ -46,10 +47,12 @@ const inputClass =
 export function MerchantPricingPlanBuilder({
   plan,
   cataloguePlans = [],
+  featureCatalogue = [],
   minimumUpgradePremiumBps = 2000,
 }: {
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
+  featureCatalogue?: Feature[];
   minimumUpgradePremiumBps?: number;
 }) {
   const nextEventKeyRef = useRef(0);
@@ -67,6 +70,12 @@ export function MerchantPricingPlanBuilder({
   const [isActive, setIsActive] = useState(plan?.isActive ?? true);
   const [featured, setFeatured] = useState(plan?.featured ?? false);
   const [credits, setCredits] = useState(plan?.includedRecoveryCredits ?? 0);
+  const [recoveryUsageEventHandle, setRecoveryUsageEventHandle] = useState(
+    plan?.shopifyRecoveryUsageEventHandle ?? "",
+  );
+  const [supportedFeatureKeys, setSupportedFeatureKeys] = useState<string[]>(
+    plan?.features.map(({ feature }) => feature.key) ?? [],
+  );
   const [currency, setCurrency] = useState(plan?.currency ?? "USD");
   const [recurring, setRecurring] = useState(
     plan ? minorUnitsToMoney(plan.recurringAmountMinor) : "0",
@@ -162,6 +171,10 @@ export function MerchantPricingPlanBuilder({
       shopifyPlanHandle: handle,
       name,
       planKind,
+      shopifyRecoveryUsageEventHandle:
+        planKind === "FREE" ? null : recoveryUsageEventHandle,
+      supportedFeatureKeys,
+      materializedAt: plan?.materializedAt?.toISOString() ?? null,
       isActive,
       featured,
       includedRecoveryCredits: Number(credits),
@@ -191,6 +204,8 @@ export function MerchantPricingPlanBuilder({
     name,
     plan,
     planKind,
+    recoveryUsageEventHandle,
+    supportedFeatureKeys,
     effectivePlacement,
     reason,
     recurring,
@@ -246,6 +261,8 @@ export function MerchantPricingPlanBuilder({
     credits,
     description,
     events,
+    recoveryUsageEventHandle,
+    planKind,
   });
   const retainedTemplate = plan
     ? buildMerchantPricingTranslationTemplate({
@@ -540,6 +557,19 @@ export function MerchantPricingPlanBuilder({
       ) : null}
       {step === 2 ? (
         <section className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-medium text-gray-700 sm:col-span-2">
+            Recovery usage-event handle
+            <input
+              className={inputClass}
+              value={recoveryUsageEventHandle}
+              required={planKind === "PAID_METERED"}
+              disabled={planKind === "FREE"}
+              onChange={(event) => setRecoveryUsageEventHandle(event.target.value)}
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              Normal paid recovery meter copied to BillingPlan.shopifyUsageEventHandle. Usage events below are top-up offers.
+            </span>
+          </label>
           <label className="text-sm font-medium text-gray-700">
             Currency
             <input
@@ -563,6 +593,39 @@ export function MerchantPricingPlanBuilder({
           <p className="text-sm text-gray-600 sm:col-span-2">
             Billing period: EVERY_30_DAYS
           </p>
+        </section>
+      ) : null}
+      {step === 0 ? (
+        <section className="mt-4 space-y-3 rounded-md border border-gray-200 p-4">
+          <div>
+            <h3 className="font-semibold text-gray-900">Supported features</h3>
+            <p className="text-sm text-gray-600">
+              System-required features are always included. Inactive mapped features remain selected until the catalogue feature is reactivated.
+            </p>
+          </div>
+          {featureCatalogue.filter((feature) =>
+            feature.active || plan?.features.some(({ feature: mappedFeature }) => mappedFeature.id === feature.id),
+          ).concat(
+            plan?.features.map(({ feature }) => feature) ?? [],
+          ).filter((feature, index, all) => all.findIndex((candidate) => candidate.id === feature.id) === index).map((feature) => {
+            const checked = supportedFeatureKeys.includes(feature.key);
+            const locked = feature.systemRequired || !feature.active;
+            return (
+              <label key={feature.id} className="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={checked || feature.systemRequired}
+                  disabled={locked}
+                  onChange={(event) => setSupportedFeatureKeys((current) => event.target.checked ? [...current, feature.key] : current.filter((key) => key !== feature.key))}
+                />
+                <span>
+                  <span className="font-medium">{feature.displayName}</span>
+                  {feature.systemRequired ? " (Required)" : !feature.active ? " (Inactive globally)" : ""}
+                  {feature.description ? <span className="block text-xs text-gray-500">{feature.description}</span> : null}
+                </span>
+              </label>
+            );
+          })}
         </section>
       ) : null}
       {step === 3 ? (

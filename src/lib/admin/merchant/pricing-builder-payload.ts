@@ -26,6 +26,9 @@ export type MerchantPricingBuilderPayload = {
   shopifyPlanHandle: string;
   name: string;
   planKind: "FREE" | "PAID_METERED";
+  shopifyRecoveryUsageEventHandle: string | null;
+  supportedFeatureKeys: string[];
+  materializedAt: string | Date | null;
   isActive: boolean;
   featured: boolean;
   includedRecoveryCredits: number;
@@ -160,6 +163,9 @@ const TOP_LEVEL_KEYS = [
   "shopifyPlanHandle",
   "name",
   "planKind",
+  "shopifyRecoveryUsageEventHandle",
+  "supportedFeatureKeys",
+  "materializedAt",
   "isActive",
   "featured",
   "includedRecoveryCredits",
@@ -228,6 +234,60 @@ export function parseMerchantPricingBuilderPayload(
     issues.push({ path: "$.isActive", message: "must be a boolean" });
   if (typeof parsed.featured !== "boolean")
     issues.push({ path: "$.featured", message: "must be a boolean" });
+  const recoveryHandle =
+    parsed.shopifyRecoveryUsageEventHandle === null ||
+    parsed.shopifyRecoveryUsageEventHandle === ""
+      ? null
+      : requiredString(
+          parsed.shopifyRecoveryUsageEventHandle,
+          "$.shopifyRecoveryUsageEventHandle",
+          255,
+          issues,
+        );
+  if (planKind === "FREE" && recoveryHandle !== null)
+    issues.push({
+      path: "$.shopifyRecoveryUsageEventHandle",
+      message: "must be null for FREE plans",
+    });
+  if (planKind === "PAID_METERED" && recoveryHandle === null)
+    issues.push({
+      path: "$.shopifyRecoveryUsageEventHandle",
+      message: "must be a non-empty string for PAID_METERED plans",
+    });
+  const supportedFeatureKeys: string[] = [];
+  const featureKeys = new Set<string>();
+  if (!Array.isArray(parsed.supportedFeatureKeys)) {
+    issues.push({
+      path: "$.supportedFeatureKeys",
+      message: "must be an array of feature keys",
+    });
+  } else {
+    parsed.supportedFeatureKeys.forEach((value, index) => {
+      const key = requiredString(
+        value,
+        `$.supportedFeatureKeys[${index}]`,
+        128,
+        issues,
+      );
+      if (!/^[a-z][a-z0-9_]{0,127}$/.test(key))
+        issues.push({
+          path: `$.supportedFeatureKeys[${index}]`,
+          message: "must match the feature key pattern",
+        });
+      if (featureKeys.has(key))
+        issues.push({
+          path: `$.supportedFeatureKeys[${index}]`,
+          message: "must not contain duplicates",
+        });
+      featureKeys.add(key);
+      supportedFeatureKeys.push(key);
+    });
+  }
+  if (parsed.materializedAt !== null && typeof parsed.materializedAt !== "string")
+    issues.push({
+      path: "$.materializedAt",
+      message: "must be an ISO string or null",
+    });
   const includedRecoveryCredits = safeInteger(
     parsed.includedRecoveryCredits,
     "$.includedRecoveryCredits",
@@ -520,6 +580,10 @@ export function parseMerchantPricingBuilderPayload(
     shopifyPlanHandle,
     name,
     planKind: planKind as "FREE" | "PAID_METERED",
+    shopifyRecoveryUsageEventHandle: recoveryHandle,
+    supportedFeatureKeys,
+    materializedAt:
+      typeof parsed.materializedAt === "string" ? parsed.materializedAt : null,
     isActive: parsed.isActive as boolean,
     featured: parsed.featured as boolean,
     includedRecoveryCredits,

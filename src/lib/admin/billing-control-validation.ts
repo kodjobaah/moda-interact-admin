@@ -7,6 +7,9 @@ export type PlatformBillingPolicyInput = {
   defaultWarningPercent: number;
   lifetimeFreeRecoveryAllowance: number;
   minimumUpgradePremiumBps: number;
+  defaultOutboundSoftLimit: number;
+  defaultOutboundHardLimit: number;
+  terminalMessageReservedSlots: number;
   reason: string;
 };
 
@@ -17,6 +20,7 @@ export type ShopBillingOverrideInput = {
   pauseNewRecoveries: boolean | null;
   pauseAutomatedWhatsapp: boolean | null;
   recoverySafetyCeiling: number | null;
+  terminalMessageReservedSlots: number | null;
   expiresAt: Date | null;
   reason: string;
 };
@@ -51,6 +55,26 @@ export function parsePlatformBillingPolicyForm(
     formData.get("absoluteOutboundHardLimit"),
     "Absolute outbound hard limit",
   );
+  const defaultOutboundSoftLimit = requiredPositiveInt(
+    formData.get("defaultOutboundSoftLimit"),
+    "Default outbound soft limit",
+  );
+  const defaultOutboundHardLimit = requiredPositiveInt(
+    formData.get("defaultOutboundHardLimit"),
+    "Default outbound hard limit",
+  );
+  const terminalMessageReservedSlots = requiredPositiveInt(
+    formData.get("terminalMessageReservedSlots"),
+    "Terminal message reserved slots",
+  );
+  if (defaultOutboundHardLimit < 2)
+    throw new Error("Default outbound hard limit must be at least 2.");
+  if (defaultOutboundSoftLimit > defaultOutboundHardLimit)
+    throw new Error("Default outbound soft limit must not exceed the hard limit.");
+  if (defaultOutboundHardLimit > absoluteOutboundHardLimit)
+    throw new Error("Default outbound hard limit must not exceed the absolute hard limit.");
+  if (terminalMessageReservedSlots >= defaultOutboundHardLimit)
+    throw new Error("Terminal message reserved slots must be lower than the default outbound hard limit.");
   const defaultWarningPercent = requiredInt(
     formData.get("defaultWarningPercent"),
     "Warning threshold",
@@ -83,6 +107,9 @@ export function parsePlatformBillingPolicyForm(
     defaultWarningPercent,
     lifetimeFreeRecoveryAllowance,
     minimumUpgradePremiumBps,
+    defaultOutboundSoftLimit,
+    defaultOutboundHardLimit,
+    terminalMessageReservedSlots,
     reason: requiredReason(formData.get("reason")),
   };
 }
@@ -103,6 +130,10 @@ export function parseShopBillingOverrideForm(
     formData.get("recoverySafetyCeiling"),
     "Recovery safety ceiling",
   );
+  const terminalMessageReservedSlots = optionalPositiveInt(
+    formData.get("terminalMessageReservedSlots"),
+    "Terminal message reserved slots",
+  );
   const expiresAt = optionalDate(formData.get("expiresAt"));
   return {
     shopId,
@@ -114,6 +145,7 @@ export function parseShopBillingOverrideForm(
       "pauseAutomatedWhatsapp",
     ),
     recoverySafetyCeiling,
+    terminalMessageReservedSlots,
     expiresAt,
     reason: requiredReason(formData.get("reason")),
   };

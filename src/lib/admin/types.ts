@@ -207,7 +207,6 @@ export type TenantBilling = {
       name: string;
       kind: string;
       shopifyUsageEventHandle: string | null;
-      defaultOutboundHardLimit: number;
     } | null;
     pendingPlan: { name: string } | null;
     billingPeriod: {
@@ -225,7 +224,7 @@ export type TenantBilling = {
   };
   paidRecoveryUsage: string;
   currentPeriodAutomatedMessageQuantity: string | null;
-  planDefaultOutboundHardLimit: number | null;
+  platformDefaultOutboundHardLimit: number | null;
   platformAbsoluteOutboundHardLimit: number | null;
   effectiveOutboundHardCap: number | null;
   overrideState: "ACTIVE" | "EXPIRED" | null;
@@ -238,6 +237,7 @@ export type TenantBilling = {
     pauseNewRecoveries: boolean | null;
     pauseAutomatedWhatsapp: boolean | null;
     recoverySafetyCeiling: number | null;
+    terminalMessageReservedSlots: number | null;
     reason: string;
     expiresAt: Date | null;
   } | null;
@@ -304,8 +304,14 @@ export type TenantBillingControls = {
     pauseNewRecoveries: boolean | null;
     pauseAutomatedWhatsapp: boolean | null;
     recoverySafetyCeiling: number | null;
+    terminalMessageReservedSlots: number | null;
     reason: string;
     expiresAt: Date | null;
+  } | null;
+  platform: {
+    defaultOutboundSoftLimit: number;
+    defaultOutboundHardLimit: number;
+    terminalMessageReservedSlots: number;
   } | null;
   allowance: {
     grantedAllowance: number | null;

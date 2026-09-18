@@ -52,6 +52,8 @@ export type UnmappedSubscriptionItem = {
 
 export type UnmappedSubscriptionDetail = UnmappedSubscriptionItem & {
   cataloguePlan: (NonNullable<UnmappedSubscriptionItem["cataloguePlan"]> & {
+    shopifyRecoveryUsageEventHandle: string | null;
+    features: string[];
     usageEvents: Array<{
       eventHandle: string;
       adminLabel: string;
@@ -59,20 +61,9 @@ export type UnmappedSubscriptionDetail = UnmappedSubscriptionItem & {
     }>;
   }) | null;
   operationalPlan: (NonNullable<UnmappedSubscriptionItem["operationalPlan"]> & {
-    defaultOutboundSoftLimit: number;
-    defaultOutboundHardLimit: number;
-    terminalMessageReservedSlots: number;
     features: string[];
   }) | null;
   shopifyContract: ShopifyContractValidation | null;
-  runtimeDefaults: {
-    defaultOutboundSoftLimit: number;
-    defaultOutboundHardLimit: number;
-    terminalMessageReservedSlots: number;
-    shopifyUsageEventHandle: string | null;
-    features: string[];
-    source: "CURRENT_MAPPING" | "SAME_KIND_TEMPLATE" | "SYSTEM_DEFAULT";
-  } | null;
 };
 
 type CataloguePlanSummary = NonNullable<UnmappedSubscriptionItem["cataloguePlan"]>;
@@ -259,17 +250,6 @@ export async function getUnmappedSubscriptions(input: {
   };
 }
 
-function fallbackFeatures(planKind: MerchantPricingPlanKind): string[] {
-  return planKind === MerchantPricingPlanKind.FREE
-    ? ["CHECKOUT_RECOVERY", "AI_CONVERSATIONS", "PRODUCT_SEARCH"]
-    : [
-        "CHECKOUT_RECOVERY",
-        "AI_CONVERSATIONS",
-        "PRODUCT_SEARCH",
-        "ORDER_SUPPORT",
-      ];
-}
-
 export async function getUnmappedSubscriptionDetail(
   subscriptionId: string,
 ): Promise<UnmappedSubscriptionDetail | null> {
@@ -292,9 +272,13 @@ export async function getUnmappedSubscriptionDetail(
             planKind: true,
             isActive: true,
             includedRecoveryCredits: true,
+            shopifyRecoveryUsageEventHandle: true,
             recurringAmountMinor: true,
             currency: true,
             billingPeriod: true,
+            features: {
+              select: { feature: { select: { key: true } } },
+            },
             usageEvents: {
               orderBy: { position: "asc" },
               select: {
@@ -319,9 +303,6 @@ export async function getUnmappedSubscriptionDetail(
             active: true,
             shopifyUsageEventHandle: true,
             includedRecoveryConversationAllowance: true,
-            defaultOutboundSoftLimit: true,
-            defaultOutboundHardLimit: true,
-            terminalMessageReservedSlots: true,
             features: {
               where: { enabled: true },
               select: { feature: true },
@@ -352,75 +333,12 @@ export async function getUnmappedSubscriptionDetail(
       operationalPlan: operationalPlan
         ? {
             ...operationalPlan,
-            features: operationalPlan.features.map((item) => item.feature),
+            features: operationalPlan.features.map((item) => item.feature.key),
           }
         : null,
       shopifyContract: null,
-      runtimeDefaults: null,
     };
   }
-
-  const expectedKind = expectedOperationalKind(cataloguePlan.planKind);
-  const sameKindTemplate = operationalPlan
-    ? null
-    : await prisma.billingPlan.findFirst({
-        where: {
-          kind: expectedKind,
-          active: true,
-          shopifyPlanHandle: { not: cataloguePlan.shopifyPlanHandle },
-        },
-        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-        select: {
-          defaultOutboundSoftLimit: true,
-          defaultOutboundHardLimit: true,
-          terminalMessageReservedSlots: true,
-          features: {
-            where: { enabled: true },
-            select: { feature: true },
-          },
-        },
-      });
-
-  const defaultUsageEventHandle =
-    operationalPlan?.shopifyUsageEventHandle &&
-    cataloguePlan.usageEvents.some(
-      (event) => event.eventHandle === operationalPlan.shopifyUsageEventHandle,
-    )
-      ? operationalPlan.shopifyUsageEventHandle
-      : cataloguePlan.usageEvents.length === 1
-        ? cataloguePlan.usageEvents[0].eventHandle
-        : null;
-
-  const runtimeDefaults = operationalPlan
-    ? {
-        defaultOutboundSoftLimit: operationalPlan.defaultOutboundSoftLimit,
-        defaultOutboundHardLimit: operationalPlan.defaultOutboundHardLimit,
-        terminalMessageReservedSlots:
-          operationalPlan.terminalMessageReservedSlots,
-        shopifyUsageEventHandle: defaultUsageEventHandle,
-        features: operationalPlan.features.map((item) => item.feature),
-        source: "CURRENT_MAPPING" as const,
-      }
-    : sameKindTemplate
-      ? {
-          defaultOutboundSoftLimit: sameKindTemplate.defaultOutboundSoftLimit,
-          defaultOutboundHardLimit: sameKindTemplate.defaultOutboundHardLimit,
-          terminalMessageReservedSlots:
-            sameKindTemplate.terminalMessageReservedSlots,
-          shopifyUsageEventHandle: defaultUsageEventHandle,
-          features: sameKindTemplate.features.map((item) => item.feature),
-          source: "SAME_KIND_TEMPLATE" as const,
-        }
-      : {
-          defaultOutboundSoftLimit:
-            cataloguePlan.planKind === MerchantPricingPlanKind.FREE ? 100 : 1000,
-          defaultOutboundHardLimit:
-            cataloguePlan.planKind === MerchantPricingPlanKind.FREE ? 200 : 2000,
-          terminalMessageReservedSlots: 1,
-          shopifyUsageEventHandle: defaultUsageEventHandle,
-          features: fallbackFeatures(cataloguePlan.planKind),
-          source: "SYSTEM_DEFAULT" as const,
-        };
 
   const shopifyContract = await validateShopifySubscriptionContract({
     shopifyShopId: row.shop.shopifyShopId,
@@ -442,13 +360,15 @@ export async function getUnmappedSubscriptionDetail(
   return {
     ...base,
     shopifyContract,
-    cataloguePlan,
+      cataloguePlan: {
+        ...cataloguePlan,
+        features: cataloguePlan.features.map((item) => item.feature.key),
+      },
     operationalPlan: operationalPlan
       ? {
           ...operationalPlan,
-          features: operationalPlan.features.map((item) => item.feature),
+            features: operationalPlan.features.map((item) => item.feature.key),
         }
       : null,
-    runtimeDefaults,
   };
 }

@@ -316,7 +316,6 @@ export async function getTenantBilling(
           name: true,
           kind: true,
           shopifyUsageEventHandle: true,
-          defaultOutboundHardLimit: true,
         },
       },
       pendingPlan: { select: { name: true } },
@@ -374,6 +373,7 @@ export async function getTenantBilling(
           pauseNewRecoveries: true,
           pauseAutomatedWhatsapp: true,
           recoverySafetyCeiling: true,
+          terminalMessageReservedSlots: true,
           reason: true,
           expiresAt: true,
         },
@@ -395,9 +395,9 @@ export async function getTenantBilling(
   const overrideActive = overrideState === "ACTIVE";
   const configuredHardLimit = overrideActive
     ? (override?.outboundHardLimit ??
-      subscription.plan?.defaultOutboundHardLimit ??
+      policy?.defaultOutboundHardLimit ??
       null)
-    : (subscription.plan?.defaultOutboundHardLimit ?? null);
+    : (policy?.defaultOutboundHardLimit ?? null);
   const effectiveHardCap = effectiveOutboundHardCap(
     configuredHardLimit,
     policy?.absoluteOutboundHardLimit ?? null,
@@ -415,8 +415,8 @@ export async function getTenantBilling(
       automatedMessages === null
         ? null
         : decimalValue(automatedMessages._sum.quantity),
-    planDefaultOutboundHardLimit:
-      subscription.plan?.defaultOutboundHardLimit ?? null,
+    platformDefaultOutboundHardLimit:
+      policy?.defaultOutboundHardLimit ?? null,
     platformAbsoluteOutboundHardLimit:
       policy?.absoluteOutboundHardLimit ?? null,
     effectiveOutboundHardCap: effectiveHardCap,

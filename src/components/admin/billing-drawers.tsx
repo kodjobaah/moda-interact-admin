@@ -2,6 +2,7 @@ import type {
   BillingLedgerItem,
   RecoveryCreditPurchaseItem,
 } from "@/lib/admin/types";
+import type { Feature } from "@prisma/client";
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
@@ -32,12 +33,14 @@ function DetailList({
 export function MerchantPricingPlanDrawer({
   plan,
   cataloguePlans,
+  featureCatalogue,
   minimumUpgradePremiumBps = 2000,
   params,
   register = false,
 }: {
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
+  featureCatalogue?: Feature[];
   minimumUpgradePremiumBps?: number;
   params: Record<string, string>;
   register?: boolean;
@@ -57,6 +60,7 @@ export function MerchantPricingPlanDrawer({
       <MerchantPricingPlanBuilder
         plan={plan}
         cataloguePlans={cataloguePlans}
+        featureCatalogue={featureCatalogue}
         minimumUpgradePremiumBps={minimumUpgradePremiumBps}
       />
     </AdminDetailDrawer>

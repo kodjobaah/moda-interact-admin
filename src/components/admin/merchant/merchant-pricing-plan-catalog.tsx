@@ -127,6 +127,14 @@ export function MerchantPricingPlanCatalog({
                       <dt className="text-xs text-gray-500">Translations</dt>
                       <dd>{plan.translations.length}/20</dd>
                     </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs text-gray-500">Operational status</dt>
+                      <dd>
+                        {plan.materializedAt
+                          ? `Durable since ${adminI18n.formatDateTime(plan.materializedAt)}`
+                          : "Not yet materialised"}
+                      </dd>
+                    </div>
                   </dl>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <Link
@@ -162,7 +170,8 @@ export function MerchantPricingPlanCatalog({
                         <MerchantPricingPlanDeleteButton
                           id={plan.id}
                           displayName={plan.displayName}
-                          disabled={plan.isActive}
+                          disabled={plan.isActive || Boolean(plan.materializedAt)}
+                          durable={Boolean(plan.materializedAt)}
                         />
                       ) : null}
                     </form>
