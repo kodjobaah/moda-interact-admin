@@ -9,9 +9,95 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
-import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
+import {
+  requirePlatformAdminMutation,
+  requirePlatformAdminRead,
+} from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
+import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import { validateShopifySubscriptionContract } from "@/lib/admin/shopify-subscription-contract";
+
+
+const reconciliationLogger = createLogger({
+  serviceNamespace: "moda-interact",
+  serviceName: "moda-interact-admin",
+  environment: resolveDeploymentEnvironmentName(),
+});
+
+function logReconciliationDebug(
+  event: string,
+  data: Record<string, unknown>,
+): void {
+  reconciliationLogger.info(event, data);
+}
+
+export type BillingReconciliationDebugStatus = {
+  found: boolean;
+  subscriptionId: string;
+  status: string | null;
+  observedShopifyPlanHandle: string | null;
+  planId: string | null;
+  mappedPlanHandle: string | null;
+  nextReconcileAt: string | null;
+  lastSyncedAt: string | null;
+  lastSyncErrorCode: string | null;
+  lastSyncErrorAt: string | null;
+  updatedAt: string | null;
+};
+
+export async function getBillingReconciliationDebugStatusAction(
+  subscriptionId: string,
+): Promise<BillingReconciliationDebugStatus> {
+  await requirePlatformAdminRead();
+
+  const row = await prisma.subscription.findUnique({
+    where: { id: subscriptionId },
+    select: {
+      id: true,
+      status: true,
+      observedShopifyPlanHandle: true,
+      planId: true,
+      nextReconcileAt: true,
+      lastSyncedAt: true,
+      lastSyncErrorCode: true,
+      lastSyncErrorAt: true,
+      updatedAt: true,
+      plan: { select: { shopifyPlanHandle: true } },
+    },
+  });
+
+  const status: BillingReconciliationDebugStatus = row
+    ? {
+        found: true,
+        subscriptionId: row.id,
+        status: row.status,
+        observedShopifyPlanHandle: row.observedShopifyPlanHandle,
+        planId: row.planId,
+        mappedPlanHandle: row.plan?.shopifyPlanHandle ?? null,
+        nextReconcileAt: row.nextReconcileAt?.toISOString() ?? null,
+        lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+        lastSyncErrorCode: row.lastSyncErrorCode,
+        lastSyncErrorAt: row.lastSyncErrorAt?.toISOString() ?? null,
+        updatedAt: row.updatedAt.toISOString(),
+      }
+    : {
+        found: false,
+        subscriptionId,
+        status: null,
+        observedShopifyPlanHandle: null,
+        planId: null,
+        mappedPlanHandle: null,
+        nextReconcileAt: null,
+        lastSyncedAt: null,
+        lastSyncErrorCode: null,
+        lastSyncErrorAt: null,
+        updatedAt: null,
+      };
+
+  logReconciliationDebug("admin.billing.reconciliation_status_polled", status);
+  return status;
+}
 
 function actionError(message: string): never { throw new Error(message); }
 function safeReturnTo(value: FormDataEntryValue | null): string {
@@ -70,6 +156,15 @@ export async function resolveUnmappedSubscriptionAction(formData: FormData): Pro
   const reason = requiredString(formData, "reason", "Resolution reason");
   if (reason.length > 1000) actionError("Resolution reason must be at most 1000 characters.");
   const returnTo = safeReturnTo(formData.get("returnTo"));
+  const monetaryMismatchOverrideRequested =
+    formData.get("monetaryMismatchOverride") === "1";
+
+  logReconciliationDebug("admin.billing.unmapped_resolution_started", {
+    subscriptionId,
+    adminId: principal.id,
+    adminRole: principal.role,
+    monetaryMismatchOverrideRequested,
+  });
 
   // Provider validation is deliberately outside the DB transaction. Shopify is authoritative,
   // but a remote HTTP request must not hold an interactive PostgreSQL transaction open.
@@ -81,6 +176,12 @@ export async function resolveUnmappedSubscriptionAction(formData: FormData): Pro
     },
   });
   if (!preflight || preflight.status !== "UNMAPPED") actionError("This subscription is no longer UNMAPPED.");
+  logReconciliationDebug("admin.billing.unmapped_preflight_loaded", {
+    subscriptionId,
+    status: preflight.status,
+    observedShopifyPlanHandle: preflight.observedShopifyPlanHandle,
+    hasShopifyShopId: Boolean(preflight.shop.shopifyShopId),
+  });
   const observedHandle = preflight.observedShopifyPlanHandle?.trim();
   if (!observedHandle) actionError("Shopify has not supplied an observed plan handle.");
 
@@ -94,11 +195,37 @@ export async function resolveUnmappedSubscriptionAction(formData: FormData): Pro
     shopifyShopId: preflight.shop.shopifyShopId,
     plan: preflightCatalogue,
   });
-  if (contract.status !== "VERIFIED") {
+  logReconciliationDebug("admin.billing.shopify_contract_validated", {
+    subscriptionId,
+    observedShopifyPlanHandle: observedHandle,
+    cataloguePlanId: preflightCatalogue.id,
+    cataloguePlanKind: preflightCatalogue.planKind,
+    validationStatus: contract.status,
+    mismatchCount: contract.mismatches.length,
+    mismatches: contract.mismatches,
+  });
+  if (contract.status === "UNAVAILABLE") {
     actionError(
-      contract.status === "UNAVAILABLE"
-        ? `Shopify contract validation is unavailable: ${contract.mismatches.join(" ")}`
-        : `Shopify subscription does not match the MerchantPricing plan: ${contract.mismatches.join(" ")}`,
+      `Shopify contract validation is unavailable: ${contract.mismatches.join(" ")}`,
+    );
+  }
+  if (contract.status === "MISMATCH") {
+    actionError(
+      `Shopify subscription does not match the MerchantPricing plan: ${contract.mismatches.join(" ")}`,
+    );
+  }
+  if (contract.status === "MONETARY_MISMATCH") {
+    if (preflightCatalogue.planKind !== MerchantPricingPlanKind.PAID_METERED) {
+      actionError("Only paid-tier monetary mismatches can be overridden.");
+    }
+    if (!monetaryMismatchOverrideRequested) {
+      actionError(
+        "The paid Shopify tier has a monetary mismatch. Confirm the monetary override before repairing this mapping.",
+      );
+    }
+  } else if (monetaryMismatchOverrideRequested) {
+    actionError(
+      "A monetary override was supplied, but the current Shopify validation does not require one.",
     );
   }
 
@@ -140,6 +267,16 @@ export async function resolveUnmappedSubscriptionAction(formData: FormData): Pro
       include: { features: true },
     });
 
+    logReconciliationDebug("admin.billing.operational_mapping_upserted", {
+      subscriptionId: subscription.id,
+      shopId: subscription.shopId,
+      observedShopifyPlanHandle: observedHandle,
+      billingPlanId: after.id,
+      billingPlanKind: after.kind,
+      billingPlanActive: after.active,
+      shopifyUsageEventHandle: after.shopifyUsageEventHandle,
+    });
+
     if (!cataloguePlan.materializedAt) {
       await transaction.merchantPricingPlan.update({
         where: { id: cataloguePlan.id },
@@ -147,7 +284,18 @@ export async function resolveUnmappedSubscriptionAction(formData: FormData): Pro
       });
     }
 
-    await transaction.subscription.update({ where: { id: subscription.id }, data: { nextReconcileAt: new Date() } });
+    const reconciliationRequestedAt = new Date();
+    await transaction.subscription.update({
+      where: { id: subscription.id },
+      data: { nextReconcileAt: reconciliationRequestedAt },
+    });
+    logReconciliationDebug("admin.billing.reconciliation_requested", {
+      subscriptionId: subscription.id,
+      shopId: subscription.shopId,
+      observedShopifyPlanHandle: observedHandle,
+      nextReconcileAt: reconciliationRequestedAt.toISOString(),
+      previousSyncErrorCode: subscription.lastSyncErrorCode,
+    });
     await transaction.billingAuditEvent.create({
       data: {
         action: BillingAuditAction.BILLING_CORRECTION_CREATED, shopId: subscription.shopId,
@@ -157,14 +305,27 @@ export async function resolveUnmappedSubscriptionAction(formData: FormData): Pro
           subscriptionId: subscription.id, providerSubscriptionId: subscription.providerSubscriptionId,
           observedShopifyPlanHandle: observedHandle, previousSyncErrorCode: subscription.lastSyncErrorCode,
           merchantPricingPlanId: cataloguePlan.id, billingPlan: billingPlanSnapshot(after),
-          shopifyContractValidation: contract, reconciliationRequired: true,
+          shopifyContractValidation: contract,
+          monetaryMismatchOverrideApplied:
+            contract.status === "MONETARY_MISMATCH",
+          reconciliationRequired: true,
         } as Prisma.InputJsonValue,
       },
     });
   }, { maxWait: 10_000, timeout: 20_000 });
 
+  logReconciliationDebug("admin.billing.unmapped_resolution_committed", {
+    subscriptionId,
+    observedShopifyPlanHandle: observedHandle,
+    contractStatus: contract.status,
+    monetaryMismatchOverrideApplied:
+      contract.status === "MONETARY_MISMATCH",
+  });
+
   revalidatePath("/billing");
   revalidatePath("/");
   const separator = returnTo.includes("?") ? "&" : "?";
-  redirect(`${returnTo}${separator}mappingResolved=1`);
+  redirect(
+    `${returnTo}${separator}mappingResolved=1&reconciliationDebugSubscriptionId=${encodeURIComponent(subscriptionId)}`,
+  );
 }

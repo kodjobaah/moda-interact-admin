@@ -2,6 +2,7 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { MerchantPricingPlanCatalog } from "@/components/admin/merchant/merchant-pricing-plan-catalog";
 import { BillingTabs, type BillingView } from "@/components/admin/billing-tabs";
 import { BillingUnmappedSubscriptions, UnmappedSubscriptionDrawer } from "@/components/admin/billing-unmapped-subscriptions";
+import { BillingReconciliationConsoleDebug } from "@/components/admin/billing-reconciliation-console-debug";
 import {
   BillingEventDrawer,
   MerchantPricingPlanDrawer,
@@ -39,6 +40,7 @@ import { ShopifyReportState } from "@prisma/client";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
 import { getFeatureCatalogue } from "@/lib/admin/feature-catalogue";
 import { FeatureCatalogue } from "@/components/admin/feature-catalogue";
+import { BillingPlansNavigation, type BillingPlansSection } from "@/components/admin/billing-plans-navigation";
 import { redirect } from "next/navigation";
 import { getUnmappedSubscriptionDetail, getUnmappedSubscriptions } from "@/lib/admin/unmapped-subscriptions";
 import {
@@ -77,6 +79,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
     ? (rawView ?? "overview")
     : "overview";
   const pricingError = firstParam(rawParams.pricingError);
+  const rawPlanSection = firstParam(rawParams.section);
+  const planSection: BillingPlansSection =
+    rawPlanSection === "features" ? "features" : "pricing";
+  const reconciliationDebugSubscriptionId = firstParam(
+    rawParams.reconciliationDebugSubscriptionId,
+  );
   const rawState = firstParam(rawParams.state);
   const state = Object.values(ShopifyReportState).includes(
     rawState as ShopifyReportState,
@@ -84,20 +92,26 @@ export default async function BillingPage({ searchParams }: PageProps) {
     ? (rawState as ShopifyReportState)
     : undefined;
   const plans =
-    view === "plans"
+    view === "plans" && planSection === "pricing"
       ? await getMerchantPricingPlans({
           page: positiveInt(rawParams.planPage),
           pageSize: positiveInt(rawParams.planPageSize, 5),
         })
       : null;
-  const features = view === "plans" ? await getFeatureCatalogue() : null;
   const selectedPlan =
-    view === "plans" && firstParam(rawParams.planId)
+    view === "plans" &&
+    planSection === "pricing" &&
+    firstParam(rawParams.planId)
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
       : null;
   const planDrawerOpen =
     view === "plans" &&
+    planSection === "pricing" &&
     (params.drawer === "register-plan" || Boolean(selectedPlan));
+  const features =
+    view === "plans" && (planSection === "features" || planDrawerOpen)
+      ? await getFeatureCatalogue()
+      : null;
   const plansPolicy = planDrawerOpen ? await getPlatformBillingPolicy() : null;
   const cataloguePlans = planDrawerOpen
     ? await getMerchantPricingCatalogueContext()
@@ -186,11 +200,16 @@ export default async function BillingPage({ searchParams }: PageProps) {
         {view === "overview" && overview ? (
           <BillingOverviewCards overview={overview} />
         ) : null}
-        {view === "plans" && plans ? (
-          <div className="space-y-6">
-            <FeatureCatalogue features={features ?? []} />
-            <MerchantPricingPlanCatalog plans={plans} params={params} />
-          </div>
+        {view === "plans" ? (
+          <>
+            <BillingPlansNavigation current={planSection} params={params} />
+            {planSection === "pricing" && plans ? (
+              <MerchantPricingPlanCatalog plans={plans} params={params} />
+            ) : null}
+            {planSection === "features" ? (
+              <FeatureCatalogue features={features ?? []} params={params} />
+            ) : null}
+          </>
         ) : null}
         {view === "packs" && packs ? (
           <BillingRecoveryPacks purchases={packs} params={params} />
@@ -203,10 +222,18 @@ export default async function BillingPage({ searchParams }: PageProps) {
             Operational mapping repaired. Reconciliation has been requested; Shopify remains authoritative until the subscription is re-projected.
           </div>
         ) : null}
+        {view === "unmapped" &&
+        firstParam(rawParams.mappingResolved) &&
+        reconciliationDebugSubscriptionId ? (
+          <BillingReconciliationConsoleDebug
+            subscriptionId={reconciliationDebugSubscriptionId}
+          />
+        ) : null}
         {view === "unmapped" && unmapped ? (
           <BillingUnmappedSubscriptions subscriptions={unmapped} params={params} />
         ) : null}
         {view === "plans" &&
+        planSection === "pricing" &&
         (params.drawer === "register-plan" || selectedPlan) ? (
           <MerchantPricingPlanDrawer
             plan={selectedPlan ?? undefined}

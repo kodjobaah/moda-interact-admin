@@ -15,7 +15,9 @@
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
     "admin:provision": "node scripts/provision-platform-admin.mjs",
     "admin:seed-promotions": "node scripts/seed-promotion-test-data.mjs",
-    "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear"
+    "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear",
+    "admin:seed-merchant-pricing": "node scripts/seed-manual-merchant-pricing.mjs",
+    "admin:seed-promotion": "node scripts/seed-manual-promotion.mjs"
   },
   "dependencies": {
     "@modainteract/moda-interact-shared": "0.12.1",

@@ -21,7 +21,7 @@ const tabs: Array<{ value: BillingView; label: string }> = [
 
 const relevantParams: Record<BillingView, string[]> = {
   overview: [],
-  plans: ["planId", "drawer"],
+  plans: ["section", "planId", "featureId", "drawer"],
   packs: ["packPage", "packStatus", "purchaseId"],
   refunds: ["refundPage", "refundStatus", "refundId"],
   events: ["eventPage", "state", "shopId", "from", "to", "eventId"],

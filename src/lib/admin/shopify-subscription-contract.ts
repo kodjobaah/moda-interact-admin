@@ -1,16 +1,34 @@
-import type { MerchantPricingBillingPeriod, MerchantPricingUsagePricingMode } from "@prisma/client";
+import type {
+  MerchantPricingBillingPeriod,
+  MerchantPricingPlanKind,
+  MerchantPricingUsagePricingMode,
+} from "@prisma/client";
 
 const DEFAULT_API_VERSION = "2026-07";
 
-
-type PartnerTier = { upTo: number | null; amountPerUnit: string | number; amount: string | number };
+type PartnerTier = {
+  upTo: number | null;
+  amountPerUnit: string | number;
+  amount: string | number;
+};
 
 type PartnerItem = {
   handle: string;
   description: string | null;
   price:
-    | { __typename: "FlatRatePrice"; active: boolean; currency: string; amount: string | number }
-    | { __typename: "TieredPrice"; active: boolean; currency: string; tiersMode: "VOLUME" | "GRADUATED"; tiers: PartnerTier[] };
+    | {
+        __typename: "FlatRatePrice";
+        active: boolean;
+        currency: string;
+        amount: string | number;
+      }
+    | {
+        __typename: "TieredPrice";
+        active: boolean;
+        currency: string;
+        tiersMode: "VOLUME" | "GRADUATED";
+        tiers: PartnerTier[];
+      };
 };
 
 type ActiveSubscription = {
@@ -21,24 +39,36 @@ type ActiveSubscription = {
 
 export type MerchantContractPlan = {
   shopifyPlanHandle: string;
+  planKind: MerchantPricingPlanKind;
   recurringAmountMinor: number;
   currency: string;
   billingPeriod: MerchantPricingBillingPeriod;
+  shopifyRecoveryUsageEventHandle: string | null;
   usageEvents: Array<{
     eventHandle: string;
     pricingMode: MerchantPricingUsagePricingMode;
     currency: string;
     fixedUnitAmountMinor: number | null;
-    tiers: Array<{ upTo: number | null; amountPerUnitMinor: number; flatAmountMinor: number }>;
+    tiers: Array<{
+      upTo: number | null;
+      amountPerUnitMinor: number;
+      flatAmountMinor: number;
+    }>;
   }>;
 };
 
 export type ShopifyContractValidation = {
-  status: "VERIFIED" | "MISMATCH" | "UNAVAILABLE";
+  status: "VERIFIED" | "MONETARY_MISMATCH" | "MISMATCH" | "UNAVAILABLE";
   mismatches: string[];
+  blockingMismatches: string[];
+  monetaryMismatches: string[];
   providerBillingPeriod: string | null;
   providerSubscriptionId: string | null;
-  providerItems: Array<{ handle: string; pricingType: string; currency: string }>;
+  providerItems: Array<{
+    handle: string;
+    pricingType: string;
+    currency: string;
+  }>;
 };
 
 function minor(amount: string | number): number | null {
@@ -47,26 +77,23 @@ function minor(amount: string | number): number | null {
   return Math.round(numeric * 100);
 }
 
-function sorted(values: string[]): string[] {
-  return [...values].sort((a, b) => a.localeCompare(b));
-}
-
-function sameStringSet(a: string[], b: string[]): boolean {
-  return JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
-}
-
 function partnerConfig() {
   const organizationId =
-    process.env.SHOPIFY_PARTNER_ORGANIZATION_ID ?? process.env.SHOPIFY_PARTNER_ORG_ID;
+    process.env.SHOPIFY_PARTNER_ORGANIZATION_ID ??
+    process.env.SHOPIFY_PARTNER_ORG_ID;
   const token =
-    process.env.SHOPIFY_PARTNER_API_TOKEN ?? process.env.SHOPIFY_PARTNERS_TOKEN;
+    process.env.SHOPIFY_PARTNER_API_TOKEN ??
+    process.env.SHOPIFY_PARTNER_ACCESS_TOKEN;
   const appId = process.env.SHOPIFY_APP_ID;
-  const apiVersion = process.env.SHOPIFY_PARTNER_API_VERSION ?? DEFAULT_API_VERSION;
+  const apiVersion =
+    process.env.SHOPIFY_PARTNER_API_VERSION ?? DEFAULT_API_VERSION;
   if (!organizationId || !token || !appId) return null;
   return { organizationId, token, appId, apiVersion };
 }
 
-async function loadActiveSubscription(shopifyShopId: string): Promise<ActiveSubscription | null> {
+async function loadActiveSubscription(
+  shopifyShopId: string,
+): Promise<ActiveSubscription | null> {
   const config = partnerConfig();
   if (!config) {
     throw new Error(
@@ -118,10 +145,24 @@ async function loadActiveSubscription(shopifyShopId: string): Promise<ActiveSubs
   };
   if (payload.errors?.length) {
     throw new Error(
-      payload.errors.map((error) => error.message ?? "Unknown Partner API error").join("; "),
+      payload.errors
+        .map((error) => error.message ?? "Unknown Partner API error")
+        .join("; "),
     );
   }
   return payload.data?.activeSubscription ?? null;
+}
+
+function unavailableValidation(message: string): ShopifyContractValidation {
+  return {
+    status: "UNAVAILABLE",
+    mismatches: [message],
+    blockingMismatches: [message],
+    monetaryMismatches: [],
+    providerBillingPeriod: null,
+    providerSubscriptionId: null,
+    providerItems: [],
+  };
 }
 
 export async function validateShopifySubscriptionContract(input: {
@@ -129,139 +170,118 @@ export async function validateShopifySubscriptionContract(input: {
   plan: MerchantContractPlan;
 }): Promise<ShopifyContractValidation> {
   if (!input.shopifyShopId) {
-    return {
-      status: "UNAVAILABLE",
-      mismatches: ["The tenant has no Shopify shop GID, so the provider subscription cannot be verified."],
-      providerBillingPeriod: null,
-      providerSubscriptionId: null,
-      providerItems: [],
-    };
+    return unavailableValidation(
+      "The tenant has no Shopify shop GID, so the provider subscription cannot be verified.",
+    );
   }
 
   let provider: ActiveSubscription | null;
   try {
     provider = await loadActiveSubscription(input.shopifyShopId);
   } catch (error) {
-    return {
-      status: "UNAVAILABLE",
-      mismatches: [error instanceof Error ? error.message : "Shopify subscription validation failed."],
-      providerBillingPeriod: null,
-      providerSubscriptionId: null,
-      providerItems: [],
-    };
+    return unavailableValidation(
+      error instanceof Error
+        ? error.message
+        : "Shopify subscription validation failed.",
+    );
   }
 
   if (!provider) {
+    const message =
+      "Shopify reports no active managed-pricing subscription for this shop.";
     return {
       status: "MISMATCH",
-      mismatches: ["Shopify reports no active managed-pricing subscription for this shop."],
+      mismatches: [message],
+      blockingMismatches: [message],
+      monetaryMismatches: [],
       providerBillingPeriod: null,
       providerSubscriptionId: null,
       providerItems: [],
     };
   }
 
-  const mismatches: string[] = [];
-  const expectedPeriod = input.plan.billingPeriod;
-  if (provider.billingPeriod !== expectedPeriod) {
-    mismatches.push(`Billing period differs: catalogue ${expectedPeriod}; Shopify ${provider.billingPeriod}.`);
-  }
+  const blockingMismatches: string[] = [];
+  const monetaryMismatches: string[] = [];
+  const expectedPlanHandle = input.plan.shopifyPlanHandle.trim();
 
-  const expectedCurrency = input.plan.currency.trim().toUpperCase();
-  const expectedUsageHandles = input.plan.usageEvents.map((event) => event.eventHandle.trim());
-  const providerUsageHandles = provider.items
-    .filter((item) => item.price.__typename === "TieredPrice" || expectedUsageHandles.includes(item.handle))
-    .map((item) => item.handle)
-    .filter((handle) => handle !== input.plan.shopifyPlanHandle);
-
-  if (!sameStringSet(expectedUsageHandles, providerUsageHandles)) {
-    mismatches.push(
-      `Usage meter handles differ: catalogue [${sorted(expectedUsageHandles).join(", ") || "none"}]; Shopify [${sorted(providerUsageHandles).join(", ") || "none"}].`,
+  if (provider.billingPeriod !== input.plan.billingPeriod) {
+    blockingMismatches.push(
+      `Billing period differs: catalogue ${input.plan.billingPeriod}; Shopify ${provider.billingPeriod}.`,
     );
   }
 
-  const recurringCandidates = provider.items.filter(
-    (item) => item.price.__typename === "FlatRatePrice" && !expectedUsageHandles.includes(item.handle),
+  const planItems = provider.items.filter(
+    (item) => item.handle.trim() === expectedPlanHandle,
   );
-  if (input.plan.recurringAmountMinor === 0) {
-    const nonZero = recurringCandidates.filter(
-      (item) => item.price.__typename === "FlatRatePrice" && minor(item.price.amount) !== 0,
-    );
-    if (nonZero.length) {
-      mismatches.push("Catalogue recurring price is 0, but Shopify has a non-zero recurring flat-rate item.");
-    }
-  } else if (recurringCandidates.length !== 1) {
-    mismatches.push(
-      `Expected exactly one recurring flat-rate Shopify item, found ${recurringCandidates.length}.`,
+  if (planItems.length !== 1) {
+    blockingMismatches.push(
+      planItems.length === 0
+        ? `Shopify active subscription does not contain the exact plan handle ${expectedPlanHandle}.`
+        : `Shopify active subscription contains ${planItems.length} items with plan handle ${expectedPlanHandle}; expected exactly one.`,
     );
   } else {
-    const recurring = recurringCandidates[0].price;
-    if (recurring.__typename === "FlatRatePrice") {
-      const providerMinor = minor(recurring.amount);
-      if (providerMinor !== input.plan.recurringAmountMinor) {
-        mismatches.push(
-          `Recurring amount differs: catalogue ${input.plan.recurringAmountMinor} minor units; Shopify ${providerMinor ?? "invalid"}.`,
+    const planItem = planItems[0];
+    if (planItem.price.__typename !== "FlatRatePrice") {
+      blockingMismatches.push(
+        `Shopify item ${expectedPlanHandle} is ${planItem.price.__typename}; the subscription plan item must be FlatRatePrice.`,
+      );
+    } else {
+      const expectedCurrency = input.plan.currency.trim().toUpperCase();
+      const providerAmountMinor = minor(planItem.price.amount);
+      const recurringMonetaryMismatches: string[] = [];
+
+      if (providerAmountMinor !== input.plan.recurringAmountMinor) {
+        recurringMonetaryMismatches.push(
+          `Recurring amount differs: catalogue ${input.plan.recurringAmountMinor} minor units; Shopify ${providerAmountMinor ?? "invalid"}.`,
         );
       }
-      if (recurring.currency.toUpperCase() !== expectedCurrency) {
-        mismatches.push(`Recurring currency differs: catalogue ${expectedCurrency}; Shopify ${recurring.currency}.`);
+      if (planItem.price.currency.toUpperCase() !== expectedCurrency) {
+        recurringMonetaryMismatches.push(
+          `Recurring currency differs: catalogue ${expectedCurrency}; Shopify ${planItem.price.currency}.`,
+        );
       }
-    }
-  }
 
-  for (const event of input.plan.usageEvents) {
-    const item = provider.items.find((candidate) => candidate.handle === event.eventHandle);
-    if (!item) continue;
-    if (item.price.currency.toUpperCase() !== event.currency.trim().toUpperCase()) {
-      mismatches.push(`Usage meter ${event.eventHandle} currency differs.`);
-    }
-
-    if (event.pricingMode === "FIXED") {
-      if (item.price.__typename === "FlatRatePrice") {
-        if (minor(item.price.amount) !== event.fixedUnitAmountMinor) {
-          mismatches.push(`Usage meter ${event.eventHandle} fixed price differs.`);
-        }
+      if (input.plan.planKind === "PAID_METERED") {
+        monetaryMismatches.push(...recurringMonetaryMismatches);
       } else {
-        const tiers = item.price.tiers;
-        if (
-          tiers.length !== 1 ||
-          tiers[0].upTo !== null ||
-          minor(tiers[0].amountPerUnit) !== event.fixedUnitAmountMinor ||
-          minor(tiers[0].amount) !== 0
-        ) {
-          mismatches.push(`Usage meter ${event.eventHandle} does not match the catalogue fixed-unit price.`);
-        }
+        blockingMismatches.push(...recurringMonetaryMismatches);
       }
-      continue;
     }
-
-    if (item.price.__typename !== "TieredPrice") {
-      mismatches.push(`Usage meter ${event.eventHandle} is ${event.pricingMode} in the catalogue but is not tiered in Shopify.`);
-      continue;
-    }
-    if (item.price.tiersMode !== event.pricingMode) {
-      mismatches.push(`Usage meter ${event.eventHandle} mode differs: catalogue ${event.pricingMode}; Shopify ${item.price.tiersMode}.`);
-    }
-    if (item.price.tiers.length !== event.tiers.length) {
-      mismatches.push(`Usage meter ${event.eventHandle} tier count differs.`);
-      continue;
-    }
-    event.tiers.forEach((tier, index) => {
-      const providerTier = item.price.__typename === "TieredPrice" ? item.price.tiers[index] : null;
-      if (!providerTier) return;
-      if (
-        providerTier.upTo !== tier.upTo ||
-        minor(providerTier.amountPerUnit) !== tier.amountPerUnitMinor ||
-        minor(providerTier.amount) !== tier.flatAmountMinor
-      ) {
-        mismatches.push(`Usage meter ${event.eventHandle} tier ${index + 1} differs from Shopify.`);
-      }
-    });
   }
+
+  if (input.plan.planKind === "PAID_METERED") {
+    const recoveryUsageHandle =
+      input.plan.shopifyRecoveryUsageEventHandle?.trim() ?? "";
+    if (!recoveryUsageHandle) {
+      blockingMismatches.push(
+        "The paid MerchantPricing plan has no recovery usage-event handle configured.",
+      );
+    } else if (
+      !provider.items.some(
+        (item) => item.handle.trim() === recoveryUsageHandle,
+      )
+    ) {
+      blockingMismatches.push(
+        `Shopify active subscription does not contain the configured recovery usage-event handle ${recoveryUsageHandle}.`,
+      );
+    }
+  }
+
+  // Optional/top-up usage-event prices and tier representations are deliberately
+  // not mapping gates. Shopify remains authoritative for live monetary values and
+  // the commerce surfaces intersect catalogue handles with the provider items.
+  const mismatches = [...blockingMismatches, ...monetaryMismatches];
+  const status: ShopifyContractValidation["status"] = blockingMismatches.length
+    ? "MISMATCH"
+    : monetaryMismatches.length
+      ? "MONETARY_MISMATCH"
+      : "VERIFIED";
 
   return {
-    status: mismatches.length ? "MISMATCH" : "VERIFIED",
+    status,
     mismatches,
+    blockingMismatches,
+    monetaryMismatches,
     providerBillingPeriod: provider.billingPeriod,
     providerSubscriptionId: provider.legacySubscriptionId,
     providerItems: provider.items.map((item) => ({

@@ -12,7 +12,7 @@ test("global billing exposes URL-backed views with overview fallback", async () 
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-tabs.tsx"),
   ]);
-  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*\]/);
+  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*"unmapped",\s*\]/);
   assert.match(page, /rawRequestedView = firstParam\(rawParams\.view\)/);
   assert.match(page, /rawRequestedView === "controls"/);
   assert.match(page, /: "overview"/);
@@ -26,7 +26,7 @@ test("billing route loads only the selected view and selected detail", async () 
   assert.match(page, /view === "overview" \? await getBillingOverview\(\)/);
   assert.match(
     page,
-    /view === "plans"\s*\n\s*\? await getMerchantPricingPlans\(\{[\s\S]*planPage[\s\S]*planPageSize[\s\S]*\}\)/,
+    /view === "plans" && planSection === "pricing"\s*\n\s*\? await getMerchantPricingPlans\(\{[\s\S]*planPage[\s\S]*planPageSize[\s\S]*\}\)/,
   );
   assert.match(page, /view === "packs"\s*\n\s*\? await getRecoveryCreditPurchases/);
   assert.match(page, /view === "events"\s*\n\s*\? await getBillingLedger/);
@@ -64,7 +64,10 @@ test("overview and plans use progressive disclosure", async () => {
     read("src/components/admin/billing-drawers.tsx"),
   ]);
   assert.match(page, /view === "overview" && overview/);
-  assert.match(page, /view === "plans" && plans/);
+  assert.match(page, /view === "plans" \? \(/);
+  assert.match(page, /planSection === "pricing" && plans/);
+  assert.match(page, /planSection === "features"/);
+  assert.match(page, /<BillingPlansNavigation current=\{planSection\} params=\{params\} \/>/);
   assert.doesNotMatch(overview, /providerResponseSummary.*<\/td>/s);
   assert.doesNotMatch(overview, /<BillingPlanCatalog/);
   assert.match(

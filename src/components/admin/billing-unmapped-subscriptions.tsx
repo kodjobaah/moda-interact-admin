@@ -217,7 +217,11 @@ export function BillingUnmappedSubscriptions({
         totalPages={subscriptions.totalPages}
         totalItems={subscriptions.totalItems}
         pageParam="unmappedPage"
-        resetParams={["subscriptionId", "mappingResolved"]}
+        resetParams={[
+          "subscriptionId",
+          "mappingResolved",
+          "reconciliationDebugSubscriptionId",
+        ]}
       />
     </section>
   );
@@ -284,6 +288,10 @@ export function UnmappedSubscriptionDrawer({
   const cataloguePlan = detail.cataloguePlan;
   const shopifyContract = detail.shopifyContract;
   const contractVerified = shopifyContract?.status === "VERIFIED";
+  const monetaryOverrideAvailable =
+    cataloguePlan?.planKind === "PAID_METERED" &&
+    shopifyContract?.status === "MONETARY_MISMATCH";
+  const contractAllowsRepair = contractVerified || monetaryOverrideAvailable;
 
   return (
     <AdminDetailDrawer
@@ -386,19 +394,23 @@ export function UnmappedSubscriptionDrawer({
           <section className={`rounded-lg border p-5 ${
             shopifyContract?.status === "VERIFIED"
               ? "border-green-200 bg-green-50"
-              : shopifyContract?.status === "MISMATCH"
-                ? "border-red-200 bg-red-50"
-                : "border-amber-200 bg-amber-50"
+              : shopifyContract?.status === "MONETARY_MISMATCH"
+                ? "border-amber-200 bg-amber-50"
+                : shopifyContract?.status === "MISMATCH"
+                  ? "border-red-200 bg-red-50"
+                  : "border-amber-200 bg-amber-50"
           }`}>
             <h3 className="text-base font-semibold text-gray-950">
               Shopify contract validation
             </h3>
             <p className="mt-1 text-sm text-gray-700">
               {shopifyContract?.status === "VERIFIED"
-                ? "VERIFIED — the current Shopify subscription matches the MerchantPricing recurring contract and usage-meter handles/pricing."
-                : shopifyContract?.status === "MISMATCH"
-                  ? "MISMATCH — repair is blocked until Shopify and MerchantPricing describe the same subscription contract."
-                  : "UNAVAILABLE — repair is blocked until the current Shopify contract can be verified."}
+                ? "VERIFIED — the exact Shopify plan identity is valid. Optional/top-up usage-event prices are not part of the mapping gate."
+                : shopifyContract?.status === "MONETARY_MISMATCH"
+                  ? "MONETARY MISMATCH — the exact paid-plan identity is valid, but the recurring amount or currency differs. A SUPER_ADMIN may explicitly override this monetary mismatch below."
+                  : shopifyContract?.status === "MISMATCH"
+                    ? "MISMATCH — repair is blocked because the Shopify plan identity or another non-monetary contract requirement does not match."
+                    : "UNAVAILABLE — repair is blocked until the current Shopify contract can be verified."}
             </p>
             {shopifyContract?.mismatches.length ? (
               <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-800">
@@ -494,6 +506,30 @@ export function UnmappedSubscriptionDrawer({
               />
             </label>
 
+
+            {monetaryOverrideAvailable ? (
+              <label className="flex gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                <input
+                  type="checkbox"
+                  name="monetaryMismatchOverride"
+                  value="1"
+                  required
+                  className="mt-0.5 h-4 w-4 rounded border-amber-400"
+                />
+                <span>
+                  <span className="block font-semibold">
+                    Override paid-tier monetary mismatch
+                  </span>
+                  <span className="mt-1 block">
+                    I have reviewed the live Shopify recurring amount/currency
+                    mismatch and approve repairing the exact-handle operational
+                    mapping anyway. Shopify remains authoritative for live
+                    monetary values.
+                  </span>
+                </span>
+              </label>
+            ) : null}
+
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               Saving repairs the global exact-handle BillingPlan and requests
               reconciliation. It does not directly set this subscription to ACTIVE
@@ -502,7 +538,7 @@ export function UnmappedSubscriptionDrawer({
 
             <button
               type="submit"
-              disabled={!contractVerified}
+              disabled={!contractAllowsRepair}
               className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Repair mapping and request reconciliation

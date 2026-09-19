@@ -344,9 +344,12 @@ export async function getUnmappedSubscriptionDetail(
     shopifyShopId: row.shop.shopifyShopId,
     plan: {
       shopifyPlanHandle: cataloguePlan.shopifyPlanHandle,
+      planKind: cataloguePlan.planKind,
       recurringAmountMinor: cataloguePlan.recurringAmountMinor,
       currency: cataloguePlan.currency,
       billingPeriod: cataloguePlan.billingPeriod,
+      shopifyRecoveryUsageEventHandle:
+        cataloguePlan.shopifyRecoveryUsageEventHandle,
       usageEvents: cataloguePlan.usageEvents.map((event) => ({
         eventHandle: event.eventHandle,
         pricingMode: event.pricingMode,
