@@ -267,7 +267,7 @@
   "billing.activity": "Billing activity",
   "billing.reconciliationUnavailableShort": "Shopify usage comparison is not available for this tenant.",
   "billing.ledger": "App Event ledger",
-  "billing.ledgerDescription": "Read-only usage events and Shopify reporting state. Provider secrets are excluded.",
+  "billing.ledgerDescription": "Usage events and Shopify reporting state. Eligible failed events can be safely queued for worker retry; provider secrets are excluded.",
   "billing.shop": "Shop",
   "billing.metric": "Metric",
   "billing.quantity": "Quantity",
@@ -427,5 +427,18 @@
   "billing.refund.recordProviderEvidence": "Record provider evidence",
   "billing.refund.noMatching": "No refund requests match the current filter.",
   "billing.refund.completedAutomatic": "Completed automatically through Shopify App Event correction.",
-  "billing.refund.completedManual": "Completed through a manual provider refund or credit."
+  "billing.refund.completedManual": "Completed through a manual provider refund or credit.",
+  "billing.nextReportAt": "Next retry at",
+  "billing.retryEventTitle": "Retry App Event",
+  "billing.retryEventHelp": "Use this only after the underlying configuration or provider problem has been corrected. The existing Shopify event handle, quantity, occurrence time and permanent idempotency key are preserved; the billing worker performs the retry.",
+  "billing.retryEventReason": "Reason for retry",
+  "billing.retryEvent": "Queue retry now",
+  "billing.retryEventPending": "Queueing retry…",
+  "billing.retryEventQueuedHelp": "This App Event is already queued for the next billing-worker retry cycle.",
+  "billing.retryEventResult.QUEUED": "Retry queued. The billing worker will pick up this App Event on its next cycle.",
+  "billing.retryEventResult.ALREADY_DUE": "This App Event is already due for retry.",
+  "billing.retryEventResult.STALE": "The App Event changed while the retry was being queued. The latest durable state has been kept.",
+  "billing.retryEventResult.NOT_ELIGIBLE": "Only Retryable or Needs attention App Events can be manually retried.",
+  "billing.retryEventResult.MISSING": "The App Event no longer exists.",
+  "billing.retryEventResult.ERROR": "The App Event retry could not be queued. Reload the event and try again."
 }

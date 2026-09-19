@@ -6,6 +6,7 @@ import type { Feature } from "@prisma/client";
 import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
+import { BillingEventRetryControl } from "./billing-event-retry-control";
 import { MerchantPricingPlanBuilder } from "./merchant/merchant-pricing-plan-builder";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
 
@@ -158,14 +159,23 @@ export function BillingEventDrawer({
   event,
   params,
   returnPath,
+  canRetry = false,
 }: {
   event: BillingLedgerItem;
   params: Record<string, string>;
   returnPath?: string;
+  canRetry?: boolean;
 }) {
   const closeHref = returnPath
     ? withParamUpdates(returnPath, params, { eventId: null })
     : withParamUpdates("/billing", params, { eventId: null });
+  const retryAlreadyDue =
+    event.shopifyReportState === "RETRYABLE" &&
+    (event.nextReportAt === null || event.nextReportAt.getTime() <= Date.now());
+  const manualRetryAvailable =
+    canRetry &&
+    (event.shopifyReportState === "NEEDS_ATTENTION" ||
+      (event.shopifyReportState === "RETRYABLE" && !retryAlreadyDue));
   return (
     <AdminDetailDrawer
       title={adminI18n.t("billing.eventDetails")}
@@ -185,6 +195,12 @@ export function BillingEventDrawer({
             adminI18n.formatDateTime(event.occurredAt),
           ],
           [adminI18n.t("billing.reportAttempts"), event.reportAttemptCount],
+          [
+            adminI18n.t("billing.nextReportAt"),
+            event.nextReportAt
+              ? adminI18n.formatDateTime(event.nextReportAt)
+              : null,
+          ],
           [
             adminI18n.t("billing.lastReportAttemptAt"),
             event.lastReportAttemptAt
@@ -206,6 +222,19 @@ export function BillingEventDrawer({
           [adminI18n.t("billing.usageEventId"), event.id],
         ]}
       />
+      {manualRetryAvailable ? (
+        <BillingEventRetryControl
+          eventId={event.id}
+          state={event.shopifyReportState}
+          reportAttemptCount={event.reportAttemptCount}
+          nextReportAtIso={event.nextReportAt?.toISOString() ?? null}
+        />
+      ) : null}
+      {retryAlreadyDue ? (
+        <p className="mt-6 rounded-md bg-blue-50 p-4 text-sm text-blue-900">
+          {adminI18n.t("billing.retryEventQueuedHelp")}
+        </p>
+      ) : null}
       {event.shopifyReportState === "REPORTED" ? (
         <p className="mt-6 rounded-md bg-blue-50 p-4 text-sm text-blue-900">
           {adminI18n.t("billing.asyncReceiptHelp")}

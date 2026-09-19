@@ -263,7 +263,11 @@ export default async function BillingPage({ searchParams }: PageProps) {
           />
         ) : null}
         {view === "events" && selectedEvent ? (
-          <BillingEventDrawer event={selectedEvent} params={params} />
+          <BillingEventDrawer
+            event={selectedEvent}
+            params={params}
+            canRetry={principal.role === "SUPER_ADMIN"}
+          />
         ) : null}
         {view === "unmapped" && selectedUnmapped ? (
           <UnmappedSubscriptionDrawer detail={selectedUnmapped} params={params} />
