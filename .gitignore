@@ -45,3 +45,6 @@ node_modules/
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# local manual seed snapshots
+/.seed-state/
