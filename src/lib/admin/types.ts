@@ -291,7 +291,12 @@ export type TenantRecoveryPolicy = {
   overrideReason: string | null;
   catalogue: {
     status: string;
+    syncRequestedAt: Date | null;
+    syncStartedAt: Date | null;
     lastSuccessfulSyncAt: Date | null;
+    lastErrorAt: Date | null;
+    lastErrorCode: string | null;
+    knownDiscountCount: number;
     runningDiscountCount: number;
     fixedSelectableCount: number;
     selectableDiscounts: Array<{ id: string; title: string }>;

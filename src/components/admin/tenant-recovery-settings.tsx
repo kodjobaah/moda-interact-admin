@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { upsertTenantRecoveryPolicyOverrideAction } from "@/app/actions/tenant";
 import { formatDateTime } from "@/lib/admin/format";
 import type { TenantDetail } from "@/lib/admin/types";
 import { adminI18n } from "@/i18n";
 import { TenantRecoveryPolicyClearForm } from "./tenant-recovery-policy-clear-form";
+import { TenantDiscountCatalogueSyncForm } from "./tenant-discount-catalogue-sync-form";
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -61,10 +63,12 @@ export function TenantRecoverySettings({
   tenant,
   returnTo,
   saved,
+  discountSyncRequested,
 }: {
   tenant: TenantDetail;
   returnTo: string;
   saved?: boolean;
+  discountSyncRequested?: boolean;
 }) {
   const policy = tenant.recoveryPolicy;
   const sourceLabel =
@@ -82,6 +86,15 @@ export function TenantRecoverySettings({
           className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800"
         >
           {adminI18n.t("tenant.saved")}
+        </p>
+      ) : null}
+
+      {discountSyncRequested ? (
+        <p
+          role="status"
+          className="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-900"
+        >
+          Shopify discount catalogue sync queued. The recovery worker will refresh this tenant asynchronously.
         </p>
       ) : null}
 
@@ -147,6 +160,73 @@ export function TenantRecoverySettings({
             value={String(policy.catalogue.fixedSelectableCount)}
           />
         </dl>
+      </section>
+
+      <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-950">
+              Shopify discount catalogue
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-gray-600">
+              This catalogue is refreshed asynchronously by the recovery worker.
+              Manual sync requests enqueue the canonical Shopify discount reconciliation job; Admin never calls Shopify directly.
+            </p>
+          </div>
+          <TenantDiscountCatalogueSyncForm
+            shopId={tenant.id}
+            returnTo={returnTo}
+            retry={policy.catalogue.status === "ERROR"}
+          />
+        </div>
+
+        <dl className="mt-5 grid gap-4 border-t border-gray-100 pt-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Status" value={policy.catalogue.status} />
+          <Metric
+            label="Last requested"
+            value={formatDateTime(policy.catalogue.syncRequestedAt)}
+          />
+          <Metric
+            label="Sync started"
+            value={formatDateTime(policy.catalogue.syncStartedAt)}
+          />
+          <Metric
+            label="Last successful sync"
+            value={formatDateTime(policy.catalogue.lastSuccessfulSyncAt)}
+          />
+          <Metric
+            label="Known discounts"
+            value={String(policy.catalogue.knownDiscountCount)}
+          />
+          <Metric
+            label="Running now"
+            value={String(policy.catalogue.runningDiscountCount)}
+          />
+          <Metric
+            label="Fixed selectable"
+            value={String(policy.catalogue.fixedSelectableCount)}
+          />
+          <Metric
+            label="Last error"
+            value={
+              policy.catalogue.lastErrorCode
+                ? `${policy.catalogue.lastErrorCode} · ${formatDateTime(policy.catalogue.lastErrorAt)}`
+                : "None"
+            }
+          />
+        </dl>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
+          <p className="text-xs leading-5 text-gray-500">
+            Queue processing is visible in the Shopify Queues operational view.
+          </p>
+          <Link
+            href="/observability/queues"
+            className="text-sm font-semibold text-[var(--brand-700)] hover:text-[var(--brand-800)]"
+          >
+            Open queue monitor
+          </Link>
+        </div>
       </section>
 
       <details className="rounded-lg border border-gray-200 bg-white shadow-sm">

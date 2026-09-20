@@ -8,6 +8,7 @@ import { logAdminSecurityEvent } from '@/lib/auth/audit';
 import { prisma } from '@/lib/prisma';
 import { runProtectedTenantAction } from '@/lib/auth/tenant-action';
 import { ensureDevelopmentPlatformAdmin } from '@/lib/auth/development-platform-admin';
+import { enqueueAdminShopifyDiscountSync } from '@/lib/admin/shopify-discount-sync';
 import {
   parseRecoveryPolicySnapshot,
   policySnapshot,
@@ -199,6 +200,62 @@ export async function upsertTenantRecoveryPolicyOverrideAction(formData: FormDat
 
     revalidatePath('/');
     redirect(returnTo.includes('?') ? `${returnTo}&saved=1` : `${returnTo}?saved=1`);
+  });
+}
+
+
+export async function requestTenantShopifyDiscountSyncAction(formData: FormData) {
+  return runProtectedTenantAction(formData, requireSuperAdmin, async (formData) => {
+    const shopId = formData.get('shopId');
+    const returnTo = safeReturnTo(formData.get('returnTo'));
+
+    if (typeof shopId !== 'string' || !shopId.trim()) {
+      throw new Error('A shop id is required.');
+    }
+
+    const principal = await requirePlatformAdminMutation();
+
+    try {
+      const shop = await prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { id: true, domain: true },
+      });
+      if (!shop) throw new Error('Tenant not found.');
+
+      await enqueueAdminShopifyDiscountSync({
+        shopId: shop.id,
+        shopDomain: shop.domain,
+      });
+
+      logAdminSecurityEvent('admin.tenant.shopify_discount_sync_requested', {
+        adminId: principal.id,
+        role: principal.role,
+        action: 'request_shopify_discount_sync',
+        resourceType: 'tenant',
+        resourceId: shop.id,
+        outcome: 'succeeded',
+        developmentBypass: principal.developmentBypass,
+      });
+    } catch (error) {
+      logAdminSecurityEvent('admin.tenant.shopify_discount_sync_request_failed', {
+        adminId: principal.id,
+        role: principal.role,
+        action: 'request_shopify_discount_sync',
+        resourceType: 'tenant',
+        resourceId: shopId,
+        outcome: 'failed',
+        reasonCode:
+          error instanceof Error && error.message === 'Tenant not found.'
+            ? 'tenant_not_found'
+            : 'queue_request_failed',
+        developmentBypass: principal.developmentBypass,
+      });
+      throw error;
+    }
+
+    revalidatePath('/');
+    const separator = returnTo.includes('?') ? '&' : '?';
+    redirect(`${returnTo}${separator}discountSyncRequested=1`);
   });
 }
 

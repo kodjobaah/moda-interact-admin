@@ -83,6 +83,8 @@ export default async function Home({ searchParams }: PageProps) {
       ? rawDrawerTab
       : "conversation";
   const saved = firstParam(rawParams.saved) === "1";
+  const discountSyncRequested =
+    firstParam(rawParams.discountSyncRequested) === "1";
   const purchaseId = firstParam(rawParams.purchaseId) ?? null;
   const eventId = firstParam(rawParams.eventId) ?? null;
 
@@ -166,7 +168,10 @@ export default async function Home({ searchParams }: PageProps) {
         })
       : null;
 
-  const returnTo = withParamUpdates("/", params, { saved: null });
+  const returnTo = withParamUpdates("/", params, {
+    saved: null,
+    discountSyncRequested: null,
+  });
 
   return (
     <AdminShell
@@ -241,6 +246,7 @@ export default async function Home({ searchParams }: PageProps) {
           params={params}
           returnTo={returnTo}
           saved={saved}
+          discountSyncRequested={discountSyncRequested}
           billing={tenantBilling}
           billingView={billingView}
           billingPacks={billingPacks}

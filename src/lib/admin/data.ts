@@ -292,7 +292,14 @@ export async function getTenantDetail(
         },
       },
       discountCatalogue: {
-        select: { status: true, lastSuccessfulSyncAt: true },
+        select: {
+          status: true,
+          syncRequestedAt: true,
+          syncStartedAt: true,
+          lastSuccessfulSyncAt: true,
+          lastErrorAt: true,
+          lastErrorCode: true,
+        },
       },
       subscription: {
         select: {
@@ -346,7 +353,13 @@ export async function getTenantDetail(
   const fixedSelectableWhere = catalogueCurrent
     ? { ...runningDiscountWhere, fixedSelectable: true }
     : { id: "__no_current_catalogue__" };
-  const [runningDiscountCount, fixedSelectableCount, selectableDiscounts] = await Promise.all([
+  const [
+    knownDiscountCount,
+    runningDiscountCount,
+    fixedSelectableCount,
+    selectableDiscounts,
+  ] = await Promise.all([
+    prisma.shopifyDiscount.count({ where: { shopId } }),
     prisma.shopifyDiscount.count({ where: runningDiscountWhere }),
     prisma.shopifyDiscount.count({ where: fixedSelectableWhere }),
     prisma.shopifyDiscount.findMany({
@@ -392,7 +405,12 @@ export async function getTenantDetail(
       overrideReason: row.recoveryPolicyOverride?.reason ?? null,
       catalogue: {
         status: row.discountCatalogue?.status ?? "UNAVAILABLE",
+        syncRequestedAt: row.discountCatalogue?.syncRequestedAt ?? null,
+        syncStartedAt: row.discountCatalogue?.syncStartedAt ?? null,
         lastSuccessfulSyncAt: row.discountCatalogue?.lastSuccessfulSyncAt ?? null,
+        lastErrorAt: row.discountCatalogue?.lastErrorAt ?? null,
+        lastErrorCode: row.discountCatalogue?.lastErrorCode ?? null,
+        knownDiscountCount,
         runningDiscountCount,
         fixedSelectableCount,
         selectableDiscounts,

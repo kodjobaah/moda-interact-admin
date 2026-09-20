@@ -25,6 +25,7 @@ export function TenantDetailPanel({
   params,
   returnTo,
   saved,
+  discountSyncRequested,
   billing,
   billingView,
   billingPacks,
@@ -41,6 +42,7 @@ export function TenantDetailPanel({
   params: Record<string, string>;
   returnTo: string;
   saved?: boolean;
+  discountSyncRequested?: boolean;
   billing: TenantBilling | null;
   billingView: "overview" | "usage" | "shopify" | "activity";
   billingPacks: PageResult<RecoveryCreditPurchaseItem> | null;
@@ -62,6 +64,7 @@ export function TenantDetailPanel({
     purchaseId: null,
     eventId: null,
     saved: null,
+    discountSyncRequested: null,
   } as const;
 
   const adminHref = withParamUpdates("/", params, {
@@ -126,6 +129,7 @@ export function TenantDetailPanel({
           tenant={tenant}
           returnTo={returnTo}
           saved={saved}
+          discountSyncRequested={discountSyncRequested}
         />
       ) : tab === "billing" && billing ? (
         <TenantBillingView

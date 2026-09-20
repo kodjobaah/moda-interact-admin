@@ -26,6 +26,7 @@ export function TenantTable({
   params,
   returnTo,
   saved,
+  discountSyncRequested,
   billing,
   billingView,
   billingPacks,
@@ -43,6 +44,7 @@ export function TenantTable({
   params: Record<string, string>;
   returnTo: string;
   saved?: boolean;
+  discountSyncRequested?: boolean;
   billing: TenantBilling | null;
   billingView: "overview" | "usage" | "shopify" | "activity";
   billingPacks: import("@/lib/admin/types").PageResult<import("@/lib/admin/types").RecoveryCreditPurchaseItem> | null;
@@ -89,6 +91,7 @@ export function TenantTable({
                       purchaseId: null,
                       eventId: null,
                       saved: null,
+                      discountSyncRequested: null,
                     })
                   : withParamUpdates("/", params, {
                       tenant: tenant.id,
@@ -106,6 +109,7 @@ export function TenantTable({
                       purchaseId: null,
                       eventId: null,
                       saved: null,
+                      discountSyncRequested: null,
                     });
 
                 return (
@@ -127,6 +131,7 @@ export function TenantTable({
                           params={params}
                           returnTo={returnTo}
                           saved={saved}
+                          discountSyncRequested={discountSyncRequested}
                           billing={billing}
                           billingView={billingView}
                           billingPacks={billingPacks}
@@ -168,6 +173,7 @@ export function TenantTable({
           "drawerTab",
           "messagePage",
           "saved",
+          "discountSyncRequested",
         ]}
       />
     </div>

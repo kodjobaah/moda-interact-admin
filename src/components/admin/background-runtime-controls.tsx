@@ -206,6 +206,42 @@ function TabForm({
           intro={title === "Worker throughput" ? "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap." : title === "Recovery" ? "Checkout recovery lifetime is a platform-wide control, defaults to 21 days, and changes the cutoff used by the next expiry scans. Expiry retains recovery, conversation, and message history; later checkout activity can start a new recovery generation." : undefined}
         />
       ))}
+      {section === "OPERATIONAL" ? (
+        <details className="rounded-lg border border-gray-200 bg-gray-50">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-950">
+            Shopify discount catalogue synchronisation
+          </summary>
+          <div className="grid gap-4 border-t border-gray-200 px-4 py-4 text-sm md:grid-cols-2 xl:grid-cols-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mode</p>
+              <p className="mt-1 font-medium text-gray-900">Event driven</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Queue</p>
+              <code className="mt-1 block text-gray-900">shopify-discount-sync</code>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Job</p>
+              <code className="mt-1 block text-gray-900">reconcile-shopify-discounts</code>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Consumer</p>
+              <code className="mt-1 block text-gray-900">moda-recovery-worker</code>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Consumer concurrency</p>
+              <p className="mt-1 font-medium text-gray-900">4</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Triggers</p>
+              <p className="mt-1 text-gray-700">Shopify lifecycle/webhook events and Admin requested refreshes.</p>
+            </div>
+          </div>
+          <p className="px-4 pb-4 text-xs leading-5 text-gray-500">
+            This is an event-driven background workflow, not a periodic runtime setting. The values above are informational and are intentionally not editable on this page.
+          </p>
+        </details>
+      ) : null}
       {section === "ADVANCED" ? (
         <details className="rounded-lg border border-gray-200 bg-gray-50">
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-950">System-managed settings</summary>
