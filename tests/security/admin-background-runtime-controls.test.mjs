@@ -64,3 +64,11 @@ test("checkout recovery lifetime is an audited operational control", () => {
   assert.match(component, /platform-wide control/);
   assert.match(component, /retains recovery, conversation, and message history/);
 });
+
+test("documents expired promotion cleanup on the existing reconciliation controls", () => {
+  assert.match(validation, /Reconciliation interval/);
+  assert.match(validation, /expired promotion cleanup/);
+  assert.doesNotMatch(action, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
+  assert.doesNotMatch(validation, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
+  assert.doesNotMatch(component, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
+});
