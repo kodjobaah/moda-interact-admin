@@ -81,8 +81,8 @@ const millisecondsField = (
 
 export const RUNTIME_FIELDS: Record<RuntimeSection, RuntimeField[]> = {
   OPERATIONAL: [
-    integerField("billingReconciliationIntervalSeconds", "Reconciliation interval", "How often Moda checks Shopify billing state. Lower values detect changes sooner but increase Shopify and database activity.", "seconds", 10, 3600, 60),
-    integerField("billingReconciliationShopBatchSize", "Shops per reconciliation cycle", "Maximum merchants checked during one reconciliation pass. Increase this as the merchant base grows, while watching provider and database load.", "shops", 1, 200, 50),
+    integerField("billingReconciliationIntervalSeconds", "Reconciliation interval", "How often Moda performs periodic billing and entitlement reconciliation, including Shopify billing checks and expired promotion cleanup.", "seconds", 10, 3600, 60),
+    integerField("billingReconciliationShopBatchSize", "Shops per reconciliation cycle", "Maximum merchants processed during one periodic billing and entitlement reconciliation pass, including expired promotion cleanup. Increase this as the merchant base grows, while watching provider and database load.", "shops", 1, 200, 50),
     integerField("shopifyUsagePublishBatchSize", "Usage events per publish cycle", "Maximum pending Shopify App Events submitted during one billing publish pass. Higher values drain backlog faster but create more provider traffic.", "events", 1, 200, 50),
     secondsField("recoveryRepairIntervalSeconds", "Repair interval", "How often Moda looks for recoveries blocked because recovery capacity was unavailable.", 30, 3600, 300, "5 min"),
     integerField("recoveryRepairShopBatchSize", "Shops per repair", "Maximum shops inspected during one recovery-capacity repair pass.", "shops", 1, 500, 100),

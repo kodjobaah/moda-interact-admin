@@ -13,6 +13,30 @@ test("covers every DATABASE-004 editable field exactly once", () => {
   assert.equal(new Set(keys).size, keys.length);
 });
 
+test("describes billing reconciliation as including expired promotion cleanup", () => {
+  const interval = ALL_RUNTIME_FIELDS.find((field) => field.key === "billingReconciliationIntervalSeconds");
+  const batch = ALL_RUNTIME_FIELDS.find((field) => field.key === "billingReconciliationShopBatchSize");
+
+  assert.deepEqual(interval, {
+    key: "billingReconciliationIntervalSeconds",
+    label: "Reconciliation interval",
+    guidance: "How often Moda performs periodic billing and entitlement reconciliation, including Shopify billing checks and expired promotion cleanup.",
+    unit: "seconds",
+    min: 10,
+    max: 3600,
+    defaultValue: 60,
+  });
+  assert.deepEqual(batch, {
+    key: "billingReconciliationShopBatchSize",
+    label: "Shops per reconciliation cycle",
+    guidance: "Maximum merchants processed during one periodic billing and entitlement reconciliation pass, including expired promotion cleanup. Increase this as the merchant base grows, while watching provider and database load.",
+    unit: "shops",
+    min: 1,
+    max: 200,
+    defaultValue: 50,
+  });
+});
+
 test("validates checkout recovery lifetime as whole days from 1 through 90", () => {
   const current = Object.fromEntries(ALL_RUNTIME_FIELDS.map((field) => [field.key, field.defaultValue]));
   const form = new FormData();
