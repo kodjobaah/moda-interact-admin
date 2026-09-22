@@ -763,7 +763,6 @@ async function main() {
             ? {
                 conversation: {
                   create: {
-                    type: "RECOVERY",
                     outcome: profile.outcome ?? "IN_PROGRESS",
                     languageTag: "en-GB",
                     languageSource: "SHOPIFY",

@@ -211,7 +211,6 @@ function conversationFixtures(shopId, recoveries) {
     shopId,
     customerId: recovery.customerId,
     checkoutRecoveryId: recovery.id,
-    type: "RECOVERY",
     outcome: conversationOutcome(recovery.status),
     languageTag: index % 3 === 0 ? "fr" : "en",
     languageSource: "MERCHANT_DEFAULT",

@@ -174,14 +174,12 @@ export async function getTenantDirectory(input: {
     }),
     prisma.conversation.count({
       where: {
-        type: "RECOVERY",
         checkoutRecovery: { shop: { status: "ACTIVE" } },
       },
     }),
     prisma.conversationMessage.count({
       where: {
         conversation: {
-          type: "RECOVERY",
           checkoutRecovery: { shop: { status: "ACTIVE" } },
         },
       },
