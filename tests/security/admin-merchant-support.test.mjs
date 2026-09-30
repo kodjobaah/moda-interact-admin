@@ -38,7 +38,7 @@ const moduleUrl = pathToFileURL(sourcePath).href;
 test('consumes the published shared release without a local declaration shim', () => {
   assert.equal(
     packageJson.dependencies['@modainteract/moda-interact-shared'],
-    '^0.7.3',
+    '1.0.1',
   );
   assert.equal(
     existsSync(resolve(root, 'src/types/shared-merchant-communications.d.ts')),
