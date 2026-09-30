@@ -56,12 +56,20 @@ test("sidebar exposes nested System Controls navigation", async () => {
   assert.match(sidebarSource, /nav\.backgroundRuntime/);
   assert.match(
     sidebarSource,
-    /active === "platform-policy" \|\| active === "background-runtime"/,
+    /active === "platform-policy" \|\|[\s\S]*active === "background-runtime" \|\|[\s\S]*active === "store-categories"/,
   );
   assert.match(shellSource, /\| "platform-policy"/);
   assert.match(shellSource, /\| "background-runtime"/);
+  assert.match(shellSource, /\| "store-categories"/);
   assert.match(policyPageSource, /<AdminShell active="platform-policy">/);
   assert.match(runtimePageSource, /<AdminShell active="background-runtime">/);
+  const storeCategoriesPageSource = await readSource(
+    "src/app/(protected)/system-controls/store-categories/page.tsx",
+  );
+  assert.match(sidebarSource, /href="\/system-controls\/store-categories"/);
+  assert.match(sidebarSource, /Store Categories/);
+  assert.match(storeCategoriesPageSource, /requirePlatformAdminPage\(\)/);
+  assert.match(storeCategoriesPageSource, /<AdminShell active="store-categories">/);
 });
 
 test("sidebar uses a stable desktop rail and bottom administrator treatment", async () => {

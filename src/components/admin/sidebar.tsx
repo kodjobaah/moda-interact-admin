@@ -17,7 +17,8 @@ export function Sidebar({
     | "billing"
     | "promotions"
     | "platform-policy"
-    | "background-runtime";
+    | "background-runtime"
+    | "store-categories";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -27,7 +28,9 @@ export function Sidebar({
     "border border-[var(--brand-200)] bg-white text-[var(--brand-900)] shadow-sm";
   const idle = "text-[var(--brand-800)] hover:bg-white/60";
   const systemControlsActive =
-    active === "platform-policy" || active === "background-runtime";
+    active === "platform-policy" ||
+    active === "background-runtime" ||
+    active === "store-categories";
   const observabilityActive = active === "observability" || active === "queues";
 
   return (
@@ -107,6 +110,13 @@ export function Sidebar({
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "background-runtime" ? selected : idle}`}
               >
                 {adminI18n.t("nav.backgroundRuntime")}
+              </Link>
+              <Link
+                href="/system-controls/store-categories"
+                aria-current={active === "store-categories" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "store-categories" ? selected : idle}`}
+              >
+                Store Categories
               </Link>
             </div>
           ) : null}
