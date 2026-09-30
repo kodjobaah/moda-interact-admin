@@ -44,6 +44,7 @@ import {
   ZERO_COST_USAGE_EVENT_MESSAGE,
 } from "@/lib/admin/merchant/pricing-plan-builder";
 import { presentMerchantPricingEconomicsResult } from "@/lib/admin/merchant/pricing-economics-presentation";
+import { buildSupportedFeatureControls } from "@/lib/admin/merchant/pricing-plan-feature-controls";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MerchantPricingTranslationWorkbook } from "./merchant-pricing-translation-workbook";
 import { MerchantPricingPlanSubmitButton } from "./merchant-pricing-plan-submit-button";
@@ -137,6 +138,11 @@ export function MerchantPricingPlanBuilder({
       .map(({ feature }) => feature.key)
       .filter((key) => key !== merchantKnowledgeFeatureKey) ?? [],
   );
+  const supportedFeatureControls = buildSupportedFeatureControls({
+    featureCatalogue,
+    existingFeatures: plan?.features.map(({ feature }) => feature) ?? [],
+    supportedFeatureKeys,
+  });
   const [currency, setCurrency] = useState(plan?.currency ?? "USD");
   const [recurring, setRecurring] = useState(
     plan ? minorUnitsToMoney(plan.recurringAmountMinor) : "0",
@@ -233,9 +239,14 @@ export function MerchantPricingPlanBuilder({
       maxContentUnitsPerSource: Number(maxContentUnitsPerSource),
       allowedSourceTypes: merchantKnowledgeSourceTypes
         .filter(({ purposeKey, dataFormatKey }) =>
-          allowedSourceTypeKeys.includes(sourceTypeKey(purposeKey, dataFormatKey)),
+          allowedSourceTypeKeys.includes(
+            sourceTypeKey(purposeKey, dataFormatKey),
+          ),
         )
-        .map(({ purposeKey, dataFormatKey }) => ({ purposeKey, dataFormatKey })),
+        .map(({ purposeKey, dataFormatKey }) => ({
+          purposeKey,
+          dataFormatKey,
+        })),
     }),
     [
       allowedSourceTypeKeys,
@@ -653,10 +664,14 @@ export function MerchantPricingPlanBuilder({
               value={recoveryUsageEventHandle}
               required={planKind === "PAID_METERED"}
               disabled={planKind === "FREE"}
-              onChange={(event) => setRecoveryUsageEventHandle(event.target.value)}
+              onChange={(event) =>
+                setRecoveryUsageEventHandle(event.target.value)
+              }
             />
             <span className="mt-1 block text-xs font-normal text-gray-500">
-              Normal paid recovery meter copied to BillingPlan.shopifyUsageEventHandle. Usage events below are top-up offers.
+              Normal paid recovery meter copied to
+              BillingPlan.shopifyUsageEventHandle. Usage events below are top-up
+              offers.
             </span>
           </label>
           <label className="text-sm font-medium text-gray-700">
@@ -689,125 +704,159 @@ export function MerchantPricingPlanBuilder({
           <div>
             <h3 className="font-semibold text-gray-900">Supported features</h3>
             <p className="text-sm text-gray-600">
-              System-required features are always included. Inactive mapped features remain selected until the catalogue feature is reactivated.
+              System-required features are always included. Inactive mapped
+              features remain selected until the catalogue feature is
+              reactivated.
             </p>
           </div>
-          <label className="flex items-start gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked disabled readOnly />
-            <span>
-              <span className="font-medium">Merchant Knowledge</span>
-              <span> (Included by product policy)</span>
-            </span>
-          </label>
-          <div className="ml-6 space-y-4 border-l-2 border-[var(--brand-200)] pl-4">
-            <div>
-              <h4 className="font-medium text-gray-900">
-                Merchant Knowledge configuration
-              </h4>
-              {!merchantKnowledgeConfigurationValid ? (
-                <p role="alert" className="mt-1 text-sm text-amber-800">
-                  Merchant Knowledge configuration required. Enter explicit limits and select currently active source types before saving.
-                </p>
-              ) : null}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-medium text-gray-700">
-                Maximum knowledge sources
-                <input
-                  className={inputClass}
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={maxKnowledgeSources}
-                  onChange={(event) => setMaxKnowledgeSources(event.target.value)}
-                />
-              </label>
-              <label className="text-sm font-medium text-gray-700">
-                Maximum content units per source
-                <input
-                  className={inputClass}
-                  type="number"
-                  min={1}
-                  max={25000}
-                  value={maxContentUnitsPerSource}
-                  onChange={(event) => setMaxContentUnitsPerSource(event.target.value)}
-                />
-              </label>
-            </div>
-            <div className="space-y-4">
-              {Array.from(
-                new Map(
-                  merchantKnowledgeSourceTypes.map((sourceType) => [
-                    sourceType.purposeKey,
-                    sourceType.purposeDisplayName,
-                  ]),
-                ),
-              ).map(([purposeKey, purposeDisplayName]) => (
-                <fieldset key={purposeKey} className="space-y-2">
-                  <legend className="text-sm font-medium text-gray-800">
-                    {purposeDisplayName}
-                  </legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {merchantKnowledgeSourceTypes
-                      .filter((sourceType) => sourceType.purposeKey === purposeKey)
-                      .map((sourceType) => {
-                        const key = sourceTypeKey(
-                          sourceType.purposeKey,
-                          sourceType.dataFormatKey,
-                        );
-                        return (
-                          <label
-                            key={key}
-                            className="flex items-center gap-2 text-sm text-gray-700"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={allowedSourceTypeKeys.includes(key)}
-                              onChange={(event) =>
-                                setAllowedSourceTypeKeys((current) =>
-                                  event.target.checked
-                                    ? [...current, key]
-                                    : current.filter((value) => value !== key),
-                                )
-                              }
-                            />
-                            {sourceType.dataFormatDisplayName}
-                          </label>
-                        );
-                      })}
+          {supportedFeatureControls.map((control) =>
+            control.includedByProductPolicy ? (
+              <div key={control.key}>
+                <label className="flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={control.checked}
+                    disabled={control.disabled}
+                    readOnly
+                  />
+                  <span>
+                    <span className="font-medium">{control.displayName}</span>
+                    <span> (Included by product policy)</span>
+                  </span>
+                </label>
+                <div className="ml-6 space-y-4 border-l-2 border-[var(--brand-200)] pl-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900">
+                      Merchant Knowledge configuration
+                    </h4>
+                    {!merchantKnowledgeConfigurationValid ? (
+                      <p role="alert" className="mt-1 text-sm text-amber-800">
+                        Merchant Knowledge configuration required. Enter
+                        explicit limits and select currently active source types
+                        before saving.
+                      </p>
+                    ) : null}
                   </div>
-                </fieldset>
-              ))}
-              {merchantKnowledgeSourceTypes.length === 0 ? (
-                <p className="text-sm text-gray-600">
-                  No active Merchant Knowledge source types are available.
-                </p>
-              ) : null}
-            </div>
-          </div>
-          {featureCatalogue.filter((feature) =>
-            feature.active || plan?.features.some(({ feature: mappedFeature }) => mappedFeature.id === feature.id),
-          ).filter((feature) => feature.key !== merchantKnowledgeFeatureKey).concat(
-            plan?.features.map(({ feature }) => feature) ?? [],
-          ).filter((feature, index, all) => all.findIndex((candidate) => candidate.id === feature.id) === index).map((feature) => {
-            const checked = supportedFeatureKeys.includes(feature.key);
-            const locked = feature.systemRequired || !feature.active;
-            return (
-              <label key={feature.id} className="flex items-start gap-2 text-sm text-gray-700">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Maximum knowledge sources
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={maxKnowledgeSources}
+                        onChange={(event) =>
+                          setMaxKnowledgeSources(event.target.value)
+                        }
+                      />
+                    </label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Maximum content units per source
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={1}
+                        max={25000}
+                        value={maxContentUnitsPerSource}
+                        onChange={(event) =>
+                          setMaxContentUnitsPerSource(event.target.value)
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="space-y-4">
+                    {Array.from(
+                      new Map(
+                        merchantKnowledgeSourceTypes.map((sourceType) => [
+                          sourceType.purposeKey,
+                          sourceType.purposeDisplayName,
+                        ]),
+                      ),
+                    ).map(([purposeKey, purposeDisplayName]) => (
+                      <fieldset key={purposeKey} className="space-y-2">
+                        <legend className="text-sm font-medium text-gray-800">
+                          {purposeDisplayName}
+                        </legend>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {merchantKnowledgeSourceTypes
+                            .filter(
+                              (sourceType) =>
+                                sourceType.purposeKey === purposeKey,
+                            )
+                            .map((sourceType) => {
+                              const key = sourceTypeKey(
+                                sourceType.purposeKey,
+                                sourceType.dataFormatKey,
+                              );
+                              return (
+                                <label
+                                  key={key}
+                                  className="flex items-center gap-2 text-sm text-gray-700"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={allowedSourceTypeKeys.includes(
+                                      key,
+                                    )}
+                                    onChange={(event) =>
+                                      setAllowedSourceTypeKeys((current) =>
+                                        event.target.checked
+                                          ? [...current, key]
+                                          : current.filter(
+                                              (value) => value !== key,
+                                            ),
+                                      )
+                                    }
+                                  />
+                                  {sourceType.dataFormatDisplayName}
+                                </label>
+                              );
+                            })}
+                        </div>
+                      </fieldset>
+                    ))}
+                    {merchantKnowledgeSourceTypes.length === 0 ? (
+                      <p className="text-sm text-gray-600">
+                        No active Merchant Knowledge source types are available.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <label
+                key={control.key}
+                className="flex items-start gap-2 text-sm text-gray-700"
+              >
                 <input
                   type="checkbox"
-                  checked={checked || feature.systemRequired}
-                  disabled={locked}
-                  onChange={(event) => setSupportedFeatureKeys((current) => event.target.checked ? [...current, feature.key] : current.filter((key) => key !== feature.key))}
+                  checked={control.checked}
+                  disabled={control.disabled}
+                  onChange={(event) =>
+                    setSupportedFeatureKeys((current) =>
+                      event.target.checked
+                        ? [...current, control.key]
+                        : current.filter((key) => key !== control.key),
+                    )
+                  }
                 />
                 <span>
-                  <span className="font-medium">{feature.displayName}</span>
-                  {feature.systemRequired ? " (Required)" : !feature.active ? " (Inactive globally)" : ""}
-                  {feature.description ? <span className="block text-xs text-gray-500">{feature.description}</span> : null}
+                  <span className="font-medium">{control.displayName}</span>
+                  {control.systemRequired
+                    ? " (Required)"
+                    : !control.active
+                      ? " (Inactive globally)"
+                      : ""}
+                  {control.description ? (
+                    <span className="block text-xs text-gray-500">
+                      {control.description}
+                    </span>
+                  ) : null}
                 </span>
               </label>
-            );
-          })}
+            ),
+          )}
         </section>
       ) : null}
       {step === 3 ? (

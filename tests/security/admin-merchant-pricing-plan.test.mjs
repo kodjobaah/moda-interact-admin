@@ -83,29 +83,70 @@ test("generic Feature toggle protects the active Merchant Knowledge product Feat
     action,
     /Merchant Knowledge is included by pricing-plan product policy and cannot be deactivated here\./,
   );
-  assert.match(action, /existing\.key === "merchant_knowledge" && existing\.active/);
+  assert.match(
+    action,
+    /existing\.key === "merchant_knowledge" && existing\.active/,
+  );
   assert.match(action, /systemRequired: false/);
 });
 
 test("Merchant Knowledge configuration is validated and mirrored as the same generic mapping", async () => {
   const action = await source("src/app/actions/merchant-pricing-plan.ts");
-  const policy = await source("src/lib/admin/merchant-knowledge-plan-policy.ts");
+  const policy = await source(
+    "src/lib/admin/merchant-knowledge-plan-policy.ts",
+  );
+  const persistence = await source(
+    "src/lib/admin/merchant/merchant-pricing-plan-feature-persistence.ts",
+  );
   assert.match(action, /ensureMerchantKnowledgeFeature\(\s*transaction/);
-  assert.match(action, /transaction\.merchantKnowledgePurposeDataFormat\.findMany/);
+  assert.match(
+    action,
+    /transaction\.merchantKnowledgePurposeDataFormat\.findMany/,
+  );
   assert.match(action, /validateMerchantKnowledgeConfiguration/);
-  assert.match(action, /features:\s*\{\s*create: desiredPlanFeatures/);
-  assert.match(action, /configuration: mapping\.configuration/);
-  assert.match(action, /update:\s*\{\s*enabled: true,\s*configuration: mapping\.configuration/);
-  assert.match(policy, /configuration:\s*merchantKnowledgeConfiguration as Prisma\.InputJsonValue/);
-  assert.doesNotMatch(action, /shopFeaturePreference\.(?:create|update|delete)/i);
+  assert.match(action, /persistMerchantPricingPlanFeatures\(transaction/);
+  assert.match(
+    persistence,
+    /transaction\.merchantPricingPlanFeature\.createMany/,
+  );
+  assert.match(persistence, /transaction\.billingPlanFeature\.upsert/);
+  assert.match(persistence, /configuration,/);
+  assert.match(persistence, /update: \{ enabled: true, configuration \}/);
+  assert.match(
+    policy,
+    /configuration:\s*merchantKnowledgeConfiguration as Prisma\.InputJsonValue/,
+  );
+  assert.doesNotMatch(
+    action,
+    /shopFeaturePreference\.(?:create|update|delete)/i,
+  );
   assert.doesNotMatch(action, /feature\.key\s*===\s*["']merchant_knowledge/);
+  assert.doesNotMatch(
+    persistence,
+    /feature\.key\s*===\s*["']merchant_knowledge/,
+  );
 });
 
 test("builder locks Merchant Knowledge and exposes only explicit active source options", async () => {
-  const builder = await source("src/components/admin/merchant/merchant-pricing-plan-builder.tsx");
+  const builder = await source(
+    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
+  );
+  const controls = await source(
+    "src/lib/admin/merchant/pricing-plan-feature-controls.ts",
+  );
   const pricing = await source("src/lib/admin/merchant/pricing-plan.ts");
-  const catalogue = await source("src/components/admin/merchant/merchant-pricing-plan-catalog.tsx");
-  assert.match(builder, /type="checkbox" checked disabled readOnly/);
+  const catalogue = await source(
+    "src/components/admin/merchant/merchant-pricing-plan-catalog.tsx",
+  );
+  assert.match(builder, /supportedFeatureControls\.map/);
+  assert.match(builder, /checked=\{control\.checked\}/);
+  assert.match(builder, /disabled=\{control\.disabled\}/);
+  assert.match(controls, /checked: true/);
+  assert.match(controls, /disabled: true/);
+  assert.match(
+    controls,
+    /\.filter\(\(\{ key \}\) => key !== MERCHANT_KNOWLEDGE_FEATURE_KEY\)/,
+  );
   assert.match(builder, /Included by product policy/);
   assert.match(builder, /Maximum knowledge sources/);
   assert.match(builder, /Maximum content units per source/);
@@ -206,11 +247,17 @@ test("MerchantPricing catalogue pagination is database-backed and drawer context
     "src/components/admin/merchant/merchant-pricing-plan-catalog.tsx",
   );
 
-  assert.match(pricing, /MERCHANT_PRICING_CATALOGUE_PAGE_SIZES = \[5, 10, 20, 50\]/);
+  assert.match(
+    pricing,
+    /MERCHANT_PRICING_CATALOGUE_PAGE_SIZES = \[5, 10, 20, 50\]/,
+  );
   assert.match(pricing, /merchantPricingPlan\.count\(\)/);
   assert.match(pricing, /skip: \(page - 1\) \* pageSize/);
   assert.match(pricing, /take: pageSize/);
-  assert.match(pricing, /export async function getMerchantPricingCatalogueContext/);
+  assert.match(
+    pricing,
+    /export async function getMerchantPricingCatalogueContext/,
+  );
   assert.match(pricing, /where: \{ isActive: true \}/);
   assert.match(pricing, /translations: \[\]/);
   assert.match(pricing, /highlights: \[\]/);
