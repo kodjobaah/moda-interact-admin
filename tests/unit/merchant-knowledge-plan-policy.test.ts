@@ -8,14 +8,17 @@ import {
 } from "../../src/lib/admin/merchant-knowledge-plan-policy.ts";
 import type { Prisma } from "@prisma/client";
 
-function transactionDouble(existingFeature: unknown = null) {
+function transactionDouble(
+  existingFeature: unknown = null,
+  transitionCount = 1,
+) {
   const calls: Array<{ model: string; args: unknown }> = [];
   const feature = {
     id: "feature-mk",
     key: "merchant_knowledge",
     displayName: "Persisted wording",
     description: null,
-    activationMode: "ALWAYS_ENABLED",
+    activationMode: "MERCHANT_OPT_IN",
     systemRequired: false,
     active: true,
   };
@@ -28,6 +31,10 @@ function transactionDouble(existingFeature: unknown = null) {
       create: async (args: unknown) => {
         calls.push({ model: "create", args });
         return feature;
+      },
+      updateMany: async (args: unknown) => {
+        calls.push({ model: "updateMany", args });
+        return { count: transitionCount };
       },
     },
     billingAuditEvent: {
@@ -55,7 +62,7 @@ test("creates the fixed ordinary Feature and audits its creation once", async ()
       displayName: "Merchant Knowledge",
       description:
         "Allow the CommerceAgent to use merchant-managed knowledge sources.",
-      activationMode: "ALWAYS_ENABLED",
+      activationMode: "MERCHANT_OPT_IN",
       systemRequired: false,
       active: true,
     },
@@ -71,13 +78,13 @@ test("creates the fixed ordinary Feature and audits its creation once", async ()
   });
 });
 
-test("preserves wording on a valid existing Feature without writing", async () => {
+test("preserves a target-state Feature without writing", async () => {
   const { transaction, calls } = transactionDouble({
     id: "feature-mk",
     key: "merchant_knowledge",
     displayName: "Custom persisted name",
     description: "Existing description",
-    activationMode: "ALWAYS_ENABLED",
+    activationMode: "MERCHANT_OPT_IN",
     systemRequired: false,
     active: true,
   });
@@ -86,9 +93,74 @@ test("preserves wording on a valid existing Feature without writing", async () =
   assert.deepEqual(calls.map(({ model }) => model), ["findUnique"]);
 });
 
+test("transitions only the exact legacy state and audits once without side writes", async () => {
+  const { transaction, calls } = transactionDouble({
+    id: "feature-mk",
+    key: "merchant_knowledge",
+    displayName: "Merchant Knowledge",
+    description: null,
+    activationMode: "ALWAYS_ENABLED",
+    systemRequired: false,
+    active: true,
+  });
+
+  const feature = await ensureMerchantKnowledgeFeature(transaction, "admin-1");
+
+  assert.equal(feature.activationMode, "MERCHANT_OPT_IN");
+  assert.deepEqual(calls.map(({ model }) => model), [
+    "findUnique",
+    "updateMany",
+    "audit",
+  ]);
+  assert.deepEqual(calls[1].args, {
+    where: {
+      id: "feature-mk",
+      activationMode: "ALWAYS_ENABLED",
+      systemRequired: false,
+      active: true,
+    },
+    data: { activationMode: "MERCHANT_OPT_IN" },
+  });
+  assert.deepEqual(calls[2].args, {
+    data: {
+      action: "PLAN_CATALOG_CHANGED",
+      platformAdminId: "admin-1",
+      reason:
+        "Updated Feature merchant_knowledge activation mode to MERCHANT_OPT_IN",
+      relatedEntityType: "Feature",
+      relatedEntityId: "feature-mk",
+    },
+  });
+});
+
+test("fails closed without auditing when the exact legacy state changes concurrently", async () => {
+  const { transaction, calls } = transactionDouble(
+    {
+      id: "feature-mk",
+      key: "merchant_knowledge",
+      displayName: "Merchant Knowledge",
+      description: null,
+      activationMode: "ALWAYS_ENABLED",
+      systemRequired: false,
+      active: true,
+    },
+    0,
+  );
+
+  await assert.rejects(
+    ensureMerchantKnowledgeFeature(transaction, "admin-1"),
+    /Merchant Knowledge Feature has a conflicting configuration\./,
+  );
+  assert.deepEqual(calls.map(({ model }) => model), [
+    "findUnique",
+    "updateMany",
+  ]);
+});
+
 test("rejects conflicting identity or state without rewriting the Feature", async () => {
   for (const values of [
-    { activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
+    { activationMode: "MERCHANT_OPT_IN", systemRequired: true, active: true },
+    { activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: false },
     { activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true },
     { activationMode: "ALWAYS_ENABLED", systemRequired: false, active: false },
   ]) {

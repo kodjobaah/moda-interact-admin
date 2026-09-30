@@ -81,6 +81,14 @@ test("generic Feature toggle protects the active Merchant Knowledge product Feat
   const action = await source("src/app/actions/feature-catalogue.ts");
   assert.match(
     action,
+    /key === "merchant_knowledge"\)[\s\S]*?Merchant Knowledge is managed by pricing-plan product policy\./,
+  );
+  assert.match(
+    action,
+    /data: \{ displayName, description: description \|\| null \}/,
+  );
+  assert.match(
+    action,
     /Merchant Knowledge is included by pricing-plan product policy and cannot be deactivated here\./,
   );
   assert.match(

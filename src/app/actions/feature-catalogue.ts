@@ -29,6 +29,9 @@ export async function mutateFeatureCatalogueAction(formData: FormData): Promise<
   if (intent === "create") {
     const key = text(formData, "key", 128);
     if (!FEATURE_KEY_PATTERN.test(key)) actionError("Feature key has an invalid format.");
+    if (key === "merchant_knowledge") {
+      actionError("Merchant Knowledge is managed by pricing-plan product policy.");
+    }
     const displayName = text(formData, "displayName", 255);
     const rawDescription = formData.get("description");
     const description = typeof rawDescription === "string" ? rawDescription.trim() : "";

@@ -16,7 +16,7 @@ export const MERCHANT_KNOWLEDGE_FEATURE_DESCRIPTOR = {
   displayName: "Merchant Knowledge",
   description:
     "Allow the CommerceAgent to use merchant-managed knowledge sources.",
-  activationMode: "ALWAYS_ENABLED",
+  activationMode: "MERCHANT_OPT_IN",
   systemRequired: false,
   active: true,
 } as const;
@@ -141,6 +141,14 @@ export async function ensureMerchantKnowledgeFeature(
   });
   if (existing) {
     if (
+      existing.activationMode === FeatureActivationMode.MERCHANT_OPT_IN &&
+      !existing.systemRequired &&
+      existing.active
+    ) {
+      return existing;
+    }
+
+    if (
       existing.activationMode !== FeatureActivationMode.ALWAYS_ENABLED ||
       existing.systemRequired ||
       !existing.active
@@ -149,7 +157,36 @@ export async function ensureMerchantKnowledgeFeature(
         "Merchant Knowledge Feature has a conflicting configuration.",
       );
     }
-    return existing;
+
+    const transition = await transaction.feature.updateMany({
+      where: {
+        id: existing.id,
+        activationMode: FeatureActivationMode.ALWAYS_ENABLED,
+        systemRequired: false,
+        active: true,
+      },
+      data: { activationMode: FeatureActivationMode.MERCHANT_OPT_IN },
+    });
+    if (transition.count !== 1) {
+      throw new Error(
+        "Merchant Knowledge Feature has a conflicting configuration.",
+      );
+    }
+
+    await transaction.billingAuditEvent.create({
+      data: {
+        action: BillingAuditAction.PLAN_CATALOG_CHANGED,
+        platformAdminId,
+        reason:
+          "Updated Feature merchant_knowledge activation mode to MERCHANT_OPT_IN",
+        relatedEntityType: "Feature",
+        relatedEntityId: existing.id,
+      },
+    });
+    return {
+      ...existing,
+      activationMode: FeatureActivationMode.MERCHANT_OPT_IN,
+    };
   }
 
   const feature = await transaction.feature.create({
