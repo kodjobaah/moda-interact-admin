@@ -119,13 +119,13 @@ export async function getAgentInstructionsData(input: {
     ? await prisma.shop.findUnique({ where: { id: input.shopId }, select: { id: true, domain: true } })
     : shops[0] ?? null;
   const [platform, shopData] = await Promise.all([
-    readScope(prisma, environment, "PLATFORM", null),
-    selectedShop ? readScope(prisma, environment, "SHOP", selectedShop.id) : Promise.resolve(null),
+    getAgentInstructionsScopeData(prisma, environment, "PLATFORM", null),
+    selectedShop ? getAgentInstructionsScopeData(prisma, environment, "SHOP", selectedShop.id) : Promise.resolve(null),
   ]);
   return { environment, shops, selectedShop, platform, shopData };
 }
 
-async function readScope(tx: Tx | typeof prisma, environment: CommerceEnvironment, scope: Scope, shopId: string | null) {
+export async function getAgentInstructionsScopeData(tx: Tx | typeof prisma, environment: CommerceEnvironment, scope: Scope, shopId: string | null) {
   const [lineage, configurationRows, profile] = await Promise.all([
     findLineage(tx, scope, shopId),
     tx.commerceAgentConfiguration.findMany({
@@ -156,7 +156,6 @@ async function readScope(tx: Tx | typeof prisma, environment: CommerceEnvironmen
       pendingRevision.status === "DRAFT" && lineage?.scope === "SHOP" &&
       lineage.shopId === shopId && pendingRevision.promptId === lineage.id && category &&
       pendingRevision.sourceTemplateId &&
-      pendingRevision.sourceTemplateId === category.defaultTemplateId &&
       pendingRevision.sourceTemplateEditVersion !== null,
     );
     if (!valid) conflict("Pending Store Category prompt configuration conflict; do not edit until reconciled.");
@@ -340,7 +339,7 @@ export async function mutateAgentInstructions(tx: Tx, mutation: PromptMutation, 
   if (pendingPromotion) {
     const validPending = Boolean(
       profile?.pendingCategoryId && profile.pendingSelectedAt && revision.sourceTemplateId &&
-      revision.sourceTemplateEditVersion !== null && profile.pendingCategory?.defaultTemplateId === revision.sourceTemplateId,
+      revision.sourceTemplateEditVersion !== null,
     );
     if (!validPending) conflict("Pending Store Category configuration conflict; publishing was cancelled.");
   }

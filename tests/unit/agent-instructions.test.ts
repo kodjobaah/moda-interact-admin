@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { mutateAgentInstructions, validatePromptText } from "../../src/lib/admin/agent-instructions.ts";
+import { getAgentInstructionsScopeData, mutateAgentInstructions, validatePromptText } from "../../src/lib/admin/agent-instructions.ts";
 import { resolveAdminCommerceEnvironment } from "../../src/lib/admin/commerce-environment.ts";
 
 function makePromotionTransaction(options: { configurationConflict?: boolean; profileConflict?: boolean } = {}) {
@@ -39,7 +39,7 @@ function makePromotionTransaction(options: { configurationConflict?: boolean; pr
       pendingPromptRevisionId: "shop-revision-2",
       pendingSelectedAt: new Date("2026-09-30T12:00:00.000Z"),
       pendingSelectionGeneration: 9,
-      pendingCategory: { defaultTemplateId: "template-home" },
+      pendingCategory: { defaultTemplateId: "template-current-b" },
     },
     audits: [] as Array<Record<string, unknown>>,
   };
@@ -249,7 +249,7 @@ test("ordinary publish atomically updates the environment-scoped pointer and aud
 
 test("pending category publish promotes only its exact revision and retains the generation counter", () => {
   assert.match(serviceSource, /profile\?\.pendingPromptRevisionId === revision\.id/);
-  assert.match(serviceSource, /pendingCategory\?\.defaultTemplateId === revision\.sourceTemplateId/);
+  assert.doesNotMatch(serviceSource, /pendingCategory\?\.defaultTemplateId\s*===\s*revision\.sourceTemplateId/);
   assert.match(serviceSource, /sourceTemplateEditVersion !== null/);
   assert.match(serviceSource, /changeKind: "PENDING_STORE_CATEGORY_PROMOTION"/);
   assert.match(serviceSource, /pendingSelectionGeneration: profile\.pendingSelectionGeneration/);
@@ -299,6 +299,78 @@ test("pending category publish atomically promotes the exact edited prompt and p
     assert.ok(state.audits.every((event) => typeof event.operationId === "string" && event.operationId.length > 0));
     assert.notEqual(state.audits[0]?.operationId, state.audits[1]?.operationId);
     assert.deepEqual(state.audits[0]?.metadata, { changeKind: "PENDING_STORE_CATEGORY_PROMOTION" });
+  });
+});
+
+test("pending Shop read keeps the exact selection-time template snapshot after the category default changes", async () => {
+  await withProductionEnvironment(async () => {
+    const revision = {
+      id: "shop-revision-2",
+      promptId: "shop-prompt",
+      revisionNumber: 2,
+      status: "DRAFT",
+      editVersion: 4,
+      promptText: "Pinned template-A text",
+      sourceTemplateId: "template-a",
+      sourceTemplateEditVersion: 7,
+    };
+    const profile = {
+      shopId: "shop-1",
+      activeCategoryId: null,
+      pendingCategoryId: "category-home",
+      pendingPromptRevisionId: revision.id,
+      pendingSelectedAt: new Date("2026-09-30T12:00:00.000Z"),
+      pendingSelectionGeneration: 9,
+      pendingCategory: { id: "category-home", displayName: "Home", defaultTemplateId: "template-b" },
+      pendingPromptRevision: {
+        ...revision,
+        prompt: { id: "shop-prompt", scope: "SHOP", shopId: "shop-1" },
+        sourceTemplate: { id: "template-a", key: "template-a", displayName: "Template A" },
+      },
+    };
+    const tx = {
+      commerceAgentPrompt: {
+        findMany: async () => [{ id: "shop-prompt", scope: "SHOP", shopId: "shop-1", revisions: [revision] }],
+      },
+      commerceAgentConfiguration: { findMany: async () => [] },
+      commerceShopProfile: { findUnique: async () => profile },
+    };
+
+    const data = await getAgentInstructionsScopeData(tx as never, "PRODUCTION", "SHOP", "shop-1");
+
+    assert.equal(data.draft?.id, revision.id);
+    assert.equal(data.draft?.promptText, "Pinned template-A text");
+    assert.equal(data.pendingCategory?.defaultTemplateId, "template-b");
+    assert.equal(data.pendingCategory?.templateDisplayName, "Template A");
+    assert.equal(data.pendingCategory?.sourceTemplateEditVersion, 7);
+  });
+});
+
+test("pending Shop publish promotes the exact template-A draft after the category default changes to template B", async () => {
+  await withProductionEnvironment(async () => {
+    const { state, transaction } = makePromotionTransaction();
+    state.profile.pendingCategory.defaultTemplateId = "template-b";
+    state.revision.sourceTemplateId = "template-a";
+    state.revision.sourceTemplateEditVersion = 7;
+    state.revision.promptText = "Pinned template-A text  ";
+
+    await transaction((tx) => mutateAgentInstructions(tx as never, {
+      kind: "publish",
+      revisionId: "shop-revision-2",
+      expectedRevisionEditVersion: 4,
+      expectedConfigurationPromptEditVersion: 5,
+      reason: "Promote the pinned category draft",
+    }, "admin-1"));
+
+    assert.equal(state.revision.status, "PUBLISHED");
+    assert.equal(state.revision.promptText, "Pinned template-A text  ");
+    assert.equal(state.revision.contentHash, createHash("sha256").update("Pinned template-A text  ", "utf8").digest("hex"));
+    assert.equal(state.revision.sourceTemplateId, "template-a");
+    assert.equal(state.revision.sourceTemplateEditVersion, 7);
+    assert.equal(state.configuration.activePromptRevisionId, "shop-revision-2");
+    assert.equal(state.profile.activeCategoryId, "category-home");
+    assert.equal(state.profile.pendingCategoryId, null);
+    assert.equal(state.profile.pendingSelectionGeneration, 9);
   });
 });
 
