@@ -16,7 +16,8 @@ export async function AdminShell({
     | "billing"
     | "promotions"
     | "platform-policy"
-    | "background-runtime";
+    | "background-runtime"
+    | "store-categories";
   header?: ReactNode;
   children: ReactNode;
 }) {
