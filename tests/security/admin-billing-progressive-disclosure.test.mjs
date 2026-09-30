@@ -72,7 +72,7 @@ test("overview and plans use progressive disclosure", async () => {
   assert.doesNotMatch(overview, /<BillingPlanCatalog/);
   assert.match(
     page,
-    /<MerchantPricingPlanCatalog plans=\{plans\} params=\{params\} \/>/,
+    /<MerchantPricingPlanCatalog[\s\S]*?plans=\{plans\}[\s\S]*?params=\{params\}/,
   );
   assert.match(catalogue, /name="planPageSize"/);
   assert.match(catalogue, /pageParam="planPage"/);

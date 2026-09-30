@@ -31,6 +31,12 @@ function payload(overrides: Record<string, unknown> = {}) {
     highlights: [],
     shopifyRecoveryUsageEventHandle: null,
     supportedFeatureKeys: [],
+    merchantKnowledgeConfiguration: {
+      schemaVersion: 1,
+      maxKnowledgeSources: 5,
+      maxContentUnitsPerSource: 1000,
+      allowedSourceTypes: [],
+    },
     materializedAt: null,
     ...overrides,
   });
@@ -57,6 +63,52 @@ test("rejects an empty or missing English description", () => {
       ),
     /\$\.englishDescription: must be a non-empty string of at most 2000 characters/,
   );
+});
+
+test("requires a bounded structured Merchant Knowledge configuration", () => {
+  assert.deepEqual(
+    parseMerchantPricingBuilderPayload(payload()).merchantKnowledgeConfiguration,
+    {
+      schemaVersion: 1,
+      maxKnowledgeSources: 5,
+      maxContentUnitsPerSource: 1000,
+      allowedSourceTypes: [],
+    },
+  );
+  for (const merchantKnowledgeConfiguration of [
+    undefined,
+    {
+      schemaVersion: 1,
+      maxKnowledgeSources: 101,
+      maxContentUnitsPerSource: 1,
+      allowedSourceTypes: [],
+    },
+    {
+      schemaVersion: 1,
+      maxKnowledgeSources: 1,
+      maxContentUnitsPerSource: 25001,
+      allowedSourceTypes: [],
+    },
+    {
+      schemaVersion: 2,
+      maxKnowledgeSources: 1,
+      maxContentUnitsPerSource: 1,
+      allowedSourceTypes: [],
+    },
+    {
+      schemaVersion: 1,
+      maxKnowledgeSources: 1,
+      maxContentUnitsPerSource: 1,
+      allowedSourceTypes: [
+        { purposeKey: "FAQ", dataFormatKey: "CSV", extra: true },
+      ],
+    },
+  ]) {
+    assert.throws(
+      () => parseMerchantPricingBuilderPayload(payload({ merchantKnowledgeConfiguration })),
+      MerchantPricingPayloadError,
+    );
+  }
 });
 
 test("derives allowance period and preserves UI event order without browser positions", () => {

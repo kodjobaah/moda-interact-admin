@@ -3,6 +3,7 @@ import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-
 import { Pagination } from "@/components/admin/pagination";
 import {
   MERCHANT_PRICING_CATALOGUE_PAGE_SIZES,
+  type MerchantKnowledgePlanConfigurationIssue,
   type MerchantPricingPlanWithChildren,
 } from "@/lib/admin/merchant/pricing-plan";
 import { withParamUpdates } from "@/lib/admin/query";
@@ -13,9 +14,11 @@ import { adminI18n } from "@/i18n";
 export function MerchantPricingPlanCatalog({
   plans,
   params,
+  merchantKnowledgePlansRequiringConfiguration = [],
 }: {
   plans: PageResult<MerchantPricingPlanWithChildren>;
   params: Record<string, string>;
+  merchantKnowledgePlansRequiringConfiguration?: MerchantKnowledgePlanConfigurationIssue[];
 }) {
   return (
     <div className="space-y-4">
@@ -65,6 +68,38 @@ export function MerchantPricingPlanCatalog({
           </Link>
         </div>
       </section>
+
+      {merchantKnowledgePlansRequiringConfiguration.length ? (
+        <section
+          role="alert"
+          className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+        >
+          <h3 className="font-semibold">
+            Merchant Knowledge configuration required
+          </h3>
+          <p className="mt-1">
+            Existing plans need explicit limits and source types before they can
+            be saved through the pricing builder.
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {merchantKnowledgePlansRequiringConfiguration.map((plan) => (
+              <li key={plan.id}>
+                <Link
+                  className="font-medium underline"
+                  href={withParamUpdates("/billing", params, {
+                    view: "plans",
+                    planId: plan.id,
+                    drawer: null,
+                    pricingError: null,
+                  })}
+                >
+                  {plan.displayName}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="max-h-[calc(100vh-20rem)] min-h-64 overflow-y-auto p-4">

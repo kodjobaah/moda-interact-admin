@@ -14,6 +14,8 @@ import {
 } from "@/components/admin/billing-recovery-packs";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import {
+  getMerchantKnowledgePlansRequiringConfiguration,
+  getMerchantKnowledgeSourceTypeCatalogue,
   getMerchantPricingCatalogueContext,
   getMerchantPricingPlanById,
   getMerchantPricingPlans,
@@ -108,6 +110,13 @@ export default async function BillingPage({ searchParams }: PageProps) {
     view === "plans" &&
     planSection === "pricing" &&
     (params.drawer === "register-plan" || Boolean(selectedPlan));
+  const merchantKnowledgePlansRequiringConfiguration =
+    view === "plans" && planSection === "pricing"
+      ? await getMerchantKnowledgePlansRequiringConfiguration()
+      : [];
+  const merchantKnowledgeSourceTypes = planDrawerOpen
+    ? await getMerchantKnowledgeSourceTypeCatalogue()
+    : [];
   const features =
     view === "plans" && (planSection === "features" || planDrawerOpen)
       ? await getFeatureCatalogue()
@@ -204,7 +213,13 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <>
             <BillingPlansNavigation current={planSection} params={params} />
             {planSection === "pricing" && plans ? (
-              <MerchantPricingPlanCatalog plans={plans} params={params} />
+              <MerchantPricingPlanCatalog
+                plans={plans}
+                params={params}
+                merchantKnowledgePlansRequiringConfiguration={
+                  merchantKnowledgePlansRequiringConfiguration
+                }
+              />
             ) : null}
             {planSection === "features" ? (
               <FeatureCatalogue features={features ?? []} params={params} />
@@ -239,6 +254,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
             plan={selectedPlan ?? undefined}
             cataloguePlans={cataloguePlans ?? []}
             featureCatalogue={features ?? []}
+            merchantKnowledgeSourceTypes={merchantKnowledgeSourceTypes}
             minimumUpgradePremiumBps={
               plansPolicy?.minimumUpgradePremiumBps ?? 2000
             }

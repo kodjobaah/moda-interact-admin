@@ -1,3 +1,8 @@
+import type {
+  MerchantKnowledgeDataFormatKey,
+  MerchantKnowledgePurposeKey,
+} from "@modainteract/moda-interact-shared/merchant-knowledge";
+
 export type MerchantPricingBuilderEvent = {
   adminLabel: string;
   eventHandle: string;
@@ -21,6 +26,16 @@ export type MerchantPricingBuilderHighlight = {
   description: string;
 };
 
+export type MerchantKnowledgeBuilderConfiguration = {
+  schemaVersion: 1;
+  maxKnowledgeSources: number;
+  maxContentUnitsPerSource: number;
+  allowedSourceTypes: Array<{
+    purposeKey: MerchantKnowledgePurposeKey;
+    dataFormatKey: MerchantKnowledgeDataFormatKey;
+  }>;
+};
+
 export type MerchantPricingBuilderPayload = {
   id: string | null;
   shopifyPlanHandle: string;
@@ -28,6 +43,7 @@ export type MerchantPricingBuilderPayload = {
   planKind: "FREE" | "PAID_METERED";
   shopifyRecoveryUsageEventHandle: string | null;
   supportedFeatureKeys: string[];
+  merchantKnowledgeConfiguration: MerchantKnowledgeBuilderConfiguration;
   materializedAt: string | Date | null;
   isActive: boolean;
   featured: boolean;
@@ -95,6 +111,88 @@ function safeInteger(
     return 0;
   }
   return value;
+}
+
+function parseMerchantKnowledgeConfiguration(
+  value: unknown,
+  issues: MerchantPricingPayloadIssue[],
+): MerchantKnowledgeBuilderConfiguration {
+  const path = "$.merchantKnowledgeConfiguration";
+  if (!isRecord(value)) {
+    issues.push({ path, message: "must be an object" });
+    return {
+      schemaVersion: 1,
+      maxKnowledgeSources: 0,
+      maxContentUnitsPerSource: 0,
+      allowedSourceTypes: [],
+    };
+  }
+
+  const expectedKeys = [
+    "schemaVersion",
+    "maxKnowledgeSources",
+    "maxContentUnitsPerSource",
+    "allowedSourceTypes",
+  ];
+  for (const key of Object.keys(value))
+    if (!expectedKeys.includes(key))
+      issues.push({ path: `${path}.${key}`, message: "unexpected field" });
+  for (const key of expectedKeys)
+    if (!(key in value))
+      issues.push({ path: `${path}.${key}`, message: "required field is missing" });
+
+  if (value.schemaVersion !== 1)
+    issues.push({ path: `${path}.schemaVersion`, message: "must be 1" });
+  const maxKnowledgeSources = safeInteger(
+    value.maxKnowledgeSources,
+    `${path}.maxKnowledgeSources`,
+    1,
+    issues,
+  );
+  if (maxKnowledgeSources > 100)
+    issues.push({ path: `${path}.maxKnowledgeSources`, message: "must be at most 100" });
+  const maxContentUnitsPerSource = safeInteger(
+    value.maxContentUnitsPerSource,
+    `${path}.maxContentUnitsPerSource`,
+    1,
+    issues,
+  );
+  if (maxContentUnitsPerSource > 25000)
+    issues.push({ path: `${path}.maxContentUnitsPerSource`, message: "must be at most 25000" });
+
+  const allowedSourceTypes: MerchantKnowledgeBuilderConfiguration["allowedSourceTypes"] = [];
+  if (!Array.isArray(value.allowedSourceTypes) || value.allowedSourceTypes.length > 100) {
+    issues.push({ path: `${path}.allowedSourceTypes`, message: "must be an array containing at most 100 source types" });
+  } else {
+    value.allowedSourceTypes.forEach((sourceType, index) => {
+      const sourcePath = `${path}.allowedSourceTypes[${index}]`;
+      if (!isRecord(sourceType)) {
+        issues.push({ path: sourcePath, message: "must be an object" });
+        return;
+      }
+      for (const key of Object.keys(sourceType))
+        if (key !== "purposeKey" && key !== "dataFormatKey")
+          issues.push({ path: `${sourcePath}.${key}`, message: "unexpected field" });
+      const purposeKey = sourceType.purposeKey;
+      const dataFormatKey = sourceType.dataFormatKey;
+      if (typeof purposeKey !== "string" || !purposeKey.trim() || purposeKey.trim().length > 64)
+        issues.push({ path: `${sourcePath}.purposeKey`, message: "must be a non-empty string of at most 64 characters" });
+      if (typeof dataFormatKey !== "string" || !dataFormatKey.trim() || dataFormatKey.trim().length > 32)
+        issues.push({ path: `${sourcePath}.dataFormatKey`, message: "must be a non-empty string of at most 32 characters" });
+      if (typeof purposeKey === "string" && typeof dataFormatKey === "string")
+        allowedSourceTypes.push({
+          purposeKey: purposeKey.trim() as MerchantKnowledgePurposeKey,
+          dataFormatKey: dataFormatKey.trim() as MerchantKnowledgeDataFormatKey,
+        });
+    });
+  }
+
+  return {
+    schemaVersion: 1,
+    maxKnowledgeSources,
+    maxContentUnitsPerSource,
+    allowedSourceTypes,
+  };
 }
 
 export function parseMoneyToMinorUnits(value: unknown): number {
@@ -165,6 +263,7 @@ const TOP_LEVEL_KEYS = [
   "planKind",
   "shopifyRecoveryUsageEventHandle",
   "supportedFeatureKeys",
+  "merchantKnowledgeConfiguration",
   "materializedAt",
   "isActive",
   "featured",
@@ -574,6 +673,10 @@ export function parseMerchantPricingBuilderPayload(
       });
     });
   }
+  const merchantKnowledgeConfiguration = parseMerchantKnowledgeConfiguration(
+    parsed.merchantKnowledgeConfiguration,
+    issues,
+  );
   if (issues.length) throw new MerchantPricingPayloadError(issues);
   return {
     id,
@@ -582,6 +685,7 @@ export function parseMerchantPricingBuilderPayload(
     planKind: planKind as "FREE" | "PAID_METERED",
     shopifyRecoveryUsageEventHandle: recoveryHandle,
     supportedFeatureKeys,
+    merchantKnowledgeConfiguration,
     materializedAt:
       typeof parsed.materializedAt === "string" ? parsed.materializedAt : null,
     isActive: parsed.isActive as boolean,
