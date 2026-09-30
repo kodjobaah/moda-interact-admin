@@ -18,7 +18,8 @@ export function Sidebar({
     | "promotions"
     | "platform-policy"
     | "background-runtime"
-    | "store-categories";
+    | "store-categories"
+    | "agent-instructions";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -30,7 +31,8 @@ export function Sidebar({
   const systemControlsActive =
     active === "platform-policy" ||
     active === "background-runtime" ||
-    active === "store-categories";
+    active === "store-categories" ||
+    active === "agent-instructions";
   const observabilityActive = active === "observability" || active === "queues";
 
   return (
@@ -117,6 +119,13 @@ export function Sidebar({
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "store-categories" ? selected : idle}`}
               >
                 Store Categories
+              </Link>
+              <Link
+                href="/system-controls/agent-instructions"
+                aria-current={active === "agent-instructions" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "agent-instructions" ? selected : idle}`}
+              >
+                Agent Instructions
               </Link>
             </div>
           ) : null}
