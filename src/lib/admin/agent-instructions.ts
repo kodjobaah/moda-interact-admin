@@ -29,6 +29,14 @@ function requireReason(reason: string): string {
   return value;
 }
 
+export function validatePromptText(promptText: string): string {
+  const length = Array.from(promptText).length;
+  if (promptText.trim().length === 0 || length > 32_000) {
+    throw new Error("Prompt text must be non-empty and at most 32,000 characters.");
+  }
+  return promptText;
+}
+
 function assertUnique<T>(rows: T[], message: string): T | null {
   if (rows.length > 1) conflict(message);
   return rows[0] ?? null;
@@ -52,7 +60,6 @@ async function audit(
     promptId?: string;
     revisionId?: string;
     configurationId?: string;
-    operationId: string;
     metadata?: Prisma.InputJsonObject;
   },
 ) {
@@ -66,7 +73,7 @@ async function audit(
       agentPromptId: input.promptId,
       agentPromptRevisionId: input.revisionId,
       agentConfigurationId: input.configurationId,
-      operationId: input.operationId,
+      operationId: randomUUID(),
       metadata: input.metadata ?? {},
     },
   });
@@ -193,13 +200,12 @@ async function allocateDraft(tx: Tx, input: Extract<PromptMutation, { kind: "cre
     if (profile?.pendingPromptRevisionId) conflict("Edit the pending Store Category draft instead of creating another draft.");
   }
   let lineage = await findLineage(tx, input.scope, input.shopId);
-  const operationId = randomUUID();
   if (!lineage) {
     const prompt = await tx.commerceAgentPrompt.create({ data: { scope: input.scope, shopId: input.shopId } });
     lineage = { ...prompt, revisions: [] };
     await audit(tx, {
       action: "CREATE_AGENT_PROMPT", actorAdminId, reason: input.reason,
-      environment, scope: input.scope, shopId: input.shopId, promptId: prompt.id, operationId,
+      environment, scope: input.scope, shopId: input.shopId, promptId: prompt.id,
     });
   }
   const preLockDraft = uniqueDraft(lineage.revisions);
@@ -240,7 +246,7 @@ async function allocateDraft(tx: Tx, input: Extract<PromptMutation, { kind: "cre
   await audit(tx, {
     action: "CREATE_AGENT_PROMPT_DRAFT", actorAdminId, reason: input.reason,
     environment, scope: input.scope, shopId: input.shopId, promptId: lineage.id,
-    revisionId: draft.id, operationId,
+    revisionId: draft.id,
   });
   return draft.id;
 }
@@ -254,7 +260,6 @@ async function upsertPromptConfiguration(tx: Tx, input: {
   actorAdminId: string;
   reason: string;
   promptId: string;
-  operationId: string;
 }) {
   const configuration = await findConfiguration(tx, input.environment, input.scope, input.shopId);
   if (configuration) {
@@ -281,17 +286,14 @@ async function upsertPromptConfiguration(tx: Tx, input: {
 }
 
 export async function mutateAgentInstructions(tx: Tx, mutation: PromptMutation, actorAdminId: string) {
+  if (mutation.kind === "update-draft") validatePromptText(mutation.promptText);
   const environment = resolveAdminCommerceEnvironment();
   const reason = requireReason(mutation.reason);
   if (mutation.kind === "create-draft") return allocateDraft(tx, { ...mutation, reason }, actorAdminId, environment);
 
-  const operationId = randomUUID();
   if (mutation.kind === "update-draft") {
     const revision = await tx.commerceAgentPromptRevision.findUnique({ where: { id: mutation.revisionId }, include: { prompt: true } });
     if (!revision || revision.status !== "DRAFT" || revision.editVersion !== mutation.expectedEditVersion) conflict();
-    if (mutation.promptText.trim().length === 0 || mutation.promptText.length > 100_000) {
-      throw new Error("Prompt text must be non-empty and at most 100,000 characters.");
-    }
     const updated = await tx.commerceAgentPromptRevision.updateMany({
       where: { id: revision.id, status: "DRAFT", editVersion: mutation.expectedEditVersion },
       data: { promptText: mutation.promptText, editVersion: { increment: 1 } },
@@ -300,7 +302,7 @@ export async function mutateAgentInstructions(tx: Tx, mutation: PromptMutation, 
     await audit(tx, {
       action: "UPDATE_AGENT_PROMPT_DRAFT", actorAdminId, reason, environment,
       scope: revision.prompt.scope, shopId: revision.prompt.shopId, promptId: revision.promptId,
-      revisionId: revision.id, operationId,
+      revisionId: revision.id,
     });
     return revision.id;
   }
@@ -318,11 +320,11 @@ export async function mutateAgentInstructions(tx: Tx, mutation: PromptMutation, 
     }
     const configurationId = await upsertPromptConfiguration(tx, {
       environment, scope, shopId, revisionId, expectedEditVersion: expectedConfigVersion,
-      actorAdminId, reason, promptId: revision.promptId, operationId,
+      actorAdminId, reason, promptId: revision.promptId,
     });
     await audit(tx, {
       action: "SET_AGENT_PROMPT", actorAdminId, reason, environment, scope, shopId,
-      promptId: revision.promptId, revisionId, configurationId, operationId,
+      promptId: revision.promptId, revisionId, configurationId,
     });
     return revisionId;
   }
@@ -354,16 +356,16 @@ export async function mutateAgentInstructions(tx: Tx, mutation: PromptMutation, 
   if (published.count !== 1) conflict();
   const configurationId = await upsertPromptConfiguration(tx, {
     environment, scope, shopId, revisionId, expectedEditVersion: expectedConfigVersion,
-    actorAdminId, reason, promptId: revision.promptId, operationId,
+    actorAdminId, reason, promptId: revision.promptId,
   });
   await audit(tx, {
     action: "PUBLISH_AGENT_PROMPT_REVISION", actorAdminId, reason, environment, scope,
-    shopId, promptId: revision.promptId, revisionId, operationId,
+    shopId, promptId: revision.promptId, revisionId,
     ...(pendingPromotion ? { metadata: { changeKind: "PENDING_STORE_CATEGORY_PROMOTION" } } : {}),
   });
   await audit(tx, {
     action: "SET_AGENT_PROMPT", actorAdminId, reason, environment, scope, shopId,
-    promptId: revision.promptId, revisionId, configurationId, operationId,
+    promptId: revision.promptId, revisionId, configurationId,
   });
   if (pendingPromotion && profile?.pendingCategoryId) {
     const now = new Date();

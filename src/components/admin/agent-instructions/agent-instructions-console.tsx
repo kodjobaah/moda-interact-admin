@@ -41,7 +41,7 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
               className={inputClass}
               name="promptText"
               rows={14}
-              maxLength={100_000}
+              maxLength={32_000}
               value={promptText}
               onChange={(event) => setPromptText(event.currentTarget.value)}
               required

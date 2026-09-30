@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { mutateAgentInstructions } from "../../src/lib/admin/agent-instructions.ts";
+import { mutateAgentInstructions, validatePromptText } from "../../src/lib/admin/agent-instructions.ts";
 import { resolveAdminCommerceEnvironment } from "../../src/lib/admin/commerce-environment.ts";
 
 function makePromotionTransaction(options: { configurationConflict?: boolean; profileConflict?: boolean } = {}) {
@@ -139,6 +139,61 @@ test("rejects unsupported deployment environments without fallback", () => {
   }
 });
 
+test("accepts exactly 32,000 prompt characters and rejects 32,001 before database access", async () => {
+  assert.equal(validatePromptText("x".repeat(32_000)).length, 32_000);
+  assert.throws(() => validatePromptText("x".repeat(32_001)), {
+    message: "Prompt text must be non-empty and at most 32,000 characters.",
+  });
+  await withProductionEnvironment(async () => {
+    const noDatabaseAccess = new Proxy({}, {
+      get() {
+        throw new Error("Database access occurred before prompt validation.");
+      },
+    });
+    await assert.rejects(mutateAgentInstructions(noDatabaseAccess as never, {
+      kind: "update-draft",
+      revisionId: "revision-1",
+      expectedEditVersion: 1,
+      promptText: "x".repeat(32_001),
+      reason: "Reject oversized prompt",
+    }, "admin-1"), /at most 32,000 characters/);
+  });
+});
+
+test("new lineage and draft audit rows receive distinct operation IDs", async () => {
+  await withProductionEnvironment(async () => {
+    const audits: Array<Record<string, unknown>> = [];
+    const tx = {
+      commerceAgentPrompt: {
+        findMany: async () => [],
+        create: async () => ({ id: "platform-prompt", scope: "PLATFORM", shopId: null }),
+      },
+      commerceAgentPromptRevision: {
+        findMany: async () => [],
+        findFirst: async () => null,
+        create: async () => ({ id: "platform-revision-1" }),
+      },
+      commerceAgentConfiguration: { findMany: async () => [] },
+      $queryRaw: async () => [{ id: "platform-prompt" }],
+      commerceAuditEvent: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          audits.push(data);
+          return data;
+        },
+      },
+    };
+    await mutateAgentInstructions(tx as never, {
+      kind: "create-draft",
+      scope: "PLATFORM",
+      shopId: null,
+      reason: "Create Platform draft",
+    }, "admin-1");
+    assert.deepEqual(audits.map((event) => event.action), ["CREATE_AGENT_PROMPT", "CREATE_AGENT_PROMPT_DRAFT"]);
+    assert.ok(audits.every((event) => typeof event.operationId === "string" && event.operationId.length > 0));
+    assert.notEqual(audits[0]?.operationId, audits[1]?.operationId);
+  });
+});
+
 const serviceSource = await readFile(
   new URL("../../src/lib/admin/agent-instructions.ts", import.meta.url),
   "utf8",
@@ -241,6 +296,8 @@ test("pending category publish atomically promotes the exact edited prompt and p
     assert.equal(state.profile.pendingPromptRevisionId, null);
     assert.equal(state.profile.pendingSelectionGeneration, 9);
     assert.deepEqual(state.audits.map((event) => event.action), ["PUBLISH_AGENT_PROMPT_REVISION", "SET_AGENT_PROMPT"]);
+    assert.ok(state.audits.every((event) => typeof event.operationId === "string" && event.operationId.length > 0));
+    assert.notEqual(state.audits[0]?.operationId, state.audits[1]?.operationId);
     assert.deepEqual(state.audits[0]?.metadata, { changeKind: "PENDING_STORE_CATEGORY_PROMOTION" });
   });
 });

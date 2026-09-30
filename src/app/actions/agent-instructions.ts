@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
-import { mutateAgentInstructions, type PromptMutation } from "@/lib/admin/agent-instructions";
+import { mutateAgentInstructions, validatePromptText, type PromptMutation } from "@/lib/admin/agent-instructions";
 import { prisma } from "@/lib/prisma";
 
 function text(formData: FormData, key: string, maxLength: number): string {
@@ -31,11 +31,12 @@ function mutationFromForm(formData: FormData): PromptMutation {
     return { kind: intent, scope, shopId, reason };
   }
   if (intent === "update-draft") {
+    const promptText = validatePromptText(String(formData.get("promptText") ?? ""));
     return {
       kind: intent,
       revisionId: text(formData, "revisionId", 128),
       expectedEditVersion: version(formData, "expectedEditVersion"),
-      promptText: String(formData.get("promptText") ?? ""),
+      promptText,
       reason,
     };
   }
@@ -72,9 +73,9 @@ function databaseCode(error: unknown): string | undefined {
 }
 
 export async function mutateAgentInstructionsAction(formData: FormData): Promise<void> {
+  const mutation = mutationFromForm(formData);
   const principal = await requirePlatformAdminMutation();
   if (principal.role !== "SUPER_ADMIN") throw new Error("SUPER_ADMIN access is required.");
-  const mutation = mutationFromForm(formData);
   try {
     await prisma.$transaction(async (transaction) => {
       await ensureDevelopmentPlatformAdmin(transaction, principal);
