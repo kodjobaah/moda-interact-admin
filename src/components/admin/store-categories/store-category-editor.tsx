@@ -101,11 +101,9 @@ export function StoreCategoryEditor({
             </button>
           </div>
         </form>
-        {!category.enabled ? (
-          <p className="mt-3 text-sm text-gray-600">
-            Shopify localization keys must exist before merchants can select this category.
-          </p>
-        ) : null}
+        <p className="mt-3 text-sm text-gray-600">
+          Shopify localization keys must exist before merchants can select this category.
+        </p>
         <div className="mt-5">
           <h3 className="text-sm font-semibold text-gray-900">Default template</h3>
           <p className="mt-1 text-sm text-gray-600">
