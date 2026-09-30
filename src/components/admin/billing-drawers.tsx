@@ -9,6 +9,7 @@ import { AdminDetailDrawer } from "./admin-detail-drawer";
 import { BillingEventRetryControl } from "./billing-event-retry-control";
 import { MerchantPricingPlanBuilder } from "./merchant/merchant-pricing-plan-builder";
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
+import type { MerchantKnowledgeSourceTypeOption } from "@/lib/admin/merchant/pricing-plan";
 
 function DetailList({
   items,
@@ -35,6 +36,7 @@ export function MerchantPricingPlanDrawer({
   plan,
   cataloguePlans,
   featureCatalogue,
+  merchantKnowledgeSourceTypes = [],
   minimumUpgradePremiumBps = 2000,
   params,
   register = false,
@@ -42,6 +44,7 @@ export function MerchantPricingPlanDrawer({
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
   featureCatalogue?: Feature[];
+  merchantKnowledgeSourceTypes?: MerchantKnowledgeSourceTypeOption[];
   minimumUpgradePremiumBps?: number;
   params: Record<string, string>;
   register?: boolean;
@@ -62,6 +65,7 @@ export function MerchantPricingPlanDrawer({
         plan={plan}
         cataloguePlans={cataloguePlans}
         featureCatalogue={featureCatalogue}
+        merchantKnowledgeSourceTypes={merchantKnowledgeSourceTypes}
         minimumUpgradePremiumBps={minimumUpgradePremiumBps}
       />
     </AdminDetailDrawer>

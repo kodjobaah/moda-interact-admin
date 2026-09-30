@@ -93,6 +93,11 @@ export async function mutateFeatureCatalogueAction(formData: FormData): Promise<
     await prisma.$transaction(async (transaction) => {
       const existing = await transaction.feature.findUnique({ where: { id } });
       if (!existing) actionError("Feature not found.");
+      if (existing.key === "merchant_knowledge" && existing.active) {
+        actionError(
+          "Merchant Knowledge is included by pricing-plan product policy and cannot be deactivated here.",
+        );
+      }
       if (existing.systemRequired) actionError("System-required Features cannot be deactivated.");
       const feature = await transaction.feature.update({
         where: { id },

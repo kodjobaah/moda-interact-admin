@@ -35,6 +35,12 @@ import {
   type MerchantPricingPlanWithChildren,
 } from "@/lib/admin/merchant/pricing-plan";
 import { parseCompletedMerchantPricingTranslationPackage } from "@/lib/admin/merchant/pricing-translations";
+import {
+  buildDesiredPlanFeatures,
+  ensureMerchantKnowledgeFeature,
+  MERCHANT_KNOWLEDGE_FEATURE_KEY,
+  validateMerchantKnowledgeConfiguration,
+} from "@/lib/admin/merchant-knowledge-plan-policy";
 
 const merchantPricingInclude = {
   features: {
@@ -989,6 +995,30 @@ export async function mutateMerchantPricingPlanAction(
         : JSON.stringify(beforeOverrideSnapshot) !==
           JSON.stringify(afterOverrideSnapshot);
 
+      const merchantKnowledgeFeature = await ensureMerchantKnowledgeFeature(
+        transaction,
+        adminId,
+      );
+      const activeSourceTypeRows =
+        await transaction.merchantKnowledgePurposeDataFormat.findMany({
+          where: {
+            purpose: { active: true },
+            dataFormat: { active: true },
+          },
+          select: {
+            purpose: { select: { key: true } },
+            dataFormat: { select: { key: true } },
+          },
+        });
+      const merchantKnowledgeConfiguration =
+        validateMerchantKnowledgeConfiguration(
+          payload.merchantKnowledgeConfiguration,
+          activeSourceTypeRows.map(({ purpose, dataFormat }) => ({
+            purposeKey: purpose.key,
+            dataFormatKey: dataFormat.key,
+          })),
+        );
+
       const activeFeatures = await transaction.feature.findMany({
         where: { active: true },
         select: { id: true, key: true, systemRequired: true },
@@ -999,28 +1029,32 @@ export async function mutateMerchantPricingPlanAction(
             include: { feature: { select: { id: true, key: true, active: true } } },
           })
         : [];
+      const requestedFeatureKeys = payload.supportedFeatureKeys.includes(
+        MERCHANT_KNOWLEDGE_FEATURE_KEY,
+      )
+        ? payload.supportedFeatureKeys
+        : [...payload.supportedFeatureKeys, MERCHANT_KNOWLEDGE_FEATURE_KEY];
       const requestedFeatures = await transaction.feature.findMany({
-        where: { key: { in: payload.supportedFeatureKeys } },
+        where: { key: { in: requestedFeatureKeys } },
         select: { id: true, key: true, active: true },
       });
-      if (requestedFeatures.length !== payload.supportedFeatureKeys.length)
+      if (requestedFeatures.length !== requestedFeatureKeys.length)
         actionError("One or more selected features do not exist.");
       if (requestedFeatures.some((feature) => !feature.active))
         actionError("Inactive features must be reactivated before they can be newly selected.");
       const requestedKeys = new Set(payload.supportedFeatureKeys);
       if (requestedKeys.size !== payload.supportedFeatureKeys.length)
         actionError("Supported feature keys must be unique.");
-      const desiredFeatureIds = [
-        ...new Set([
-          ...activeFeatures
-            .filter((feature) => feature.systemRequired)
-            .map((feature) => feature.id),
-          ...existingFeatureMappings
-            .filter(({ feature }) => !feature.active)
-            .map(({ feature }) => feature.id),
-          ...requestedFeatures.map((feature) => feature.id),
-        ]),
-      ];
+      const desiredPlanFeatures = buildDesiredPlanFeatures({
+        activeFeatures,
+        existingMappings: existingFeatureMappings,
+        requestedFeatures,
+        merchantKnowledgeFeatureId: merchantKnowledgeFeature.id,
+        merchantKnowledgeConfiguration,
+      });
+      const desiredFeatureIds = desiredPlanFeatures.map(
+        ({ featureId }) => featureId,
+      );
 
       if (isCreate) {
         for (const row of [...rows]
@@ -1081,7 +1115,7 @@ export async function mutateMerchantPricingPlanAction(
               ),
             },
             features: {
-              create: desiredFeatureIds.map((featureId) => ({ featureId })),
+              create: desiredPlanFeatures,
             },
           },
         });
@@ -1167,7 +1201,7 @@ export async function mutateMerchantPricingPlanAction(
             : {}),
             features: {
               deleteMany: {},
-              create: desiredFeatureIds.map((featureId) => ({ featureId })),
+              create: desiredPlanFeatures,
             },
         },
       });
@@ -1195,12 +1229,22 @@ export async function mutateMerchantPricingPlanAction(
                   : payload.includedRecoveryCredits,
               features: {
                 deleteMany: { featureId: { notIn: desiredFeatureIds } },
-                upsert: desiredFeatureIds.map((featureId) => ({
+                upsert: desiredPlanFeatures.map((mapping) => ({
                   where: {
-                    planId_featureId: { planId: billingPlan.id, featureId },
+                    planId_featureId: {
+                      planId: billingPlan.id,
+                      featureId: mapping.featureId,
+                    },
                   },
-                  create: { featureId, enabled: true },
-                  update: { enabled: true },
+                  create: {
+                    featureId: mapping.featureId,
+                    enabled: true,
+                    configuration: mapping.configuration,
+                  },
+                  update: {
+                    enabled: true,
+                    configuration: mapping.configuration,
+                  },
                 })),
               },
             },

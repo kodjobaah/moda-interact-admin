@@ -7,6 +7,7 @@ import type {
   MerchantPricingUsageEvent,
   MerchantPricingUsageTier,
 } from "@prisma/client";
+import { hasCurrentMerchantKnowledgeConfiguration } from "@/lib/admin/merchant-knowledge-plan-policy";
 import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import type { PageResult } from "@/lib/admin/types";
@@ -16,7 +17,7 @@ import type {
 } from "./pricing-economics";
 
 export type MerchantPricingPlanWithChildren = MerchantPricingPlan & {
-  features: Array<{ feature: Feature }>;
+  features: Array<{ feature: Feature; configuration: unknown }>;
   translations: MerchantPricingPlanTranslation[];
   highlights: Array<
     MerchantPricingPlanHighlight & {
@@ -26,6 +27,18 @@ export type MerchantPricingPlanWithChildren = MerchantPricingPlan & {
   usageEvents: Array<
     MerchantPricingUsageEvent & { tiers: MerchantPricingUsageTier[] }
   >;
+};
+
+export type MerchantKnowledgeSourceTypeOption = {
+  purposeKey: string;
+  purposeDisplayName: string;
+  dataFormatKey: string;
+  dataFormatDisplayName: string;
+};
+
+export type MerchantKnowledgePlanConfigurationIssue = {
+  id: string;
+  displayName: string;
 };
 
 export const MERCHANT_PRICING_CATALOGUE_PAGE_SIZES = [5, 10, 20, 50] as const;
@@ -89,6 +102,78 @@ export async function getMerchantPricingPlans(
     totalItems,
     totalPages,
   };
+}
+
+export async function getMerchantKnowledgeSourceTypeCatalogue(): Promise<
+  MerchantKnowledgeSourceTypeOption[]
+> {
+  await requirePlatformAdminRead();
+  const rows = await prisma.merchantKnowledgePurposeDataFormat.findMany({
+    where: {
+      purpose: { active: true },
+      dataFormat: { active: true },
+    },
+    select: {
+      purpose: {
+        select: { key: true, displayName: true, displayOrder: true },
+      },
+      dataFormat: {
+        select: { key: true, displayName: true, displayOrder: true },
+      },
+    },
+    orderBy: [
+      { purpose: { displayOrder: "asc" } },
+      { purpose: { key: "asc" } },
+      { dataFormat: { displayOrder: "asc" } },
+      { dataFormat: { key: "asc" } },
+    ],
+  });
+
+  return rows.map(({ purpose, dataFormat }) => ({
+    purposeKey: purpose.key,
+    purposeDisplayName: purpose.displayName,
+    dataFormatKey: dataFormat.key,
+    dataFormatDisplayName: dataFormat.displayName,
+  }));
+}
+
+export async function getMerchantKnowledgePlansRequiringConfiguration(): Promise<
+  MerchantKnowledgePlanConfigurationIssue[]
+> {
+  await requirePlatformAdminRead();
+  const [plans, sourceTypes] = await Promise.all([
+    prisma.merchantPricingPlan.findMany({
+      orderBy: [{ cataloguePosition: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        displayName: true,
+        features: {
+          include: { feature: { select: { key: true } } },
+        },
+      },
+    }),
+    prisma.merchantKnowledgePurposeDataFormat.findMany({
+      where: {
+        purpose: { active: true },
+        dataFormat: { active: true },
+      },
+      select: {
+        purpose: { select: { key: true } },
+        dataFormat: { select: { key: true } },
+      },
+    }),
+  ]);
+  const activePairs = sourceTypes.map(({ purpose, dataFormat }) => ({
+    purposeKey: purpose.key,
+    dataFormatKey: dataFormat.key,
+  }));
+
+  return plans
+    .filter(
+      (plan) =>
+        !hasCurrentMerchantKnowledgeConfiguration(plan.features, activePairs),
+    )
+    .map(({ id, displayName }) => ({ id, displayName }));
 }
 
 /**
