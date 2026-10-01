@@ -72,6 +72,7 @@ test("production sealer uses Shared AAD and has no secret logging or fingerprint
     "utf8",
   );
   assert.match(source, /createCommerceOpenRouterCredentialAad\(/);
+  assert.match(source, /Buffer\.from\(aad, "utf8"\)/);
   assert.doesNotMatch(source, /console\.|createHash|fingerprint|digest\(/i);
   assert.doesNotMatch(source, /createDecipheriv/);
 });
