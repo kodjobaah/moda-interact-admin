@@ -74,26 +74,25 @@ test("sidebar exposes nested System Controls navigation", async () => {
   );
 });
 
-test("sidebar exposes only the implemented Commerce models Availability destination", async () => {
+test("sidebar exposes the implemented Commerce models Availability and Catalogue destinations", async () => {
   const sidebarSource = await readSource("src/components/admin/sidebar.tsx");
   const shellSource = await readSource("src/components/admin/admin-shell.tsx");
   const pageSource = await readSource(
     "src/app/(protected)/commerce-models/availability/page.tsx",
   );
+  const cataloguePageSource = await readSource(
+    "src/app/(protected)/commerce-models/catalogue/page.tsx",
+  );
 
   assert.match(sidebarSource, /Commerce models/);
   assert.match(sidebarSource, /Availability/);
-  assert.equal(
-    (sidebarSource.match(/href="\/commerce-models\/availability"/g) ?? [])
-      .length,
-    2,
-  );
+  assert.match(sidebarSource, /href="\/commerce-models\/availability"/);
+  assert.match(sidebarSource, /href="\/commerce-models\/catalogue"/);
   assert.match(shellSource, /\| "model-availability"/);
+  assert.match(shellSource, /\| "model-catalogue"/);
   assert.match(pageSource, /<AdminShell active="model-availability">/);
-  assert.doesNotMatch(
-    sidebarSource,
-    /href="\/commerce-models\/(catalogue|credentials)"/,
-  );
+  assert.match(cataloguePageSource, /<AdminShell active="model-catalogue">/);
+  assert.doesNotMatch(sidebarSource, /href="\/commerce-models\/credentials"/);
 });
 
 test("sidebar uses a stable desktop rail and bottom administrator treatment", async () => {
