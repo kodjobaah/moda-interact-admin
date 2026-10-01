@@ -113,10 +113,11 @@ export function ModelAvailabilityEditor(props: ModelAvailabilityEditorProps) {
     ? "Disable availability"
     : "Enable availability";
   const pendingLabel = availability.enabled ? "Disabling…" : "Enabling…";
-  const warning =
-    availability.scope === "PLATFORM"
+  const warning = availability.enabled
+    ? availability.scope === "PLATFORM"
       ? "Disabling Platform availability removes Platform catalogue models from every Shop's effective available set. Existing Agent model selections are not rewritten."
-      : "Disabling this Shop availability removes its private catalogue models from this Shop's effective available set. Existing Agent model selections are not rewritten.";
+      : "Disabling this Shop availability removes its private catalogue models from this Shop's effective available set. Existing Agent model selections are not rewritten."
+    : null;
 
   return (
     <AdminDetailDrawer
@@ -169,9 +170,11 @@ export function ModelAvailabilityEditor(props: ModelAvailabilityEditorProps) {
 
         {canMutate ? (
           <section className="space-y-4">
-            <p className="border-l-2 border-amber-400 pl-3 text-sm text-gray-700">
-              {warning}
-            </p>
+            {warning ? (
+              <p className="border-l-2 border-amber-400 pl-3 text-sm text-gray-700">
+                {warning}
+              </p>
+            ) : null}
             <form action={mutateModelAvailabilityAction} className="space-y-4">
               <input type="hidden" name="intent" value="set-enabled" />
               <input type="hidden" name="id" value={availability.id} />

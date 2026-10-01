@@ -191,6 +191,19 @@ test("Availability page explains scope and UI limits writes to Super Admin with 
     normalizedEditor,
     /Disabling this Shop availability removes its private catalogue models from this Shop's effective available set\. Existing Agent model selections are not rewritten\./,
   );
+  const actionLabelStart = normalizedEditor.indexOf(
+    "const actionLabel = availability.enabled",
+  );
+  const manageState = normalizedEditor.slice(
+    actionLabelStart,
+    normalizedEditor.indexOf("return (", actionLabelStart),
+  );
+  assert.match(
+    manageState,
+    /const actionLabel = availability\.enabled \? "Disable availability" : "Enable availability"/,
+  );
+  assert.match(manageState, /const warning = availability\.enabled \?/);
+  assert.match(normalizedEditor, /\{warning \? \(/);
   const manageForm = editorSource.slice(
     editorSource.indexOf("const { item, canMutate } = props"),
   );
