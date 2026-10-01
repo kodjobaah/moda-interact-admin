@@ -19,7 +19,8 @@ export function Sidebar({
     | "platform-policy"
     | "background-runtime"
     | "store-categories"
-    | "agent-instructions";
+    | "agent-instructions"
+    | "model-availability";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -34,6 +35,7 @@ export function Sidebar({
     active === "store-categories" ||
     active === "agent-instructions";
   const observabilityActive = active === "observability" || active === "queues";
+  const commerceModelsActive = active === "model-availability";
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--brand-200)] bg-[var(--brand-100)] md:flex">
@@ -89,6 +91,28 @@ export function Sidebar({
         ) : null}
         <div>
           <Link
+            href="/commerce-models/availability"
+            aria-current={commerceModelsActive ? "page" : undefined}
+            className={`${base} ${commerceModelsActive ? selected : idle}`}
+          >
+            <Icon name="box" className="h-5 w-5 text-[var(--brand-700)]" />
+            <span className="flex-1">Commerce models</span>
+            <Icon name="chevron-down" className="h-4 w-4" />
+          </Link>
+          {commerceModelsActive ? (
+            <div className="ml-8 mt-1 space-y-1 border-l border-[var(--brand-300)] pl-3">
+              <Link
+                href="/commerce-models/availability"
+                aria-current="page"
+                className={`${base} !rounded-md px-3 py-2 text-sm ${selected}`}
+              >
+                Availability
+              </Link>
+            </div>
+          ) : null}
+        </div>
+        <div>
+          <Link
             href="/system-controls/platform-policy"
             aria-current={systemControlsActive ? "page" : undefined}
             className={`${base} ${systemControlsActive ? selected : idle}`}
@@ -108,21 +132,27 @@ export function Sidebar({
               </Link>
               <Link
                 href="/system-controls/background-runtime"
-                aria-current={active === "background-runtime" ? "page" : undefined}
+                aria-current={
+                  active === "background-runtime" ? "page" : undefined
+                }
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "background-runtime" ? selected : idle}`}
               >
                 {adminI18n.t("nav.backgroundRuntime")}
               </Link>
               <Link
                 href="/system-controls/store-categories"
-                aria-current={active === "store-categories" ? "page" : undefined}
+                aria-current={
+                  active === "store-categories" ? "page" : undefined
+                }
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "store-categories" ? selected : idle}`}
               >
                 Store Categories
               </Link>
               <Link
                 href="/system-controls/agent-instructions"
-                aria-current={active === "agent-instructions" ? "page" : undefined}
+                aria-current={
+                  active === "agent-instructions" ? "page" : undefined
+                }
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "agent-instructions" ? selected : idle}`}
               >
                 Agent Instructions
