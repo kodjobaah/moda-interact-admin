@@ -103,7 +103,7 @@ export async function mutateModelCatalogueAction(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const principal = await requirePlatformAdminMutation();
   if (principal.role !== "SUPER_ADMIN") {
-    return { ok: false, message: "SUPER_ADMIN access is required." };
+    throw new Error("SUPER_ADMIN access is required.");
   }
 
   try {

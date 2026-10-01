@@ -41,7 +41,11 @@ test("page, read service and every mutation enforce their own authorization", ()
   assert.match(action, /if \(principal\.role !== "SUPER_ADMIN"\)/);
   assert.match(
     action,
-    /return \{ ok: false, message: "SUPER_ADMIN access is required\." \}/,
+    /if \(principal\.role !== "SUPER_ADMIN"\) \{\s*throw new Error\("SUPER_ADMIN access is required\."\);\s*\}/,
+  );
+  assert.ok(
+    action.indexOf('throw new Error("SUPER_ADMIN access is required.")') <
+      action.indexOf("mutationFromForm(formData)"),
   );
   assert.match(
     action,
