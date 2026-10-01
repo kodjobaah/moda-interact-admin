@@ -39,7 +39,6 @@ test("sidebar exposes the approved nested Observability navigation", async () =>
   assert.doesNotMatch(queuePageSource, /href="\/observability"/);
 });
 
-
 test("sidebar exposes nested System Controls navigation", async () => {
   const sidebarSource = await readSource("src/components/admin/sidebar.tsx");
   const shellSource = await readSource("src/components/admin/admin-shell.tsx");
@@ -69,7 +68,32 @@ test("sidebar exposes nested System Controls navigation", async () => {
   assert.match(sidebarSource, /href="\/system-controls\/store-categories"/);
   assert.match(sidebarSource, /Store Categories/);
   assert.match(storeCategoriesPageSource, /requirePlatformAdminPage\(\)/);
-  assert.match(storeCategoriesPageSource, /<AdminShell active="store-categories">/);
+  assert.match(
+    storeCategoriesPageSource,
+    /<AdminShell active="store-categories">/,
+  );
+});
+
+test("sidebar exposes only the implemented Commerce models Availability destination", async () => {
+  const sidebarSource = await readSource("src/components/admin/sidebar.tsx");
+  const shellSource = await readSource("src/components/admin/admin-shell.tsx");
+  const pageSource = await readSource(
+    "src/app/(protected)/commerce-models/availability/page.tsx",
+  );
+
+  assert.match(sidebarSource, /Commerce models/);
+  assert.match(sidebarSource, /Availability/);
+  assert.equal(
+    (sidebarSource.match(/href="\/commerce-models\/availability"/g) ?? [])
+      .length,
+    2,
+  );
+  assert.match(shellSource, /\| "model-availability"/);
+  assert.match(pageSource, /<AdminShell active="model-availability">/);
+  assert.doesNotMatch(
+    sidebarSource,
+    /href="\/commerce-models\/(catalogue|credentials)"/,
+  );
 });
 
 test("sidebar uses a stable desktop rail and bottom administrator treatment", async () => {
