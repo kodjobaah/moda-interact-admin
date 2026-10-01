@@ -13,6 +13,7 @@ import { findUnboundedZeroCostEventLabel } from "../../src/lib/admin/merchant/pr
 function payload(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
     id: null,
+    commerceModelId: null,
     shopifyPlanHandle: "starter",
     name: "Starter",
     planKind: "FREE",
@@ -42,6 +43,47 @@ function payload(overrides: Record<string, unknown> = {}) {
   });
 }
 
+test("normalizes nullable Commerce model assignment payloads", () => {
+  assert.equal(
+    parseMerchantPricingBuilderPayload(payload({ commerceModelId: null }))
+      .commerceModelId,
+    null,
+  );
+  assert.equal(
+    parseMerchantPricingBuilderPayload(payload({ commerceModelId: "  " }))
+      .commerceModelId,
+    null,
+  );
+  assert.equal(
+    parseMerchantPricingBuilderPayload(
+      payload({ commerceModelId: "  catalogue-model-1  " }),
+    ).commerceModelId,
+    "catalogue-model-1",
+  );
+  assert.equal(
+    parseMerchantPricingBuilderPayload(
+      payload({ commerceModelId: "m".repeat(128) }),
+    ).commerceModelId,
+    "m".repeat(128),
+  );
+
+  for (const commerceModelId of [
+    undefined,
+    42,
+    false,
+    {},
+    [],
+    "m".repeat(129),
+  ]) {
+    assert.throws(
+      () => parseMerchantPricingBuilderPayload(payload({ commerceModelId })),
+      (error) =>
+        error instanceof MerchantPricingPayloadError &&
+        error.issues.some((issue) => issue.path === "$.commerceModelId"),
+    );
+  }
+});
+
 test("parses valid money and rejects ambiguous money forms", () => {
   assert.equal(parseMoneyToMinorUnits("35"), 3500);
   assert.equal(parseMoneyToMinorUnits("35.5"), 3550);
@@ -67,7 +109,8 @@ test("rejects an empty or missing English description", () => {
 
 test("requires a bounded structured Merchant Knowledge configuration", () => {
   assert.deepEqual(
-    parseMerchantPricingBuilderPayload(payload()).merchantKnowledgeConfiguration,
+    parseMerchantPricingBuilderPayload(payload())
+      .merchantKnowledgeConfiguration,
     {
       schemaVersion: 1,
       maxKnowledgeSources: 5,
@@ -105,7 +148,10 @@ test("requires a bounded structured Merchant Knowledge configuration", () => {
     },
   ]) {
     assert.throws(
-      () => parseMerchantPricingBuilderPayload(payload({ merchantKnowledgeConfiguration })),
+      () =>
+        parseMerchantPricingBuilderPayload(
+          payload({ merchantKnowledgeConfiguration }),
+        ),
       MerchantPricingPayloadError,
     );
   }

@@ -11,6 +11,7 @@ import type {
   MerchantKnowledgeSourceTypeOption,
   MerchantPricingPlanWithChildren,
 } from "@/lib/admin/merchant/pricing-plan";
+import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
 import type { Feature } from "@prisma/client";
 import {
   MerchantKnowledgeFeatureConfigurationSchema,
@@ -87,12 +88,14 @@ export function MerchantPricingPlanBuilder({
   cataloguePlans = [],
   featureCatalogue = [],
   merchantKnowledgeSourceTypes = [],
+  commerceModelOptions = [],
   minimumUpgradePremiumBps = 2000,
 }: {
   plan?: MerchantPricingPlanWithChildren;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
   featureCatalogue?: Feature[];
   merchantKnowledgeSourceTypes?: MerchantKnowledgeSourceTypeOption[];
+  commerceModelOptions?: MerchantPricingPlanModelOption[];
   minimumUpgradePremiumBps?: number;
 }) {
   const nextEventKeyRef = useRef(0);
@@ -109,6 +112,14 @@ export function MerchantPricingPlanBuilder({
   );
   const [isActive, setIsActive] = useState(plan?.isActive ?? true);
   const [featured, setFeatured] = useState(plan?.featured ?? false);
+  const [commerceModelId, setCommerceModelId] = useState(
+    plan?.commerceModelId ?? "",
+  );
+  const unavailableCommerceModelId =
+    commerceModelId &&
+    !commerceModelOptions.some(({ id }) => id === commerceModelId)
+      ? commerceModelId
+      : null;
   const initialMerchantKnowledgeConfiguration = initialKnowledgeConfiguration(
     plan,
     merchantKnowledgeSourceTypes,
@@ -262,6 +273,7 @@ export function MerchantPricingPlanBuilder({
   const payload = useMemo(() => {
     return {
       id: plan?.id ?? null,
+      commerceModelId: commerceModelId || null,
       shopifyPlanHandle: handle,
       name,
       planKind,
@@ -290,6 +302,7 @@ export function MerchantPricingPlanBuilder({
     };
   }, [
     credits,
+    commerceModelId,
     cataloguePlans,
     currency,
     description,
@@ -561,6 +574,40 @@ export function MerchantPricingPlanBuilder({
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
+          </label>
+          <label className="text-sm font-medium text-gray-700 sm:col-span-2">
+            Commerce model
+            <select
+              className={inputClass}
+              value={commerceModelId}
+              onChange={(event) => setCommerceModelId(event.target.value || "")}
+            >
+              <option value="">Use Platform default</option>
+              {unavailableCommerceModelId ? (
+                <option value={unavailableCommerceModelId}>
+                  Current model unavailable — {unavailableCommerceModelId}
+                </option>
+              ) : null}
+              {commerceModelOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.displayName} ({option.provider}/
+                  {option.providerModelId})
+                </option>
+              ))}
+            </select>
+            {unavailableCommerceModelId ? (
+              <span role="alert" className="mt-1 block text-sm text-amber-800">
+                This saved model is no longer selectable. Choose an available
+                Commerce model or Use Platform default to repair the assignment.
+              </span>
+            ) : null}
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              When a Shop has no explicit model override, a current subscription
+              to this plan uses this model. Use Platform default leaves the plan
+              without its own model override. The current billing plan is used
+              on the next CommerceAgent turn; pending plan changes do not take
+              effect early.
+            </span>
           </label>
           <label className="text-sm font-medium text-gray-700">
             Plan kind

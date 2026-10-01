@@ -7,6 +7,7 @@ import {
   MerchantPricingUsagePricingMode,
   Prisma,
 } from "@prisma/client";
+import { CommercePricingPlanModelAssignmentSchema } from "@modainteract/moda-interact-shared/commerce/model";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
@@ -34,6 +35,7 @@ import {
   toMerchantPricingEconomicsPlan,
   type MerchantPricingPlanWithChildren,
 } from "@/lib/admin/merchant/pricing-plan";
+import { assertMerchantPricingPlanModelSelectable } from "@/lib/admin/merchant/pricing-plan-model";
 import { parseCompletedMerchantPricingTranslationPackage } from "@/lib/admin/merchant/pricing-translations";
 import {
   buildDesiredPlanFeatures,
@@ -941,6 +943,8 @@ export async function mutateMerchantPricingPlanAction(
   const beforeOverrideSnapshot = existing
     ? economicsOverrideSnapshot(existing)
     : null;
+  const commerceModelChanged =
+    payload.commerceModelId !== (existing?.commerceModelId ?? null);
 
   await prisma.$transaction(async (transaction) => {
     // Optimistic concurrency fence: the expensive snapshot was loaded before
@@ -973,6 +977,13 @@ export async function mutateMerchantPricingPlanAction(
       actionError(
         "The billing economics policy changed while this update was being validated. Reload the plan and try again.",
       );
+    }
+
+    if (commerceModelChanged && payload.commerceModelId !== null) {
+      await assertMerchantPricingPlanModelSelectable({
+        db: transaction,
+        modelId: payload.commerceModelId,
+      });
     }
 
     const economicsOverride = await resolveEconomicsOverrideForSave({
@@ -1063,6 +1074,7 @@ export async function mutateMerchantPricingPlanAction(
       const created = await transaction.merchantPricingPlan.create({
         data: {
           shopifyPlanHandle: payload.shopifyPlanHandle,
+          commerceModelId: payload.commerceModelId,
           displayName: payload.name,
           planKind: payload.planKind as MerchantPricingPlanKind,
           isActive: payload.isActive,
@@ -1109,6 +1121,11 @@ export async function mutateMerchantPricingPlanAction(
           },
         },
       });
+      CommercePricingPlanModelAssignmentSchema.parse({
+        merchantPricingPlanId: created.id,
+        shopifyPlanHandle: created.shopifyPlanHandle,
+        modelId: created.commerceModelId,
+      });
 
       await persistMerchantPricingPlanFeatures(transaction, {
         merchantPricingPlanId: created.id,
@@ -1131,6 +1148,12 @@ export async function mutateMerchantPricingPlanAction(
           action: "PLAN_CATALOG_CHANGED",
           platformAdminId: adminId,
           reason: payload.reason,
+          ...(commerceModelChanged
+            ? {
+                beforeValue: { commerceModelId: null },
+                afterValue: { commerceModelId: payload.commerceModelId },
+              }
+            : {}),
           relatedEntityType: "MerchantPricingPlan",
           relatedEntityId: created.id,
         },
@@ -1138,9 +1161,10 @@ export async function mutateMerchantPricingPlanAction(
       return;
     }
 
-    await transaction.merchantPricingPlan.update({
+    const updated = await transaction.merchantPricingPlan.update({
       where: { id: existing.id },
       data: {
+        commerceModelId: payload.commerceModelId,
         displayName: payload.name,
         planKind: payload.planKind as MerchantPricingPlanKind,
         shopifyRecoveryUsageEventHandle:
@@ -1197,6 +1221,11 @@ export async function mutateMerchantPricingPlanAction(
           : {}),
       },
     });
+    CommercePricingPlanModelAssignmentSchema.parse({
+      merchantPricingPlanId: updated.id,
+      shopifyPlanHandle: updated.shopifyPlanHandle,
+      modelId: updated.commerceModelId,
+    });
 
     let materializedBillingPlanId: string | undefined;
     if (existing.materializedAt) {
@@ -1247,6 +1276,12 @@ export async function mutateMerchantPricingPlanAction(
         action: "PLAN_CATALOG_CHANGED",
         platformAdminId: adminId,
         reason: payload.reason,
+        ...(commerceModelChanged
+          ? {
+              beforeValue: { commerceModelId: existing.commerceModelId },
+              afterValue: { commerceModelId: payload.commerceModelId },
+            }
+          : {}),
         relatedEntityType: "MerchantPricingPlan",
         relatedEntityId: existing.id,
       },

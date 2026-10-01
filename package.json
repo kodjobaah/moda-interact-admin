@@ -20,7 +20,7 @@
     "admin:seed-promotion": "node scripts/seed-manual-promotion.mjs"
   },
   "dependencies": {
-    "@modainteract/moda-interact-shared": "1.0.1",
+    "@modainteract/moda-interact-shared": "1.1.0",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "exceljs": "4.4.0",
