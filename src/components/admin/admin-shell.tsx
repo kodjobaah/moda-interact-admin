@@ -19,7 +19,8 @@ export async function AdminShell({
     | "background-runtime"
     | "store-categories"
     | "agent-instructions"
-    | "model-availability";
+    | "model-availability"
+    | "model-catalogue";
   header?: ReactNode;
   children: ReactNode;
 }) {

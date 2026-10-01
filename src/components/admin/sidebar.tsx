@@ -20,7 +20,8 @@ export function Sidebar({
     | "background-runtime"
     | "store-categories"
     | "agent-instructions"
-    | "model-availability";
+    | "model-availability"
+    | "model-catalogue";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -35,7 +36,8 @@ export function Sidebar({
     active === "store-categories" ||
     active === "agent-instructions";
   const observabilityActive = active === "observability" || active === "queues";
-  const commerceModelsActive = active === "model-availability";
+  const commerceModelsActive =
+    active === "model-availability" || active === "model-catalogue";
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--brand-200)] bg-[var(--brand-100)] md:flex">
@@ -103,10 +105,19 @@ export function Sidebar({
             <div className="ml-8 mt-1 space-y-1 border-l border-[var(--brand-300)] pl-3">
               <Link
                 href="/commerce-models/availability"
-                aria-current="page"
-                className={`${base} !rounded-md px-3 py-2 text-sm ${selected}`}
+                aria-current={
+                  active === "model-availability" ? "page" : undefined
+                }
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "model-availability" ? selected : idle}`}
               >
                 Availability
+              </Link>
+              <Link
+                href="/commerce-models/catalogue"
+                aria-current={active === "model-catalogue" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "model-catalogue" ? selected : idle}`}
+              >
+                Catalogue
               </Link>
             </div>
           ) : null}
