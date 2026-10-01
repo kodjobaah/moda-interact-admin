@@ -92,7 +92,24 @@ test("sidebar exposes the implemented Commerce models Availability and Catalogue
   assert.match(shellSource, /\| "model-catalogue"/);
   assert.match(pageSource, /<AdminShell active="model-availability">/);
   assert.match(cataloguePageSource, /<AdminShell active="model-catalogue">/);
-  assert.doesNotMatch(sidebarSource, /href="\/commerce-models\/credentials"/);
+});
+
+test("sidebar exposes one Credentials destination in Commerce models", async () => {
+  const sidebarSource = await readSource("src/components/admin/sidebar.tsx");
+  const shellSource = await readSource("src/components/admin/admin-shell.tsx");
+  const pageSource = await readSource(
+    "src/app/(protected)/commerce-models/credentials/page.tsx",
+  );
+
+  assert.equal(
+    [...sidebarSource.matchAll(/href="\/commerce-models\/credentials"/g)]
+      .length,
+    1,
+  );
+  assert.match(sidebarSource, /Credentials/);
+  assert.match(sidebarSource, /active === "openrouter-credentials"/);
+  assert.match(shellSource, /\| "openrouter-credentials"/);
+  assert.match(pageSource, /<AdminShell active="openrouter-credentials">/);
 });
 
 test("sidebar uses a stable desktop rail and bottom administrator treatment", async () => {

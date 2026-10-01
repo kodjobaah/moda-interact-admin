@@ -21,7 +21,8 @@ export function Sidebar({
     | "store-categories"
     | "agent-instructions"
     | "model-availability"
-    | "model-catalogue";
+    | "model-catalogue"
+    | "openrouter-credentials";
   administratorRole: string;
   grafanaHref: string;
 }) {
@@ -37,7 +38,9 @@ export function Sidebar({
     active === "agent-instructions";
   const observabilityActive = active === "observability" || active === "queues";
   const commerceModelsActive =
-    active === "model-availability" || active === "model-catalogue";
+    active === "model-availability" ||
+    active === "model-catalogue" ||
+    active === "openrouter-credentials";
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--brand-200)] bg-[var(--brand-100)] md:flex">
@@ -118,6 +121,15 @@ export function Sidebar({
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "model-catalogue" ? selected : idle}`}
               >
                 Catalogue
+              </Link>
+              <Link
+                href="/commerce-models/credentials"
+                aria-current={
+                  active === "openrouter-credentials" ? "page" : undefined
+                }
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "openrouter-credentials" ? selected : idle}`}
+              >
+                Credentials
               </Link>
             </div>
           ) : null}

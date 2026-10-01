@@ -20,7 +20,8 @@ export async function AdminShell({
     | "store-categories"
     | "agent-instructions"
     | "model-availability"
-    | "model-catalogue";
+    | "model-catalogue"
+    | "openrouter-credentials";
   header?: ReactNode;
   children: ReactNode;
 }) {
