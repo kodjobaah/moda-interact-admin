@@ -276,3 +276,83 @@ test("MerchantPricing catalogue pagination is database-backed and drawer context
   assert.match(catalogue, /name="planPageSize"/);
   assert.match(catalogue, /pageParam="planPage"/);
 });
+
+test("Commerce model pricing assignments remain Platform-admin-only and repairable", async () => {
+  const action = await source("src/app/actions/merchant-pricing-plan.ts");
+  const builder = await source(
+    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
+  );
+  const pricing = await source("src/lib/admin/merchant/pricing-plan.ts");
+  const schema = await source("database/prisma/schema.prisma");
+
+  const transactionStart = action.indexOf(
+    "await prisma.$transaction(async (transaction)",
+    action.indexOf("const beforeOverrideSnapshot"),
+  );
+  const selectableCheck = action.indexOf(
+    "await assertMerchantPricingPlanModelSelectable({",
+    transactionStart,
+  );
+  assert.ok(transactionStart >= 0 && selectableCheck > transactionStart);
+  assert.match(
+    action,
+    /if \(commerceModelChanged && payload\.commerceModelId !== null\)/,
+  );
+  assert.match(
+    action,
+    /commerceModelChanged =\s*payload\.commerceModelId !== \(existing\?\.commerceModelId \?\? null\)/,
+  );
+  assert.equal(
+    (action.match(/commerceModelId: payload\.commerceModelId/g) ?? []).length,
+    4,
+  );
+  assert.match(
+    action,
+    /beforeValue: \{ commerceModelId: existing\.commerceModelId \},\s*afterValue: \{ commerceModelId: payload\.commerceModelId \}/,
+  );
+  assert.match(
+    action,
+    /beforeValue: \{ commerceModelId: null \},\s*afterValue: \{ commerceModelId: payload\.commerceModelId \}/,
+  );
+  assert.match(action, /CommercePricingPlanModelAssignmentSchema\.parse/);
+  assert.match(action, /requirePlatformAdminMutation/);
+  assert.match(action, /principal\.role !== "SUPER_ADMIN"/);
+
+  const toggleStart = action.indexOf('if (intent === "toggle")');
+  const payloadStart = action.indexOf("const payload = parsePayload(formData)");
+  const toggle = action.slice(toggleStart, payloadStart);
+  assert.match(toggle, /data: \{\s*isActive: !existing\.isActive/);
+  assert.doesNotMatch(toggle, /commerceModelId/);
+
+  const billingSyncStart = action.indexOf(
+    "await transaction.billingPlan.update",
+  );
+  const billingSyncEnd = action.indexOf(
+    "materializedBillingPlanId = billingPlan.id",
+    billingSyncStart,
+  );
+  assert.doesNotMatch(
+    action.slice(billingSyncStart, billingSyncEnd),
+    /commerceModelId|modelId/,
+  );
+  const billingPlan = schema.match(/model BillingPlan \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(billingPlan);
+  assert.doesNotMatch(billingPlan, /commerceModelId|modelId/);
+
+  assert.match(builder, /commerceModelId: commerceModelId \|\| null/);
+  assert.match(builder, /Use Platform default/);
+  assert.match(
+    builder,
+    /\{option\.displayName\}\s*\(\{option\.provider\}\/\s*\{option\.providerModelId\}\)/,
+  );
+  assert.match(
+    builder,
+    /Current model unavailable — \{unavailableCommerceModelId\}/,
+  );
+  assert.match(builder, /role="alert"/);
+  assert.match(builder, /pending plan changes do not take\s+effect early/);
+  assert.match(
+    pricing,
+    /CommercePricingPlanModelAssignmentSchema\.parse\([\s\S]*?modelId: plan\.commerceModelId/,
+  );
+});

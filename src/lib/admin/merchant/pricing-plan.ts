@@ -7,6 +7,7 @@ import type {
   MerchantPricingUsageEvent,
   MerchantPricingUsageTier,
 } from "@prisma/client";
+import { CommercePricingPlanModelAssignmentSchema } from "@modainteract/moda-interact-shared/commerce/model";
 import { hasCurrentMerchantKnowledgeConfiguration } from "@/lib/admin/merchant-knowledge-plan-policy";
 import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
@@ -48,6 +49,21 @@ export type MerchantPricingPlanPageInput = {
   pageSize?: number;
 };
 
+function validateMerchantPricingPlanAssignment<
+  T extends {
+    id: string;
+    shopifyPlanHandle: string;
+    commerceModelId: string | null;
+  },
+>(plan: T): T {
+  CommercePricingPlanModelAssignmentSchema.parse({
+    merchantPricingPlanId: plan.id,
+    shopifyPlanHandle: plan.shopifyPlanHandle,
+    modelId: plan.commerceModelId,
+  });
+  return plan;
+}
+
 const merchantPricingInclude = {
   features: {
     include: { feature: true },
@@ -69,7 +85,9 @@ function safeMerchantPricingPage(value: number | undefined): number {
 }
 
 function safeMerchantPricingPageSize(value: number | undefined): number {
-  const candidate = Math.trunc(value ?? MERCHANT_PRICING_CATALOGUE_PAGE_SIZES[0]);
+  const candidate = Math.trunc(
+    value ?? MERCHANT_PRICING_CATALOGUE_PAGE_SIZES[0],
+  );
   return MERCHANT_PRICING_CATALOGUE_PAGE_SIZES.includes(
     candidate as (typeof MERCHANT_PRICING_CATALOGUE_PAGE_SIZES)[number],
   )
@@ -96,7 +114,7 @@ export async function getMerchantPricingPlans(
   });
 
   return {
-    items,
+    items: items.map(validateMerchantPricingPlanAssignment),
     page,
     pageSize,
     totalItems,
@@ -215,22 +233,25 @@ export async function getMerchantPricingCatalogueContext(): Promise<
     activeUsageEvents.map((plan) => [plan.id, plan.usageEvents] as const),
   );
 
-  return plans.map((plan) => ({
-    ...plan,
-    translations: [],
-    highlights: [],
-    usageEvents: usageEventsByPlanId.get(plan.id) ?? [],
-  }));
+  return plans.map((plan) =>
+    validateMerchantPricingPlanAssignment({
+      ...plan,
+      translations: [],
+      highlights: [],
+      usageEvents: usageEventsByPlanId.get(plan.id) ?? [],
+    }),
+  );
 }
 
 export async function getMerchantPricingPlanById(
   id: string,
 ): Promise<MerchantPricingPlanWithChildren | null> {
   await requirePlatformAdminRead();
-  return prisma.merchantPricingPlan.findUnique({
+  const plan = await prisma.merchantPricingPlan.findUnique({
     where: { id },
     include: merchantPricingInclude,
   });
+  return plan ? validateMerchantPricingPlanAssignment(plan) : null;
 }
 
 export function toMerchantPricingEconomicsPlan(

@@ -38,6 +38,7 @@ export type MerchantKnowledgeBuilderConfiguration = {
 
 export type MerchantPricingBuilderPayload = {
   id: string | null;
+  commerceModelId: string | null;
   shopifyPlanHandle: string;
   name: string;
   planKind: "FREE" | "PAID_METERED";
@@ -139,7 +140,10 @@ function parseMerchantKnowledgeConfiguration(
       issues.push({ path: `${path}.${key}`, message: "unexpected field" });
   for (const key of expectedKeys)
     if (!(key in value))
-      issues.push({ path: `${path}.${key}`, message: "required field is missing" });
+      issues.push({
+        path: `${path}.${key}`,
+        message: "required field is missing",
+      });
 
   if (value.schemaVersion !== 1)
     issues.push({ path: `${path}.schemaVersion`, message: "must be 1" });
@@ -150,7 +154,10 @@ function parseMerchantKnowledgeConfiguration(
     issues,
   );
   if (maxKnowledgeSources > 100)
-    issues.push({ path: `${path}.maxKnowledgeSources`, message: "must be at most 100" });
+    issues.push({
+      path: `${path}.maxKnowledgeSources`,
+      message: "must be at most 100",
+    });
   const maxContentUnitsPerSource = safeInteger(
     value.maxContentUnitsPerSource,
     `${path}.maxContentUnitsPerSource`,
@@ -158,11 +165,21 @@ function parseMerchantKnowledgeConfiguration(
     issues,
   );
   if (maxContentUnitsPerSource > 25000)
-    issues.push({ path: `${path}.maxContentUnitsPerSource`, message: "must be at most 25000" });
+    issues.push({
+      path: `${path}.maxContentUnitsPerSource`,
+      message: "must be at most 25000",
+    });
 
-  const allowedSourceTypes: MerchantKnowledgeBuilderConfiguration["allowedSourceTypes"] = [];
-  if (!Array.isArray(value.allowedSourceTypes) || value.allowedSourceTypes.length > 100) {
-    issues.push({ path: `${path}.allowedSourceTypes`, message: "must be an array containing at most 100 source types" });
+  const allowedSourceTypes: MerchantKnowledgeBuilderConfiguration["allowedSourceTypes"] =
+    [];
+  if (
+    !Array.isArray(value.allowedSourceTypes) ||
+    value.allowedSourceTypes.length > 100
+  ) {
+    issues.push({
+      path: `${path}.allowedSourceTypes`,
+      message: "must be an array containing at most 100 source types",
+    });
   } else {
     value.allowedSourceTypes.forEach((sourceType, index) => {
       const sourcePath = `${path}.allowedSourceTypes[${index}]`;
@@ -172,13 +189,30 @@ function parseMerchantKnowledgeConfiguration(
       }
       for (const key of Object.keys(sourceType))
         if (key !== "purposeKey" && key !== "dataFormatKey")
-          issues.push({ path: `${sourcePath}.${key}`, message: "unexpected field" });
+          issues.push({
+            path: `${sourcePath}.${key}`,
+            message: "unexpected field",
+          });
       const purposeKey = sourceType.purposeKey;
       const dataFormatKey = sourceType.dataFormatKey;
-      if (typeof purposeKey !== "string" || !purposeKey.trim() || purposeKey.trim().length > 64)
-        issues.push({ path: `${sourcePath}.purposeKey`, message: "must be a non-empty string of at most 64 characters" });
-      if (typeof dataFormatKey !== "string" || !dataFormatKey.trim() || dataFormatKey.trim().length > 32)
-        issues.push({ path: `${sourcePath}.dataFormatKey`, message: "must be a non-empty string of at most 32 characters" });
+      if (
+        typeof purposeKey !== "string" ||
+        !purposeKey.trim() ||
+        purposeKey.trim().length > 64
+      )
+        issues.push({
+          path: `${sourcePath}.purposeKey`,
+          message: "must be a non-empty string of at most 64 characters",
+        });
+      if (
+        typeof dataFormatKey !== "string" ||
+        !dataFormatKey.trim() ||
+        dataFormatKey.trim().length > 32
+      )
+        issues.push({
+          path: `${sourcePath}.dataFormatKey`,
+          message: "must be a non-empty string of at most 32 characters",
+        });
       if (typeof purposeKey === "string" && typeof dataFormatKey === "string")
         allowedSourceTypes.push({
           purposeKey: purposeKey.trim() as MerchantKnowledgePurposeKey,
@@ -258,6 +292,7 @@ export function projectMerchantPricingCatalogueOrder(
 
 const TOP_LEVEL_KEYS = [
   "id",
+  "commerceModelId",
   "shopifyPlanHandle",
   "name",
   "planKind",
@@ -304,6 +339,25 @@ export function parseMerchantPricingBuilderPayload(
       issues.push({ path: `$.${key}`, message: "unexpected field" });
   const id =
     parsed.id === null ? null : requiredString(parsed.id, "$.id", 255, issues);
+  let commerceModelId: string | null = null;
+  if (parsed.commerceModelId === null) {
+    commerceModelId = null;
+  } else if (typeof parsed.commerceModelId === "string") {
+    const normalizedCommerceModelId = parsed.commerceModelId.trim();
+    if (normalizedCommerceModelId.length > 128) {
+      issues.push({
+        path: "$.commerceModelId",
+        message: "must be at most 128 characters",
+      });
+    } else {
+      commerceModelId = normalizedCommerceModelId || null;
+    }
+  } else {
+    issues.push({
+      path: "$.commerceModelId",
+      message: "must be a string or null",
+    });
+  }
   const shopifyPlanHandle = requiredString(
     parsed.shopifyPlanHandle,
     "$.shopifyPlanHandle",
@@ -382,7 +436,10 @@ export function parseMerchantPricingBuilderPayload(
       supportedFeatureKeys.push(key);
     });
   }
-  if (parsed.materializedAt !== null && typeof parsed.materializedAt !== "string")
+  if (
+    parsed.materializedAt !== null &&
+    typeof parsed.materializedAt !== "string"
+  )
     issues.push({
       path: "$.materializedAt",
       message: "must be an ISO string or null",
@@ -680,6 +737,7 @@ export function parseMerchantPricingBuilderPayload(
   if (issues.length) throw new MerchantPricingPayloadError(issues);
   return {
     id,
+    commerceModelId,
     shopifyPlanHandle,
     name,
     planKind: planKind as "FREE" | "PAID_METERED",

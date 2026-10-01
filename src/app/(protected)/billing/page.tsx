@@ -1,7 +1,10 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import { MerchantPricingPlanCatalog } from "@/components/admin/merchant/merchant-pricing-plan-catalog";
 import { BillingTabs, type BillingView } from "@/components/admin/billing-tabs";
-import { BillingUnmappedSubscriptions, UnmappedSubscriptionDrawer } from "@/components/admin/billing-unmapped-subscriptions";
+import {
+  BillingUnmappedSubscriptions,
+  UnmappedSubscriptionDrawer,
+} from "@/components/admin/billing-unmapped-subscriptions";
 import { BillingReconciliationConsoleDebug } from "@/components/admin/billing-reconciliation-console-debug";
 import {
   BillingEventDrawer,
@@ -20,6 +23,7 @@ import {
   getMerchantPricingPlanById,
   getMerchantPricingPlans,
 } from "@/lib/admin/merchant/pricing-plan";
+import { listMerchantPricingPlanModelOptions } from "@/lib/admin/merchant/pricing-plan-model";
 import {
   getBillingLedger,
   getBillingLedgerItem,
@@ -42,9 +46,15 @@ import { ShopifyReportState } from "@prisma/client";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
 import { getFeatureCatalogue } from "@/lib/admin/feature-catalogue";
 import { FeatureCatalogue } from "@/components/admin/feature-catalogue";
-import { BillingPlansNavigation, type BillingPlansSection } from "@/components/admin/billing-plans-navigation";
+import {
+  BillingPlansNavigation,
+  type BillingPlansSection,
+} from "@/components/admin/billing-plans-navigation";
 import { redirect } from "next/navigation";
-import { getUnmappedSubscriptionDetail, getUnmappedSubscriptions } from "@/lib/admin/unmapped-subscriptions";
+import {
+  getUnmappedSubscriptionDetail,
+  getUnmappedSubscriptions,
+} from "@/lib/admin/unmapped-subscriptions";
 import {
   RecoveryCreditRefundDrawer,
   RecoveryCreditRefundQueue,
@@ -125,6 +135,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const cataloguePlans = planDrawerOpen
     ? await getMerchantPricingCatalogueContext()
     : null;
+  const commerceModelOptions = planDrawerOpen
+    ? await listMerchantPricingPlanModelOptions()
+    : [];
   const overview = view === "overview" ? await getBillingOverview() : null;
   const packs =
     view === "packs"
@@ -234,7 +247,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
         ) : null}
         {view === "unmapped" && firstParam(rawParams.mappingResolved) ? (
           <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-            Operational mapping repaired. Reconciliation has been requested; Shopify remains authoritative until the subscription is re-projected.
+            Operational mapping repaired. Reconciliation has been requested;
+            Shopify remains authoritative until the subscription is
+            re-projected.
           </div>
         ) : null}
         {view === "unmapped" &&
@@ -245,7 +260,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
           />
         ) : null}
         {view === "unmapped" && unmapped ? (
-          <BillingUnmappedSubscriptions subscriptions={unmapped} params={params} />
+          <BillingUnmappedSubscriptions
+            subscriptions={unmapped}
+            params={params}
+          />
         ) : null}
         {view === "plans" &&
         planSection === "pricing" &&
@@ -255,6 +273,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
             cataloguePlans={cataloguePlans ?? []}
             featureCatalogue={features ?? []}
             merchantKnowledgeSourceTypes={merchantKnowledgeSourceTypes}
+            commerceModelOptions={commerceModelOptions}
             minimumUpgradePremiumBps={
               plansPolicy?.minimumUpgradePremiumBps ?? 2000
             }
@@ -286,7 +305,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
           />
         ) : null}
         {view === "unmapped" && selectedUnmapped ? (
-          <UnmappedSubscriptionDrawer detail={selectedUnmapped} params={params} />
+          <UnmappedSubscriptionDrawer
+            detail={selectedUnmapped}
+            params={params}
+          />
         ) : null}
       </div>
     </AdminShell>
