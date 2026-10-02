@@ -1,87 +1,19 @@
 "use client";
 
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
-import type { MerchantPricingBuilderHighlight } from "@/lib/admin/merchant/pricing-builder-payload";
-import {
-  parseMoneyToMinorUnits,
-  resolveMerchantPricingCreatePlacement,
-} from "@/lib/admin/merchant/pricing-builder-payload";
-import { findUnboundedZeroCostEventLabel } from "@/lib/admin/merchant/pricing-builder-presentation";
 import type {
   MerchantKnowledgeSourceTypeOption,
   MerchantPricingPlanWithChildren,
 } from "@/lib/admin/merchant/pricing-plan";
 import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
 import type { Feature } from "@prisma/client";
-import {
-  MerchantKnowledgeFeatureConfigurationSchema,
-  type MerchantKnowledgeFeatureConfiguration,
-} from "@modainteract/moda-interact-shared/merchant-knowledge";
-import { assessMerchantPricingEconomicsOverride } from "@/lib/admin/merchant/pricing-economics-override";
-import {
-  buildMerchantPricingTranslationTemplate,
-  type MerchantPricingTranslationParseResult,
-} from "@/lib/admin/merchant/pricing-translations";
-import {
-  addBuilderTier,
-  type BuilderEvent,
-  createEmptyBuilderEvent,
-  evaluateBuilderEconomics,
-  formatBuilderEventPrice,
-  formatMinorUnits,
-  hasUnboundedZeroCostFixedEvent,
-  initialEvents,
-  initialHighlights,
-  merchantPricingBuilderMerchantContentValid,
-  merchantPricingBuilderRequiredFieldsValid,
-  merchantPricingBuilderTranslationsRetained,
-  minorUnitsToMoney,
-  moveBuilderEvent,
-  moveBuilderHighlight,
-  serializeBuilderEvent,
-  updateBuilderEvent,
-  updateBuilderHighlight,
-  updateBuilderTier,
-  ZERO_COST_USAGE_EVENT_MESSAGE,
-} from "@/lib/admin/merchant/pricing-plan-builder";
-import { presentMerchantPricingEconomicsResult } from "@/lib/admin/merchant/pricing-economics-presentation";
-import { buildSupportedFeatureControls } from "@/lib/admin/merchant/pricing-plan-feature-controls";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { BuilderEvent } from "@/lib/admin/merchant/pricing-plan-builder";
+import { useMerchantPricingPlanDraft } from "./merchant-pricing-plan-builder/use-merchant-pricing-plan-draft";
 import { MerchantPricingTranslationWorkbook } from "./merchant-pricing-translation-workbook";
 import { MerchantPricingPlanSubmitButton } from "./merchant-pricing-plan-submit-button";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white p-2 text-sm";
-const merchantKnowledgeFeatureKey = "merchant_knowledge";
-
-function sourceTypeKey(purposeKey: string, dataFormatKey: string): string {
-  return `${purposeKey}\u001f${dataFormatKey}`;
-}
-
-function initialKnowledgeConfiguration(
-  plan: MerchantPricingPlanWithChildren | undefined,
-  sourceTypes: MerchantKnowledgeSourceTypeOption[],
-): MerchantKnowledgeFeatureConfiguration | null {
-  const mappings =
-    plan?.features.filter(
-      ({ feature }) => feature.key === merchantKnowledgeFeatureKey,
-    ) ?? [];
-  if (mappings.length !== 1) return null;
-  const parsed = MerchantKnowledgeFeatureConfigurationSchema.safeParse(
-    mappings[0].configuration,
-  );
-  if (!parsed.success) return null;
-  const activePairs = new Set(
-    sourceTypes.map(({ purposeKey, dataFormatKey }) =>
-      sourceTypeKey(purposeKey, dataFormatKey),
-    ),
-  );
-  return parsed.data.allowedSourceTypes.every(({ purposeKey, dataFormatKey }) =>
-    activePairs.has(sourceTypeKey(purposeKey, dataFormatKey)),
-  )
-    ? parsed.data
-    : null;
-}
 
 export function MerchantPricingPlanBuilder({
   plan,
@@ -98,441 +30,118 @@ export function MerchantPricingPlanBuilder({
   commerceModelOptions?: MerchantPricingPlanModelOption[];
   minimumUpgradePremiumBps?: number;
 }) {
-  const nextEventKeyRef = useRef(0);
-  const [step, setStep] = useState(0);
-  const [name, setName] = useState(plan?.displayName ?? "");
-  const [handle, setHandle] = useState(plan?.shopifyPlanHandle ?? "");
-  const hasFreePlan = cataloguePlans.some(
-    (cataloguePlan) => cataloguePlan.planKind === "FREE",
-  );
-  const freePlanAlreadyExists = hasFreePlan && plan?.planKind !== "FREE";
-
-  const [planKind, setPlanKind] = useState<"FREE" | "PAID_METERED">(
-    plan?.planKind ?? (hasFreePlan ? "PAID_METERED" : "FREE"),
-  );
-  const [isActive, setIsActive] = useState(plan?.isActive ?? true);
-  const [featured, setFeatured] = useState(plan?.featured ?? false);
-  const [commerceModelId, setCommerceModelId] = useState(
-    plan?.commerceModelId ?? "",
-  );
-  const unavailableCommerceModelId =
-    commerceModelId &&
-    !commerceModelOptions.some(({ id }) => id === commerceModelId)
-      ? commerceModelId
-      : null;
-  const initialMerchantKnowledgeConfiguration = initialKnowledgeConfiguration(
-    plan,
-    merchantKnowledgeSourceTypes,
-  );
-  const [maxKnowledgeSources, setMaxKnowledgeSources] = useState(
-    initialMerchantKnowledgeConfiguration
-      ? String(initialMerchantKnowledgeConfiguration.maxKnowledgeSources)
-      : "",
-  );
-  const [maxContentUnitsPerSource, setMaxContentUnitsPerSource] = useState(
-    initialMerchantKnowledgeConfiguration
-      ? String(initialMerchantKnowledgeConfiguration.maxContentUnitsPerSource)
-      : "",
-  );
-  const [allowedSourceTypeKeys, setAllowedSourceTypeKeys] = useState<string[]>(
-    initialMerchantKnowledgeConfiguration?.allowedSourceTypes.map(
-      ({ purposeKey, dataFormatKey }) =>
-        sourceTypeKey(purposeKey, dataFormatKey),
-    ) ?? [],
-  );
-  const [credits, setCredits] = useState(plan?.includedRecoveryCredits ?? 0);
-  const [recoveryUsageEventHandle, setRecoveryUsageEventHandle] = useState(
-    plan?.shopifyRecoveryUsageEventHandle ?? "",
-  );
-  const [supportedFeatureKeys, setSupportedFeatureKeys] = useState<string[]>(
-    plan?.features
-      .map(({ feature }) => feature.key)
-      .filter((key) => key !== merchantKnowledgeFeatureKey) ?? [],
-  );
-  const supportedFeatureControls = buildSupportedFeatureControls({
-    featureCatalogue,
-    existingFeatures: plan?.features.map(({ feature }) => feature) ?? [],
-    supportedFeatureKeys,
-  });
-  const [currency, setCurrency] = useState(plan?.currency ?? "USD");
-  const [recurring, setRecurring] = useState(
-    plan ? minorUnitsToMoney(plan.recurringAmountMinor) : "0",
-  );
-  const cataloguePlanIds = useMemo(
-    () => cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
-    [cataloguePlans],
-  );
-  const [placement, setPlacement] = useState(() =>
-    plan
-      ? "UNCHANGED"
-      : resolveMerchantPricingCreatePlacement(planKind, cataloguePlanIds),
-  );
-  const effectivePlacement =
-    !plan && planKind === "FREE"
-      ? resolveMerchantPricingCreatePlacement("FREE", cataloguePlanIds)
-      : placement;
-  const [description, setDescription] = useState(
-    plan
-      ? (plan.translations.find((translation) => translation.locale === "en")
-          ?.merchantDescription ?? "")
-      : "",
-  );
-  const [reason, setReason] = useState("");
-  const [economicsOverrideEnabled, setEconomicsOverrideEnabled] =
-    useState(false);
-
-  const [economicsOverrideReason, setEconomicsOverrideReason] = useState("");
-  const [events, setEvents] = useState<BuilderEvent[]>(initialEvents(plan));
-  const [highlights, setHighlights] = useState<
-    MerchantPricingBuilderHighlight[]
-  >(initialHighlights(plan));
-  const [translationJson, setTranslationJson] = useState("");
-  const [translationResult, setTranslationResult] =
-    useState<MerchantPricingTranslationParseResult | null>(null);
-
-  const economicsConfigurationKey = useMemo(
-    () =>
-      JSON.stringify({
-        handle: handle.trim(),
-        credits,
-        currency: currency.trim().toUpperCase(),
-        recurring,
-        placement: effectivePlacement,
-        minimumUpgradePremiumBps,
-        usageEvents: events.map(serializeBuilderEvent),
-      }),
-    [
-      handle,
-      credits,
-      currency,
-      recurring,
-      effectivePlacement,
-      minimumUpgradePremiumBps,
-      events,
-    ],
-  );
-
-  const previousEconomicsConfigurationKeyRef = useRef(
-    economicsConfigurationKey,
-  );
-
-  useEffect(() => {
-    if (
-      previousEconomicsConfigurationKeyRef.current !== economicsConfigurationKey
-    ) {
-      setEconomicsOverrideEnabled(false);
-
-      previousEconomicsConfigurationKeyRef.current = economicsConfigurationKey;
-    }
-  }, [economicsConfigurationKey]);
-  const merchantContentValid = merchantPricingBuilderMerchantContentValid({
-    description,
-    highlights,
-  });
-
-  const economicsState = evaluateBuilderEconomics({
+  const controller = useMerchantPricingPlanDraft({
     plan,
     cataloguePlans,
-    handle,
-    name,
-    credits,
-    recurring,
-    currency,
-    events,
-    placement: effectivePlacement,
+    featureCatalogue,
+    merchantKnowledgeSourceTypes,
+    commerceModelOptions,
     minimumUpgradePremiumBps,
   });
-
-  const merchantKnowledgeConfiguration = useMemo(
-    () => ({
-      schemaVersion: 1 as const,
-      maxKnowledgeSources: Number(maxKnowledgeSources),
-      maxContentUnitsPerSource: Number(maxContentUnitsPerSource),
-      allowedSourceTypes: merchantKnowledgeSourceTypes
-        .filter(({ purposeKey, dataFormatKey }) =>
-          allowedSourceTypeKeys.includes(
-            sourceTypeKey(purposeKey, dataFormatKey),
-          ),
-        )
-        .map(({ purposeKey, dataFormatKey }) => ({
-          purposeKey,
-          dataFormatKey,
-        })),
-    }),
-    [
-      allowedSourceTypeKeys,
-      maxContentUnitsPerSource,
-      maxKnowledgeSources,
-      merchantKnowledgeSourceTypes,
-    ],
-  );
-  const merchantKnowledgeConfigurationValid =
-    MerchantKnowledgeFeatureConfigurationSchema.safeParse(
-      merchantKnowledgeConfiguration,
-    ).success;
-  const payload = useMemo(() => {
-    return {
-      id: plan?.id ?? null,
-      commerceModelId: commerceModelId || null,
-      shopifyPlanHandle: handle,
-      name,
-      planKind,
-      shopifyRecoveryUsageEventHandle:
-        planKind === "FREE" ? null : recoveryUsageEventHandle,
-      supportedFeatureKeys: [
-        ...new Set([...supportedFeatureKeys, merchantKnowledgeFeatureKey]),
-      ],
-      merchantKnowledgeConfiguration,
-      materializedAt: plan?.materializedAt?.toISOString() ?? null,
-      isActive,
-      featured,
-      includedRecoveryCredits: Number(credits),
-      allowancePeriod: planKind === "FREE" ? "LIFETIME" : "EVERY_30_DAYS",
-      billingPeriod: "EVERY_30_DAYS",
-      currency: currency.toUpperCase(),
-      recurringAmount: recurring,
-      placement: effectivePlacement,
-      catalogueOrderSnapshot: plan
-        ? null
-        : cataloguePlans.map((cataloguePlan) => cataloguePlan.id),
-      englishDescription: description,
-      reason,
-      usageEvents: events.map(serializeBuilderEvent),
-      highlights,
-    };
-  }, [
-    credits,
-    commerceModelId,
-    cataloguePlans,
-    currency,
-    description,
-    events,
-    highlights,
-    featured,
+  const {
+    step,
+    name,
     handle,
+    planKind,
     isActive,
-    name,
-    plan,
-    planKind,
-    recoveryUsageEventHandle,
-    supportedFeatureKeys,
-    merchantKnowledgeConfiguration,
-    effectivePlacement,
-    reason,
-    recurring,
-    // ...
-  ]);
-  const economicsPreview = economicsState.results;
-  const unboundedZeroCostEventLabel = findUnboundedZeroCostEventLabel(
-    events,
-    parseMoneyToMinorUnits,
-  );
-  const economicsPassed =
-    !economicsState.invalid &&
-    economicsPreview.every((result) => result.status === "PASS");
-
-  const economicsOverrideAssessment = assessMerchantPricingEconomicsOverride(
-    economicsPreview,
-    economicsState.invalid,
-  );
-
-  const economicsOverrideAvailable =
-    economicsOverrideAssessment.kind === "OVERRIDEABLE";
-
-  const economicsOverrideReasonValid =
-    Boolean(economicsOverrideReason.trim()) &&
-    economicsOverrideReason.trim().length <= 2000;
-
-  const economicsOverrideReady =
-    economicsOverrideAvailable &&
-    economicsOverrideEnabled &&
-    economicsOverrideReasonValid;
-
-  const economicsSatisfied = economicsPassed || economicsOverrideReady;
-
-  const presentedEconomics = economicsPreview.map((result) => ({
-    result,
-    presentation: presentMerchantPricingEconomicsResult({
-      result,
-      lowerPlan: economicsState.plansById[result.lowerPlanId],
-      higherPlan: economicsState.plansById[result.higherPlanId],
-      minimumUpgradePremiumBps,
-    }),
-  }));
-  const failedEconomics = presentedEconomics.filter(
-    ({ result }) => result.status !== "PASS",
-  );
-
-  const passedEconomics = presentedEconomics.filter(
-    ({ result }) => result.status === "PASS",
-  );
-  const requiredFieldsValid = merchantPricingBuilderRequiredFieldsValid({
-    handle,
-    name,
-    currency,
+    featured,
+    commerceModelId,
+    maxKnowledgeSources,
+    maxContentUnitsPerSource,
+    allowedSourceTypeKeys,
     credits,
-    description,
-    events,
     recoveryUsageEventHandle,
-    planKind,
-  });
-  const retainedTemplate = plan
-    ? buildMerchantPricingTranslationTemplate({
-        planHandle: handle,
-        planName: name,
-        englishDescription: description,
-        highlights,
-        previous: {
-          englishDescription:
-            plan.translations.find((translation) => translation.locale === "en")
-              ?.merchantDescription ?? "",
-          highlights: initialHighlights(plan),
-          translations: plan.translations.map((translation) => ({
-            locale: translation.locale,
-            merchantDescription: translation.merchantDescription,
-            highlights: plan.highlights.map((highlight) => {
-              const value = highlight.translations.find(
-                (candidate) => candidate.locale === translation.locale,
-              );
-              return {
-                contentKey: highlight.contentKey,
-                title: value?.merchantTitle ?? "",
-                description: value?.merchantDescription ?? "",
-              };
-            }),
-          })),
-        },
-      })
-    : null;
-  const translationsRetained = merchantPricingBuilderTranslationsRetained(
-    plan,
+    currency,
+    recurring,
     description,
+    reason,
+    economicsOverrideEnabled,
+    economicsOverrideReason,
+    events,
     highlights,
-  );
-
-  const canSubmit =
-    requiredFieldsValid &&
-    merchantKnowledgeConfigurationValid &&
-    Boolean(reason.trim()) &&
-    reason.trim().length <= 2000 &&
-    economicsSatisfied &&
-    (translationsRetained || Boolean(translationResult?.valid));
-
-  const placementLabel = plan
-    ? `Current position (${plan.cataloguePosition + 1})`
-    : effectivePlacement === "ONLY"
-      ? "This will be the first plan."
-      : effectivePlacement.startsWith("BEFORE:")
-        ? `First — before ${cataloguePlans[0]?.displayName ?? "the first plan"}`
-        : `After ${cataloguePlans.find((cataloguePlan) => effectivePlacement === `AFTER:${cataloguePlan.id}`)?.displayName ?? "the selected plan"}`;
-
-  function handlePlanKindChange(nextPlanKind: "FREE" | "PAID_METERED") {
-    setPlanKind(nextPlanKind);
-
-    if (plan) return;
-
-    setPlacement(
-      resolveMerchantPricingCreatePlacement(nextPlanKind, cataloguePlanIds),
-    );
-  }
-
-  function canNavigateTo(targetStep: number): boolean {
-    if (targetStep <= step) return true;
-    if (targetStep > step + 1) return false;
-
-    if (step === 3 && events.some(hasUnboundedZeroCostFixedEvent)) {
-      return false;
-    }
-
-    if (step === 4 && !merchantContentValid) {
-      return false;
-    }
-
-    if (step === 5 && !economicsSatisfied) {
-      return false;
-    }
-
-    return true;
-  }
-
-  function addEvent() {
-    if (events.length >= 5) return;
-
-    const clientKey = `new-usage-event-${nextEventKeyRef.current++}`;
-
-    setEvents((current) => [...current, createEmptyBuilderEvent(clientKey)]);
-  }
-  function moveEvent(index: number, direction: -1 | 1) {
-    setEvents((current) => moveBuilderEvent(current, index, direction));
-  }
-
-  function updateTier(
-    eventIndex: number,
-    tierIndex: number,
-    update: Partial<NonNullable<BuilderEvent["tiers"]>[number]>,
-  ) {
-    setEvents((current) =>
-      updateBuilderTier(current, eventIndex, tierIndex, update),
-    );
-  }
-
-  function addTier(eventIndex: number) {
-    setEvents((current) => addBuilderTier(current, eventIndex));
-  }
-
-  function updateEvent(
-    index: number,
-    update: Partial<Omit<BuilderEvent, "clientKey">>,
-  ) {
-    setEvents((current) => updateBuilderEvent(current, index, update));
-  }
-
-  function updateHighlight(
-    index: number,
-    update: Partial<MerchantPricingBuilderHighlight>,
-  ) {
-    setHighlights((current) => updateBuilderHighlight(current, index, update));
-  }
-
-  function moveHighlight(index: number, direction: -1 | 1) {
-    setHighlights((current) => moveBuilderHighlight(current, index, direction));
-  }
-
-  function validTranslationJson(): string {
-    if (translationResult?.valid) return translationJson;
-    if (retainedTemplate) return JSON.stringify(retainedTemplate);
-    return (
-      translationJson ||
-      JSON.stringify(
-        buildMerchantPricingTranslationTemplate({
-          planHandle: handle,
-          planName: name,
-          englishDescription: description,
-          highlights,
-        }),
-      )
-    );
-  }
+    translationResult,
+  } = controller.draft;
+  const {
+    setStep,
+    setName,
+    setHandle,
+    handlePlanKindChange,
+    setIsActive,
+    setFeatured,
+    setCommerceModelId,
+    setMaxKnowledgeSources,
+    setMaxContentUnitsPerSource,
+    setSourceType,
+    setCredits,
+    setRecoveryUsageEventHandle,
+    setSupportedFeature,
+    setCurrency,
+    setRecurring,
+    setPlacement,
+    setDescription,
+    setReason,
+    setEconomicsOverrideEnabled,
+    setEconomicsOverrideReason,
+    addEvent,
+    removeEvent,
+    moveEvent,
+    updateEvent,
+    addTier,
+    updateTier,
+    addHighlight,
+    removeHighlight,
+    moveHighlight,
+    updateHighlight,
+    onWorkbookChange,
+  } = controller.actions;
+  const {
+    freePlanAlreadyExists,
+    unavailableCommerceModelId,
+    supportedFeatureControls,
+    effectivePlacement,
+    placementLabel,
+    merchantKnowledgeConfigurationValid,
+    merchantContentValid,
+    economicsState,
+    economicsPreview,
+    economicsPassed,
+    economicsOverrideAssessment,
+    economicsOverrideReady,
+    failedEconomics,
+    passedEconomics,
+    unboundedZeroCostEventLabel,
+    translationsRetained,
+    retainedTemplate,
+    currentTemplate,
+    canSubmit,
+    canNavigateTo,
+    formFields,
+    sourceTypeKey,
+    formatBuilderEventPrice,
+    formatMinorUnits,
+    hasUnboundedZeroCostFixedEvent,
+    ZERO_COST_USAGE_EVENT_MESSAGE,
+  } = controller.selectors;
 
   return (
     <form action={mutateMerchantPricingPlanAction} className="space-y-6">
-      <input type="hidden" name="intent" value={plan ? "update" : "create"} />
-      <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+      <input type="hidden" name="intent" value={formFields.intent} />
+      <input type="hidden" name="payload" value={formFields.payload} />
       <input
         type="hidden"
         name="translationJson"
-        value={validTranslationJson()}
+        value={formFields.translationJson}
       />
       <input
         type="hidden"
         name="economicsOverrideRequested"
-        value={economicsOverrideReady ? "true" : "false"}
+        value={formFields.economicsOverrideRequested}
       />
 
       <input
         type="hidden"
         name="economicsOverrideReason"
-        value={economicsOverrideReady ? economicsOverrideReason.trim() : ""}
+        value={formFields.economicsOverrideReason}
       />
       <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {[
@@ -847,13 +456,7 @@ export function MerchantPricingPlanBuilder({
                                       key,
                                     )}
                                     onChange={(event) =>
-                                      setAllowedSourceTypeKeys((current) =>
-                                        event.target.checked
-                                          ? [...current, key]
-                                          : current.filter(
-                                              (value) => value !== key,
-                                            ),
-                                      )
+                                      setSourceType(key, event.target.checked)
                                     }
                                   />
                                   {sourceType.dataFormatDisplayName}
@@ -881,11 +484,7 @@ export function MerchantPricingPlanBuilder({
                   checked={control.checked}
                   disabled={control.disabled}
                   onChange={(event) =>
-                    setSupportedFeatureKeys((current) =>
-                      event.target.checked
-                        ? [...current, control.key]
-                        : current.filter((key) => key !== control.key),
-                    )
+                    setSupportedFeature(control.key, event.target.checked)
                   }
                 />
                 <span>
@@ -1125,11 +724,7 @@ export function MerchantPricingPlanBuilder({
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  setEvents(
-                    events.filter((_, eventIndex) => eventIndex !== index),
-                  )
-                }
+                onClick={() => removeEvent(index)}
                 className="text-sm font-semibold text-red-700"
               >
                 Remove usage event
@@ -1196,13 +791,7 @@ export function MerchantPricingPlanBuilder({
                 <button
                   type="button"
                   className="text-red-700"
-                  onClick={() =>
-                    setHighlights((current) =>
-                      current.filter(
-                        (_, highlightIndex) => highlightIndex !== index,
-                      ),
-                    )
-                  }
+                  onClick={() => removeHighlight(index)}
                 >
                   Remove
                 </button>
@@ -1211,12 +800,7 @@ export function MerchantPricingPlanBuilder({
           ))}
           <button
             type="button"
-            onClick={() =>
-              setHighlights((current) => [
-                ...current,
-                { contentKey: crypto.randomUUID(), title: "", description: "" },
-              ])
-            }
+            onClick={addHighlight}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold"
           >
             + Add highlight
@@ -1434,21 +1018,10 @@ export function MerchantPricingPlanBuilder({
       <div className={step === 6 ? "" : "hidden"}>
         <MerchantPricingTranslationWorkbook
           planHandle={handle}
-          canonicalTemplate={
-            retainedTemplate ??
-            buildMerchantPricingTranslationTemplate({
-              planHandle: handle,
-              planName: name,
-              englishDescription: description,
-              highlights,
-            })
-          }
+          canonicalTemplate={retainedTemplate ?? currentTemplate}
           highlights={highlights}
           translationsRetained={translationsRetained}
-          onChange={(rawJson, result) => {
-            setTranslationJson(rawJson);
-            setTranslationResult(result);
-          }}
+          onChange={onWorkbookChange}
         />
       </div>
       {step === 6 ? (
