@@ -1,7 +1,4 @@
-import type {
-  MerchantKnowledgeSourceTypeOption,
-  MerchantPricingPlanWithChildren,
-} from "@/lib/admin/merchant/pricing-plan";
+import type { MerchantKnowledgeSourceTypeOption } from "@/lib/admin/merchant/pricing-plan";
 import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
 import type { MerchantPricingPlanDraftController } from "./use-merchant-pricing-plan-draft";
 
@@ -11,11 +8,11 @@ const inputClass =
 type Controller = MerchantPricingPlanDraftController;
 
 type PlanStepProps = {
-  plan?: MerchantPricingPlanWithChildren;
   commerceModelOptions: MerchantPricingPlanModelOption[];
   merchantKnowledgeSourceTypes: MerchantKnowledgeSourceTypeOption[];
   draft: Pick<
     Controller["draft"],
+    | "isEditing"
     | "name"
     | "handle"
     | "planKind"
@@ -52,7 +49,6 @@ type PlanStepProps = {
 };
 
 export function PlanStep({
-  plan,
   commerceModelOptions,
   merchantKnowledgeSourceTypes,
   draft,
@@ -69,7 +65,7 @@ export function PlanStep({
           <input
             className={inputClass}
             value={draft.handle}
-            readOnly={Boolean(plan)}
+            readOnly={draft.isEditing}
             onChange={(event) => actions.setHandle(event.target.value)}
           />
         </label>

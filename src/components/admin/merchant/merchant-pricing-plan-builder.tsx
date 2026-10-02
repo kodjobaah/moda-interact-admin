@@ -168,10 +168,10 @@ export function MerchantPricingPlanBuilder({
       </nav>
       {step === 0 ? (
         <PlanStep
-          plan={plan}
           commerceModelOptions={commerceModelOptions}
           merchantKnowledgeSourceTypes={merchantKnowledgeSourceTypes}
           draft={{
+            isEditing: controller.draft.isEditing,
             name,
             handle,
             planKind,
