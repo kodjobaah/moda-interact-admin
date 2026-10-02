@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -9,6 +9,21 @@ const repositoryRoot = path.resolve(
   '../..',
 );
 const sourcePath = (relativePath) => path.join(repositoryRoot, relativePath);
+const queueMonitorModuleDirectory = sourcePath('src/components/admin/queue-monitor');
+
+async function readQueueMonitorSources() {
+  const entries = await readdir(queueMonitorModuleDirectory, { withFileTypes: true });
+  const modulePaths = entries
+    .filter((entry) => entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name))
+    .map((entry) => path.join(queueMonitorModuleDirectory, entry.name))
+    .sort();
+  const sources = await Promise.all(
+    [sourcePath('src/components/admin/queue-monitor.tsx'), ...modulePaths].map(
+      (filePath) => readFile(filePath, 'utf8'),
+    ),
+  );
+  return sources.join('\n');
+}
 
 function importQueueMonitor() {
   return import(`${sourcePath('src/lib/admin/queue-monitor.ts')}?test=${Date.now()}`);
@@ -298,7 +313,7 @@ test('Tenant Directory is independent from transient queue state', async () => {
 });
 
 test('detailed queue monitor presents a compact five-queue table with read-only selection', async () => {
-  const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
+  const componentSource = await readQueueMonitorSources();
   assert.match(componentSource, /<table/);
   for (const key of ['queue', 'jobLabel', 'workers', 'lastRedisActivity']) {
     assert.match(componentSource, new RegExp(`queue\\.${key}`));
@@ -313,12 +328,12 @@ test('detailed queue monitor presents a compact five-queue table with read-only 
 });
 
 test('queue monitor renders a bounded four-state job summary without mutation actions', async () => {
-  const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
+  const componentSource = await readQueueMonitorSources();
   assert.match(componentSource, /\/api\/admin\/queues\/jobs\?/);
   assert.match(componentSource, /queueJobStatus/);
   assert.match(componentSource, /queueJobDirection/);
   assert.match(componentSource, /limit: showAllJobs \? "10" : "5"/);
-  assert.match(componentSource, /page: String\(queueJobPage\)/);
+  assert.match(componentSource, /page: String\(request\.page\)/);
   for (const key of ['jobId', 'shop', 'jobName', 'attempts']) {
     assert.match(componentSource, new RegExp(`queue\\.${key}`));
   }
@@ -346,7 +361,7 @@ test('queue API authorizes before accessing the Redis snapshot reader', async ()
 
 test('refresh preference defaults safely and restores valid browser-local values', async () => {
   const originalWindow = globalThis.window;
-  const module = await import(`${sourcePath('src/components/admin/queue-monitor-refresh.ts')}?refresh-test=${Date.now()}`);
+  const refreshModule = await import(`${sourcePath('src/components/admin/queue-monitor-refresh.ts')}?refresh-test=${Date.now()}`);
   const values = new Map();
 
   globalThis.window = {
@@ -354,21 +369,21 @@ test('refresh preference defaults safely and restores valid browser-local values
       getItem: (key) => values.get(key) ?? null,
     },
   };
-  assert.equal(module.getInitialRefreshMs(), 5_000);
+  assert.equal(refreshModule.getInitialRefreshMs(), 5_000);
 
   values.set('moda-admin.queue-monitor.refresh-ms', '0');
-  assert.equal(module.getInitialRefreshMs(), 0);
+  assert.equal(refreshModule.getInitialRefreshMs(), 0);
   values.set('moda-admin.queue-monitor.refresh-ms', '2000');
-  assert.equal(module.getInitialRefreshMs(), 2_000);
+  assert.equal(refreshModule.getInitialRefreshMs(), 2_000);
   values.set('moda-admin.queue-monitor.refresh-ms', 'invalid');
-  assert.equal(module.getInitialRefreshMs(), 5_000);
+  assert.equal(refreshModule.getInitialRefreshMs(), 5_000);
 
   globalThis.window = originalWindow;
 });
 
 test('queue display labels remain catalogue-owned at the UI boundary', async () => {
   const source = await readFile(sourcePath('src/lib/admin/queue-monitor.ts'), 'utf8');
-  const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
+  const componentSource = await readQueueMonitorSources();
 
   assert.doesNotMatch(source, /Pending recovery candidates|WhatsApp events/);
   assert.match(source, /evaluate-pending-recovery/);

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { test } from "node:test";
@@ -13,9 +13,25 @@ const componentPath = path.join(
   repositoryRoot,
   "src/components/admin/queue-monitor.tsx",
 );
+const queueMonitorModuleDirectory = path.join(
+  repositoryRoot,
+  "src/components/admin/queue-monitor",
+);
+
+async function readQueueMonitorSources() {
+  const entries = await readdir(queueMonitorModuleDirectory, { withFileTypes: true });
+  const modulePaths = entries
+    .filter((entry) => entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name))
+    .map((entry) => path.join(queueMonitorModuleDirectory, entry.name))
+    .sort();
+  const sources = await Promise.all(
+    [componentPath, ...modulePaths].map((filePath) => readFile(filePath, "utf8")),
+  );
+  return sources.join("\n");
+}
 
 test("queue details uses a full-workspace fixed overlay with resizing controls", async () => {
-  const source = await readFile(componentPath, "utf8");
+  const source = await readQueueMonitorSources();
 
   assert.doesNotMatch(source, /flex flex-col gap-5 lg:flex-row/);
   assert.match(
@@ -40,7 +56,7 @@ test("queue details uses a full-workspace fixed overlay with resizing controls",
 });
 
 test("closing the drawer does not clear queue or failed-job data", async () => {
-  const source = await readFile(componentPath, "utf8");
+  const source = await readQueueMonitorSources();
   const closeHandler = source.match(
     /queue\.closeDetails[\s\S]{0,300}?onClick=\{\(\) => \{([\s\S]*?)\}\}/,
   );
@@ -56,7 +72,7 @@ test("closing the drawer does not clear queue or failed-job data", async () => {
 });
 
 test("queue names switch diagnostics without resetting an open drawer", async () => {
-  const source = await readFile(componentPath, "utf8");
+  const source = await readQueueMonitorSources();
   const selectQueue = source.match(
     /function selectQueue\(queueName: string\) \{([\s\S]*?)\n  \}/,
   );
@@ -72,7 +88,7 @@ test("queue names switch diagnostics without resetting an open drawer", async ()
 });
 
 test("queue drawer uses the bounded Shop, Status, Direction filter contract", async () => {
-  const source = await readFile(componentPath, "utf8");
+  const source = await readQueueMonitorSources();
 
   assert.match(source, /\/api\/admin\/queues\/jobs\?/);
   assert.match(source, /status: queueJobStatus/);
@@ -92,7 +108,7 @@ test("queue drawer uses the bounded Shop, Status, Direction filter contract", as
 });
 
 test("queue drawer keeps the full browser paginated and state-safe", async () => {
-  const source = await readFile(componentPath, "utf8");
+  const source = await readQueueMonitorSources();
 
   assert.match(source, /setQueueJobPage\(1\)/);
   assert.match(source, /setQueueJobPage\(\(page\) => Math\.max\(1, page - 1\)\)/);

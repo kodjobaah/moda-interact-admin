@@ -2,6 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { adminI18n, adminQueueJobLabel, adminStatusLabel } from "@/i18n";
+import {
+  fetchQueueJobDetail,
+  fetchQueueJobs,
+  fetchQueueMonitorSnapshot,
+  QueueJobDetailHttpError,
+} from "./queue-monitor/queue-monitor.client";
+import type {
+  QueueJobDetail,
+  QueueJobDirection,
+  QueueJobShop,
+  QueueJobSnapshot,
+  QueueJobStatus,
+  QueueMonitorSnapshot,
+} from "./queue-monitor/queue-monitor.types";
 
 import {
   getInitialRefreshMs,
@@ -9,71 +23,6 @@ import {
   REFRESH_OPTIONS,
   STORAGE_KEY,
 } from "./queue-monitor-refresh";
-
-type QueueJobStatus = "failed" | "active" | "waiting" | "delayed";
-type QueueJobShop = "*" | "__orphan__" | "__unresolved__" | string;
-type QueueJobDirection = "asc" | "desc";
-
-type QueueMonitorSnapshot = {
-  observedAt: string;
-  queues: Array<{
-    queueName: string;
-    jobNames: string[];
-    counts: {
-      waiting: number;
-      active: number;
-      delayed: number;
-      failed: number;
-      workers: number;
-    };
-    lastActivity: { event: string; observedAt: string } | null;
-  }>;
-};
-
-type QueueJobSnapshot = {
-  queueName: string;
-  status: QueueJobStatus;
-  shop: string;
-  page: number;
-  limit: number;
-  direction: QueueJobDirection;
-  hasPrevious: boolean;
-  hasNext: boolean;
-  knownTotal: number | null;
-  scanTruncated: boolean;
-  jobs: Array<{
-    id: string;
-    queueName: string;
-    name: string;
-    status: QueueJobStatus;
-    shop: string | null;
-    attribution: "known" | "unresolved" | "orphan";
-    attemptsMade: number;
-    eventAt: string | null;
-    failedReason: string;
-  }>;
-  facets: {
-    shops: Array<{ value: string; label: string }>;
-    hasOrphans: boolean;
-    hasUnresolved: boolean;
-  };
-};
-
-type FailedJobDetail = {
-  id: string;
-  queueName: string;
-  name: string;
-  status: QueueJobStatus;
-  shop: string | null;
-  attribution: "known" | "unresolved" | "orphan";
-  attemptsMade: number;
-  timestamp: string | null;
-  processedOn: string | null;
-  finishedOn: string | null;
-  failedReason: string;
-  stacktrace: string[];
-  data: unknown;
-};
 
 const DESKTOP_BREAKPOINT = 768;
 const SIDEBAR_WIDTH = 240;
@@ -158,7 +107,7 @@ export function QueueMonitor() {
   const [queueJobDirection, setQueueJobDirection] =
     useState<QueueJobDirection>("desc");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [jobDetail, setJobDetail] = useState<FailedJobDetail | null>(null);
+  const [jobDetail, setJobDetail] = useState<QueueJobDetail | null>(null);
   const [jobDetailError, setJobDetailError] = useState<string | null>(null);
   const [jobDetailLoading, setJobDetailLoading] = useState(false);
   const [queueJobsError, setQueueJobsError] = useState<string | null>(null);
@@ -234,12 +183,7 @@ export function QueueMonitor() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/admin/queues", {
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(adminI18n.t("empty.unavailable"));
-      const nextSnapshot = (await response.json()) as QueueMonitorSnapshot;
+      const nextSnapshot = await fetchQueueMonitorSnapshot(controller.signal);
       setSnapshot(nextSnapshot);
       setError(null);
       if (selectedQueueName) refreshQueueJobs();
@@ -283,23 +227,14 @@ export function QueueMonitor() {
     queueJobsRequestRef.current?.abort();
     queueJobsRequestRef.current = controller;
 
-    const params = new URLSearchParams({
+    void fetchQueueJobs({
       queue: selectedQueueName,
       status: queueJobStatus,
       shop: queueJobShop,
-      page: String(queueJobPage),
+      page: queueJobPage,
       limit: showAllJobs ? "10" : "5",
       direction: queueJobDirection,
-    });
-
-    void fetch(`/api/admin/queues/jobs?${params.toString()}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(adminI18n.t("empty.unavailable"));
-        return (await response.json()) as QueueJobSnapshot;
-      })
+    }, controller.signal)
       .then((nextQueueJobs) => {
         setQueueJobs(nextQueueJobs);
         setSelectedJobId(null);
@@ -344,23 +279,11 @@ export function QueueMonitor() {
     const controller = new AbortController();
     jobDetailRequestRef.current?.abort();
     jobDetailRequestRef.current = controller;
-    const params = new URLSearchParams({
+    void fetchQueueJobDetail({
       queue: selectedQueueName,
       status: queueJobStatus,
       jobId: selectedJobId,
-    });
-
-    void fetch(`/api/admin/queues/jobs/detail?${params.toString()}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (response.status === 404)
-          throw new Error(adminI18n.t("queue.jobGone"));
-        if (!response.ok)
-          throw new Error(adminI18n.t("queue.jobDetailsUnavailable"));
-        return (await response.json()) as FailedJobDetail;
-      })
+    }, controller.signal)
       .then((nextDetail) => {
         setJobDetail(nextDetail);
         setJobDetailError(null);
@@ -371,9 +294,15 @@ export function QueueMonitor() {
         )) {
           setJobDetail(null);
           setJobDetailError(
-            fetchError instanceof Error
-              ? fetchError.message
-              : adminI18n.t("queue.jobDetailsUnavailable"),
+            fetchError instanceof QueueJobDetailHttpError
+              ? adminI18n.t(
+                  fetchError.status === 404
+                    ? "queue.jobGone"
+                    : "queue.jobDetailsUnavailable",
+                )
+              : fetchError instanceof Error
+                ? fetchError.message
+                : adminI18n.t("queue.jobDetailsUnavailable"),
           );
         }
       })
