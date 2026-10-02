@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -10,8 +10,23 @@ const repositoryRoot = path.resolve(
 );
 const sourcePath = (relativePath) => path.join(repositoryRoot, relativePath);
 
+async function readQueueMonitorSources() {
+  const moduleDirectory = sourcePath('src/components/admin/queue-monitor');
+  const entries = await readdir(moduleDirectory, { withFileTypes: true });
+  const modulePaths = entries
+    .filter((entry) => entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name))
+    .map((entry) => path.join(moduleDirectory, entry.name))
+    .sort();
+  const sources = await Promise.all(
+    [sourcePath('src/components/admin/queue-monitor.tsx'), ...modulePaths].map(
+      (filePath) => readFile(filePath, 'utf8'),
+    ),
+  );
+  return sources.join('\n');
+}
+
 test('selected queue rows load the protected normalized detail endpoint', async () => {
-  const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
+  const componentSource = await readQueueMonitorSources();
 
   assert.match(componentSource, /\/api\/admin\/queues\/jobs\/detail/);
   assert.match(componentSource, /status: queueJobStatus/);
@@ -22,7 +37,7 @@ test('selected queue rows load the protected normalized detail endpoint', async 
 });
 
 test('detail panel renders lifecycle, failure, stacktrace, payload and bounded diagnostic controls', async () => {
-  const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
+  const componentSource = await readQueueMonitorSources();
 
   for (const key of ['queue', 'jobName', 'status', 'attemptsMade', 'created', 'processedAt', 'finishedAt', 'failedReason', 'stackTrace', 'payloadData']) {
     assert.match(componentSource, new RegExp(`queue\\.${key}`), `expected detail key: ${key}`);
@@ -35,7 +50,7 @@ test('detail panel renders lifecycle, failure, stacktrace, payload and bounded d
 });
 
 test('detail panel remains read-only and does not expose configuration values', async () => {
-  const componentSource = await readFile(sourcePath('src/components/admin/queue-monitor.tsx'), 'utf8');
+  const componentSource = await readQueueMonitorSources();
 
   assert.doesNotMatch(componentSource, /retry|requeue|delete|pause|resume/);
   assert.doesNotMatch(componentSource, /REDIS_URL|connectionString|process\.env|authorization|accessToken/);

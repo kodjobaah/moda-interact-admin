@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { test } from "node:test";
 import {
   createInternationalizationRuntime,
@@ -23,6 +23,26 @@ const requiredKeysSource = await readFile(
 const packageJson = JSON.parse(
   await readFile(new URL("../../package.json", import.meta.url), "utf8"),
 );
+async function readQueueMonitorSources() {
+  const moduleDirectory = new URL(
+    "../../src/components/admin/queue-monitor/",
+    import.meta.url,
+  );
+  const entries = await readdir(moduleDirectory, { withFileTypes: true });
+  const moduleUrls = entries
+    .filter((entry) => entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name))
+    .map((entry) => new URL(entry.name, moduleDirectory))
+    .sort((left, right) => (left.href < right.href ? -1 : left.href > right.href ? 1 : 0));
+  const sources = await Promise.all(
+    [
+      new URL("../../src/components/admin/queue-monitor.tsx", import.meta.url),
+      ...moduleUrls,
+    ].map((url) => readFile(url, "utf8")),
+  );
+  return sources.join("\n");
+}
+
+const queueMonitorSource = await readQueueMonitorSources();
 const adminSource = await Promise.all(
   [
     "src/app/layout.tsx",
@@ -34,13 +54,12 @@ const adminSource = await Promise.all(
     "src/components/admin/tenant-table.tsx",
     "src/components/admin/customer-table.tsx",
     "src/components/admin/recovery-table.tsx",
-    "src/components/admin/queue-monitor.tsx",
     "src/components/admin/observability-panel.tsx",
     "src/lib/observability/grafana.ts",
   ].map((relativePath) =>
     readFile(new URL(`../../${relativePath}`, import.meta.url), "utf8"),
   ),
-).then((sources) => sources.join("\n"));
+).then((sources) => [...sources, queueMonitorSource].join("\n"));
 
 const requiredKeys = [...requiredKeysSource.matchAll(/"([^"]+)"/g)].map(
   ([, key]) => key,
