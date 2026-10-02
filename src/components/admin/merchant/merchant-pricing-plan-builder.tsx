@@ -10,6 +10,7 @@ import type { Feature } from "@prisma/client";
 import type { BuilderEvent } from "@/lib/admin/merchant/pricing-plan-builder";
 import { useMerchantPricingPlanDraft } from "./merchant-pricing-plan-builder/use-merchant-pricing-plan-draft";
 import { PlanStep } from "./merchant-pricing-plan-builder/plan-step";
+import { CataloguePlacementStep } from "./merchant-pricing-plan-builder/catalogue-placement-step";
 import { MerchantPricingTranslationWorkbook } from "./merchant-pricing-translation-workbook";
 import { MerchantPricingPlanSubmitButton } from "./merchant-pricing-plan-submit-button";
 
@@ -206,52 +207,14 @@ export function MerchantPricingPlanBuilder({
         />
       ) : null}
       {step === 1 ? (
-        <section className="space-y-3">
-          <label className="text-sm font-medium text-gray-700">
-            Where should this plan appear?
-            <p className="mt-1 font-normal text-gray-600">
-              Choose where this plan should appear in the pricing list merchants
-              see. This order is also used when Moda compares this plan with the
-              other plans.
-            </p>
-          </label>
-          <select
-            className={inputClass}
-            value={effectivePlacement}
-            disabled={Boolean(plan) || planKind === "FREE"}
-            onChange={(event) => setPlacement(event.target.value)}
-          >
-            {plan ? (
-              <option value="UNCHANGED">Keep current position</option>
-            ) : !cataloguePlans.length ? (
-              <option value="ONLY">This will be the first plan.</option>
-            ) : planKind === "FREE" ? (
-              <option value={`BEFORE:${cataloguePlans[0].id}`}>
-                First — before {cataloguePlans[0].displayName}
-              </option>
-            ) : (
-              cataloguePlans.map((cataloguePlan) => (
-                <option
-                  key={cataloguePlan.id}
-                  value={`AFTER:${cataloguePlan.id}`}
-                >
-                  After {cataloguePlan.displayName}
-                </option>
-              ))
-            )}
-          </select>
-          {!plan && planKind === "FREE" && cataloguePlans.length ? (
-            <p className="text-sm text-gray-600">
-              The FREE plan must be the first plan in the catalogue, so it will
-              be inserted before {cataloguePlans[0].displayName}.
-            </p>
-          ) : null}
-          {plan ? (
-            <p className="text-sm text-gray-600">
-              Current position: {plan.cataloguePosition}
-            </p>
-          ) : null}
-        </section>
+        <CataloguePlacementStep
+          cataloguePlans={cataloguePlans}
+          isEditing={Boolean(plan)}
+          cataloguePosition={plan?.cataloguePosition ?? null}
+          planKind={planKind}
+          effectivePlacement={effectivePlacement}
+          setPlacement={setPlacement}
+        />
       ) : null}
       {step === 2 ? (
         <section className="grid gap-4 sm:grid-cols-2">
