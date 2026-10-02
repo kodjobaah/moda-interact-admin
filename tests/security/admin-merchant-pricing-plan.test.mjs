@@ -1,11 +1,31 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const root = new URL("../../", import.meta.url);
 
 async function source(path) {
   return readFile(new URL(path, root), "utf8");
+}
+
+async function builderSource() {
+  const directory = new URL(
+    "src/components/admin/merchant/merchant-pricing-plan-builder/",
+    root,
+  );
+  const entries = await readdir(directory, { withFileTypes: true });
+  const modules = entries
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+    .map(
+      ({ name }) =>
+        `src/components/admin/merchant/merchant-pricing-plan-builder/${name}`,
+    )
+    .sort();
+  const paths = [
+    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
+    ...modules,
+  ];
+  return (await Promise.all(paths.map(source))).join("\n");
 }
 
 test("MerchantPricing mutation requires SUPER_ADMIN and revalidates server payload", async () => {
@@ -42,12 +62,13 @@ test("ARCH-014 implementation modules do not use operational plan or economics s
     "src/lib/admin/merchant/pricing-economics.ts",
     "src/lib/admin/merchant/pricing-translations.ts",
     "src/components/admin/merchant/merchant-pricing-plan-catalog.tsx",
-    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
     "src/components/admin/merchant/merchant-pricing-translation-workbook.tsx",
   ];
-  const contents = await Promise.all(paths.map(source));
-  const action = contents[0];
-  const nonActionModules = contents.slice(1).join("\n");
+  const [action, ...nonActionSources] = await Promise.all(paths.map(source));
+  const nonActionModules = [
+    ...nonActionSources,
+    await builderSource(),
+  ].join("\n");
   for (const forbidden of [
     "BillingEconomicsSnapshot",
     "BillingUpgradeEconomicsEdge",
@@ -136,9 +157,7 @@ test("Merchant Knowledge configuration is validated and mirrored as the same gen
 });
 
 test("builder locks Merchant Knowledge and exposes only explicit active source options", async () => {
-  const builder = await source(
-    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
-  );
+  const builder = await builderSource();
   const controls = await source(
     "src/lib/admin/merchant/pricing-plan-feature-controls.ts",
   );
@@ -167,9 +186,7 @@ test("builder locks Merchant Knowledge and exposes only explicit active source o
 });
 
 test("usage-event builder exposes currency-aware labels and blocks unbounded free events", async () => {
-  const builder = await source(
-    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
-  );
+  const builder = await builderSource();
   assert.match(builder, /Admin label/);
   assert.match(builder, /Shopify usage-event handle/);
   assert.match(builder, /Recovery credits granted per event/);
@@ -191,8 +208,8 @@ test("usage-event builder exposes currency-aware labels and blocks unbounded fre
   );
   assert.match(builder, /Unlimited/);
   assert.match(builder, /ZERO_COST_USAGE_EVENT_MESSAGE/);
-  assert.match(builder, /events\.some\(hasUnboundedZeroCostFixedEvent\)/);
-  assert.match(builder, /usageEvents: events\.map\(serializeBuilderEvent\)/);
+  assert.match(builder, /draft\.events\.some\(\s*hasUnboundedZeroCostFixedEvent/);
+  assert.match(builder, /draft\.events\.map\(serializeBuilderEvent\)/);
   assert.match(builder, /Usage events \(\{events\.length}\/5\)/);
 });
 
@@ -234,9 +251,7 @@ test("translation workbook keeps schema-v2 guidance and upload failures non-dest
 });
 
 test("final review uses the exact human-readable fixed usage-event summary", async () => {
-  const builder = await source(
-    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
-  );
+  const builder = await builderSource();
   assert.match(builder, /formatBuilderEventPrice\(event, currency\)/);
   assert.match(
     builder,
@@ -279,9 +294,7 @@ test("MerchantPricing catalogue pagination is database-backed and drawer context
 
 test("Commerce model pricing assignments remain Platform-admin-only and repairable", async () => {
   const action = await source("src/app/actions/merchant-pricing-plan.ts");
-  const builder = await source(
-    "src/components/admin/merchant/merchant-pricing-plan-builder.tsx",
-  );
+  const builder = await builderSource();
   const pricing = await source("src/lib/admin/merchant/pricing-plan.ts");
   const schema = await source("database/prisma/schema.prisma");
 
@@ -339,7 +352,7 @@ test("Commerce model pricing assignments remain Platform-admin-only and repairab
   assert.ok(billingPlan);
   assert.doesNotMatch(billingPlan, /commerceModelId|modelId/);
 
-  assert.match(builder, /commerceModelId: commerceModelId \|\| null/);
+  assert.match(builder, /commerceModelId: (?:draft\.)?commerceModelId \|\| null/);
   assert.match(builder, /Use Platform default/);
   assert.match(
     builder,
