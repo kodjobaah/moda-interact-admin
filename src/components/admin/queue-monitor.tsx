@@ -5,7 +5,6 @@ import { adminI18n, adminQueueJobLabel, adminStatusLabel } from "@/i18n";
 import {
   fetchQueueJobDetail,
   fetchQueueJobs,
-  fetchQueueMonitorSnapshot,
   QueueJobDetailHttpError,
 } from "./queue-monitor/queue-monitor.client";
 import type {
@@ -14,15 +13,10 @@ import type {
   QueueJobShop,
   QueueJobSnapshot,
   QueueJobStatus,
-  QueueMonitorSnapshot,
 } from "./queue-monitor/queue-monitor.types";
 
-import {
-  getInitialRefreshMs,
-  isRefreshValue,
-  REFRESH_OPTIONS,
-  STORAGE_KEY,
-} from "./queue-monitor-refresh";
+import { isRefreshValue, REFRESH_OPTIONS } from "./queue-monitor-refresh";
+import { useQueueMonitorSummary } from "./queue-monitor/use-queue-monitor-summary";
 
 const DESKTOP_BREAKPOINT = 768;
 const SIDEBAR_WIDTH = 240;
@@ -90,8 +84,6 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 export function QueueMonitor() {
-  const [refreshMs, setRefreshMs] = useState(getInitialRefreshMs);
-  const [snapshot, setSnapshot] = useState<QueueMonitorSnapshot | null>(null);
   const [selectedQueueName, setSelectedQueueName] = useState<string | null>(
     null,
   );
@@ -113,9 +105,6 @@ export function QueueMonitor() {
   const [queueJobsError, setQueueJobsError] = useState<string | null>(null);
   const [queueJobsLoading, setQueueJobsLoading] = useState(false);
   const [queueJobsRefreshKey, setQueueJobsRefreshKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const requestRef = useRef<AbortController | null>(null);
   const queueJobsRequestRef = useRef<AbortController | null>(null);
   const jobDetailRequestRef = useRef<AbortController | null>(null);
 
@@ -173,50 +162,13 @@ export function QueueMonitor() {
     prepareQueueJobsLoad();
     setQueueJobsRefreshKey((current) => current + 1);
   }
-  const inFlightRef = useRef(false);
-
-  async function refresh() {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    const controller = new AbortController();
-    requestRef.current = controller;
-    setLoading(true);
-
-    try {
-      const nextSnapshot = await fetchQueueMonitorSnapshot(controller.signal);
-      setSnapshot(nextSnapshot);
-      setError(null);
-      if (selectedQueueName) refreshQueueJobs();
-    } catch (fetchError) {
-      if (!(
-        fetchError instanceof DOMException && fetchError.name === "AbortError"
-      )) {
-        setError(
-            adminI18n.t("queue.dataUnavailable"),
-        );
-      }
-    } finally {
-      if (requestRef.current === controller) requestRef.current = null;
-      inFlightRef.current = false;
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    const initialRefresh = window.setTimeout(() => void refresh(), 0);
-
-    return () => {
-      window.clearTimeout(initialRefresh);
-      requestRef.current?.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, String(refreshMs));
-    if (refreshMs === 0) return undefined;
-    const timer = window.setInterval(() => void refresh(), refreshMs);
-    return () => window.clearInterval(timer);
-  }, [refreshMs]);
+  const { refreshMs, setRefreshMs, snapshot, error, loading, refresh } =
+    useQueueMonitorSummary({
+      unavailableError: adminI18n.t("queue.dataUnavailable"),
+      onSnapshotAccepted: () => {
+        if (selectedQueueName) refreshQueueJobs();
+      },
+    });
 
   useEffect(() => {
     if (!selectedQueueName) {
