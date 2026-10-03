@@ -93,13 +93,26 @@ test("queue names switch diagnostics without resetting an open drawer", async ()
   assert.match(queueSelectedTransition[1], /queueJobsError: null/);
   assert.match(queueSelectedTransition[1], /queueJobsLoading: true/);
 
-  const invalidationPort = source.match(
-    /onSelectionInvalidated: \(reason:[\s\S]*?\n    \},\n  \}\);/,
+  assert.match(
+    source,
+    /onSelectionInvalidated: \(reason\) => invalidateSelectionRef\.current\(reason\)/,
   );
-  assert.ok(invalidationPort, "expected the jobs-to-detail invalidation port");
-  assert.match(invalidationPort[0], /setSelectedJobId\(null\)/);
-  assert.match(invalidationPort[0], /setJobDetail\(null\)/);
-  assert.match(invalidationPort[0], /reason === "queue-selection"/);
+  assert.match(
+    source,
+    /invalidateSelectionRef\.current = jobDetailState\.invalidateSelection/,
+  );
+
+  const detailInvalidatedTransition = source.match(
+    /case "selection-invalidated":([\s\S]*?)case "request-succeeded":/,
+  );
+  assert.ok(detailInvalidatedTransition, "expected a detail invalidation transition");
+  assert.match(detailInvalidatedTransition[1], /selectedJobId: null/);
+  assert.match(detailInvalidatedTransition[1], /jobDetail: null/);
+  assert.match(
+    detailInvalidatedTransition[1],
+    /action\.reason === "queue-selection" \|\| action\.reason === "jobs-replaced"/,
+  );
+  assert.match(detailInvalidatedTransition[1], /jobDetailError: null, jobDetailLoading: false/);
 });
 
 test("queue drawer uses the bounded Shop, Status, Direction filter contract", async () => {
@@ -142,5 +155,15 @@ test("queue drawer keeps the full browser paginated and state-safe", async () =>
   assert.match(source, /knownTotal !== null/);
   assert.match(source, /scanTruncated/);
   assert.match(source, /queue\.backTo/);
-  assert.match(source, /setJobDetailError\(null\)/);
+  assert.match(source, /onClick=\{clearSelection\}/);
+
+  const detailClearedTransition = source.match(
+    /case "selection-cleared":([\s\S]*?)case "selection-invalidated":/,
+  );
+  assert.ok(detailClearedTransition, "expected a cleared detail transition");
+  assert.match(detailClearedTransition[1], /return createInitialQueueJobDetailState\(\)/);
+  assert.match(
+    source,
+    /function createInitialQueueJobDetailState\(\): QueueJobDetailState \{\s+return \{\s+selectedJobId: null,\s+jobDetail: null,\s+jobDetailError: null,\s+jobDetailLoading: false,\s+\};/,
+  );
 });

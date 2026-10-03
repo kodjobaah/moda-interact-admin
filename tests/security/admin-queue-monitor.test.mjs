@@ -347,7 +347,15 @@ test('queue monitor renders a bounded four-state job summary without mutation ac
   for (const status of ['failed', 'active', 'waiting', 'delayed']) {
     assert.match(componentSource, new RegExp(`value="${status}"`));
   }
-  assert.match(componentSource, /setSelectedJobId/);
+  assert.match(componentSource, /onClick=\{\(\) => selectJob\(job\.id\)\}/);
+  const selectedJobTransition = componentSource.match(
+    /case "job-selected":([\s\S]*?)case "selection-cleared":/,
+  );
+  assert.ok(selectedJobTransition, "expected a selected-job detail transition");
+  assert.match(selectedJobTransition[1], /selectedJobId: action\.jobId/);
+  assert.match(selectedJobTransition[1], /jobDetail: null/);
+  assert.match(selectedJobTransition[1], /jobDetailError: null/);
+  assert.match(selectedJobTransition[1], /jobDetailLoading: true/);
   assert.doesNotMatch(componentSource, /retry|requeue|delete|pause|resume/);
 });
 
