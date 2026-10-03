@@ -4,27 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { adminI18n, adminQueueJobLabel, adminStatusLabel } from "@/i18n";
 
 import { isRefreshValue, REFRESH_OPTIONS } from "./queue-monitor-refresh";
+import { useResizableDrawer } from "./queue-monitor/use-resizable-drawer";
 import { useQueueJobDetail } from "./queue-monitor/use-queue-job-detail";
 import { useQueueMonitorSummary } from "./queue-monitor/use-queue-monitor-summary";
 import {
   useQueueJobs,
   type QueueJobsSelectionInvalidationReason,
 } from "./queue-monitor/use-queue-jobs";
-
-const DESKTOP_BREAKPOINT = 768;
-const SIDEBAR_WIDTH = 240;
-const MIN_DRAWER_WIDTH = 448;
-const RESIZE_STEP = 32;
-
-function getWorkspaceWidth(viewportWidth: number) {
-  return viewportWidth >= DESKTOP_BREAKPOINT
-    ? viewportWidth - SIDEBAR_WIDTH
-    : viewportWidth;
-}
-
-function clampDrawerWidth(width: number, maximum: number) {
-  return Math.min(maximum, Math.max(MIN_DRAWER_WIDTH, width));
-}
 
 function formatTime(value: string | null) {
   if (!value) return adminI18n.t("empty.noneObserved");
@@ -80,9 +66,14 @@ export function QueueMonitor() {
   const [selectedQueueName, setSelectedQueueName] = useState<string | null>(
     null,
   );
-  const [drawerWidth, setDrawerWidth] = useState<number | null>(null);
-  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
-  const [isResizing, setIsResizing] = useState(false);
+  const {
+    activeDrawerWidth,
+    maximizeDrawer,
+    resizeDrawerForKey,
+    setDrawerWidth,
+    setIsResizing,
+    startResizing,
+  } = useResizableDrawer({ selectedQueueName });
   const invalidateSelectionRef = useRef<
     (reason: QueueJobsSelectionInvalidationReason) => void
   >(() => {});
@@ -127,35 +118,6 @@ export function QueueMonitor() {
   useEffect(() => {
     invalidateSelectionRef.current = jobDetailState.invalidateSelection;
   }, [jobDetailState.invalidateSelection]);
-
-  useEffect(() => {
-    const updateViewportWidth = () => setViewportWidth(window.innerWidth);
-    updateViewportWidth();
-    window.addEventListener("resize", updateViewportWidth);
-    return () => window.removeEventListener("resize", updateViewportWidth);
-  }, []);
-
-  useEffect(() => {
-    if (!isResizing || !selectedQueueName) return undefined;
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const maximum = getWorkspaceWidth(window.innerWidth);
-      setDrawerWidth(clampDrawerWidth(window.innerWidth - event.clientX, maximum));
-    };
-    const stopResizing = () => setIsResizing(false);
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", stopResizing);
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", stopResizing);
-    };
-  }, [isResizing, selectedQueueName]);
-
-  const maximumDrawerWidth = viewportWidth
-    ? getWorkspaceWidth(viewportWidth)
-    : null;
-  const activeDrawerWidth = drawerWidth ?? maximumDrawerWidth;
 
   function selectQueue(queueName: string) {
     if (!selectedQueueName) setDrawerWidth(null);
@@ -351,34 +313,10 @@ export function QueueMonitor() {
                   aria-orientation="vertical"
                   onPointerDown={(event) => {
                     event.preventDefault();
-                    setIsResizing(true);
+                    startResizing();
                   }}
                   onKeyDown={(event) => {
-                    if (!maximumDrawerWidth) return;
-                    const currentWidth = drawerWidth ?? maximumDrawerWidth;
-                    if (event.key === "ArrowLeft") {
-                      event.preventDefault();
-                      setDrawerWidth(
-                        clampDrawerWidth(
-                          currentWidth + RESIZE_STEP,
-                          maximumDrawerWidth,
-                        ),
-                      );
-                    } else if (event.key === "ArrowRight") {
-                      event.preventDefault();
-                      setDrawerWidth(
-                        clampDrawerWidth(
-                          currentWidth - RESIZE_STEP,
-                          maximumDrawerWidth,
-                        ),
-                      );
-                    } else if (event.key === "Home") {
-                      event.preventDefault();
-                      setDrawerWidth(MIN_DRAWER_WIDTH);
-                    } else if (event.key === "End") {
-                      event.preventDefault();
-                      setDrawerWidth(maximumDrawerWidth);
-                    }
+                    if (resizeDrawerForKey(event)) event.preventDefault();
                   }}
                 >
                   <span className="h-12 w-1 rounded-full bg-gray-300 transition-colors hover:bg-[var(--brand-500)]" />
@@ -402,7 +340,7 @@ export function QueueMonitor() {
                       type="button"
                       className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
                       aria-label={adminI18n.t("queue.maximizeDetails")}
-                      onClick={() => setDrawerWidth(null)}
+                      onClick={maximizeDrawer}
                     >
                       {adminI18n.t("queue.maximize")}
                     </button>
