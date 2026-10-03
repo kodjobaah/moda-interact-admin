@@ -2,15 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { adminI18n, adminQueueJobLabel, adminStatusLabel } from "@/i18n";
-import {
-  fetchQueueJobDetail,
-  QueueJobDetailHttpError,
-} from "./queue-monitor/queue-monitor.client";
-import type {
-  QueueJobDetail,
-} from "./queue-monitor/queue-monitor.types";
 
 import { isRefreshValue, REFRESH_OPTIONS } from "./queue-monitor-refresh";
+import { useQueueJobDetail } from "./queue-monitor/use-queue-job-detail";
 import { useQueueMonitorSummary } from "./queue-monitor/use-queue-monitor-summary";
 import {
   useQueueJobs,
@@ -89,23 +83,14 @@ export function QueueMonitor() {
   const [drawerWidth, setDrawerWidth] = useState<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
   const [isResizing, setIsResizing] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [jobDetail, setJobDetail] = useState<QueueJobDetail | null>(null);
-  const [jobDetailError, setJobDetailError] = useState<string | null>(null);
-  const [jobDetailLoading, setJobDetailLoading] = useState(false);
-  const jobDetailRequestRef = useRef<AbortController | null>(null);
+  const invalidateSelectionRef = useRef<
+    (reason: QueueJobsSelectionInvalidationReason) => void
+  >(() => {});
 
   const queueJobsState = useQueueJobs({
     selectedQueueName,
     unavailableError: adminI18n.t("queue.jobsUnavailable"),
-    onSelectionInvalidated: (reason: QueueJobsSelectionInvalidationReason) => {
-      setSelectedJobId(null);
-      setJobDetail(null);
-      if (reason === "queue-selection" || reason === "jobs-replaced") {
-        setJobDetailError(null);
-        setJobDetailLoading(false);
-      }
-    },
+    onSelectionInvalidated: (reason) => invalidateSelectionRef.current(reason),
   });
   const {
     queueJobs,
@@ -124,6 +109,24 @@ export function QueueMonitor() {
     previousPage,
     nextPage,
   } = queueJobsState;
+  const jobDetailState = useQueueJobDetail({
+    selectedQueueName,
+    status: queueJobStatus,
+    jobGoneError: adminI18n.t("queue.jobGone"),
+    unavailableError: adminI18n.t("queue.jobDetailsUnavailable"),
+  });
+  const {
+    selectedJobId,
+    jobDetail,
+    jobDetailError,
+    jobDetailLoading,
+    selectJob,
+    clearSelection,
+  } = jobDetailState;
+
+  useEffect(() => {
+    invalidateSelectionRef.current = jobDetailState.invalidateSelection;
+  }, [jobDetailState.invalidateSelection]);
 
   useEffect(() => {
     const updateViewportWidth = () => setViewportWidth(window.innerWidth);
@@ -156,7 +159,6 @@ export function QueueMonitor() {
 
   function selectQueue(queueName: string) {
     if (!selectedQueueName) setDrawerWidth(null);
-    jobDetailRequestRef.current?.abort();
     setSelectedQueueName(queueName);
     prepareForQueueSelection();
   }
@@ -171,52 +173,6 @@ export function QueueMonitor() {
         if (selectedQueueName) refreshQueueJobs();
       },
     });
-
-  useEffect(() => {
-    if (!selectedQueueName || !selectedJobId) {
-      jobDetailRequestRef.current?.abort();
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    jobDetailRequestRef.current?.abort();
-    jobDetailRequestRef.current = controller;
-    void fetchQueueJobDetail({
-      queue: selectedQueueName,
-      status: queueJobStatus,
-      jobId: selectedJobId,
-    }, controller.signal)
-      .then((nextDetail) => {
-        setJobDetail(nextDetail);
-        setJobDetailError(null);
-      })
-      .catch((fetchError) => {
-        if (!(
-          fetchError instanceof DOMException && fetchError.name === "AbortError"
-        )) {
-          setJobDetail(null);
-          setJobDetailError(
-            fetchError instanceof QueueJobDetailHttpError
-              ? adminI18n.t(
-                  fetchError.status === 404
-                    ? "queue.jobGone"
-                    : "queue.jobDetailsUnavailable",
-                )
-              : fetchError instanceof Error
-                ? fetchError.message
-                : adminI18n.t("queue.jobDetailsUnavailable"),
-          );
-        }
-      })
-      .finally(() => {
-        if (jobDetailRequestRef.current === controller) {
-          jobDetailRequestRef.current = null;
-          setJobDetailLoading(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [selectedQueueName, selectedJobId, queueJobStatus]);
 
   return (
     <section
@@ -648,12 +604,7 @@ export function QueueMonitor() {
                                   type="button"
                                   className="max-w-40 truncate font-medium text-[var(--brand-700)] hover:text-[var(--brand-900)]"
                                   title={job.id}
-                                  onClick={() => {
-                                    setSelectedJobId(job.id);
-                                    setJobDetail(null);
-                                    setJobDetailError(null);
-                                    setJobDetailLoading(true);
-                                  }}
+                                  onClick={() => selectJob(job.id)}
                                 >
                                   {job.id}
                                 </button>
@@ -732,12 +683,7 @@ export function QueueMonitor() {
                       <button
                         type="button"
                         className="mb-4 text-sm font-medium text-[var(--brand-700)] hover:text-[var(--brand-900)]"
-                        onClick={() => {
-                          setSelectedJobId(null);
-                          setJobDetail(null);
-                          setJobDetailError(null);
-                          setJobDetailLoading(false);
-                        }}
+                        onClick={clearSelection}
                       >
                         {adminI18n.t("queue.backTo", { target: showAllJobs ? adminI18n.t("queue.allJobs") : adminI18n.t("queue.recentJobs") })}
                       </button>
