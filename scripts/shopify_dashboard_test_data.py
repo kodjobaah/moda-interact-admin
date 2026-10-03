@@ -138,7 +138,7 @@ def resolve_shop(cur, shop_id: str | None, shop_domain: str | None) -> dict[str,
     if shop_id:
         cur.execute(
             '''
-            SELECT "id", "domain", "status"::text
+            SELECT "id", "domain", "status"::text, "platform"::text
             FROM commerce."Shop"
             WHERE "id" = %s
             ''',
@@ -147,7 +147,7 @@ def resolve_shop(cur, shop_id: str | None, shop_domain: str | None) -> dict[str,
     else:
         cur.execute(
             '''
-            SELECT "id", "domain", "status"::text
+            SELECT "id", "domain", "status"::text, "platform"::text
             FROM commerce."Shop"
             WHERE lower("domain") = lower(%s)
             ''',
@@ -162,7 +162,7 @@ def resolve_shop(cur, shop_id: str | None, shop_domain: str | None) -> dict[str,
             "Let the Shopify app resolve/install the shop first."
         )
 
-    return {"id": row[0], "domain": row[1], "status": row[2]}
+    return {"id": row[0], "domain": row[1], "status": row[2], "platform": row[3]}
 
 
 def owned_id(prefix: str, kind: str, key: str) -> str:
@@ -215,38 +215,51 @@ def ensure_dashboard_access(cur, shop: dict[str, Any], prefix: str, now: datetim
     warnings: list[str] = []
     shop_id = shop["id"]
 
-    cur.execute(
-        '''
-        SELECT "id", "onboardingCompleted", "plan"
-        FROM shopify."ShopSettings"
-        WHERE "shopId" = %s
-        ''',
-        (shop_id,),
-    )
-    settings = cur.fetchone()
-
-    if settings is None:
+    if shop["platform"] == "SHOPIFY":
         cur.execute(
             '''
-            INSERT INTO shopify."ShopSettings" (
-              "id", "shopId", "onboardingCompleted", "plan",
-              "recoveryDelayMinutes", "createdAt", "updatedAt"
-            )
-            VALUES (%s, %s, true, %s, 30, %s, %s)
+            SELECT "id", "onboardingCompleted", "plan"
+            FROM shopify."ShopSettings"
+            WHERE "shopId" = %s
             ''',
-            (
-                owned_id(prefix, "settings", "dashboard"),
-                shop_id,
-                f"{prefix}-plan",
-                now,
-                now,
-            ),
+            (shop_id,),
         )
-        print("Created test ShopSettings (onboardingCompleted=true).")
-    elif not settings[1]:
-        warnings.append(
-            "Existing ShopSettings has onboardingCompleted=false. "
-            "The script did not overwrite it, so /app will show onboarding."
+        settings = cur.fetchone()
+
+        if settings is None:
+            cur.execute(
+                '''
+                INSERT INTO shopify."ShopSettings" (
+                  "id", "shopId", "onboardingCompleted", "plan",
+                  "recoveryDelayMinutes", "createdAt", "updatedAt"
+                )
+                VALUES (%s, %s, true, %s, 30, %s, %s)
+                ''',
+                (
+                    owned_id(prefix, "settings", "dashboard"),
+                    shop_id,
+                    f"{prefix}-plan",
+                    now,
+                    now,
+                ),
+            )
+            onboarding_completed = True
+            print("Created test ShopSettings (onboardingCompleted=true).")
+        else:
+            onboarding_completed = bool(settings[1])
+            if not onboarding_completed:
+                warnings.append(
+                    "Existing ShopSettings has onboardingCompleted=false. "
+                    "The script did not overwrite it, so /app will show onboarding."
+                )
+
+        cur.execute(
+            '''
+            UPDATE commerce."Shop"
+            SET "onboardingCompleted" = %s
+            WHERE "id" = %s
+            ''',
+            (onboarding_completed, shop_id),
         )
 
     cur.execute(

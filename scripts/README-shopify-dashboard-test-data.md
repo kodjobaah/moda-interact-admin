@@ -81,12 +81,22 @@ The script does **not**:
 - delete unrelated checkout recoveries
 - overwrite an existing `ShopSettings` row
 - overwrite an existing `Subscription` row
+- create Shopify settings for a Woo fixture
 
 If the target Shop has no dashboard access configuration, the seed command may create test-owned:
 
 - `ShopSettings`
 - `BillingPlan`
 - `Subscription`
+
+For the Shopify dashboard fixture, the script keeps
+`commerce.Shop.onboardingCompleted` aligned with
+`shopify.ShopSettings.onboardingCompleted`. When settings are absent, both are
+created/set to `true`; when settings already exist, their current milestone is
+preserved and copied to the shared Shop field. The script checks the Shop
+platform before applying Shopify settings behavior, so it does not create
+`ShopSettings` for Woo Shops. The tenant administration read model uses the
+shared field and does not require Shopify settings for Woo Shops.
 
 These are also removed by `clean` because they use the test prefix.
 

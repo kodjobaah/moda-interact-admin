@@ -19,6 +19,7 @@ import type {
 import { customerName } from "./format";
 import { getTenantBillingControls } from "./billing-controls";
 import { effectiveRecoveryPolicy } from "./recovery-policy";
+import { readTenantOnboardingCompleted } from "./tenant-onboarding";
 
 const ACTIVE_RECOVERY_STATUSES: CheckoutRecoveryStatus[] = [
   CheckoutRecoveryStatus.DETECTED,
@@ -265,12 +266,12 @@ export async function getTenantDetail(
       status: true,
       installedAt: true,
       uninstalledAt: true,
+      onboardingCompleted: true,
       brand: {
         select: { brandName: true, squareLogoUrl: true, logoUrl: true },
       },
       settings: {
         select: {
-          onboardingCompleted: true,
           recoveryDelayMinutes: true,
           recoveryOfferMode: true,
           fixedShopifyDiscountId: true,
@@ -414,7 +415,7 @@ export async function getTenantDetail(
         selectableDiscounts,
       },
     },
-    onboardingCompleted: row.settings?.onboardingCompleted ?? false,
+    onboardingCompleted: readTenantOnboardingCompleted(row),
     subscriptionStatus: subscription?.status ?? null,
     currentPeriodStart: subscription?.currentPeriodStart ?? null,
     currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
