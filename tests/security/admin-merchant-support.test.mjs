@@ -159,7 +159,7 @@ test('enforces the Unicode body limit and owner recheck', () => {
   });
 });
 
-test('commits English and non-English compose work before queue handling', () => {
+test('uses shared Shop language context for compose, including Shops without ShopSettings', () => {
   const result = runBehaviorScript(`
     import { composeAdministrativeMessage } from ${JSON.stringify(moduleUrl)};
     const run = async (defaultLanguageTag) => {
@@ -168,6 +168,7 @@ test('commits English and non-English compose work before queue handling', () =>
       let responseBoundaryConditions = [];
       let threadReadQuery;
       let messageInsertQuery;
+      const needsTranslation = defaultLanguageTag === 'fr-FR';
       const database = {
         $transaction: async (callback) => callback({
             $queryRaw: async (query) => {
@@ -191,7 +192,7 @@ test('commits English and non-English compose work before queue handling', () =>
             if (query.sql.includes('INSERT INTO "support"."MerchantSupportMessage"')) {
               messageInsertQuery = query;
             }
-            if (executions === (defaultLanguageTag === 'en-GB' ? 3 : 4)) {
+            if (executions === (needsTranslation ? 4 : 3)) {
               responseBoundaryConditions = query.values.filter(
                 (value) => typeof value === 'boolean',
               );
@@ -216,7 +217,11 @@ test('commits English and non-English compose work before queue handling', () =>
         messageInsertValues: messageInsertQuery.values,
       };
     };
-    console.log(JSON.stringify({ english: await run('en-GB'), french: await run('fr-FR') }));
+    console.log(JSON.stringify({
+      english: await run('en-GB'),
+      french: await run('fr-FR'),
+      fallback: await run(null),
+    }));
   `);
 
   const {
@@ -231,6 +236,12 @@ test('commits English and non-English compose work before queue handling', () =>
     messageInsertValues: frenchMessageInsertValues,
     ...frenchResult
   } = result.french;
+  const {
+    threadReadSql: fallbackThreadReadSql,
+    messageInsertSql: fallbackMessageInsertSql,
+    messageInsertValues: fallbackMessageInsertValues,
+    ...fallbackResult
+  } = result.fallback;
   assert.deepEqual(englishResult, {
     hasTranslation: false,
     executions: 3,
@@ -243,15 +254,25 @@ test('commits English and non-English compose work before queue handling', () =>
     queueCalls: 1,
     responseBoundaryConditions: [false, false],
   });
-  for (const threadReadSql of [englishThreadReadSql, frenchThreadReadSql]) {
+  assert.deepEqual(fallbackResult, {
+    hasTranslation: false,
+    executions: 3,
+    queueCalls: 0,
+    responseBoundaryConditions: [true, true],
+  });
+  assert.ok(fallbackMessageInsertValues.includes('en-GB'));
+  for (const threadReadSql of [englishThreadReadSql, frenchThreadReadSql, fallbackThreadReadSql]) {
     const normalizedSql = threadReadSql.replace(/\s+/g, ' ').trim();
-    assert.match(normalizedSql, /LEFT JOIN "shopify"\."ShopSettings" ss/);
+    assert.match(normalizedSql, /INNER JOIN "commerce"\."Shop" s ON s\."id" = t\."shopId"/);
+    assert.match(normalizedSql, /s\."defaultLanguageTag"/);
+    assert.doesNotMatch(normalizedSql, /"shopify"\."ShopSettings"/);
     assert.match(normalizedSql, /FOR UPDATE OF t/);
     assert.doesNotMatch(normalizedSql, /FOR UPDATE(?!\s+OF\s+t)/);
   }
   for (const [messageInsertSql, messageInsertValues, state] of [
     [englishMessageInsertSql, englishMessageInsertValues, 'AVAILABLE'],
     [frenchMessageInsertSql, frenchMessageInsertValues, 'PROCESSING'],
+    [fallbackMessageInsertSql, fallbackMessageInsertValues, 'AVAILABLE'],
   ]) {
     const normalizedSql = messageInsertSql.replace(/\s+/g, ' ').trim();
     assert.match(normalizedSql, /INSERT INTO "support"\."MerchantSupportMessage"/);
