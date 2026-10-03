@@ -598,9 +598,9 @@ export async function composeAdministrativeMessage(input: {
     await ensureDevelopmentPlatformAdmin(transaction, principal);
     const rows = await transaction.$queryRaw<[{ shopId: string; assignedPlatformAdminId: string | null; merchantMessageVersion: number; defaultLanguageTag: string | null }]>(Prisma.sql`
       SELECT t."shopId", t."assignedPlatformAdminId", t."merchantMessageVersion",
-        ss."defaultLanguageTag"
+        s."defaultLanguageTag"
       FROM "support"."MerchantSupportThread" t
-      LEFT JOIN "shopify"."ShopSettings" ss ON ss."shopId" = t."shopId"
+      INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
       WHERE t."id" = ${input.threadId}
       FOR UPDATE OF t
     `);
