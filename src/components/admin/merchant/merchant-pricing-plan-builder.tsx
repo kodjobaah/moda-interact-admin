@@ -11,6 +11,7 @@ import type { BuilderEvent } from "@/lib/admin/merchant/pricing-plan-builder";
 import { useMerchantPricingPlanDraft } from "./merchant-pricing-plan-builder/use-merchant-pricing-plan-draft";
 import { PlanStep } from "./merchant-pricing-plan-builder/plan-step";
 import { CataloguePlacementStep } from "./merchant-pricing-plan-builder/catalogue-placement-step";
+import { ShopifyPricingStep } from "./merchant-pricing-plan-builder/shopify-pricing-step";
 import { MerchantPricingTranslationWorkbook } from "./merchant-pricing-translation-workbook";
 import { MerchantPricingPlanSubmitButton } from "./merchant-pricing-plan-submit-button";
 
@@ -217,48 +218,15 @@ export function MerchantPricingPlanBuilder({
         />
       ) : null}
       {step === 2 ? (
-        <section className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-medium text-gray-700 sm:col-span-2">
-            Recovery usage-event handle
-            <input
-              className={inputClass}
-              value={recoveryUsageEventHandle}
-              required={planKind === "PAID_METERED"}
-              disabled={planKind === "FREE"}
-              onChange={(event) =>
-                setRecoveryUsageEventHandle(event.target.value)
-              }
-            />
-            <span className="mt-1 block text-xs font-normal text-gray-500">
-              Normal paid recovery meter copied to
-              BillingPlan.shopifyUsageEventHandle. Usage events below are top-up
-              offers.
-            </span>
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Currency
-            <input
-              className={inputClass}
-              value={currency}
-              onChange={(event) =>
-                setCurrency(event.target.value.toUpperCase())
-              }
-              maxLength={3}
-            />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Recurring amount
-            <input
-              className={inputClass}
-              value={recurring}
-              onChange={(event) => setRecurring(event.target.value)}
-              inputMode="decimal"
-            />
-          </label>
-          <p className="text-sm text-gray-600 sm:col-span-2">
-            Billing period: EVERY_30_DAYS
-          </p>
-        </section>
+        <ShopifyPricingStep
+          planKind={planKind}
+          recoveryUsageEventHandle={recoveryUsageEventHandle}
+          currency={currency}
+          recurring={recurring}
+          setRecoveryUsageEventHandle={setRecoveryUsageEventHandle}
+          setCurrency={setCurrency}
+          setRecurring={setRecurring}
+        />
       ) : null}
       {step === 3 ? (
         <section className="space-y-4">
