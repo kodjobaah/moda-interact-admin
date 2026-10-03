@@ -81,20 +81,40 @@ test("queue names switch diagnostics without resetting an open drawer", async ()
   assert.match(source, /queue\.openDetails/);
   assert.doesNotMatch(source, />View details<|>Details<\/span>/);
   assert.match(selectQueue[1], /if \(!selectedQueueName\) setDrawerWidth\(null\)/);
-  assert.match(selectQueue[1], /setQueueJobs\(null\)/);
-  assert.match(selectQueue[1], /setSelectedJobId\(null\)/);
-  assert.match(selectQueue[1], /setJobDetail\(null\)/);
-  assert.match(selectQueue[1], /prepareQueueJobsLoad\(\)/);
+  assert.match(selectQueue[1], /prepareForQueueSelection\(\)/);
+
+  const queueSelectedTransition = source.match(
+    /case "queue-selected":([\s\S]*?)case "refresh-requested":/,
+  );
+  assert.ok(queueSelectedTransition, "expected a queue-selected jobs transition");
+  assert.match(queueSelectedTransition[1], /queueJobs: null/);
+  assert.match(queueSelectedTransition[1], /showAllJobs: false/);
+  assert.match(queueSelectedTransition[1], /queueJobPage: 1/);
+  assert.match(queueSelectedTransition[1], /queueJobsError: null/);
+  assert.match(queueSelectedTransition[1], /queueJobsLoading: true/);
+
+  const invalidationPort = source.match(
+    /onSelectionInvalidated: \(reason:[\s\S]*?\n    \},\n  \}\);/,
+  );
+  assert.ok(invalidationPort, "expected the jobs-to-detail invalidation port");
+  assert.match(invalidationPort[0], /setSelectedJobId\(null\)/);
+  assert.match(invalidationPort[0], /setJobDetail\(null\)/);
+  assert.match(invalidationPort[0], /reason === "queue-selection"/);
 });
 
 test("queue drawer uses the bounded Shop, Status, Direction filter contract", async () => {
   const source = await readQueueMonitorSources();
 
   assert.match(source, /\/api\/admin\/queues\/jobs\?/);
-  assert.match(source, /status: queueJobStatus/);
-  assert.match(source, /shop: queueJobShop/);
-  assert.match(source, /limit: showAllJobs \? "10" : "5"/);
-  assert.match(source, /setShowAllJobs\(true\)/);
+  assert.match(source, /changeShop\(event\.target\.value\)/);
+  assert.match(source, /changeStatus\(event\.target\.value as typeof queueJobStatus\)/);
+  assert.match(source, /changeDirection\(event\.target\.value as typeof queueJobDirection\)/);
+  assert.match(source, /onClick=\{viewAll\}/);
+  assert.match(source, /status: state\.queueJobStatus/);
+  assert.match(source, /shop: state\.queueJobShop/);
+  assert.match(source, /page: state\.queueJobPage/);
+  assert.match(source, /limit: state\.showAllJobs \? "10" : "5"/);
+  assert.match(source, /direction: state\.queueJobDirection/);
   assert.match(source, /pagination\.page/);
   assert.match(source, /disabled=\{!queueJobs\.hasPrevious/);
   assert.match(source, /disabled=\{!queueJobs\.hasNext/);
@@ -110,9 +130,15 @@ test("queue drawer uses the bounded Shop, Status, Direction filter contract", as
 test("queue drawer keeps the full browser paginated and state-safe", async () => {
   const source = await readQueueMonitorSources();
 
-  assert.match(source, /setQueueJobPage\(1\)/);
-  assert.match(source, /setQueueJobPage\(\(page\) => Math\.max\(1, page - 1\)\)/);
-  assert.match(source, /setQueueJobPage\(\(page\) => page \+ 1\)/);
+  assert.match(source, /onClick=\{previousPage\}/);
+  assert.match(source, /onClick=\{nextPage\}/);
+  assert.match(source, /onClick=\{viewAll\}/);
+  assert.match(source, /case "page-previous":/);
+  assert.match(source, /queueJobPage: Math\.max\(1, state\.queueJobPage - 1\)/);
+  assert.match(source, /case "page-next":/);
+  assert.match(source, /queueJobPage: state\.queueJobPage \+ 1/);
+  assert.match(source, /case "view-all":/);
+  assert.match(source, /showAllJobs: true, queueJobPage: 1/);
   assert.match(source, /knownTotal !== null/);
   assert.match(source, /scanTruncated/);
   assert.match(source, /queue\.backTo/);

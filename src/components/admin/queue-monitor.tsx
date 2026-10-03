@@ -4,19 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { adminI18n, adminQueueJobLabel, adminStatusLabel } from "@/i18n";
 import {
   fetchQueueJobDetail,
-  fetchQueueJobs,
   QueueJobDetailHttpError,
 } from "./queue-monitor/queue-monitor.client";
 import type {
   QueueJobDetail,
-  QueueJobDirection,
-  QueueJobShop,
-  QueueJobSnapshot,
-  QueueJobStatus,
 } from "./queue-monitor/queue-monitor.types";
 
 import { isRefreshValue, REFRESH_OPTIONS } from "./queue-monitor-refresh";
 import { useQueueMonitorSummary } from "./queue-monitor/use-queue-monitor-summary";
+import {
+  useQueueJobs,
+  type QueueJobsSelectionInvalidationReason,
+} from "./queue-monitor/use-queue-jobs";
 
 const DESKTOP_BREAKPOINT = 768;
 const SIDEBAR_WIDTH = 240;
@@ -90,23 +89,41 @@ export function QueueMonitor() {
   const [drawerWidth, setDrawerWidth] = useState<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
   const [isResizing, setIsResizing] = useState(false);
-  const [queueJobs, setQueueJobs] = useState<QueueJobSnapshot | null>(null);
-  const [showAllJobs, setShowAllJobs] = useState(false);
-  const [queueJobPage, setQueueJobPage] = useState(1);
-  const [queueJobShop, setQueueJobShop] = useState<QueueJobShop>("*");
-  const [queueJobStatus, setQueueJobStatus] =
-    useState<QueueJobStatus>("failed");
-  const [queueJobDirection, setQueueJobDirection] =
-    useState<QueueJobDirection>("desc");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobDetail, setJobDetail] = useState<QueueJobDetail | null>(null);
   const [jobDetailError, setJobDetailError] = useState<string | null>(null);
   const [jobDetailLoading, setJobDetailLoading] = useState(false);
-  const [queueJobsError, setQueueJobsError] = useState<string | null>(null);
-  const [queueJobsLoading, setQueueJobsLoading] = useState(false);
-  const [queueJobsRefreshKey, setQueueJobsRefreshKey] = useState(0);
-  const queueJobsRequestRef = useRef<AbortController | null>(null);
   const jobDetailRequestRef = useRef<AbortController | null>(null);
+
+  const queueJobsState = useQueueJobs({
+    selectedQueueName,
+    unavailableError: adminI18n.t("queue.jobsUnavailable"),
+    onSelectionInvalidated: (reason: QueueJobsSelectionInvalidationReason) => {
+      setSelectedJobId(null);
+      setJobDetail(null);
+      if (reason === "queue-selection" || reason === "jobs-replaced") {
+        setJobDetailError(null);
+        setJobDetailLoading(false);
+      }
+    },
+  });
+  const {
+    queueJobs,
+    showAllJobs,
+    queueJobShop,
+    queueJobStatus,
+    queueJobDirection,
+    queueJobsError,
+    queueJobsLoading,
+    prepareForQueueSelection,
+    refreshJobs,
+    changeShop,
+    changeStatus,
+    changeDirection,
+    viewAll,
+    previousPage,
+    nextPage,
+  } = queueJobsState;
 
   useEffect(() => {
     const updateViewportWidth = () => setViewportWidth(window.innerWidth);
@@ -137,30 +154,15 @@ export function QueueMonitor() {
     : null;
   const activeDrawerWidth = drawerWidth ?? maximumDrawerWidth;
 
-  function prepareQueueJobsLoad() {
-    setQueueJobsLoading(true);
-    setQueueJobsError(null);
-  }
-
   function selectQueue(queueName: string) {
     if (!selectedQueueName) setDrawerWidth(null);
-    queueJobsRequestRef.current?.abort();
     jobDetailRequestRef.current?.abort();
     setSelectedQueueName(queueName);
-    setQueueJobs(null);
-    setShowAllJobs(false);
-    setQueueJobPage(1);
-    setQueueJobsError(null);
-    setSelectedJobId(null);
-    setJobDetail(null);
-    setJobDetailError(null);
-    setJobDetailLoading(false);
-    prepareQueueJobsLoad();
+    prepareForQueueSelection();
   }
 
   function refreshQueueJobs() {
-    prepareQueueJobsLoad();
-    setQueueJobsRefreshKey((current) => current + 1);
+    refreshJobs();
   }
   const { refreshMs, setRefreshMs, snapshot, error, loading, refresh } =
     useQueueMonitorSummary({
@@ -169,58 +171,6 @@ export function QueueMonitor() {
         if (selectedQueueName) refreshQueueJobs();
       },
     });
-
-  useEffect(() => {
-    if (!selectedQueueName) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    queueJobsRequestRef.current?.abort();
-    queueJobsRequestRef.current = controller;
-
-    void fetchQueueJobs({
-      queue: selectedQueueName,
-      status: queueJobStatus,
-      shop: queueJobShop,
-      page: queueJobPage,
-      limit: showAllJobs ? "10" : "5",
-      direction: queueJobDirection,
-    }, controller.signal)
-      .then((nextQueueJobs) => {
-        setQueueJobs(nextQueueJobs);
-        setSelectedJobId(null);
-        setJobDetail(null);
-        setJobDetailError(null);
-        setJobDetailLoading(false);
-      })
-      .catch((fetchError) => {
-        if (!(
-          fetchError instanceof DOMException && fetchError.name === "AbortError"
-        )) {
-          setQueueJobsError(
-            adminI18n.t("queue.jobsUnavailable"),
-          );
-          setQueueJobs(null);
-        }
-      })
-      .finally(() => {
-        if (queueJobsRequestRef.current === controller) {
-          queueJobsRequestRef.current = null;
-          setQueueJobsLoading(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [
-    selectedQueueName,
-    queueJobShop,
-    queueJobStatus,
-    queueJobDirection,
-    queueJobPage,
-    showAllJobs,
-    queueJobsRefreshKey,
-  ]);
 
   useEffect(() => {
     if (!selectedQueueName || !selectedJobId) {
@@ -584,13 +534,7 @@ export function QueueMonitor() {
                           aria-label={adminI18n.t("queue.shop")}
                           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
                           value={queueJobShop}
-                          onChange={(event) => {
-                            prepareQueueJobsLoad();
-                            setQueueJobShop(event.target.value);
-                            setQueueJobPage(1);
-                            setSelectedJobId(null);
-                            setJobDetail(null);
-                          }}
+                          onChange={(event) => changeShop(event.target.value)}
                         >
                           <option value="*">{adminI18n.t("queue.allShops")}</option>
                           {queueJobs?.facets.shops.map((shop) => (
@@ -608,13 +552,9 @@ export function QueueMonitor() {
                           aria-label={adminI18n.t("queue.status")}
                           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
                           value={queueJobStatus}
-                          onChange={(event) => {
-                            prepareQueueJobsLoad();
-                            setQueueJobStatus(event.target.value as QueueJobStatus);
-                            setQueueJobPage(1);
-                            setSelectedJobId(null);
-                            setJobDetail(null);
-                          }}
+                          onChange={(event) =>
+                            changeStatus(event.target.value as typeof queueJobStatus)
+                          }
                         >
                           <option value="failed">{adminStatusLabel("failed")}</option>
                           <option value="active">{adminStatusLabel("active")}</option>
@@ -628,11 +568,9 @@ export function QueueMonitor() {
                           aria-label={adminI18n.t("queue.direction")}
                           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
                           value={queueJobDirection}
-                          onChange={(event) => {
-                            prepareQueueJobsLoad();
-                            setQueueJobDirection(event.target.value as QueueJobDirection);
-                            setQueueJobPage(1);
-                          }}
+                          onChange={(event) =>
+                            changeDirection(event.target.value as typeof queueJobDirection)
+                          }
                         >
                           <option value="desc">{adminI18n.t("queue.descending")}</option>
                           <option value="asc">{adminI18n.t("queue.ascending")}</option>
@@ -755,7 +693,7 @@ export function QueueMonitor() {
                         type="button"
                         className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!queueJobs.hasPrevious || queueJobsLoading}
-                        onClick={() => setQueueJobPage((page) => Math.max(1, page - 1))}
+                        onClick={previousPage}
                       >
                         {adminI18n.t("pagination.previous")}
                       </button>
@@ -768,7 +706,7 @@ export function QueueMonitor() {
                         type="button"
                         className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!queueJobs.hasNext || queueJobsLoading}
-                        onClick={() => setQueueJobPage((page) => page + 1)}
+                        onClick={nextPage}
                       >
                         {adminI18n.t("pagination.next")}
                       </button>
@@ -779,12 +717,7 @@ export function QueueMonitor() {
                     <button
                       type="button"
                       className="text-sm font-medium text-[var(--brand-700)] hover:text-[var(--brand-900)]"
-                      onClick={() => {
-                        setShowAllJobs(true);
-                        setQueueJobPage(1);
-                        setSelectedJobId(null);
-                        setJobDetail(null);
-                      }}
+                      onClick={viewAll}
                     >
                       {adminI18n.t("queue.viewAllJobs")}
                     </button>
