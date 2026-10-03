@@ -332,7 +332,7 @@ test('queue monitor renders a bounded four-state job summary without mutation ac
   assert.match(componentSource, /\/api\/admin\/queues\/jobs\?/);
   assert.match(componentSource, /queueJobStatus/);
   assert.match(componentSource, /queueJobDirection/);
-  assert.match(componentSource, /limit: showAllJobs \? "10" : "5"/);
+  assert.match(componentSource, /limit: state\.showAllJobs \? "10" : "5"/);
   assert.match(componentSource, /page: String\(request\.page\)/);
   for (const key of ['jobId', 'shop', 'jobName', 'attempts']) {
     assert.match(componentSource, new RegExp(`queue\\.${key}`));
