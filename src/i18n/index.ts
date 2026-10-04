@@ -70,15 +70,45 @@ export function adminQueueLabel(queueName: string): string {
     "checkout-events": "queue.checkoutEvents",
     "order-events": "queue.orderEvents",
     "pending-recovery-candidates": "queue.pendingRecoveries",
+    "recovery-capacity-resume": "queue.recoveryCapacityResume",
+    "recovery-outreach-follow-up": "queue.recoveryOutreachFollowUp",
+    "shopify-discount-sync": "queue.shopifyDiscountSync",
+    "billing-subscription-reconcile": "queue.billingSubscriptionReconcile",
     "whatsapp-events": "queue.whatsappEvents",
     "merchant-communications": "queue.merchantCommunications",
+    "merchant-knowledge": "queue.merchantKnowledge",
+  };
+  return keys[queueName] ? adminI18n.t(keys[queueName]) : queueName;
+}
+
+export function adminQueueWorkloadLabel(queueName: string): string {
+  const keys: Record<string, string> = {
+    "checkout-events": "queue.workloadShopifyEvents",
+    "order-events": "queue.workloadShopifyEvents",
+    "pending-recovery-candidates": "queue.workloadRecovery",
+    "recovery-capacity-resume": "queue.workloadRecovery",
+    "recovery-outreach-follow-up": "queue.workloadRecovery",
+    "shopify-discount-sync": "queue.workloadShopifyDiscounts",
+    "billing-subscription-reconcile": "queue.workloadBilling",
+    "whatsapp-events": "queue.workloadMessaging",
+    "merchant-communications": "queue.workloadMerchantCommunications",
+    "merchant-knowledge": "queue.workloadMerchantKnowledge",
   };
   return keys[queueName] ? adminI18n.t(keys[queueName]) : queueName;
 }
 
 export function adminQueueJobLabel(jobName: string): string {
   const keys: Record<string, string> = {
+    "cart-activity": "queue.cartActivityJob",
     "evaluate-pending-recovery": "queue.pendingRecoveryCandidates",
+    "resume-capacity-blocked-recoveries": "queue.resumeCapacityBlockedRecoveriesJob",
+    "recovery-outreach-follow-up": "queue.recoveryOutreachFollowUpJob",
+    "reconcile-shopify-discounts": "queue.reconcileShopifyDiscountsJob",
+    "reconcile-subscription": "queue.reconcileSubscriptionJob",
+    "message-received": "queue.messageReceivedJob",
+    "message-status": "queue.messageStatusJob",
+    "process-conversation-turn": "queue.processConversationTurnJob",
+    "process-source-revision": "queue.processSourceRevisionJob",
     "whatsapp-events": "queue.whatsappEventsJob",
     "translation-dispatch": "queue.translationDispatchJob",
     "translation-batch-submit": "queue.translationBatchSubmitJob",

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { adminI18n, adminQueueJobLabel } from "@/i18n";
 
 import { isRefreshValue, REFRESH_OPTIONS } from "../queue-monitor-refresh";
@@ -24,6 +25,40 @@ type QueueDetailDrawerProps = {
   setSelectedQueueName: (queueName: string | null) => void;
 };
 
+type BreadcrumbButtonProps = {
+  children: ReactNode;
+  onClick?: () => void;
+  current?: boolean;
+};
+
+function BreadcrumbButton({
+  children,
+  onClick,
+  current = false,
+}: BreadcrumbButtonProps) {
+  if (!onClick) {
+    return (
+      <span
+        aria-current={current ? "page" : undefined}
+        className={`truncate ${current ? "font-medium text-gray-900" : "text-gray-600"}`}
+      >
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="truncate text-left text-[var(--brand-700)] hover:text-[var(--brand-900)]"
+      onClick={onClick}
+      aria-current={current ? "page" : undefined}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function QueueDetailDrawer({
   snapshot,
   selectedQueueName,
@@ -47,6 +82,9 @@ export function QueueDetailDrawer({
   const selectedQueue = snapshot.queues.find(
     (queue) => queue.queueName === selectedQueueName,
   );
+  const browsingLabel = queueJobsState.showAllJobs
+    ? adminI18n.t("queue.allJobs")
+    : adminI18n.t("queue.recentJobs");
 
   return (
     <aside
@@ -112,6 +150,55 @@ export function QueueDetailDrawer({
           </button>
         </div>
       </div>
+      <nav
+        aria-label={adminI18n.t("queue.breadcrumbs")}
+        className="border-b border-gray-200 bg-white px-5 py-3"
+      >
+        <ol className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+          <li>
+            <BreadcrumbButton
+              onClick={() => {
+                jobDetailState.clearSelection();
+                setSelectedQueueName(null);
+                setDrawerWidth(null);
+                setIsResizing(false);
+              }}
+            >
+              {adminI18n.t("nav.platformQueues")}
+            </BreadcrumbButton>
+          </li>
+          <li aria-hidden="true" className="text-gray-400">
+            /
+          </li>
+          <li>
+            <BreadcrumbButton>{selectedQueueName}</BreadcrumbButton>
+          </li>
+          <li aria-hidden="true" className="text-gray-400">
+            /
+          </li>
+          <li>
+            {jobDetailState.selectedJobId ? (
+              <BreadcrumbButton onClick={jobDetailState.clearSelection}>
+                {browsingLabel}
+              </BreadcrumbButton>
+            ) : (
+              <BreadcrumbButton current>{browsingLabel}</BreadcrumbButton>
+            )}
+          </li>
+          {jobDetailState.selectedJobId ? (
+            <>
+              <li aria-hidden="true" className="text-gray-400">
+                /
+              </li>
+              <li>
+                <BreadcrumbButton current>
+                  {adminI18n.t("queue.jobDetails")}
+                </BreadcrumbButton>
+              </li>
+            </>
+          ) : null}
+        </ol>
+      </nav>
       <div className="flex flex-col justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm font-medium text-gray-900">

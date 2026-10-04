@@ -99,7 +99,7 @@ test('observability page keeps the platform-admin guard and has no screenshot de
   assert.doesNotMatch(panelSource, /<iframe/);
 });
 
-test('Shopify Queues has a protected route and the Tenant Directory no longer mounts diagnostics', async () => {
+test('Platform Queues has a protected route and the Tenant Directory no longer mounts diagnostics', async () => {
   const queuePageSource = await readFile(
     sourcePath('src/app/(protected)/observability/queues/page.tsx'),
     'utf8',
@@ -117,6 +117,6 @@ test('Shopify Queues has a protected route and the Tenant Directory no longer mo
   assert.match(queuePageSource, /QueueMonitor/);
   assert.doesNotMatch(tenantPageSource, /components\/admin\/queue-monitor/);
   assert.doesNotMatch(tenantPageSource, /<QueueMonitor/);
-  assert.doesNotMatch(panelSource, /Shopify Queues/);
-  assert.doesNotMatch(panelSource, /Open Shopify Queues/);
+  assert.doesNotMatch(panelSource, /Platform Queues/);
+  assert.doesNotMatch(panelSource, /Open Platform Queues/);
 });

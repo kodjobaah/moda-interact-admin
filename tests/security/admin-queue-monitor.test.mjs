@@ -29,37 +29,53 @@ function importQueueMonitor() {
   return import(`${sourcePath('src/lib/admin/queue-monitor.ts')}?test=${Date.now()}`);
 }
 
-test('uses the canonical Shopify contracts and observed queues for detailed readers', async () => {
+const platformQueueDefinitions = [
+  {
+    queueName: 'checkout-events',
+    jobNames: ['checkout-created', 'checkout-updated', 'cart-activity'],
+  },
+  { queueName: 'order-events', jobNames: ['order-completed'] },
+  {
+    queueName: 'pending-recovery-candidates',
+    jobNames: ['evaluate-pending-recovery'],
+  },
+  {
+    queueName: 'recovery-capacity-resume',
+    jobNames: ['resume-capacity-blocked-recoveries'],
+  },
+  {
+    queueName: 'recovery-outreach-follow-up',
+    jobNames: ['recovery-outreach-follow-up'],
+  },
+  {
+    queueName: 'shopify-discount-sync',
+    jobNames: ['reconcile-shopify-discounts'],
+  },
+  {
+    queueName: 'billing-subscription-reconcile',
+    jobNames: ['reconcile-subscription'],
+  },
+  {
+    queueName: 'whatsapp-events',
+    jobNames: ['message-received', 'message-status', 'process-conversation-turn'],
+  },
+  {
+    queueName: 'merchant-communications',
+    jobNames: [
+      'translation-dispatch',
+      'translation-batch-submit',
+      'translation-batch-poll',
+      'translation-batch-results',
+      'translation-reconcile',
+    ],
+  },
+  { queueName: 'merchant-knowledge', jobNames: ['process-source-revision'] },
+];
+
+test('uses canonical shared contracts plus the background-owned recovery queues for detailed readers', async () => {
   const { getQueueMonitorDefinitions } = await importQueueMonitor();
 
-  assert.deepEqual(getQueueMonitorDefinitions(), [
-    {
-      queueName: 'checkout-events',
-      jobNames: ['checkout-created', 'checkout-updated'],
-    },
-    {
-      queueName: 'order-events',
-      jobNames: ['order-completed'],
-    },
-    {
-      queueName: 'pending-recovery-candidates',
-      jobNames: ['evaluate-pending-recovery'],
-    },
-    {
-      queueName: 'whatsapp-events',
-      jobNames: ['whatsapp-events'],
-    },
-    {
-      queueName: 'merchant-communications',
-      jobNames: [
-        'translation-dispatch',
-        'translation-batch-submit',
-        'translation-batch-poll',
-        'translation-batch-results',
-        'translation-reconcile',
-      ],
-    },
-  ]);
+  assert.deepEqual(getQueueMonitorDefinitions(), platformQueueDefinitions);
 });
 
 test('maps bounded queue state and latest activity without payload data', async () => {
@@ -96,47 +112,14 @@ test('maps bounded queue state and latest activity without payload data', async 
     now: () => new Date('2026-09-04T16:00:00.000Z'),
   });
 
-  assert.equal(queueCalls.length, 5);
+  assert.equal(queueCalls.length, platformQueueDefinitions.length);
   assert.deepEqual(snapshot, {
     observedAt: '2026-09-04T16:00:00.000Z',
-    queues: [
-      {
-        queueName: 'checkout-events',
-        jobNames: ['checkout-created', 'checkout-updated'],
-        counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
-        lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
-      },
-      {
-        queueName: 'order-events',
-        jobNames: ['order-completed'],
-        counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
-        lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
-      },
-      {
-        queueName: 'pending-recovery-candidates',
-        jobNames: ['evaluate-pending-recovery'],
-        counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
-        lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
-      },
-      {
-        queueName: 'whatsapp-events',
-        jobNames: ['whatsapp-events'],
-        counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
-        lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
-      },
-      {
-        queueName: 'merchant-communications',
-        jobNames: [
-          'translation-dispatch',
-          'translation-batch-submit',
-          'translation-batch-poll',
-          'translation-batch-results',
-          'translation-reconcile',
-        ],
-        counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
-        lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
-      },
-    ],
+    queues: platformQueueDefinitions.map((definition) => ({
+      ...definition,
+      counts: { waiting: 2, active: 3, delayed: 4, failed: 5, workers: 1 },
+      lastActivity: { event: 'completed', observedAt: '2024-03-09T16:00:00.000Z' },
+    })),
   });
   assert.equal(JSON.stringify(snapshot).includes('secret-payload'), false);
   assert.equal(JSON.stringify(snapshot).includes('secret-job-id'), false);
@@ -218,19 +201,25 @@ test('failed detailed readers are recreated for a later healthy refresh', async 
     redisFactory,
   });
 
-  assert.equal(snapshot.queues.length, 5);
-  assert.equal(factoryCalls, 10);
+  assert.equal(snapshot.queues.length, platformQueueDefinitions.length);
+  assert.equal(factoryCalls, platformQueueDefinitions.length * 2);
 });
 
-test('queue overview reads active counts for the five observed queues only', async () => {
+test('queue overview reads active counts for the complete platform queue registry', async () => {
   const { getQueueOverviewDefinitions, readQueueOverviewSnapshot } = await importQueueMonitor();
-  assert.deepEqual(getQueueOverviewDefinitions(), [
+  const expectedOverview = [
     { queueName: 'checkout-events', labelKey: 'queue.checkoutEvents' },
     { queueName: 'order-events', labelKey: 'queue.orderEvents' },
     { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries' },
+    { queueName: 'recovery-capacity-resume', labelKey: 'queue.recoveryCapacityResume' },
+    { queueName: 'recovery-outreach-follow-up', labelKey: 'queue.recoveryOutreachFollowUp' },
+    { queueName: 'shopify-discount-sync', labelKey: 'queue.shopifyDiscountSync' },
+    { queueName: 'billing-subscription-reconcile', labelKey: 'queue.billingSubscriptionReconcile' },
     { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents' },
     { queueName: 'merchant-communications', labelKey: 'queue.merchantCommunications' },
-  ]);
+    { queueName: 'merchant-knowledge', labelKey: 'queue.merchantKnowledge' },
+  ];
+  assert.deepEqual(getQueueOverviewDefinitions(), expectedOverview);
 
   const calls = [];
   const snapshot = await readQueueOverviewSnapshot({
@@ -248,22 +237,13 @@ test('queue overview reads active counts for the five observed queues only', asy
     now: () => new Date('2026-09-04T16:00:00.000Z'),
   });
 
-  assert.deepEqual(calls, [
-    ['checkout-events', 'active'],
-    ['order-events', 'active'],
-    ['pending-recovery-candidates', 'active'],
-    ['whatsapp-events', 'active'],
-    ['merchant-communications', 'active'],
-  ]);
+  assert.deepEqual(calls, expectedOverview.map(({ queueName }) => [queueName, 'active']));
   assert.deepEqual(snapshot, {
     observedAt: '2026-09-04T16:00:00.000Z',
-    queues: [
-      { queueName: 'checkout-events', labelKey: 'queue.checkoutEvents', active: 15 },
-      { queueName: 'order-events', labelKey: 'queue.orderEvents', active: 12 },
-      { queueName: 'pending-recovery-candidates', labelKey: 'queue.pendingRecoveries', active: 27 },
-      { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents', active: 15 },
-      { queueName: 'merchant-communications', labelKey: 'queue.merchantCommunications', active: 23 },
-    ],
+    queues: expectedOverview.map((definition) => ({
+      ...definition,
+      active: definition.queueName.length,
+    })),
   });
   assert.equal('failed' in snapshot.queues[0], false);
 });
@@ -286,7 +266,7 @@ test('queue overview waits for cold readers before requesting active counts', as
     }),
   });
 
-  for (const queueName of ['checkout-events', 'order-events', 'pending-recovery-candidates', 'whatsapp-events', 'merchant-communications']) {
+  for (const { queueName } of platformQueueDefinitions) {
     assert.ok(events.indexOf(`ready:${queueName}`) < events.indexOf(`count:${queueName}`));
   }
 });
@@ -312,7 +292,7 @@ test('Tenant Directory is independent from transient queue state', async () => {
   assert.doesNotMatch(pageSource, /adminQueueLabel/);
 });
 
-test('detailed queue monitor presents a compact five-queue table with read-only selection', async () => {
+test('detailed queue monitor presents the platform queue table with read-only selection', async () => {
   const componentSource = await readQueueMonitorSources();
   assert.match(componentSource, /<table/);
   for (const key of ['queue', 'jobLabel', 'workers', 'lastRedisActivity']) {
@@ -359,6 +339,20 @@ test('queue monitor renders a bounded four-state job summary without mutation ac
   assert.doesNotMatch(componentSource, /retry|requeue|delete|pause|resume/);
 });
 
+test('queue observability is presented as Platform Queues with workload ownership', async () => {
+  const componentSource = await readQueueMonitorSources();
+  const pageSource = await readFile(sourcePath('src/app/(protected)/observability/queues/page.tsx'), 'utf8');
+  const sidebarSource = await readFile(sourcePath('src/components/admin/sidebar.tsx'), 'utf8');
+  const catalogueSource = await readFile(sourcePath('src/i18n/locales/en.json'), 'utf8');
+
+  assert.match(componentSource, /queue\.workload/);
+  assert.match(componentSource, /adminQueueWorkloadLabel/);
+  assert.match(pageSource, /nav\.platformQueues/);
+  assert.match(sidebarSource, /nav\.platformQueues/);
+  assert.match(catalogueSource, /"nav\.platformQueues": "Platform Queues"/);
+  assert.doesNotMatch(catalogueSource, /"nav\.shopifyQueues"/);
+});
+
 test('queue API authorizes before accessing the Redis snapshot reader', async () => {
   const routeSource = await readFile(sourcePath('src/app/api/admin/queues/route.ts'), 'utf8');
   assert.ok(routeSource.indexOf('await requirePlatformAdminRead()') < routeSource.indexOf('readQueueMonitorSnapshot()'));
@@ -396,8 +390,19 @@ test('queue display labels remain catalogue-owned at the UI boundary', async () 
   assert.doesNotMatch(source, /Pending recovery candidates|WhatsApp events/);
   assert.match(source, /evaluate-pending-recovery/);
   assert.match(source, /whatsapp-events/);
-  assert.match(source, /merchant-communications/);
+  for (const queueName of [
+    'pending-recovery-candidates',
+    'recovery-capacity-resume',
+    'recovery-outreach-follow-up',
+    'whatsapp-events',
+  ]) {
+    assert.match(source, new RegExp(queueName));
+  }
+  assert.match(source, /CART_ACTIVITY_EVENTS/);
+  assert.match(source, /SHOPIFY_DISCOUNT_SYNC/);
   assert.match(source, /MERCHANT_COMMUNICATIONS_JOB_NAMES/);
+  assert.match(source, /BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME/);
+  assert.match(source, /MERCHANT_KNOWLEDGE_QUEUE_NAME/);
   assert.match(
     componentSource,
     /\{queue\.jobNames\.map\(adminQueueJobLabel\)\.join\(", "\)\}/,

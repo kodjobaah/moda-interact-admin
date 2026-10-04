@@ -217,7 +217,7 @@ export function QueueJobsTable({
                         </button>
                       </td>
                       <td className="px-4 py-3 text-gray-700">
-                        {formatQueueJobShop(job.shop, job.attribution)}
+                        {formatQueueJobShop(job.shop, job.attribution, job.shopDomain)}
                       </td>
                       <td className="px-4 py-3 text-gray-700">{job.name}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600">

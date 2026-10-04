@@ -36,6 +36,7 @@ export type QueueJobSnapshot = {
     name: string;
     status: QueueJobStatus;
     shop: string | null;
+    shopDomain: string | null;
     attribution: QueueJobAttribution;
     attemptsMade: number;
     eventAt: string | null;
@@ -54,6 +55,7 @@ export type QueueJobDetail = {
   name: string;
   status: QueueJobStatus;
   shop: string | null;
+  shopDomain: string | null;
   attribution: QueueJobAttribution;
   attemptsMade: number;
   timestamp: string | null;

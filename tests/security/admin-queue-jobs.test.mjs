@@ -119,6 +119,7 @@ test('projects documented internal shop IDs when a queue payload has no shop dom
   });
 
   assert.equal(snapshot.jobs[0].shop, 'cmu8d6ypo0008qr0i5pvwjzux');
+  assert.equal(snapshot.jobs[0].shopDomain, null);
   assert.equal(snapshot.jobs[0].attribution, 'identified');
   assert.deepEqual(snapshot.facets.shops, [
     {
@@ -340,6 +341,7 @@ test('generic queue-job API authorizes first and exposes safe errors', async () 
   assert.match(routeSource, /status: 401/);
   assert.match(routeSource, /status: 400/);
   assert.match(routeSource, /status: 503/);
+  assert.match(routeSource, /enrichQueueJobSnapshotShopDomains\(snapshot\)/);
   assert.match(routeSource, /Cache-Control.*no-store/);
   assert.doesNotMatch(routeSource, /REDIS_URL|connectionString|stacktrace|data/);
 });

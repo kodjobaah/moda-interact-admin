@@ -99,6 +99,7 @@ export type QueueJobDetail = {
   name: string;
   status: QueueJobStatus;
   shop: string | null;
+  shopDomain: string | null;
   attribution: QueueJobAttribution;
   attemptsMade: number;
   timestamp: string | null;
@@ -118,6 +119,7 @@ export type QueueJobSummary = {
   name: string;
   status: QueueJobStatus;
   shop: string | null;
+  shopDomain: string | null;
   attribution: QueueJobAttribution;
   attemptsMade: number;
   eventAt: string | null;
@@ -625,15 +627,16 @@ function classifyQueueJob(
   queueName: string,
   jobName: string,
   data: unknown,
-): { shop: string | null; attribution: QueueJobAttribution } {
+): { shop: string | null; shopDomain: string | null; attribution: QueueJobAttribution } {
   const shop = extractQueueJobShop(queueName, jobName, data);
-  if (shop) return { shop, attribution: 'known' };
+  if (shop) return { shop, shopDomain: shop, attribution: 'known' };
 
   const shopId = extractQueueJobShopId(queueName, jobName, data);
-  if (shopId) return { shop: shopId, attribution: 'identified' };
+  if (shopId) return { shop: shopId, shopDomain: null, attribution: 'identified' };
 
   return {
     shop: null,
+    shopDomain: null,
     attribution: isWhatsAppQueue(queueName) ? 'unresolved' : 'orphan',
   };
 }

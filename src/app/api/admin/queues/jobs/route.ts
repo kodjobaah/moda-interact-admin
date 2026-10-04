@@ -5,6 +5,7 @@ import {
   QueueMonitorUnavailableError,
   readQueueJobSnapshot,
 } from '@/lib/admin/queue-monitor';
+import { enrichQueueJobSnapshotShopDomains } from '@/lib/admin/queue-shop-directory';
 import {
   PlatformAdminUnauthorizedError,
   requirePlatformAdminRead,
@@ -33,15 +34,16 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   try {
+    const snapshot = await readQueueJobSnapshot({
+      queueName: params.get('queue') ?? undefined,
+      status: params.get('status') ?? undefined,
+      shop: params.get('shop') ?? undefined,
+      page: params.get('page') ?? undefined,
+      limit: params.get('limit') ?? undefined,
+      direction: params.get('direction') ?? undefined,
+    });
     return NextResponse.json(
-      await readQueueJobSnapshot({
-        queueName: params.get('queue') ?? undefined,
-        status: params.get('status') ?? undefined,
-        shop: params.get('shop') ?? undefined,
-        page: params.get('page') ?? undefined,
-        limit: params.get('limit') ?? undefined,
-        direction: params.get('direction') ?? undefined,
-      }),
+      await enrichQueueJobSnapshotShopDomains(snapshot),
       { headers: NO_STORE_HEADERS },
     );
   } catch (error) {

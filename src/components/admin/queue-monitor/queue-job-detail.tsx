@@ -117,7 +117,7 @@ export function QueueJobDetail({ state, showAllJobs }: QueueJobDetailProps) {
               [adminI18n.t("queue.status"), adminStatusLabel(jobDetail.status)],
               [
                 adminI18n.t("queue.shop"),
-                formatQueueJobShop(jobDetail.shop, jobDetail.attribution),
+                formatQueueJobShop(jobDetail.shop, jobDetail.attribution, jobDetail.shopDomain),
               ],
               [
                 adminI18n.t("queue.attemptsMade"),

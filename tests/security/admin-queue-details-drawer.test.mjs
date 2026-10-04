@@ -222,6 +222,28 @@ test("queue jobs distinguish internal shop IDs from orphan jobs", async () => {
 
   assert.match(source, /QueueJobAttribution = "known" \| "identified" \| "unresolved" \| "orphan"/);
   assert.match(source, /queue\.shopIdLabel/);
-  assert.match(source, /formatQueueJobShop\(job\.shop, job\.attribution\)/);
-  assert.match(source, /formatQueueJobShop\(jobDetail\.shop, jobDetail\.attribution\)/);
+  assert.match(source, /formatQueueJobShop\(job\.shop, job\.attribution, job\.shopDomain\)/);
+  assert.match(source, /formatQueueJobShop\(jobDetail\.shop, jobDetail\.attribution, jobDetail\.shopDomain\)/);
+});
+
+
+test("queue shop labels prefer resolved domains while retaining shop ID fallback", async () => {
+  const source = await readQueueMonitorSources();
+  const shopHelper = await readFile(
+    path.join(repositoryRoot, "src/components/admin/queue-monitor/queue-job-shop.ts"),
+    "utf8",
+  );
+  const directorySource = await readFile(
+    path.join(repositoryRoot, "src/lib/admin/queue-shop-directory.ts"),
+    "utf8",
+  );
+
+  assert.match(source, /job\.shopDomain/);
+  assert.match(source, /jobDetail\.shopDomain/);
+  assert.match(shopHelper, /if \(shopDomain\) return shopDomain/);
+  assert.match(directorySource, /prisma\.shop\.findMany/);
+  assert.match(directorySource, /select: \{ id: true, domain: true \}/);
+  assert.match(directorySource, /Queue diagnostics must remain usable when PostgreSQL is unavailable/);
+  assert.match(directorySource, /facet\.value\.startsWith\("id:"\)/);
+  assert.match(directorySource, /label: domain/);
 });

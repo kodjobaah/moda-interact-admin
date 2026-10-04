@@ -1,6 +1,6 @@
 "use client";
 
-import { adminI18n, adminQueueJobLabel } from "@/i18n";
+import { adminI18n, adminQueueJobLabel, adminQueueWorkloadLabel } from "@/i18n";
 
 import type { QueueMonitorSnapshot } from "./queue-monitor.types";
 
@@ -26,12 +26,15 @@ export function QueueSummaryTable({
 }: QueueSummaryTableProps) {
   return (
     <div className="min-w-0 overflow-x-auto rounded-lg border border-gray-200">
-      <table className="min-w-[960px] w-full text-left text-sm">
+      <table className="min-w-[1120px] w-full text-left text-sm">
         <caption className="sr-only">{adminI18n.t("queue.summary")}</caption>
         <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
           <tr>
             <th className="px-4 py-3 font-medium" scope="col">
               {adminI18n.t("queue.queue")}
+            </th>
+            <th className="px-4 py-3 font-medium" scope="col">
+              {adminI18n.t("queue.workload")}
             </th>
             <th className="px-4 py-3 font-medium" scope="col">
               {adminI18n.t("queue.jobLabel")}
@@ -81,7 +84,10 @@ export function QueueSummaryTable({
                   {queue.queueName}
                 </button>
               </th>
-              <td className="max-w-56 px-4 py-4 text-gray-600">
+              <td className="whitespace-nowrap px-4 py-4 text-gray-600">
+                {adminQueueWorkloadLabel(queue.queueName)}
+              </td>
+              <td className="max-w-64 px-4 py-4 text-gray-600">
                 {queue.jobNames.map(adminQueueJobLabel).join(", ")}
               </td>
               <td className="px-4 py-4 text-right text-gray-700">

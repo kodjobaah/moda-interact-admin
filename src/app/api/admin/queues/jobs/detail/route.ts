@@ -6,6 +6,7 @@ import {
   QueueMonitorUnavailableError,
   readQueueJobDetail,
 } from '@/lib/admin/queue-monitor';
+import { enrichQueueJobDetailShopDomain } from '@/lib/admin/queue-shop-directory';
 import {
   PlatformAdminUnauthorizedError,
   requirePlatformAdminRead,
@@ -28,11 +29,15 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   try {
-    return NextResponse.json(await readQueueJobDetail({
+    const detail = await readQueueJobDetail({
       queueName: params.get('queue') ?? undefined,
       status: params.get('status') ?? undefined,
       jobId: params.get('jobId') ?? undefined,
-    }), { headers: NO_STORE_HEADERS });
+    });
+    return NextResponse.json(
+      await enrichQueueJobDetailShopDomain(detail),
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     if (error instanceof InvalidQueueJobQueryError) {
       return NextResponse.json({ error: 'invalid_query' }, { status: 400, headers: NO_STORE_HEADERS });

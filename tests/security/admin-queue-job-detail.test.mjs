@@ -48,6 +48,7 @@ test('normalizes active detail with the same shop projection as list rows', asyn
     name: 'checkout-created',
     status: 'active',
     shop: 'alpha.myshopify.com',
+    shopDomain: 'alpha.myshopify.com',
     attribution: 'known',
     attemptsMade: 2,
     timestamp: '2024-03-09T16:00:00.000Z',
@@ -83,6 +84,7 @@ test('keeps merchant knowledge shop IDs attributed instead of marking them orpha
   });
 
   assert.equal(detail.shop, 'cmu8d6ypo0008qr0i5pvwjzux');
+  assert.equal(detail.shopDomain, null);
   assert.equal(detail.attribution, 'identified');
 });
 
@@ -170,6 +172,7 @@ test('generic detail API authorizes first and exposes safe errors', async () => 
   assert.match(routeSource, /status: 400/);
   assert.match(routeSource, /status: 404/);
   assert.match(routeSource, /status: 503/);
+  assert.match(routeSource, /enrichQueueJobDetailShopDomain\(detail\)/);
   assert.match(routeSource, /Cache-Control.*no-store/);
   assert.doesNotMatch(routeSource, /REDIS_URL|connectionString|process\.env/);
 });

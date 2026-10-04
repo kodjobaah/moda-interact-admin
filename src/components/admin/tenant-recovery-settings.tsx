@@ -218,7 +218,7 @@ export function TenantRecoverySettings({
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
           <p className="text-xs leading-5 text-gray-500">
-            Queue processing is visible in the Shopify Queues operational view.
+            Queue processing is visible in the Platform Queues operational view.
           </p>
           <Link
             href="/observability/queues"

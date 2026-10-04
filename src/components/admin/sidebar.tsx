@@ -200,7 +200,7 @@ export function Sidebar({
                 aria-current={active === "queues" ? "page" : undefined}
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "queues" ? selected : idle}`}
               >
-                {adminI18n.t("nav.shopifyQueues")}
+                {adminI18n.t("nav.platformQueues")}
               </Link>
               <a
                 href={grafanaHref}
