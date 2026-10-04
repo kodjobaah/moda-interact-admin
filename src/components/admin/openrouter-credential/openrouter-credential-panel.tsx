@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { useRouter } from "next/navigation";
 import { removeOpenRouterCredentialAction } from "@/app/actions/openrouter-credential";
 import type { OpenRouterCredentialStatus } from "@/lib/admin/openrouter-credential";
 import { OpenRouterCredentialForm } from "./openrouter-credential-form";
@@ -16,6 +18,7 @@ export function OpenRouterCredentialPanel({
   status: OpenRouterCredentialStatus;
   canMutate: boolean;
 }) {
+  const router = useRouter();
   const removeForm = useRef<HTMLFormElement>(null);
   const inFlight = useRef(false);
   const [pending, setPending] = useState(false);
@@ -26,8 +29,10 @@ export function OpenRouterCredentialPanel({
     event.preventDefault();
     if (inFlight.current || conflictVersion === status.editVersion) return;
     inFlight.current = true;
-    setPending(true);
-    setMessage(null);
+    flushSync(() => {
+      setPending(true);
+      setMessage(null);
+    });
     const formData = new FormData(event.currentTarget);
     formData.set("operationId", crypto.randomUUID());
     formData.set("expectedEditVersion", String(status.editVersion));
@@ -37,6 +42,7 @@ export function OpenRouterCredentialPanel({
       if (result.ok) {
         removeForm.current?.reset();
         setMessage("OpenRouter credential removed.");
+        router.refresh();
       } else {
         setMessage(result.message);
         if (result.refreshRequired) setConflictVersion(status.editVersion);
@@ -111,6 +117,7 @@ export function OpenRouterCredentialPanel({
           <form
             ref={removeForm}
             onSubmit={remove}
+            aria-busy={pending}
             className="max-w-2xl space-y-4 border-t border-gray-200 pt-6"
           >
             <label className="block text-sm font-medium text-gray-800">
@@ -141,6 +148,7 @@ export function OpenRouterCredentialPanel({
               <OpenRouterCredentialSubmitButton
                 disabled={pending || locked}
                 pending={pending}
+                pendingLabel="Removing credential…"
               >
                 Remove credential
               </OpenRouterCredentialSubmitButton>
@@ -154,8 +162,12 @@ export function OpenRouterCredentialPanel({
                 </button>
               ) : null}
             </div>
-            <p aria-live="polite" className="min-h-5 text-sm text-gray-700">
-              {message}
+            <p
+              role="status"
+              aria-live="polite"
+              className="min-h-5 text-sm text-gray-700"
+            >
+              {pending ? "Removing OpenRouter credential…" : message}
             </p>
           </form>
         </div>

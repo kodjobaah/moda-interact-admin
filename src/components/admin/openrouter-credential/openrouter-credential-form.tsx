@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { useRouter } from "next/navigation";
 import {
   replaceOpenRouterCredentialAction,
   setOpenRouterCredentialAction,
@@ -17,19 +19,28 @@ export function OpenRouterCredentialForm({
   mode: "set" | "replace";
   editVersion: number | null;
 }) {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const secretRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef(false);
   const [pending, setPending] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [conflictVersion, setConflictVersion] = useState<number | null>(null);
+  const [refreshRequired, setRefreshRequired] = useState(false);
+
+  function clearSecret() {
+    if (secretRef.current) secretRef.current.value = "";
+    setShowSecret(false);
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current || conflictVersion === editVersion) return;
+    if (inFlight.current || refreshRequired) return;
     inFlight.current = true;
-    setPending(true);
-    setMessage(null);
+    flushSync(() => {
+      setPending(true);
+      setMessage(null);
+    });
     const formData = new FormData(event.currentTarget);
     formData.set("operationId", crypto.randomUUID());
     try {
@@ -37,16 +48,17 @@ export function OpenRouterCredentialForm({
         mode === "set"
           ? await setOpenRouterCredentialAction(formData)
           : await replaceOpenRouterCredentialAction(formData);
-      if (secretRef.current) secretRef.current.value = "";
+      clearSecret();
       if (result.ok) {
         formRef.current?.reset();
         setMessage("OpenRouter credential saved.");
+        router.refresh();
       } else {
         setMessage(result.message);
-        if (result.refreshRequired) setConflictVersion(editVersion);
+        if (result.refreshRequired) setRefreshRequired(true);
       }
     } catch {
-      if (secretRef.current) secretRef.current.value = "";
+      clearSecret();
       setMessage("OpenRouter credential update could not be completed.");
     } finally {
       inFlight.current = false;
@@ -54,10 +66,15 @@ export function OpenRouterCredentialForm({
     }
   }
 
-  const locked = conflictVersion !== null && conflictVersion === editVersion;
+  const locked = refreshRequired;
 
   return (
-    <form ref={formRef} onSubmit={submit} className="max-w-2xl space-y-4">
+    <form
+      ref={formRef}
+      onSubmit={submit}
+      aria-busy={pending}
+      className="max-w-2xl space-y-4"
+    >
       {mode === "replace" ? (
         <input
           type="hidden"
@@ -70,7 +87,7 @@ export function OpenRouterCredentialForm({
         <input
           ref={secretRef}
           className={fieldClass}
-          type="password"
+          type={showSecret ? "text" : "password"}
           name="secret"
           autoComplete="new-password"
           spellCheck={false}
@@ -79,6 +96,21 @@ export function OpenRouterCredentialForm({
           maxLength={8192}
         />
       </label>
+      <div className="-mt-2 flex flex-wrap items-center gap-3 text-sm">
+        <button
+          type="button"
+          onClick={() => setShowSecret((visible) => !visible)}
+          disabled={pending || locked}
+          aria-pressed={showSecret}
+          className="font-medium text-[var(--brand-700)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {showSecret ? "Hide entered credential" : "Show entered credential"}
+        </button>
+        <span className="text-xs text-gray-500">
+          This only shows the value currently typed in this browser. A saved
+          credential cannot be viewed from Admin.
+        </span>
+      </div>
       <label className="block text-sm font-medium text-gray-800">
         Audit reason
         <textarea
@@ -94,6 +126,9 @@ export function OpenRouterCredentialForm({
         <OpenRouterCredentialSubmitButton
           disabled={pending || locked}
           pending={pending}
+          pendingLabel={
+            mode === "set" ? "Setting credential…" : "Replacing credential…"
+          }
         >
           {mode === "set" ? "Set credential" : "Replace credential"}
         </OpenRouterCredentialSubmitButton>
@@ -107,8 +142,12 @@ export function OpenRouterCredentialForm({
           </button>
         ) : null}
       </div>
-      <p aria-live="polite" className="min-h-5 text-sm text-gray-700">
-        {message}
+      <p
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-sm text-gray-700"
+      >
+        {pending ? "Saving OpenRouter credential…" : message}
       </p>
     </form>
   );
