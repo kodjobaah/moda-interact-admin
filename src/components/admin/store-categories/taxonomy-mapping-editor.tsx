@@ -13,8 +13,8 @@ export function TaxonomyMappingEditor({
   categories: Category[];
 }) {
   return (
-    <section className="border-t border-gray-200 pt-5">
-      <h3 className="text-lg font-semibold text-gray-950">Shopify taxonomy mappings</h3>
+    <section aria-labelledby="shopify-taxonomy-mappings-title">
+      <h3 id="shopify-taxonomy-mappings-title" className="text-lg font-semibold text-gray-950">Shopify taxonomy mappings</h3>
       <form
         action={mutateStoreCategoryCatalogueAction}
         className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,2fr)_8rem_minmax(0,2fr)_auto]"

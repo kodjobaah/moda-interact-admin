@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { mutateStoreCategoryCatalogueAction } from "@/app/actions/store-categories";
 import type { StoreCategoryCatalogue } from "@/lib/admin/store-categories";
 import { PromptTemplateEditor } from "./prompt-template-editor";
+import type { StoreCategoryTab } from "./store-category-catalog";
 import { TaxonomyMappingEditor } from "./taxonomy-mapping-editor";
 
 type Category = StoreCategoryCatalogue["categories"][number];
@@ -11,29 +13,59 @@ const inputClass =
 export function StoreCategoryEditor({
   category,
   categories,
+  activeTab,
 }: {
   category: Category;
   categories: Category[];
+  activeTab: StoreCategoryTab;
 }) {
   const templates = category.templates;
 
   return (
-    <div className="min-w-0 space-y-8">
-      <section className="border-b border-gray-200 pb-6">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-950">
-              {category.displayName}
-            </h2>
-            <p className="mt-1 font-mono text-xs text-gray-500">
-              {category.slug} · immutable identity
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-            <span>Active profiles: {category.activeShopProfileCount}</span>
-            <span>Pending profiles: {category.pendingShopProfileCount}</span>
-          </div>
+    <div className="min-w-0">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-950">
+            {category.displayName}
+          </h2>
+          <p className="mt-1 font-mono text-xs text-gray-500">
+            {category.slug} · immutable identity
+          </p>
         </div>
+        <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+          <span>Active profiles: {category.activeShopProfileCount}</span>
+          <span>Pending profiles: {category.pendingShopProfileCount}</span>
+        </div>
+      </div>
+
+      <nav
+        aria-label="Store category sections"
+        className="mb-6 flex flex-wrap gap-1 border-b border-gray-200"
+      >
+        {[
+          ["details", "Category details"],
+          ["templates", `Prompt templates (${templates.length})`],
+          ["taxonomy", `Shopify mappings (${category.taxonomyMappings.length})`],
+        ].map(([tab, label]) => {
+          const selected = activeTab === tab;
+          return (
+            <Link
+              key={tab}
+              href={`/system-controls/store-categories?category=${encodeURIComponent(category.id)}&tab=${tab}`}
+              aria-current={selected ? "page" : undefined}
+              className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${selected ? "border-[var(--brand-700)] text-[var(--brand-900)]" : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"}`}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {activeTab === "details" ? (
+        <section aria-labelledby="store-category-details-title">
+          <h3 id="store-category-details-title" className="sr-only">
+            Category details
+          </h3>
         <form
           action={mutateStoreCategoryCatalogueAction}
           className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
@@ -152,19 +184,32 @@ export function StoreCategoryEditor({
             </button>
           </form>
         </div>
-      </section>
 
-      <section>
-        <h3 className="mb-4 text-lg font-semibold text-gray-950">Prompt templates</h3>
-        <div className="space-y-6">
-          <PromptTemplateEditor categoryId={category.id} />
-          {templates.map((template) => (
-            <PromptTemplateEditor key={template.id} template={template} categoryId={category.id} />
-          ))}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <TaxonomyMappingEditor category={category} categories={categories} />
+      {activeTab === "templates" ? (
+        <section aria-labelledby="store-category-templates-title">
+          <div className="mb-5">
+            <h3 id="store-category-templates-title" className="text-lg font-semibold text-gray-950">
+              Prompt templates
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Create and maintain the canonical-English templates available to this category.
+            </p>
+          </div>
+          <div className="space-y-6">
+            <PromptTemplateEditor categoryId={category.id} />
+            {templates.map((template) => (
+              <PromptTemplateEditor key={template.id} template={template} categoryId={category.id} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "taxonomy" ? (
+        <TaxonomyMappingEditor category={category} categories={categories} />
+      ) : null}
     </div>
   );
 }

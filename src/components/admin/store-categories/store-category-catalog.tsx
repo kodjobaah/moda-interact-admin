@@ -6,12 +6,16 @@ import { StoreCategoryEditor } from "./store-category-editor";
 const inputClass =
   "mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]";
 
+export type StoreCategoryTab = "details" | "templates" | "taxonomy";
+
 export function StoreCategoryCatalog({
   catalogue,
   selectedCategoryId,
+  selectedTab = "details",
 }: {
   catalogue: StoreCategoryCatalogue;
   selectedCategoryId?: string;
+  selectedTab?: StoreCategoryTab;
 }) {
   const selectedCategory =
     catalogue.categories.find((category) => category.id === selectedCategoryId) ??
@@ -28,61 +32,74 @@ export function StoreCategoryCatalog({
         </p>
       </div>
 
-      <form
-        action={mutateStoreCategoryCatalogueAction}
-        className="mb-8 grid gap-4 border-y border-gray-200 py-5 sm:grid-cols-2 xl:grid-cols-6"
-      >
-        <input type="hidden" name="intent" value="create-category" />
-        <input type="hidden" name="enabled" value="false" />
-        <label className="text-sm font-medium text-gray-700">
-          Stable slug
-          <input
-            className={inputClass}
-            name="slug"
-            pattern="[a-z][a-z0-9-]{0,127}"
-            maxLength={128}
-            required
-          />
-        </label>
-        <label className="text-sm font-medium text-gray-700">
-          Display name
-          <input className={inputClass} name="displayName" maxLength={255} required />
-        </label>
-        <label className="text-sm font-medium text-gray-700">
-          Display order
-          <input
-            className={inputClass}
-            name="displayOrder"
-            type="number"
-            min={0}
-            max={1_000_000}
-            defaultValue={0}
-            required
-          />
-        </label>
-        <label className="text-sm font-medium text-gray-700">
-          Initial status
-          <span className={`${inputClass} block text-gray-600`}>
-            Disabled until a valid default template is selected
+      <details className="mb-8 rounded-lg border border-gray-200 bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-[var(--brand-900)] marker:hidden">
+          <span className="flex items-center justify-between gap-4">
+            <span>
+              <span className="block">Create category</span>
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                Add a new disabled category, then configure its templates and mappings.
+              </span>
+            </span>
+            <span aria-hidden="true" className="text-lg text-gray-400">+</span>
           </span>
-        </label>
-        <label className="text-sm font-medium text-gray-700 sm:col-span-2">
-          Description
-          <textarea className={inputClass} name="description" maxLength={2000} rows={2} />
-        </label>
-        <label className="text-sm font-medium text-gray-700 sm:col-span-2 xl:col-span-4">
-          Audit reason
-          <input className={inputClass} name="reason" maxLength={1000} required />
-        </label>
-        <div className="flex items-end">
-          <button
-            className="w-full rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
-            type="submit"
-          >
-            Create category
-          </button>
-        </div>
-      </form>
+        </summary>
+        <form
+          action={mutateStoreCategoryCatalogueAction}
+          className="grid gap-4 border-t border-gray-200 px-5 py-5 sm:grid-cols-2 xl:grid-cols-6"
+        >
+          <input type="hidden" name="intent" value="create-category" />
+          <input type="hidden" name="enabled" value="false" />
+          <label className="text-sm font-medium text-gray-700">
+            Stable slug
+            <input
+              className={inputClass}
+              name="slug"
+              pattern="[a-z][a-z0-9-]{0,127}"
+              maxLength={128}
+              required
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Display name
+            <input className={inputClass} name="displayName" maxLength={255} required />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Display order
+            <input
+              className={inputClass}
+              name="displayOrder"
+              type="number"
+              min={0}
+              max={1_000_000}
+              defaultValue={0}
+              required
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Initial status
+            <span className={`${inputClass} block text-gray-600`}>
+              Disabled until a valid default template is selected
+            </span>
+          </label>
+          <label className="text-sm font-medium text-gray-700 sm:col-span-2">
+            Description
+            <textarea className={inputClass} name="description" maxLength={2000} rows={2} />
+          </label>
+          <label className="text-sm font-medium text-gray-700 sm:col-span-2 xl:col-span-4">
+            Audit reason
+            <input className={inputClass} name="reason" maxLength={1000} required />
+          </label>
+          <div className="flex items-end">
+            <button
+              className="w-full rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
+              type="submit"
+            >
+              Create category
+            </button>
+          </div>
+        </form>
+      </details>
 
       {catalogue.categories.length === 0 ? (
         <p className="border-y border-gray-200 py-8 text-sm text-gray-600">
@@ -94,7 +111,7 @@ export function StoreCategoryCatalog({
             {catalogue.categories.map((category) => (
               <Link
                 key={category.id}
-                href={`/system-controls/store-categories?category=${encodeURIComponent(category.id)}`}
+                href={`/system-controls/store-categories?category=${encodeURIComponent(category.id)}&tab=${selectedTab}`}
                 aria-current={category.id === selectedCategory?.id ? "page" : undefined}
                 className={`block rounded-md px-3 py-2 text-sm ${category.id === selectedCategory?.id ? "bg-[var(--brand-100)] font-semibold text-[var(--brand-900)]" : "text-gray-700 hover:bg-gray-100"}`}
               >
@@ -109,6 +126,7 @@ export function StoreCategoryCatalog({
             <StoreCategoryEditor
               category={selectedCategory}
               categories={catalogue.categories}
+              activeTab={selectedTab}
             />
           ) : null}
         </div>

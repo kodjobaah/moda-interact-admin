@@ -49,3 +49,21 @@ test("Admin catalogue introduces no translation persistence or queue surface", a
   assert.doesNotMatch(contents, /CommercePromptTemplateTranslation|TranslationJob|Queue\.add|queue\.add/i);
   assert.match(contents, /Shopify localization keys must exist before merchants can select this category/);
 });
+
+test("Store Categories uses progressive disclosure and scoped tabs", async () => {
+  const page = await source("src/app/(protected)/system-controls/store-categories/page.tsx");
+  const catalog = await source("src/components/admin/store-categories/store-category-catalog.tsx");
+  const editor = await source("src/components/admin/store-categories/store-category-editor.tsx");
+
+  assert.match(page, /tab\?: string \| string\[\]/);
+  assert.match(page, /rawTab === "templates" \|\| rawTab === "taxonomy"/);
+  assert.match(catalog, /<details className="mb-8/);
+  assert.match(catalog, /Create category/);
+  assert.match(editor, /aria-label="Store category sections"/);
+  assert.match(editor, /Category details/);
+  assert.match(editor, /Prompt templates \(\$\{templates\.length\}\)/);
+  assert.match(editor, /Shopify mappings \(\$\{category\.taxonomyMappings\.length\}\)/);
+  assert.match(editor, /activeTab === "details"/);
+  assert.match(editor, /activeTab === "templates"/);
+  assert.match(editor, /activeTab === "taxonomy"/);
+});

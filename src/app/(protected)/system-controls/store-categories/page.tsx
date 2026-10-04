@@ -5,8 +5,13 @@ import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 
 export const dynamic = "force-dynamic";
 
+type StoreCategoryTab = "details" | "templates" | "taxonomy";
+
 type StoreCategoriesPageProps = {
-  searchParams: Promise<{ category?: string | string[] }>;
+  searchParams: Promise<{
+    category?: string | string[];
+    tab?: string | string[];
+  }>;
 };
 
 export default async function StoreCategoriesPage({
@@ -14,10 +19,14 @@ export default async function StoreCategoriesPage({
 }: StoreCategoriesPageProps) {
   await requirePlatformAdminPage();
   const catalogue = await getStoreCategoryCatalogue();
-  const rawCategory = (await searchParams).category;
+  const params = await searchParams;
+  const rawCategory = params.category;
   const selectedCategoryId = Array.isArray(rawCategory)
     ? rawCategory[0]
     : rawCategory;
+  const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const selectedTab: StoreCategoryTab =
+    rawTab === "templates" || rawTab === "taxonomy" ? rawTab : "details";
 
   return (
     <AdminShell active="store-categories">
@@ -25,6 +34,7 @@ export default async function StoreCategoriesPage({
         <StoreCategoryCatalog
           catalogue={catalogue}
           selectedCategoryId={selectedCategoryId}
+          selectedTab={selectedTab}
         />
       </div>
     </AdminShell>
