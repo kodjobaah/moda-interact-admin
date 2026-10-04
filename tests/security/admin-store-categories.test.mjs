@@ -54,6 +54,11 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   const page = await source("src/app/(protected)/system-controls/store-categories/page.tsx");
   const catalog = await source("src/components/admin/store-categories/store-category-catalog.tsx");
   const creator = await source("src/components/admin/store-categories/store-category-creation-workspace.tsx");
+  const workspace = await source("src/components/admin/store-categories/store-category-authoring-workspace.tsx");
+  const categoryStep = await source("src/components/admin/store-categories/store-category-category-step.tsx");
+  const templateStep = await source("src/components/admin/store-categories/store-category-template-step.tsx");
+  const mappingsStep = await source("src/components/admin/store-categories/store-category-mappings-step.tsx");
+  const reviewStep = await source("src/components/admin/store-categories/store-category-review-step.tsx");
   const session = await source("src/components/admin/store-categories/store-category-authoring-session.ts");
   const editor = await source("src/components/admin/store-categories/store-category-editor.tsx");
 
@@ -61,12 +66,18 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   assert.match(page, /rawTab === "templates" \|\| rawTab === "taxonomy"/);
   assert.match(catalog, /StoreCategoryCreationWorkspace/);
   assert.doesNotMatch(catalog, /<details className="mb-8/);
-  assert.match(creator, /Category identity/);
-  assert.match(creator, /Default prompt template/);
-  assert.match(creator, /Shopify taxonomy mappings/);
-  assert.match(creator, /Review Store Category/);
-  assert.match(creator, /Nothing is written to PostgreSQL until the final Review step succeeds/);
+  assert.match(creator, /StoreCategoryAuthoringWorkspace/);
   assert.match(creator, /window\.sessionStorage/);
+  assert.doesNotMatch(creator, /function CategoryStep|function TemplateStep|function MappingsStep|function ReviewStep/);
+  assert.match(workspace, /Nothing is written to PostgreSQL until the final Review step succeeds/);
+  assert.match(workspace, /StoreCategoryCategoryStep/);
+  assert.match(workspace, /StoreCategoryTemplateStep/);
+  assert.match(workspace, /StoreCategoryMappingsStep/);
+  assert.match(workspace, /StoreCategoryReviewStep/);
+  assert.match(categoryStep, /Category identity/);
+  assert.match(templateStep, /Default prompt template/);
+  assert.match(mappingsStep, /Shopify taxonomy mappings/);
+  assert.match(reviewStep, /Review Store Category/);
   assert.match(session, /validationRevision/);
   assert.match(session, /reviewedRevision/);
   assert.match(session, /status: "DRAFT"/);
