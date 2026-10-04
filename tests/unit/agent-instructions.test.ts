@@ -210,6 +210,14 @@ const agentInstructionsTabsSource = await readFile(
   new URL("../../src/components/admin/agent-instructions/agent-instructions-tabs.tsx", import.meta.url),
   "utf8",
 );
+const promptCodeEditorSource = await readFile(
+  new URL("../../src/components/admin/agent-instructions/prompt-code-editor.tsx", import.meta.url),
+  "utf8",
+);
+const packageJsonSource = await readFile(
+  new URL("../../package.json", import.meta.url),
+  "utf8",
+);
 const sidebarSource = await readFile(
   new URL("../../src/components/admin/sidebar.tsx", import.meta.url),
   "utf8",
@@ -313,6 +321,22 @@ test("protected page and navigation expose the Agent Instructions workflow", () 
   assert.match(consoleSource, /name="tab" value="shop"/);
   assert.match(consoleSource, /Publishing this draft will activate the pending Store Category/);
   assert.match(consoleSource, /disabled=\{!promptText\.trim\(\) \|\| promptText !== savedText\}/);
+});
+
+
+test("Agent Instructions edits drafts through CodeMirror while preserving form submission semantics", () => {
+  assert.match(packageJsonSource, /"codemirror": "\^6\.0\.2"/);
+  assert.match(packageJsonSource, /"@codemirror\/lang-markdown": "\^6\.5\.2"/);
+  assert.match(promptCodeEditorSource, /import \{ basicSetup, EditorView \} from "codemirror"/);
+  assert.match(promptCodeEditorSource, /import \{ markdown \} from "@codemirror\/lang-markdown"/);
+  assert.match(promptCodeEditorSource, /EditorView\.lineWrapping/);
+  assert.match(promptCodeEditorSource, /EditorView\.inputHandler\.of/);
+  assert.match(promptCodeEditorSource, /nextLength > maxLength/);
+  assert.match(promptCodeEditorSource, /EditorView\.updateListener\.of/);
+  assert.match(consoleSource, /<PromptCodeEditor/);
+  assert.match(consoleSource, /<input type="hidden" name="promptText" value=\{promptText\} \/>/);
+  assert.match(consoleSource, /disabled=\{!promptText\.trim\(\)\}/);
+  assert.doesNotMatch(consoleSource, /<textarea[\s\S]*name="promptText"/);
 });
 
 test("pending category publish atomically promotes the exact edited prompt and preserves selection generation", async () => {

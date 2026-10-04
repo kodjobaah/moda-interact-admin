@@ -20,9 +20,11 @@
     "admin:seed-promotion": "node scripts/seed-manual-promotion.mjs"
   },
   "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.2",
     "@modainteract/moda-interact-shared": "1.1.0",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
+    "codemirror": "^6.0.2",
     "exceljs": "4.4.0",
     "ioredis": "^6.0.0",
     "next": "16.3.3",

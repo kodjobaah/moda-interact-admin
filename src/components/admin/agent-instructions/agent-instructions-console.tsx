@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { mutateAgentInstructionsAction } from "@/app/actions/agent-instructions";
 import type { AgentInstructionsScopeConflict, getAgentInstructionsData } from "@/lib/admin/agent-instructions";
 import { AgentInstructionsTabs, type AgentInstructionsTab } from "./agent-instructions-tabs";
+import { PromptCodeEditor } from "./prompt-code-editor";
 
 type Data = Awaited<ReturnType<typeof getAgentInstructionsData>>;
 type ScopeResult = NonNullable<Data["platform"]>;
@@ -74,23 +75,35 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
           <input type="hidden" name="intent" value="update-draft" />
           <input type="hidden" name="revisionId" value={draft.id} />
           <input type="hidden" name="expectedEditVersion" value={draft.editVersion} />
-          <label className="block text-sm font-medium text-gray-700">
-            Draft prompt, canonical English
-            <textarea
-              className={inputClass}
-              name="promptText"
-              rows={14}
-              maxLength={32_000}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-sm font-medium text-gray-700">
+                Draft prompt, canonical English
+              </span>
+              <span className="text-xs text-gray-500" aria-live="polite">
+                {promptText.length.toLocaleString()} / 32,000 characters
+              </span>
+            </div>
+            <PromptCodeEditor
               value={promptText}
-              onChange={(event) => setPromptText(event.currentTarget.value)}
-              required
+              onChange={setPromptText}
+              maxLength={32_000}
+              ariaLabel="Draft prompt, canonical English"
             />
-          </label>
+            <input type="hidden" name="promptText" value={promptText} />
+            <p className="text-xs text-gray-500">
+              CodeMirror editor with Markdown-aware highlighting, line numbers, search, and keyboard navigation.
+            </p>
+          </div>
           <label className="block text-sm font-medium text-gray-700">
             Audit reason
             <input className={inputClass} name="reason" maxLength={1000} required />
           </label>
-          <button className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]" type="submit">
+          <button
+            className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:opacity-50"
+            type="submit"
+            disabled={!promptText.trim()}
+          >
             Save Draft
           </button>
         </form>
