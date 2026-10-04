@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch } from "react";
+import { useRef, type Dispatch } from "react";
 import { useRouter } from "next/navigation";
 import { createStoreCategoryBundleAction } from "@/app/actions/store-categories";
 import {
@@ -32,6 +32,7 @@ export function StoreCategoryAuthoringWorkspace({
   dispatch: Dispatch<StoreCategoryAuthoringAction>;
 }) {
   const router = useRouter();
+  const createInFlightRef = useRef(false);
   const validation = validateStoreCategoryAuthoringSession(session);
   const reviewCurrent = isStoreCategoryReviewCurrent(session);
   const canCreate = canCreateStoreCategoryFromSession(session);
@@ -47,7 +48,10 @@ export function StoreCategoryAuthoringWorkspace({
   }
 
   async function createCategory() {
-    if (!canCreateStoreCategoryFromSession(session)) return;
+    if (createInFlightRef.current || !canCreateStoreCategoryFromSession(session)) {
+      return;
+    }
+    createInFlightRef.current = true;
     dispatch({ type: "save.started", now: storeCategoryAuthoringNow() });
     try {
       const result = await createStoreCategoryBundleAction(
@@ -68,6 +72,8 @@ export function StoreCategoryAuthoringWorkspace({
             : "The Store Category could not be created.",
         now: storeCategoryAuthoringNow(),
       });
+    } finally {
+      createInFlightRef.current = false;
     }
   }
 

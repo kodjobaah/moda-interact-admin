@@ -128,11 +128,24 @@ test("Shopify mappings are optional but every supplied mapping must be valid and
   assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, false);
 });
 
-test("browser session restoration rejects incompatible state and normalizes interrupted saves", () => {
+test("browser session restoration rejects incompatible state and derives readiness from the reviewed revision", () => {
   assert.equal(restoreStoreCategoryAuthoringSession("{}"), null);
   const session = completeSession();
-  const interrupted = { ...session, status: "SAVING" as const };
-  const restored = restoreStoreCategoryAuthoringSession(JSON.stringify(interrupted));
-  assert.equal(restored?.status, "READY");
-  assert.equal(restored?.sessionId, "session-1");
+
+  for (const persistedStatus of ["SAVING", "FAILED", "DRAFT"] as const) {
+    const restored = restoreStoreCategoryAuthoringSession(
+      JSON.stringify({ ...session, status: persistedStatus }),
+    );
+    assert.equal(restored?.status, "READY");
+    assert.equal(restored?.sessionId, "session-1");
+    assert.equal(restored && canCreateStoreCategoryFromSession(restored), true);
+  }
+});
+
+test("creation readiness is derived from validation and the current review rather than a stale browser status", () => {
+  const session = completeSession();
+  const staleStatus = { ...session, status: "DRAFT" as const };
+
+  assert.equal(staleStatus.reviewedRevision, staleStatus.validationRevision);
+  assert.equal(canCreateStoreCategoryFromSession(staleStatus), true);
 });

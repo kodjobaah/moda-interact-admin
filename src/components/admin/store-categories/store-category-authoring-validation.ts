@@ -135,7 +135,8 @@ export function canCreateStoreCategoryFromSession(
 ): boolean {
   const validation = validateStoreCategoryAuthoringSession(session);
   return (
-    session.status === "READY" &&
+    session.status !== "SAVING" &&
+    session.status !== "COMPLETE" &&
     isStoreCategoryReviewCurrent(session) &&
     validation.category.valid &&
     validation.defaultTemplate.valid &&

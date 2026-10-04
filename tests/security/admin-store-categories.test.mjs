@@ -82,6 +82,10 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   assert.match(session, /reviewedRevision/);
   assert.match(session, /status: "DRAFT"/);
   assert.match(session, /status: "READY"/);
+  assert.match(session, /Readiness is derived from the reviewed configuration/);
+  assert.match(workspace, /createInFlightRef/);
+  assert.match(reviewStep, /Audit reason supplied/);
+  assert.match(reviewStep, /Ready to create/);
   assert.match(editor, /aria-label="Store category sections"/);
   assert.match(editor, /Category details/);
   assert.match(editor, /Prompt templates \(\$\{templates\.length\}\)/);

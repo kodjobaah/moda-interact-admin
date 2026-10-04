@@ -116,6 +116,7 @@ export function StoreCategoryReviewStep({
             {validation.shopifyMappings.valid ? "✓" : "✕"} Shopify mappings valid
           </li>
           <li>{reviewCurrent ? "✓" : "✕"} Review matches current configuration</li>
+          <li>{validation.auditReason.valid ? "✓" : "✕"} Audit reason supplied</li>
         </ul>
       </div>
 
@@ -136,6 +137,19 @@ export function StoreCategoryReviewStep({
         />
       </label>
       <StoreCategoryAuthoringErrorList issues={validation.auditReason.issues} />
+      <p className={`mt-2 text-sm ${
+        configurationValid && reviewCurrent && validation.auditReason.valid
+          ? "text-green-700"
+          : "text-amber-700"
+      }`} role="status">
+        {configurationValid && reviewCurrent && validation.auditReason.valid
+          ? "Ready to create. The complete configuration will be committed atomically."
+          : !validation.auditReason.valid
+            ? "Add an audit reason before creating this Store Category."
+            : !reviewCurrent
+              ? "The configuration changed after review. Re-enter Review to confirm the latest version."
+              : "Resolve the validation issues above before creating this Store Category."}
+      </p>
     </section>
   );
 }

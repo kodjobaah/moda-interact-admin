@@ -203,14 +203,16 @@ export function restoreStoreCategoryAuthoringSession(
     }
     const session = candidate as StoreCategoryAuthoringSession;
     if (session.status === "COMPLETE") return null;
-    if (session.status === "SAVING" || session.status === "FAILED") {
-      return {
-        ...session,
-        status: isStoreCategoryReviewCurrent(session) ? "READY" : "DRAFT",
-        error: null,
-      };
-    }
-    return session;
+
+    // Readiness is derived from the reviewed configuration, not trusted from
+    // persisted browser state. This keeps older/in-flight browser drafts from
+    // leaving the Review screen visually current while the Create button is
+    // silently disabled because a stale status value survived a refresh.
+    return {
+      ...session,
+      status: isStoreCategoryReviewCurrent(session) ? "READY" : "DRAFT",
+      error: null,
+    };
   } catch {
     return null;
   }
