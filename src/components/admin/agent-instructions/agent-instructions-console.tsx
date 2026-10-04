@@ -55,10 +55,29 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
   const draft = data.draft;
   const [promptText, setPromptText] = useState(draft?.promptText ?? "");
   const [savedText, setSavedText] = useState(draft?.promptText ?? "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const nextSavedText = draft?.promptText ?? "";
+    setPromptText(nextSavedText);
+    setSavedText(nextSavedText);
+    setSaving(false);
+  }, [draft?.id, draft?.editVersion, draft?.promptText]);
+
+  const hasPrompt = promptText.trim().length > 0;
+  const hasUnsavedChanges = promptText !== savedText;
+  const canSave = hasPrompt && hasUnsavedChanges && !saving;
+  const canPublish = hasPrompt && !hasUnsavedChanges && !saving;
+
   const saveAction = async (formData: FormData) => {
-    await mutateAgentInstructionsAction(formData);
-    setSavedText(promptText);
-    router.refresh();
+    setSaving(true);
+    try {
+      await mutateAgentInstructionsAction(formData);
+      setSavedText(promptText);
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <section className="space-y-5">
@@ -86,14 +105,35 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
             </div>
             <PromptCodeEditor
               value={promptText}
-              onChange={setPromptText}
+              onChange={(value) => {
+                setPromptText(value);
+              }}
               maxLength={32_000}
               ariaLabel="Draft prompt, canonical English"
             />
             <input type="hidden" name="promptText" value={promptText} />
-            <p className="text-xs text-gray-500">
-              CodeMirror editor with Markdown-aware highlighting, line numbers, search, and keyboard navigation.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <p className="text-gray-500">
+                CodeMirror editor with Markdown-aware highlighting, line numbers, search, and keyboard navigation.
+              </p>
+              <p
+                className={
+                  saving
+                    ? "font-medium text-gray-600"
+                    : hasUnsavedChanges
+                      ? "font-medium text-amber-700"
+                      : "font-medium text-emerald-700"
+                }
+                role="status"
+                aria-live="polite"
+              >
+                {saving
+                  ? "Saving draft…"
+                  : hasUnsavedChanges
+                    ? "● Unsaved changes"
+                    : "✓ Draft saved"}
+              </p>
+            </div>
           </div>
           <label className="block text-sm font-medium text-gray-700">
             Audit reason
@@ -102,9 +142,16 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
           <button
             className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:opacity-50"
             type="submit"
-            disabled={!promptText.trim()}
+            disabled={!canSave}
+            title={
+              !hasPrompt
+                ? "Enter prompt text before saving."
+                : !hasUnsavedChanges
+                  ? "The current draft is already saved."
+                  : undefined
+            }
           >
-            Save Draft
+            {saving ? "Saving Draft…" : "Save Draft"}
           </button>
         </form>
       ) : (
@@ -122,24 +169,43 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
         </form>
       )}
       {draft ? (
-        <form action={mutateAgentInstructionsAction} className="flex flex-wrap items-end gap-3">
-          <input type="hidden" name="intent" value="publish" />
-          <input type="hidden" name="revisionId" value={draft.id} />
-          <input type="hidden" name="expectedRevisionEditVersion" value={draft.editVersion} />
-          <input type="hidden" name="expectedConfigurationPromptEditVersion" value={configurationVersion} />
-          <label className="min-w-64 flex-1 text-sm font-medium text-gray-700">
-            Publish reason
-            <input className={inputClass} name="reason" maxLength={1000} required />
-          </label>
-          <button
-            className="rounded-md border border-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-[var(--brand-800)] hover:bg-[var(--brand-100)] disabled:cursor-not-allowed disabled:opacity-50"
-            type="submit"
-            disabled={!promptText.trim() || promptText !== savedText}
-            title={promptText !== savedText ? "Save the draft before publishing." : undefined}
+        <div className="space-y-2">
+          <form action={mutateAgentInstructionsAction} className="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="intent" value="publish" />
+            <input type="hidden" name="revisionId" value={draft.id} />
+            <input type="hidden" name="expectedRevisionEditVersion" value={draft.editVersion} />
+            <input type="hidden" name="expectedConfigurationPromptEditVersion" value={configurationVersion} />
+            <label className="min-w-64 flex-1 text-sm font-medium text-gray-700">
+              Publish reason
+              <input className={inputClass} name="reason" maxLength={1000} required />
+            </label>
+            <button
+              className="rounded-md border border-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-[var(--brand-800)] hover:bg-[var(--brand-100)] disabled:cursor-not-allowed disabled:opacity-50"
+              type="submit"
+              disabled={!canPublish}
+              title={
+                !hasPrompt
+                  ? "Enter and save prompt text before publishing."
+                  : hasUnsavedChanges
+                    ? "Save the current draft before publishing."
+                    : undefined
+              }
+            >
+              Publish and Activate
+            </button>
+          </form>
+          <p
+            className={`text-xs ${canPublish ? "text-emerald-700" : "text-amber-700"}`}
+            role="status"
+            aria-live="polite"
           >
-            Publish and Activate
-          </button>
-        </form>
+            {!hasPrompt
+              ? "Enter prompt text and save the draft before publishing."
+              : hasUnsavedChanges
+                ? "Save the current draft before publishing."
+                : "✓ Draft is saved and ready to publish."}
+          </p>
+        </div>
       ) : null}
       <div className="mt-8">
         <h3 className="text-sm font-semibold text-gray-900">Revision History</h3>
@@ -236,7 +302,7 @@ export function AgentInstructionsConsole({
                   </span>
                 </div>
                 <PromptEditor
-                  key={`${data.platform.draft?.id ?? "none"}:${data.platform.draft?.editVersion ?? 0}`}
+                  key={data.platform.draft?.id ?? "none"}
                   data={data.platform}
                   configurationVersion={data.platform.configuration?.promptEditVersion ?? 1}
                 />
@@ -317,7 +383,7 @@ export function AgentInstructionsConsole({
                       </span>
                     </div>
                     <PromptEditor
-                      key={`${selected.id}:${data.shopData.draft?.id ?? "none"}:${data.shopData.draft?.editVersion ?? 0}`}
+                      key={`${selected.id}:${data.shopData.draft?.id ?? "none"}`}
                       data={data.shopData}
                       configurationVersion={data.shopData.configuration?.promptEditVersion ?? 1}
                     />

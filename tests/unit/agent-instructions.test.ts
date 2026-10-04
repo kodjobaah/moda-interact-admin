@@ -320,7 +320,7 @@ test("protected page and navigation expose the Agent Instructions workflow", () 
   assert.match(consoleSource, /role="tabpanel"/);
   assert.match(consoleSource, /name="tab" value="shop"/);
   assert.match(consoleSource, /Publishing this draft will activate the pending Store Category/);
-  assert.match(consoleSource, /disabled=\{!promptText\.trim\(\) \|\| promptText !== savedText\}/);
+  assert.match(consoleSource, /disabled=\{!canPublish\}/);
 });
 
 
@@ -335,8 +335,26 @@ test("Agent Instructions edits drafts through CodeMirror while preserving form s
   assert.match(promptCodeEditorSource, /EditorView\.updateListener\.of/);
   assert.match(consoleSource, /<PromptCodeEditor/);
   assert.match(consoleSource, /<input type="hidden" name="promptText" value=\{promptText\} \/>/);
-  assert.match(consoleSource, /disabled=\{!promptText\.trim\(\)\}/);
+  assert.match(consoleSource, /disabled=\{!canSave\}/);
   assert.doesNotMatch(consoleSource, /<textarea[\s\S]*name="promptText"/);
+});
+
+test("Agent Instructions explains draft dirty state and publish readiness", () => {
+  assert.match(consoleSource, /const hasUnsavedChanges = promptText !== savedText/);
+  assert.match(consoleSource, /const canSave = hasPrompt && hasUnsavedChanges && !saving/);
+  assert.match(consoleSource, /const canPublish = hasPrompt && !hasUnsavedChanges && !saving/);
+  assert.match(consoleSource, /● Unsaved changes/);
+  assert.match(consoleSource, /✓ Draft saved/);
+  assert.match(consoleSource, /Save the current draft before publishing\./);
+  assert.match(consoleSource, /✓ Draft is saved and ready to publish\./);
+  assert.match(consoleSource, /disabled=\{!canSave\}/);
+  assert.match(consoleSource, /disabled=\{!canPublish\}/);
+  assert.match(consoleSource, /setSavedText\(promptText\)/);
+  assert.match(consoleSource, /router\.refresh\(\)/);
+  assert.match(consoleSource, /draft\?\.editVersion/);
+  assert.match(consoleSource, /key=\{data\.platform\.draft\?\.id \?\? "none"\}/);
+  assert.match(consoleSource, /key=\{`\$\{selected\.id\}:\$\{data\.shopData\.draft\?\.id \?\? "none"\}`\}/);
+  assert.doesNotMatch(consoleSource, /key=\{`\$\{data\.platform\.draft\?\.id.*editVersion/);
 });
 
 test("pending category publish atomically promotes the exact edited prompt and preserves selection generation", async () => {
