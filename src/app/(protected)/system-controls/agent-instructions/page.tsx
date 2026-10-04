@@ -5,7 +5,7 @@ import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams: Promise<{ shop?: string; q?: string }> };
+type PageProps = { searchParams: Promise<{ shop?: string; q?: string; tab?: string }> };
 
 export default async function AgentInstructionsPage({ searchParams }: PageProps) {
   await requirePlatformAdminPage();
@@ -14,7 +14,7 @@ export default async function AgentInstructionsPage({ searchParams }: PageProps)
   return (
     <AdminShell active="agent-instructions">
       <div className="flex-1 overflow-auto p-4 sm:p-8">
-        <AgentInstructionsConsole data={data} />
+        <AgentInstructionsConsole data={data} initialTab={params.tab === "shop" || params.shop ? "shop" : "platform"} />
       </div>
     </AdminShell>
   );

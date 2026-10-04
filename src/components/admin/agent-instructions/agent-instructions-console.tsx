@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutateAgentInstructionsAction } from "@/app/actions/agent-instructions";
 import type { AgentInstructionsScopeConflict, getAgentInstructionsData } from "@/lib/admin/agent-instructions";
+import { AgentInstructionsTabs, type AgentInstructionsTab } from "./agent-instructions-tabs";
 
 type Data = Awaited<ReturnType<typeof getAgentInstructionsData>>;
 type ScopeResult = NonNullable<Data["platform"]>;
@@ -167,56 +168,157 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
   );
 }
 
-export function AgentInstructionsConsole({ data }: { data: Data }) {
+export function AgentInstructionsConsole({
+  data,
+  initialTab = "platform",
+}: {
+  data: Data;
+  initialTab?: AgentInstructionsTab;
+}) {
   const selected = data.selectedShop;
+  const [activeTab, setActiveTab] = useState<AgentInstructionsTab>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
   return (
-    <>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--brand-900)]">Agent Instructions</h1>
-        <p className="mt-1 text-sm text-gray-600">Canonical-English Platform and Shop prompt revisions for {data.environment}.</p>
+    <div className="mx-auto w-full max-w-7xl">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--brand-900)]">Agent Instructions</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Manage canonical-English Platform and Shop prompt revisions.
+          </p>
+        </div>
+        <span className="w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold tracking-wide text-gray-700">
+          {data.environment}
+        </span>
       </div>
-      <div className="grid gap-8 xl:grid-cols-2">
-        <section className="min-w-0">
-          <h2 className="text-lg font-semibold text-gray-900">Platform Instructions</h2>
-          {isScopeConflict(data.platform) ? (
-            <ConflictDetails conflict={data.platform} />
-          ) : (
-            <>
-              <p className="mt-1 text-xs text-gray-500">Active revision: {data.platform.active?.revisionNumber ?? "None"} · Configuration edit version: {data.platform.configuration?.promptEditVersion ?? 1}</p>
-              <PromptEditor key={`${data.platform.draft?.id ?? "none"}:${data.platform.draft?.editVersion ?? 0}`} data={data.platform} configurationVersion={data.platform.configuration?.promptEditVersion ?? 1} />
-            </>
-          )}
-        </section>
-        <section className="min-w-0">
-          <h2 className="text-lg font-semibold text-gray-900">Shop Instructions</h2>
-          <form className="my-4 grid gap-3 border-y border-gray-200 py-4 sm:grid-cols-[minmax(0,1fr)_auto]" action="/system-controls/agent-instructions" method="get">
-            <label className="text-sm font-medium text-gray-700">Search shops by domain or exact ID
-              <input className={inputClass} name="q" defaultValue="" list="agent-instructions-shops" />
-              <datalist id="agent-instructions-shops">{data.shops.map((shop) => <option key={shop.id} value={shop.domain}>{shop.id}</option>)}</datalist>
-            </label>
-            <label className="text-sm font-medium text-gray-700">Selected Shop
-              <select className={inputClass} name="shop" defaultValue={selected?.id ?? ""}>
-                {data.shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.domain}</option>)}
-                {selected && !data.shops.some((shop) => shop.id === selected.id) ? <option value={selected.id}>{selected.domain}</option> : null}
-              </select>
-            </label>
-            <button className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold sm:col-span-2 sm:justify-self-end" type="submit">Load Shop</button>
-          </form>
-          {selected && data.shopData ? (
-            isScopeConflict(data.shopData) ? (
-              <>
-                <p className="mb-3 text-xs text-gray-500">{selected.domain}</p>
-                <ConflictDetails conflict={data.shopData} />
-              </>
+
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="px-5 pt-2 sm:px-6">
+          <AgentInstructionsTabs activeTab={activeTab} onChange={setActiveTab} />
+        </div>
+
+        {activeTab === "platform" ? (
+          <section
+            id="agent-instructions-panel-platform"
+            role="tabpanel"
+            aria-labelledby="agent-instructions-tab-platform"
+            className="p-5 sm:p-6"
+          >
+            {isScopeConflict(data.platform) ? (
+              <ConflictDetails conflict={data.platform} />
             ) : (
               <>
-                <p className="mb-3 text-xs text-gray-500">{selected.domain} · Configuration edit version: {data.shopData.configuration?.promptEditVersion ?? 1}</p>
-                <PromptEditor key={`${selected.id}:${data.shopData.draft?.id ?? "none"}:${data.shopData.draft?.editVersion ?? 0}`} data={data.shopData} configurationVersion={data.shopData.configuration?.promptEditVersion ?? 1} />
+                <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                  <span>
+                    <span className="font-medium text-gray-900">Active revision:</span>{" "}
+                    {data.platform.active?.revisionNumber ?? "None"}
+                  </span>
+                  <span>
+                    <span className="font-medium text-gray-900">Configuration edit version:</span>{" "}
+                    {data.platform.configuration?.promptEditVersion ?? 1}
+                  </span>
+                </div>
+                <PromptEditor
+                  key={`${data.platform.draft?.id ?? "none"}:${data.platform.draft?.editVersion ?? 0}`}
+                  data={data.platform}
+                  configurationVersion={data.platform.configuration?.promptEditVersion ?? 1}
+                />
               </>
-            )
-          ) : <p className="border-y border-gray-200 py-6 text-sm text-gray-600">Search for and select a Shop to manage Shop Instructions.</p>}
-        </section>
+            )}
+          </section>
+        ) : (
+          <section
+            id="agent-instructions-panel-shop"
+            role="tabpanel"
+            aria-labelledby="agent-instructions-tab-shop"
+            className="p-5 sm:p-6"
+          >
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <h2 className="text-sm font-semibold text-gray-900">Select shop</h2>
+              <p className="mt-1 text-xs text-gray-600">
+                Search by shop domain or exact internal ID, then load its instruction history.
+              </p>
+              <form
+                className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)_auto] lg:items-end"
+                action="/system-controls/agent-instructions"
+                method="get"
+              >
+                <input type="hidden" name="tab" value="shop" />
+                <label className="text-sm font-medium text-gray-700">
+                  Search shops
+                  <input
+                    className={inputClass}
+                    name="q"
+                    defaultValue=""
+                    list="agent-instructions-shops"
+                    placeholder="example.myshopify.com or exact shop ID"
+                  />
+                  <datalist id="agent-instructions-shops">
+                    {data.shops.map((shop) => (
+                      <option key={shop.id} value={shop.domain}>
+                        {shop.id}
+                      </option>
+                    ))}
+                  </datalist>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Selected shop
+                  <select className={inputClass} name="shop" defaultValue={selected?.id ?? ""}>
+                    {data.shops.map((shop) => (
+                      <option key={shop.id} value={shop.id}>
+                        {shop.domain}
+                      </option>
+                    ))}
+                    {selected && !data.shops.some((shop) => shop.id === selected.id) ? (
+                      <option value={selected.id}>{selected.domain}</option>
+                    ) : null}
+                  </select>
+                </label>
+                <button
+                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+                  type="submit"
+                >
+                  Load Shop
+                </button>
+              </form>
+            </div>
+
+            <div className="mt-5">
+              {selected && data.shopData ? (
+                isScopeConflict(data.shopData) ? (
+                  <>
+                    <p className="text-sm font-medium text-gray-900">{selected.domain}</p>
+                    <ConflictDetails conflict={data.shopData} />
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                      <span className="font-medium text-gray-900">{selected.domain}</span>
+                      <span>
+                        <span className="font-medium text-gray-900">Configuration edit version:</span>{" "}
+                        {data.shopData.configuration?.promptEditVersion ?? 1}
+                      </span>
+                    </div>
+                    <PromptEditor
+                      key={`${selected.id}:${data.shopData.draft?.id ?? "none"}:${data.shopData.draft?.editVersion ?? 0}`}
+                      data={data.shopData}
+                      configurationVersion={data.shopData.configuration?.promptEditVersion ?? 1}
+                    />
+                  </>
+                )
+              ) : (
+                <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-600">
+                  Search for and select a Shop to manage Shop Instructions.
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </div>
-    </>
+    </div>
   );
 }

@@ -206,6 +206,10 @@ const consoleSource = await readFile(
   new URL("../../src/components/admin/agent-instructions/agent-instructions-console.tsx", import.meta.url),
   "utf8",
 );
+const agentInstructionsTabsSource = await readFile(
+  new URL("../../src/components/admin/agent-instructions/agent-instructions-tabs.tsx", import.meta.url),
+  "utf8",
+);
 const sidebarSource = await readFile(
   new URL("../../src/components/admin/sidebar.tsx", import.meta.url),
   "utf8",
@@ -297,10 +301,16 @@ test("historical activation is constrained to the selected scope and changes onl
 test("protected page and navigation expose the Agent Instructions workflow", () => {
   assert.match(routeSource, /requirePlatformAdminPage\(\)/);
   assert.match(routeSource, /getAgentInstructionsData/);
+  assert.match(routeSource, /initialTab=\{params\.tab === "shop" \|\| params\.shop \? "shop" : "platform"\}/);
   assert.match(sidebarSource, /href="\/system-controls\/agent-instructions"/);
   assert.match(sidebarSource, /Agent Instructions/);
-  assert.match(consoleSource, /Platform Instructions/);
-  assert.match(consoleSource, /Shop Instructions/);
+  assert.match(agentInstructionsTabsSource, /role="tablist"/);
+  assert.match(agentInstructionsTabsSource, /role="tab"/);
+  assert.match(agentInstructionsTabsSource, /aria-selected=\{active\}/);
+  assert.match(agentInstructionsTabsSource, /Platform Instructions/);
+  assert.match(agentInstructionsTabsSource, /Shop Instructions/);
+  assert.match(consoleSource, /role="tabpanel"/);
+  assert.match(consoleSource, /name="tab" value="shop"/);
   assert.match(consoleSource, /Publishing this draft will activate the pending Store Category/);
   assert.match(consoleSource, /disabled=\{!promptText\.trim\(\) \|\| promptText !== savedText\}/);
 });
