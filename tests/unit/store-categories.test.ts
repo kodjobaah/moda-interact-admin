@@ -84,7 +84,9 @@ function transactionFor(options: {
       updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
         calls.push({ model: "category", method: "updateMany", args: { where, data } });
         updates.push({ model: "category", where, data });
-        if (options.categoryUpdateCount === 0 || where.editVersion !== category.editVersion) return { count: 0 };
+        if (options.categoryUpdateCount === 0) return { count: 0 };
+        if (where.id === "category-created" && where.editVersion === 1) return { count: 1 };
+        if (where.editVersion !== category.editVersion) return { count: 0 };
         Object.assign(category, data);
         if (typeof data.editVersion === "object") category.editVersion += 1;
         return { count: 1 };
@@ -555,4 +557,65 @@ test("taxonomy mapping create, move/update, and remove use category audit metada
   assert.equal(remove.calls.some((call) => call.method === "deleteMany"), true);
   assert.equal(remove.audits[0]?.promptTemplateCategoryId, "category-1");
   assert.deepEqual(remove.audits[0]?.metadata, { changeKind: "TAXONOMY_MAPPING" });
+});
+test("atomic category bundle creates disabled category, enabled default template, mappings, and audit evidence", async () => {
+  const { createStoreCategoryBundle } = await import(
+    "../../src/lib/admin/store-categories.ts"
+  );
+  const fake = transactionFor();
+  const categoryId = await createStoreCategoryBundle(
+    fake.transaction,
+    {
+      category: {
+        slug: "fashion-apparel",
+        displayName: "Fashion & Apparel",
+        description: "Clothing and accessories",
+        displayOrder: 10,
+      },
+      defaultTemplate: {
+        key: "fashion_apparel_default",
+        displayName: "Fashion default",
+        description: "Default prompt",
+        promptText: "Help customers with fashion questions.",
+      },
+      shopifyMappings: [
+        {
+          shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa",
+          weight: 100,
+        },
+      ],
+      reason: "Initial category configuration",
+    },
+    "admin-1",
+  );
+
+  assert.equal(categoryId, "category-created");
+  const categoryCreate = fake.calls.find(
+    (call) => call.model === "category" && call.method === "create",
+  );
+  assert.equal((categoryCreate?.args as Record<string, unknown>).enabled, false);
+  const templateCreate = fake.calls.find(
+    (call) => call.model === "template" && call.method === "create",
+  );
+  assert.equal((templateCreate?.args as Record<string, unknown>).enabled, true);
+  assert.equal(
+    (templateCreate?.args as Record<string, unknown>).categoryId,
+    "category-created",
+  );
+  assert.equal(fake.updates[0]?.data.defaultTemplateId, "template-created");
+  const mappingCreate = fake.calls.find(
+    (call) => call.model === "mapping" && call.method === "create",
+  );
+  assert.equal(
+    (mappingCreate?.args as Record<string, unknown>).categoryId,
+    "category-created",
+  );
+  assert.deepEqual(
+    fake.audits.map((entry) => entry.action),
+    [
+      "CREATE_PROMPT_TEMPLATE_CATEGORY",
+      "CREATE_PROMPT_TEMPLATE",
+      "UPDATE_PROMPT_TEMPLATE_CATEGORY",
+    ],
+  );
 });

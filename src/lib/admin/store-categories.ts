@@ -1,6 +1,7 @@
 import type { CommerceAuditAction, Prisma } from "@prisma/client";
 import type {
   CreatePromptTemplateInput,
+  CreateStoreCategoryBundleInput,
   CreateStoreCategoryInput,
   CreateTaxonomyMappingInput,
   RemoveTaxonomyMappingInput,
@@ -132,6 +133,96 @@ export async function getStoreCategoryCatalogue() {
 export type StoreCategoryCatalogue = Awaited<
   ReturnType<typeof getStoreCategoryCatalogue>
 >;
+
+
+
+export async function createStoreCategoryBundle(
+  transaction: StoreCategoryTransaction,
+  input: CreateStoreCategoryBundleInput,
+  actorAdminId: string,
+): Promise<string> {
+  const category = await transaction.commercePromptTemplateCategory.create({
+    data: {
+      slug: input.category.slug,
+      displayName: input.category.displayName,
+      description: input.category.description,
+      displayOrder: input.category.displayOrder,
+      enabled: false,
+      editVersion: 1,
+      createdByAdminId: actorAdminId,
+      updatedByAdminId: actorAdminId,
+    },
+    select: { id: true },
+  });
+
+  const template = await transaction.commercePromptTemplate.create({
+    data: {
+      key: input.defaultTemplate.key,
+      categoryId: category.id,
+      displayName: input.defaultTemplate.displayName,
+      description: input.defaultTemplate.description,
+      promptText: input.defaultTemplate.promptText,
+      enabled: true,
+      editVersion: 1,
+      createdByAdminId: actorAdminId,
+      updatedByAdminId: actorAdminId,
+    },
+    select: { id: true },
+  });
+
+  const categoryUpdated = await transaction.commercePromptTemplateCategory.updateMany({
+    where: { id: category.id, editVersion: 1 },
+    data: {
+      defaultTemplateId: template.id,
+      editVersion: { increment: 1 },
+      updatedByAdminId: actorAdminId,
+    },
+  });
+  if (categoryUpdated.count !== 1) stale("category");
+
+  for (const mapping of input.shopifyMappings) {
+    await transaction.commerceStoreCategoryTaxonomyMapping.create({
+      data: {
+        categoryId: category.id,
+        shopifyTaxonomyCategoryId: mapping.shopifyTaxonomyCategoryId,
+        weight: mapping.weight,
+      },
+    });
+  }
+
+  await audit(transaction, {
+    action: "CREATE_PROMPT_TEMPLATE_CATEGORY",
+    actorAdminId,
+    reason: input.reason,
+    categoryId: category.id,
+    metadata: {
+      creationMode: "ATOMIC_AUTHORING",
+      defaultTemplateId: template.id,
+      taxonomyMappingCount: input.shopifyMappings.length,
+    },
+  });
+  await audit(transaction, {
+    action: "CREATE_PROMPT_TEMPLATE",
+    actorAdminId,
+    reason: input.reason,
+    categoryId: category.id,
+    templateId: template.id,
+    metadata: { creationMode: "ATOMIC_AUTHORING", defaultTemplate: true },
+  });
+  await audit(transaction, {
+    action: "UPDATE_PROMPT_TEMPLATE_CATEGORY",
+    actorAdminId,
+    reason: input.reason,
+    categoryId: category.id,
+    templateId: template.id,
+    metadata: {
+      changeKind: "INITIAL_CONFIGURATION",
+      taxonomyMappingCount: input.shopifyMappings.length,
+    },
+  });
+
+  return category.id;
+}
 
 export async function mutateStoreCategoryCatalogue(
   transaction: StoreCategoryTransaction,

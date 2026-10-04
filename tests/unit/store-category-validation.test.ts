@@ -127,3 +127,68 @@ test("taxonomy mapping weight must be a positive bounded integer", () => {
     );
   }
 });
+test("atomic category bundle validates category, required default template, mappings, and audit reason", async () => {
+  const { parseCreateStoreCategoryBundleInput } = await import(
+    "../../src/lib/admin/store-category-validation.ts"
+  );
+  const payload = {
+    category: {
+      slug: " fashion-apparel ",
+      displayName: " Fashion & Apparel ",
+      description: " Clothing and accessories ",
+      displayOrder: 10,
+    },
+    defaultTemplate: {
+      key: " fashion_apparel_default ",
+      displayName: " Fashion default ",
+      description: " Default fashion prompt ",
+      promptText: " Help customers with fashion questions. ",
+    },
+    shopifyMappings: [
+      {
+        shopifyTaxonomyCategoryId: " gid://shopify/TaxonomyCategory/aa ",
+        weight: 100,
+      },
+    ],
+    reason: " Initial category configuration ",
+  };
+
+  assert.deepEqual(parseCreateStoreCategoryBundleInput(payload), {
+    category: {
+      slug: "fashion-apparel",
+      displayName: "Fashion & Apparel",
+      description: "Clothing and accessories",
+      displayOrder: 10,
+    },
+    defaultTemplate: {
+      key: "fashion_apparel_default",
+      displayName: "Fashion default",
+      description: "Default fashion prompt",
+      promptText: "Help customers with fashion questions.",
+    },
+    shopifyMappings: [
+      {
+        shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa",
+        weight: 100,
+      },
+    ],
+    reason: "Initial category configuration",
+  });
+
+  assert.throws(
+    () =>
+      parseCreateStoreCategoryBundleInput({
+        ...payload,
+        defaultTemplate: { ...payload.defaultTemplate, promptText: "   " },
+      }),
+    /promptText/,
+  );
+  assert.throws(
+    () =>
+      parseCreateStoreCategoryBundleInput({
+        ...payload,
+        shopifyMappings: [payload.shopifyMappings[0], payload.shopifyMappings[0]],
+      }),
+    /mapped only once/,
+  );
+});

@@ -5,11 +5,13 @@ import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
 import {
+  createStoreCategoryBundle,
   mutateStoreCategoryCatalogue,
   type StoreCategoryMutation,
 } from "@/lib/admin/store-categories";
 import {
   parseCreatePromptTemplateForm,
+  parseCreateStoreCategoryBundleInput,
   parseCreateStoreCategoryForm,
   parseCreateTaxonomyMappingForm,
   parseRemoveTaxonomyMappingForm,
@@ -97,4 +99,33 @@ export async function mutateStoreCategoryCatalogueAction(
     throw error;
   }
   revalidatePath("/system-controls/store-categories");
+}
+
+export async function createStoreCategoryBundleAction(
+  payload: unknown,
+): Promise<{ categoryId: string }> {
+  const principal = await requirePlatformAdminMutation();
+  if (principal.role !== "SUPER_ADMIN") {
+    throw new Error("SUPER_ADMIN access is required.");
+  }
+  const input = parseCreateStoreCategoryBundleInput(payload);
+  try {
+    const categoryId = await prisma.$transaction(
+      async (transaction) => {
+        await ensureDevelopmentPlatformAdmin(transaction, principal);
+        return createStoreCategoryBundle(transaction, input, principal.id);
+      },
+      { isolationLevel: "Serializable" },
+    );
+    revalidatePath("/system-controls/store-categories");
+    return { categoryId };
+  } catch (error) {
+    if (databaseCode(error) === "P2002") {
+      throw new Error(uniqueConstraintMessage(error));
+    }
+    if (databaseCode(error) === "P2034") {
+      throw new Error("Catalogue changed; reload and retry.");
+    }
+    throw error;
+  }
 }

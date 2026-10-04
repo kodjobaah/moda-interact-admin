@@ -1,6 +1,27 @@
 export const STORE_CATEGORY_SLUG_PATTERN = /^[a-z][a-z0-9-]{0,127}$/;
 export const PROMPT_TEMPLATE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,127}$/;
 
+
+export type CreateStoreCategoryBundleInput = {
+  category: {
+    slug: string;
+    displayName: string;
+    description: string;
+    displayOrder: number;
+  };
+  defaultTemplate: {
+    key: string;
+    displayName: string;
+    description: string;
+    promptText: string;
+  };
+  shopifyMappings: Array<{
+    shopifyTaxonomyCategoryId: string;
+    weight: number;
+  }>;
+  reason: string;
+};
+
 export type CreateStoreCategoryInput = {
   slug: string;
   displayName: string;
@@ -243,5 +264,103 @@ export function parseRemoveTaxonomyMappingForm(
   return {
     id: requiredText(formData, "id", 255),
     reason: reason(formData),
+  };
+}
+
+function objectValue(input: unknown, name: string): Record<string, unknown> {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new Error(`${name} is invalid.`);
+  }
+  return input as Record<string, unknown>;
+}
+
+function objectText(
+  input: Record<string, unknown>,
+  name: string,
+  maximum: number,
+  required = true,
+): string {
+  const raw = input[name];
+  if (typeof raw !== "string") throw new Error(`${name} is invalid.`);
+  const result = raw.trim();
+  if ((required && result.length < 1) || result.length > maximum) {
+    throw new Error(
+      required
+        ? `${name} must be between 1 and ${maximum} characters.`
+        : `${name} must be at most ${maximum} characters.`,
+    );
+  }
+  return result;
+}
+
+function objectInteger(
+  input: Record<string, unknown>,
+  name: string,
+  minimum: number,
+  maximum: number,
+): number {
+  const result = input[name];
+  if (
+    typeof result !== "number" ||
+    !Number.isSafeInteger(result) ||
+    result < minimum ||
+    result > maximum
+  ) {
+    throw new Error(`${name} must be between ${minimum} and ${maximum}.`);
+  }
+  return result;
+}
+
+export function parseCreateStoreCategoryBundleInput(
+  input: unknown,
+): CreateStoreCategoryBundleInput {
+  const root = objectValue(input, "payload");
+  const category = objectValue(root.category, "category");
+  const defaultTemplate = objectValue(root.defaultTemplate, "defaultTemplate");
+  const slug = objectText(category, "slug", 128);
+  if (!STORE_CATEGORY_SLUG_PATTERN.test(slug)) {
+    throw new Error("slug has an invalid format.");
+  }
+  const key = objectText(defaultTemplate, "key", 128);
+  if (!PROMPT_TEMPLATE_KEY_PATTERN.test(key)) {
+    throw new Error("key has an invalid format.");
+  }
+  const mappings = root.shopifyMappings;
+  if (!Array.isArray(mappings) || mappings.length > 100) {
+    throw new Error("shopifyMappings must contain at most 100 mappings.");
+  }
+  const seen = new Set<string>();
+  const shopifyMappings = mappings.map((mapping, index) => {
+    const value = objectValue(mapping, `shopifyMappings[${index}]`);
+    const shopifyTaxonomyCategoryId = objectText(
+      value,
+      "shopifyTaxonomyCategoryId",
+      255,
+    );
+    if (seen.has(shopifyTaxonomyCategoryId)) {
+      throw new Error("Each Shopify taxonomy category may be mapped only once.");
+    }
+    seen.add(shopifyTaxonomyCategoryId);
+    return {
+      shopifyTaxonomyCategoryId,
+      weight: objectInteger(value, "weight", 1, 1_000_000),
+    };
+  });
+
+  return {
+    category: {
+      slug,
+      displayName: objectText(category, "displayName", 255),
+      description: objectText(category, "description", 2000, false),
+      displayOrder: objectInteger(category, "displayOrder", 0, 1_000_000),
+    },
+    defaultTemplate: {
+      key,
+      displayName: objectText(defaultTemplate, "displayName", 255),
+      description: objectText(defaultTemplate, "description", 2000, false),
+      promptText: objectText(defaultTemplate, "promptText", 100_000),
+    },
+    shopifyMappings,
+    reason: objectText(root, "reason", 1000),
   };
 }

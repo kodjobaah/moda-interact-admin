@@ -60,3 +60,11 @@ test("catalogue reads are deterministically ordered and select profile counts on
     /shopifyTaxonomyCategoryId: mapping\.shopifyTaxonomyCategoryId,[\s\S]*?weight: mapping\.weight,[\s\S]*?category:\s*\{\s*displayOrder: category\.displayOrder,[\s\S]*?id: category\.id/,
   );
 });
+
+test("atomic category authoring uses the same authenticated serializable mutation boundary", () => {
+  assert.match(actionSource, /export async function createStoreCategoryBundleAction/);
+  assert.match(actionSource, /parseCreateStoreCategoryBundleInput\(payload\)/);
+  assert.match(actionSource, /return createStoreCategoryBundle\(transaction, input, principal\.id\)/);
+  assert.match(actionSource, /ensureDevelopmentPlatformAdmin\(transaction, principal\)/);
+  assert.match(actionSource, /isolationLevel: "Serializable"/);
+});
