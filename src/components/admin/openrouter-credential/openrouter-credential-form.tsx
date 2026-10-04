@@ -36,13 +36,13 @@ export function OpenRouterCredentialForm({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (inFlight.current || refreshRequired) return;
+    const formData = new FormData(event.currentTarget);
+    formData.set("operationId", crypto.randomUUID());
     inFlight.current = true;
     flushSync(() => {
       setPending(true);
       setMessage(null);
     });
-    const formData = new FormData(event.currentTarget);
-    formData.set("operationId", crypto.randomUUID());
     try {
       const result =
         mode === "set"

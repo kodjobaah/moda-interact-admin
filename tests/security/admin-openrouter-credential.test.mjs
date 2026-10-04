@@ -146,6 +146,24 @@ test("set mode is not mistaken for an existing refresh conflict when editVersion
   assert.doesNotMatch(form, /conflictVersion === editVersion/);
 });
 
+test("credential form data is captured before pending state disables successful controls", () => {
+  for (const [name, component] of [
+    ["set/replace", form],
+    ["remove", panel],
+  ]) {
+    const snapshot = component.indexOf(
+      "const formData = new FormData(event.currentTarget);",
+    );
+    const pending = component.indexOf("flushSync(() => {");
+    assert.ok(snapshot >= 0, `${name} should capture FormData`);
+    assert.ok(pending >= 0, `${name} should enter pending state`);
+    assert.ok(
+      snapshot < pending,
+      `${name} must capture enabled form controls before pending disables them`,
+    );
+  }
+});
+
 test("production credential code has no decrypt, provider call, or secret-derived logging", () => {
   assert.doesNotMatch(
     `${service}\n${action}\n${panel}\n${form}\n${submitButton}\n${crypto}`,

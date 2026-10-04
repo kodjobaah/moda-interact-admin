@@ -28,15 +28,15 @@ export function OpenRouterCredentialPanel({
   async function remove(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (inFlight.current || conflictVersion === status.editVersion) return;
+    const formData = new FormData(event.currentTarget);
+    formData.set("operationId", crypto.randomUUID());
+    formData.set("expectedEditVersion", String(status.editVersion));
+    formData.set("confirmation", "confirmed");
     inFlight.current = true;
     flushSync(() => {
       setPending(true);
       setMessage(null);
     });
-    const formData = new FormData(event.currentTarget);
-    formData.set("operationId", crypto.randomUUID());
-    formData.set("expectedEditVersion", String(status.editVersion));
-    formData.set("confirmation", "confirmed");
     try {
       const result = await removeOpenRouterCredentialAction(formData);
       if (result.ok) {
