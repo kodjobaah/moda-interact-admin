@@ -20,6 +20,8 @@ const publicMutationErrors = new Set([
   "Model catalogue entry is already disabled.",
   "Model configuration must be valid JSON.",
   "Model configuration is invalid.",
+  "Provider is invalid.",
+  "Provider model ID is invalid.",
 ]);
 
 function publicErrorMessage(cause: unknown): string | undefined {

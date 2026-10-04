@@ -106,7 +106,7 @@ export function ModelCatalogueEditor({
   canMutate,
   row,
 }: ModelCatalogueEditorProps) {
-  const [provider, setProvider] = useState(row?.model.provider ?? "openrouter");
+  const [provider, setProvider] = useState(row?.model.provider ?? "");
   const [providerModelId, setProviderModelId] = useState(
     row?.model.providerModelId ?? "",
   );
@@ -141,8 +141,18 @@ export function ModelCatalogueEditor({
               value={provider}
               onChange={(event) => setProvider(event.currentTarget.value)}
               autoComplete="off"
+              aria-describedby="model-provider-help"
+              placeholder="nvidia"
               required
             />
+            <span
+              id="model-provider-help"
+              className="mt-2 block text-xs font-normal leading-5 text-gray-600"
+            >
+              Use the namespace before the first slash in the OpenRouter model
+              ID. For example, use nvidia for
+              nvidia/nemotron-3-ultra-550b-a55b:free.
+            </span>
           </label>
           <label className="block text-sm font-medium text-gray-800">
             Provider model ID
@@ -154,8 +164,17 @@ export function ModelCatalogueEditor({
                 setProviderModelId(event.currentTarget.value)
               }
               autoComplete="off"
+              aria-describedby="provider-model-id-help"
+              placeholder="nemotron-3-ultra-550b-a55b:free"
               required
             />
+            <span
+              id="provider-model-id-help"
+              className="mt-2 block text-xs font-normal leading-5 text-gray-600"
+            >
+              Use only the part after the first slash. Do not include a slash in
+              this field.
+            </span>
           </label>
           {readOnlyField(
             "OpenRouter model ID preview",

@@ -221,6 +221,22 @@ test("editor keeps identity read-only, configuration direct and selected-model w
   );
 });
 
+test("create editor explains the OpenRouter identity split and bounded identity errors stay user-visible", () => {
+  assert.match(editor, /useState\(row\?\.model\.provider \?\? ""\)/);
+  assert.match(
+    editor,
+    /Use the namespace before the first slash in the OpenRouter model/,
+  );
+  assert.match(
+    editor,
+    /Use only the part after the first slash\. Do not include a slash in/,
+  );
+  assert.match(editor, /placeholder="nvidia"/);
+  assert.match(editor, /placeholder="nemotron-3-ultra-550b-a55b:free"/);
+  assert.match(action, /"Provider is invalid\."/);
+  assert.match(action, /"Provider model ID is invalid\."/);
+});
+
 test("mutation form synchronously rejects same-tick duplicate submit events and releases after settle", () => {
   assert.match(mutationForm, /const inFlight = useRef\(false\)/);
   assert.match(mutationForm, /if \(inFlight\.current\)/);
