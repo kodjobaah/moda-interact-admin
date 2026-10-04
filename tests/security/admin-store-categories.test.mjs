@@ -43,6 +43,10 @@ test("Admin catalogue introduces no translation persistence or queue surface", a
     "src/components/admin/store-categories/store-category-catalog.tsx",
     "src/components/admin/store-categories/store-category-editor.tsx",
     "src/components/admin/store-categories/prompt-template-editor.tsx",
+    "src/components/admin/store-categories/prompt-template-list.tsx",
+    "src/components/admin/store-categories/prompt-template-workspace.tsx",
+    "src/components/admin/store-categories/store-category-maintenance-tabs.tsx",
+    "src/components/admin/store-categories/store-category-workspace-header.tsx",
     "src/components/admin/store-categories/taxonomy-mapping-editor.tsx",
   ];
   const contents = (await Promise.all(files.map(source))).join("\n");
@@ -61,6 +65,7 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   const reviewStep = await source("src/components/admin/store-categories/store-category-review-step.tsx");
   const session = await source("src/components/admin/store-categories/store-category-authoring-session.ts");
   const editor = await source("src/components/admin/store-categories/store-category-editor.tsx");
+  const maintenanceTabs = await source("src/components/admin/store-categories/store-category-maintenance-tabs.tsx");
 
   assert.match(page, /tab\?: string \| string\[\]/);
   assert.match(page, /rawTab === "templates" \|\| rawTab === "taxonomy"/);
@@ -86,8 +91,25 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   assert.match(workspace, /createInFlightRef/);
   assert.match(reviewStep, /Audit reason supplied/);
   assert.match(reviewStep, /Ready to create/);
-  assert.match(editor, /aria-label="Store category sections"/);
-  assert.match(editor, /Category details/);
-  assert.match(editor, /Prompt templates \(\$\{templates\.length\}\)/);
-  assert.match(editor, /Shopify mappings \(\$\{category\.taxonomyMappings\.length\}\)/);
+  assert.match(maintenanceTabs, /aria-label="Store category sections"/);
+  assert.match(maintenanceTabs, /Category details/);
+  assert.match(maintenanceTabs, /Prompt templates \(\$\{templateCount\}\)/);
+  assert.match(maintenanceTabs, /Shopify mappings \(\$\{mappingCount\}\)/);
+
+  const templateWorkspace = await source("src/components/admin/store-categories/prompt-template-workspace.tsx");
+  const templateList = await source("src/components/admin/store-categories/prompt-template-list.tsx");
+  const workspaceHeader = await source("src/components/admin/store-categories/store-category-workspace-header.tsx");
+  assert.match(page, /template\?: string \| string\[\]/);
+  assert.match(catalog, /Existing categories/);
+  assert.match(catalog, /selectedTemplateId=\{selectedTemplateId\}/);
+  assert.match(editor, /StoreCategoryWorkspaceHeader/);
+  assert.match(editor, /StoreCategoryMaintenanceTabs/);
+  assert.match(editor, /PromptTemplateWorkspace/);
+  assert.doesNotMatch(editor, /templates\.map\(\(template\) => \(\s*<PromptTemplateEditor/);
+  assert.match(templateWorkspace, /Maintain one template at a time/);
+  assert.match(templateWorkspace, /PromptTemplateList/);
+  assert.match(templateList, /\+ New/);
+  assert.match(templateList, /Default/);
+  assert.match(workspaceHeader, /Active profiles/);
+  assert.match(workspaceHeader, /Default template/);
 });

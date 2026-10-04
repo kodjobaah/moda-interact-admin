@@ -11,6 +11,7 @@ type StoreCategoriesPageProps = {
   searchParams: Promise<{
     category?: string | string[];
     tab?: string | string[];
+    template?: string | string[];
   }>;
 };
 
@@ -27,6 +28,10 @@ export default async function StoreCategoriesPage({
   const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const selectedTab: StoreCategoryTab =
     rawTab === "templates" || rawTab === "taxonomy" ? rawTab : "details";
+  const rawTemplate = params.template;
+  const selectedTemplateId = Array.isArray(rawTemplate)
+    ? rawTemplate[0]
+    : rawTemplate;
 
   return (
     <AdminShell active="store-categories">
@@ -35,6 +40,7 @@ export default async function StoreCategoriesPage({
           catalogue={catalogue}
           selectedCategoryId={selectedCategoryId}
           selectedTab={selectedTab}
+          selectedTemplateId={selectedTemplateId}
         />
       </div>
     </AdminShell>

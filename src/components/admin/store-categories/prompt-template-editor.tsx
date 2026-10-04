@@ -9,16 +9,18 @@ const inputClass =
 export function PromptTemplateEditor({
   categoryId,
   template,
+  heading,
 }: {
   categoryId: string;
   template?: Template;
+  heading?: string;
 }) {
   const creating = !template;
   return (
-    <section className="border-t border-gray-200 pt-5">
+    <section>
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="text-sm font-semibold text-gray-900">
-          {creating ? "Create prompt template" : template.displayName}
+          {heading ?? (creating ? "Create prompt template" : template.displayName)}
         </h4>
         {!creating ? (
           <span className="font-mono text-xs text-gray-500">

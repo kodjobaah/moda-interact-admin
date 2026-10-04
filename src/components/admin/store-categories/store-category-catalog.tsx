@@ -9,10 +9,12 @@ export function StoreCategoryCatalog({
   catalogue,
   selectedCategoryId,
   selectedTab = "details",
+  selectedTemplateId,
 }: {
   catalogue: StoreCategoryCatalogue;
   selectedCategoryId?: string;
   selectedTab?: StoreCategoryTab;
+  selectedTemplateId?: string;
 }) {
   const selectedCategory =
     catalogue.categories.find((category) => category.id === selectedCategoryId) ??
@@ -36,27 +38,46 @@ export function StoreCategoryCatalog({
           No Store Categories have been created.
         </p>
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[15rem_minmax(0,1fr)]">
-          <nav aria-label="Store Categories" className="space-y-1">
-            {catalogue.categories.map((category) => (
-              <Link
-                key={category.id}
-                href={`/system-controls/store-categories?category=${encodeURIComponent(category.id)}&tab=${selectedTab}`}
-                aria-current={category.id === selectedCategory?.id ? "page" : undefined}
-                className={`block rounded-md px-3 py-2 text-sm ${category.id === selectedCategory?.id ? "bg-[var(--brand-100)] font-semibold text-[var(--brand-900)]" : "text-gray-700 hover:bg-gray-100"}`}
-              >
-                <span className="block truncate">{category.displayName}</span>
-                <span className="mt-1 block text-xs font-normal text-gray-500">
-                  {category.enabled ? "Enabled" : "Disabled"} · {category.templates.length} templates
-                </span>
-              </Link>
-            ))}
-          </nav>
+        <div className="grid gap-6 xl:grid-cols-[17rem_minmax(0,1fr)]">
+          <aside className="self-start rounded-xl border border-gray-200 bg-white p-3 shadow-sm xl:sticky xl:top-4">
+            <div className="px-2 pb-3">
+              <h2 className="text-sm font-semibold text-gray-900">Existing categories</h2>
+              <p className="mt-1 text-xs text-gray-500">{catalogue.categories.length} configured</p>
+            </div>
+            <nav aria-label="Store Categories" className="space-y-1">
+              {catalogue.categories.map((category) => (
+                <Link
+                  key={category.id}
+                  href={`/system-controls/store-categories?category=${encodeURIComponent(category.id)}&tab=${selectedTab}`}
+                  aria-current={category.id === selectedCategory?.id ? "page" : undefined}
+                  className={`block rounded-lg border px-3 py-3 text-sm transition-colors ${
+                    category.id === selectedCategory?.id
+                      ? "border-[var(--brand-300)] bg-[var(--brand-50)] font-semibold text-[var(--brand-900)] shadow-sm"
+                      : "border-transparent text-gray-700 hover:border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="block truncate">{category.displayName}</span>
+                  <span className="mt-1 flex flex-wrap items-center gap-1 text-xs font-normal text-gray-500">
+                    <span>{category.enabled ? "Enabled" : "Disabled"}</span>
+                    <span>·</span>
+                    <span>{category.templates.length} templates</span>
+                    {category.defaultTemplateId ? (
+                      <>
+                        <span>·</span>
+                        <span>default set</span>
+                      </>
+                    ) : null}
+                  </span>
+                </Link>
+              ))}
+            </nav>
+          </aside>
           {selectedCategory ? (
             <StoreCategoryEditor
               category={selectedCategory}
               categories={catalogue.categories}
               activeTab={selectedTab}
+              selectedTemplateId={selectedTemplateId}
             />
           ) : null}
         </div>
