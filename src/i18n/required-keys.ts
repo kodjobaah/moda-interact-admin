@@ -84,6 +84,7 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "queue.readOnlyView",
   "queue.refresh",
   "queue.refreshNow",
+  "queue.refreshControlHint",
   "queue.refreshStoppedForJob",
   "queue.loadingData",
   "queue.summary",

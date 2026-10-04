@@ -2,6 +2,7 @@
 
 import { adminI18n, adminQueueJobLabel } from "@/i18n";
 
+import { isRefreshValue, REFRESH_OPTIONS } from "../queue-monitor-refresh";
 import { QueueJobDetail } from "./queue-job-detail";
 import { QueueJobsTable } from "./queue-jobs-table";
 import { formatQueueMonitorTime } from "./queue-summary-table";
@@ -16,6 +17,10 @@ type QueueDetailDrawerProps = {
   queueJobsState: ReturnType<typeof useQueueJobs>;
   jobDetailState: ReturnType<typeof useQueueJobDetail>;
   drawerState: ReturnType<typeof useResizableDrawer>;
+  refreshMs: number;
+  setRefreshMs: (refreshMs: number) => void;
+  summaryLoading: boolean;
+  refreshSummary: () => Promise<void>;
   setSelectedQueueName: (queueName: string | null) => void;
 };
 
@@ -25,6 +30,10 @@ export function QueueDetailDrawer({
   queueJobsState,
   jobDetailState,
   drawerState,
+  refreshMs,
+  setRefreshMs,
+  summaryLoading,
+  refreshSummary,
   setSelectedQueueName,
 }: QueueDetailDrawerProps) {
   const {
@@ -100,6 +109,47 @@ export function QueueDetailDrawer({
             <span aria-hidden="true" className="text-xl leading-none">
               &times;
             </span>
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-col justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-medium text-gray-900">
+            {adminI18n.t("queue.refresh")}
+          </p>
+          <p className="mt-1 text-xs text-gray-600">
+            {adminI18n.t("queue.refreshControlHint")}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-xs uppercase tracking-wide text-gray-500">
+            <span className="sr-only">{adminI18n.t("queue.refresh")}</span>
+            <select
+              id="queue-detail-refresh-rate"
+              aria-label={adminI18n.t("queue.refresh")}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm normal-case tracking-normal text-gray-700"
+              value={refreshMs}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                if (isRefreshValue(value)) setRefreshMs(value);
+              }}
+            >
+              {REFRESH_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {!("count" in option)
+                    ? adminI18n.t(option.labelKey)
+                    : adminI18n.t(option.labelKey, { count: option.count })}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            onClick={() => void refreshSummary()}
+            disabled={summaryLoading || jobDetailState.selectedJobId !== null}
+          >
+            {adminI18n.t("queue.refreshNow")}
           </button>
         </div>
       </div>

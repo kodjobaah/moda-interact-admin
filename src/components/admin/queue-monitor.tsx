@@ -140,6 +140,10 @@ export function QueueMonitor() {
                 queueJobsState={queueJobsState}
                 jobDetailState={jobDetailState}
                 drawerState={drawerState}
+                refreshMs={refreshMs}
+                setRefreshMs={setRefreshMs}
+                summaryLoading={loading}
+                refreshSummary={refresh}
                 setSelectedQueueName={setSelectedQueueName}
               />
             ) : null}

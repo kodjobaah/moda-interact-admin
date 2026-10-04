@@ -182,3 +182,21 @@ test("selecting a job stops queue auto-refresh until the detail view is closed",
   assert.match(source, /disabled=\{queueJobsLoading \|\| selectedJobId !== null\}/);
   assert.match(source, /queue\.refreshStoppedForJob/);
 });
+
+test("queue drawer exposes persistent auto-refresh controls while browsing jobs", async () => {
+  const source = await readQueueMonitorSources();
+
+  assert.match(source, /refreshMs=\{refreshMs\}/);
+  assert.match(source, /setRefreshMs=\{setRefreshMs\}/);
+  assert.match(source, /summaryLoading=\{loading\}/);
+  assert.match(source, /refreshSummary=\{refresh\}/);
+  assert.match(source, /id="queue-detail-refresh-rate"/);
+  assert.match(source, /REFRESH_OPTIONS\.map/);
+  assert.match(source, /if \(isRefreshValue\(value\)\) setRefreshMs\(value\)/);
+  assert.match(source, /queue\.refreshControlHint/);
+  assert.match(source, /onClick=\{\(\) => void refreshSummary\(\)\}/);
+  assert.match(
+    source,
+    /disabled=\{summaryLoading \|\| jobDetailState\.selectedJobId !== null\}/,
+  );
+});
