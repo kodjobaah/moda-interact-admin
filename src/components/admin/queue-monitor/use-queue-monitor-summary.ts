@@ -54,11 +54,13 @@ export function isQueueMonitorAbortError(error: unknown): boolean {
 
 type UseQueueMonitorSummaryOptions = {
   onSnapshotAccepted: () => void;
+  suspendAutoRefresh: boolean;
   unavailableError: string;
 };
 
 export function useQueueMonitorSummary({
   onSnapshotAccepted,
+  suspendAutoRefresh,
   unavailableError,
 }: UseQueueMonitorSummaryOptions) {
   const [refreshMs, setRefreshMs] = useState(getInitialRefreshMs);
@@ -74,6 +76,10 @@ export function useQueueMonitorSummary({
   useEffect(() => {
     onSnapshotAcceptedRef.current = onSnapshotAccepted;
   }, [onSnapshotAccepted]);
+
+  useEffect(() => {
+    if (suspendAutoRefresh) requestRef.current?.abort();
+  }, [suspendAutoRefresh]);
 
   const refresh = useCallback(async () => {
     const requestGate = requestGateRef.current;
@@ -115,10 +121,10 @@ export function useQueueMonitorSummary({
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, String(refreshMs));
-    if (refreshMs === 0) return undefined;
+    if (suspendAutoRefresh || refreshMs === 0) return undefined;
     const timer = window.setInterval(() => void refresh(), refreshMs);
     return () => window.clearInterval(timer);
-  }, [refresh, refreshMs]);
+  }, [refresh, refreshMs, suspendAutoRefresh]);
 
   return {
     refreshMs,

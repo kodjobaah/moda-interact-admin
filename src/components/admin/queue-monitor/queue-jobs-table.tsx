@@ -132,7 +132,7 @@ export function QueueJobsTable({
                 type="button"
                 className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 onClick={refreshJobs}
-                disabled={queueJobsLoading}
+                disabled={queueJobsLoading || selectedJobId !== null}
               >
                 {adminI18n.t("queue.refreshJobs")}
               </button>

@@ -167,3 +167,18 @@ test("queue drawer keeps the full browser paginated and state-safe", async () =>
     /function createInitialQueueJobDetailState\(\): QueueJobDetailState \{\s+return \{\s+selectedJobId: null,\s+jobDetail: null,\s+jobDetailError: null,\s+jobDetailLoading: false,\s+\};/,
   );
 });
+
+test("selecting a job stops queue auto-refresh until the detail view is closed", async () => {
+  const source = await readQueueMonitorSources();
+
+  assert.match(source, /suspendAutoRefresh: jobDetailState\.selectedJobId !== null/);
+  assert.match(
+    source,
+    /if \(selectedQueueName && !jobDetailState\.selectedJobId\) \{\s+refreshQueueJobs\(\);\s+\}/,
+  );
+  assert.match(source, /if \(suspendAutoRefresh\) requestRef\.current\?\.abort\(\)/);
+  assert.match(source, /if \(suspendAutoRefresh \|\| refreshMs === 0\) return undefined/);
+  assert.match(source, /disabled=\{loading \|\| jobDetailState\.selectedJobId !== null\}/);
+  assert.match(source, /disabled=\{queueJobsLoading \|\| selectedJobId !== null\}/);
+  assert.match(source, /queue\.refreshStoppedForJob/);
+});

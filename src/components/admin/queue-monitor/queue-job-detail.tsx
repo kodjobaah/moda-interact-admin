@@ -89,6 +89,9 @@ export function QueueJobDetail({ state, showAllJobs }: QueueJobDetailProps) {
           <p className="mt-1 text-sm text-gray-600">
             {adminI18n.t("queue.selectedJob", { jobId: selectedJobId })}
           </p>
+          <p className="mt-1 text-xs text-amber-700" role="status">
+            {adminI18n.t("queue.refreshStoppedForJob")}
+          </p>
         </div>
         <CopyButton value={selectedJobId} label={adminI18n.t("queue.jobId")} />
       </div>

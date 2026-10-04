@@ -55,9 +55,12 @@ export function QueueMonitor() {
   }
   const { refreshMs, setRefreshMs, snapshot, error, loading, refresh } =
     useQueueMonitorSummary({
+      suspendAutoRefresh: jobDetailState.selectedJobId !== null,
       unavailableError: adminI18n.t("queue.dataUnavailable"),
       onSnapshotAccepted: () => {
-        if (selectedQueueName) refreshQueueJobs();
+        if (selectedQueueName && !jobDetailState.selectedJobId) {
+          refreshQueueJobs();
+        }
       },
     });
 
@@ -72,7 +75,7 @@ export function QueueMonitor() {
             id="queue-monitor-title"
             className="text-lg font-semibold text-[var(--brand-900)]"
           >
-            {adminI18n.t("nav.shopifyQueues")}
+            {adminI18n.t("nav.platformQueues")}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
             {adminI18n.t("queue.readOnlyView")}
@@ -103,7 +106,7 @@ export function QueueMonitor() {
             type="button"
             className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-medium text-white hover:bg-[var(--brand-900)] disabled:opacity-50"
             onClick={() => void refresh()}
-            disabled={loading}
+            disabled={loading || jobDetailState.selectedJobId !== null}
           >
             {adminI18n.t("queue.refreshNow")}
           </button>
