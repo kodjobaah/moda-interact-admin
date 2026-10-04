@@ -216,7 +216,36 @@ test("fails closed for duplicate prompt lineages and configurations", () => {
   assert.match(serviceSource, /Multiple .* prompt lineages exist/);
   assert.match(serviceSource, /Multiple Agent configurations exist/);
   assert.match(serviceSource, /Multiple DRAFT revisions exist/);
-  assert.match(serviceSource, /assertUnique\(rows,/);
+  assert.match(serviceSource, /assertUnique\(/);
+  assert.match(serviceSource, /admin\.agent_instructions\.configuration_conflict/);
+  assert.match(consoleSource, /Agent Instructions configuration conflict/);
+  assert.match(consoleSource, /This scope is read-only until the persisted configuration is reconciled/);
+});
+
+test("duplicate DRAFT revisions surface a bounded scope conflict without choosing a draft", async () => {
+  const revisions = [
+    { id: "draft-1", promptId: "platform-prompt", revisionNumber: 1, status: "DRAFT", editVersion: 1, promptText: "One", sourceTemplateId: null, sourceTemplateEditVersion: null },
+    { id: "draft-2", promptId: "platform-prompt", revisionNumber: 2, status: "DRAFT", editVersion: 1, promptText: "Two", sourceTemplateId: null, sourceTemplateEditVersion: null },
+  ];
+  const tx = {
+    commerceAgentPrompt: {
+      findMany: async () => [{ id: "platform-prompt", scope: "PLATFORM", shopId: null, revisions }],
+    },
+    commerceAgentConfiguration: { findMany: async () => [] },
+  };
+
+  await assert.rejects(
+    getAgentInstructionsScopeData(tx as never, "DEVELOPMENT", "PLATFORM", null),
+    (error: unknown) => {
+      assert.equal((error as { name?: string }).name, "AgentInstructionsConfigurationConflict");
+      assert.equal((error as { code?: string }).code, "MULTIPLE_DRAFT_REVISIONS");
+      assert.deepEqual(
+        (error as { details?: { draftRevisionIds?: string[] } }).details?.draftRevisionIds,
+        ["draft-1", "draft-2"],
+      );
+      return true;
+    },
+  );
 });
 
 test("allocates at most one locked draft and copies only published seed provenance", () => {

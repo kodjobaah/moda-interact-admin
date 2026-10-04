@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import type {
   CommerceAgentPromptScope,
   CommerceAuditAction,
@@ -6,12 +7,53 @@ import type {
   Prisma,
 } from "@prisma/client";
 
+import { resolveDeploymentEnvironmentName } from "../auth/environment.ts";
 import { requirePlatformAdminRead } from "../auth/platform-admin.ts";
 import { resolveAdminCommerceEnvironment } from "./commerce-environment.ts";
 import { prisma } from "../prisma.ts";
 
 type Tx = Prisma.TransactionClient;
 type Scope = CommerceAgentPromptScope;
+
+const agentInstructionsLogger = createLogger({
+  serviceNamespace: "moda-interact",
+  serviceName: "moda-interact-admin",
+  environment: resolveDeploymentEnvironmentName(),
+});
+
+export type AgentInstructionsConflictCode =
+  | "MULTIPLE_PROMPT_LINEAGES"
+  | "MULTIPLE_CONFIGURATIONS"
+  | "MULTIPLE_DRAFT_REVISIONS"
+  | "PENDING_CATEGORY_CONFIGURATION"
+  | "ACTIVE_PROMPT_CONFIGURATION";
+
+type ConflictDetailValue = string | number | boolean | null | string[] | number[];
+
+export type AgentInstructionsScopeConflict = {
+  kind: "configuration-conflict";
+  code: AgentInstructionsConflictCode;
+  message: string;
+  scope: Scope;
+  shopId: string | null;
+  details: Record<string, ConflictDetailValue>;
+};
+
+class AgentInstructionsConfigurationConflict extends Error {
+  readonly code: AgentInstructionsConflictCode;
+  readonly details: Record<string, ConflictDetailValue>;
+
+  constructor(
+    code: AgentInstructionsConflictCode,
+    message: string,
+    details: Record<string, ConflictDetailValue> = {},
+  ) {
+    super(message);
+    this.name = "AgentInstructionsConfigurationConflict";
+    this.code = code;
+    this.details = details;
+  }
+}
 
 export type PromptMutation =
   | { kind: "create-draft"; scope: Scope; shopId: string | null; reason: string }
@@ -21,6 +63,14 @@ export type PromptMutation =
 
 function conflict(message = "Agent Instructions changed; reload and retry."): never {
   throw new Error(message);
+}
+
+function configurationConflict(
+  code: AgentInstructionsConflictCode,
+  message: string,
+  details: Record<string, ConflictDetailValue> = {},
+): never {
+  throw new AgentInstructionsConfigurationConflict(code, message, details);
 }
 
 function requireReason(reason: string): string {
@@ -37,14 +87,43 @@ export function validatePromptText(promptText: string): string {
   return promptText;
 }
 
-function assertUnique<T>(rows: T[], message: string): T | null {
-  if (rows.length > 1) conflict(message);
+function assertUnique<T extends { id?: string }>(
+  rows: T[],
+  code: AgentInstructionsConflictCode,
+  message: string,
+): T | null {
+  if (rows.length > 1) {
+    configurationConflict(code, message, {
+      recordCount: rows.length,
+      recordIds: rows.flatMap((row) => row.id ? [row.id] : []),
+    });
+  }
   return rows[0] ?? null;
 }
 
-function uniqueDraft<T extends { status: string }>(revisions: T[]): T | null {
+function uniqueDraft<
+  T extends {
+    status: string;
+    id?: string;
+    promptId?: string;
+    revisionNumber?: number;
+  },
+>(revisions: T[]): T | null {
   const drafts = revisions.filter((revision) => revision.status === "DRAFT");
-  if (drafts.length > 1) conflict("Multiple DRAFT revisions exist in this prompt lineage; resolve the configuration conflict first.");
+  if (drafts.length > 1) {
+    configurationConflict(
+      "MULTIPLE_DRAFT_REVISIONS",
+      "Multiple DRAFT revisions exist in this prompt lineage; resolve the configuration conflict first.",
+      {
+        draftCount: drafts.length,
+        lineageId: drafts[0]?.promptId ?? null,
+        draftRevisionIds: drafts.flatMap((draft) => draft.id ? [draft.id] : []),
+        draftRevisionNumbers: drafts.flatMap((draft) =>
+          typeof draft.revisionNumber === "number" ? [draft.revisionNumber] : [],
+        ),
+      },
+    );
+  }
   return drafts[0] ?? null;
 }
 
@@ -85,7 +164,11 @@ async function findLineage(tx: Tx, scope: Scope, shopId: string | null) {
     include: { revisions: { orderBy: [{ revisionNumber: "desc" }, { id: "asc" }] } },
     orderBy: { id: "asc" },
   });
-  return assertUnique(rows, `Multiple ${scope === "PLATFORM" ? "Platform" : "Shop"} prompt lineages exist; resolve the configuration conflict first.`);
+  return assertUnique(
+    rows,
+    "MULTIPLE_PROMPT_LINEAGES",
+    `Multiple ${scope === "PLATFORM" ? "Platform" : "Shop"} prompt lineages exist; resolve the configuration conflict first.`,
+  );
 }
 
 async function findConfiguration(
@@ -99,7 +182,38 @@ async function findConfiguration(
     include: { activePromptRevision: true },
     orderBy: { id: "asc" },
   });
-  return assertUnique(rows, "Multiple Agent configurations exist for this environment and scope.");
+  return assertUnique(
+    rows,
+    "MULTIPLE_CONFIGURATIONS",
+    "Multiple Agent configurations exist for this environment and scope.",
+  );
+}
+
+async function loadAgentInstructionsScopeData(
+  tx: Tx | typeof prisma,
+  environment: CommerceEnvironment,
+  scope: Scope,
+  shopId: string | null,
+) {
+  try {
+    return await getAgentInstructionsScopeData(tx, environment, scope, shopId);
+  } catch (error) {
+    if (!(error instanceof AgentInstructionsConfigurationConflict)) throw error;
+    agentInstructionsLogger.error("admin.agent_instructions.configuration_conflict", {
+      code: error.code,
+      scope,
+      shopId,
+      ...error.details,
+    });
+    return {
+      kind: "configuration-conflict" as const,
+      code: error.code,
+      message: error.message,
+      scope,
+      shopId,
+      details: error.details,
+    } satisfies AgentInstructionsScopeConflict;
+  }
 }
 
 export async function getAgentInstructionsData(input: {
@@ -119,8 +233,8 @@ export async function getAgentInstructionsData(input: {
     ? await prisma.shop.findUnique({ where: { id: input.shopId }, select: { id: true, domain: true } })
     : shops[0] ?? null;
   const [platform, shopData] = await Promise.all([
-    getAgentInstructionsScopeData(prisma, environment, "PLATFORM", null),
-    selectedShop ? getAgentInstructionsScopeData(prisma, environment, "SHOP", selectedShop.id) : Promise.resolve(null),
+    loadAgentInstructionsScopeData(prisma, environment, "PLATFORM", null),
+    selectedShop ? loadAgentInstructionsScopeData(prisma, environment, "SHOP", selectedShop.id) : Promise.resolve(null),
   ]);
   return { environment, shops, selectedShop, platform, shopData };
 }
@@ -143,7 +257,11 @@ export async function getAgentInstructionsScopeData(tx: Tx | typeof prisma, envi
         })
       : Promise.resolve(null),
   ]);
-  const configuration = assertUnique(configurationRows, "Multiple Agent configurations exist for this environment and scope.");
+  const configuration = assertUnique(
+    configurationRows,
+    "MULTIPLE_CONFIGURATIONS",
+    "Multiple Agent configurations exist for this environment and scope.",
+  );
   const revisions = lineage?.revisions ?? [];
   const pendingRevisionId = profile?.pendingPromptRevisionId ?? null;
   const pendingRevision = pendingRevisionId
@@ -158,14 +276,32 @@ export async function getAgentInstructionsScopeData(tx: Tx | typeof prisma, envi
       pendingRevision.sourceTemplateId &&
       pendingRevision.sourceTemplateEditVersion !== null,
     );
-    if (!valid) conflict("Pending Store Category prompt configuration conflict; do not edit until reconciled.");
+    if (!valid) {
+      configurationConflict(
+        "PENDING_CATEGORY_CONFIGURATION",
+        "Pending Store Category prompt configuration conflict; do not edit until reconciled.",
+        {
+          lineageId: lineage?.id ?? null,
+          pendingPromptRevisionId: pendingRevisionId,
+          pendingCategoryId: profile?.pendingCategoryId ?? null,
+        },
+      );
+    }
   }
   const activeRevisionId = configuration?.activePromptRevisionId ?? null;
   const active = activeRevisionId
     ? revisions.find((revision) => revision.id === activeRevisionId) ?? null
     : null;
   if (activeRevisionId && (!active || active.status !== "PUBLISHED" || active.promptId !== lineage?.id)) {
-    conflict("Active prompt configuration points to an invalid revision.");
+    configurationConflict(
+      "ACTIVE_PROMPT_CONFIGURATION",
+      "Active prompt configuration points to an invalid revision.",
+      {
+        lineageId: lineage?.id ?? null,
+        activePromptRevisionId: activeRevisionId,
+        configurationId: configuration?.id ?? null,
+      },
+    );
   }
   return {
     scope,

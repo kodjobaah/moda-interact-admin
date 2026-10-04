@@ -3,10 +3,48 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutateAgentInstructionsAction } from "@/app/actions/agent-instructions";
-import type { getAgentInstructionsData } from "@/lib/admin/agent-instructions";
+import type { AgentInstructionsScopeConflict, getAgentInstructionsData } from "@/lib/admin/agent-instructions";
 
 type Data = Awaited<ReturnType<typeof getAgentInstructionsData>>;
-type ScopeData = NonNullable<Data["platform"]>;
+type ScopeResult = NonNullable<Data["platform"]>;
+type ScopeData = Exclude<ScopeResult, AgentInstructionsScopeConflict>;
+
+function isScopeConflict(data: ScopeResult): data is AgentInstructionsScopeConflict {
+  return "kind" in data && data.kind === "configuration-conflict";
+}
+
+function ConflictDetails({ conflict }: { conflict: AgentInstructionsScopeConflict }) {
+  const detailRows = Object.entries(conflict.details).filter(([, value]) => {
+    if (Array.isArray(value)) return value.length > 0;
+    return value !== null && value !== "";
+  });
+
+  return (
+    <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-4" role="alert">
+      <h3 className="font-semibold text-amber-950">Agent Instructions configuration conflict</h3>
+      <p className="mt-2 text-sm text-amber-900">{conflict.message}</p>
+      <p className="mt-2 text-sm text-amber-900">
+        This scope is read-only until the persisted configuration is reconciled. No prompt revision was selected or changed automatically.
+      </p>
+      <dl className="mt-3 grid gap-2 text-xs text-amber-950 sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold uppercase tracking-wide">Conflict code</dt>
+          <dd className="mt-1 break-all font-mono">{conflict.code}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold uppercase tracking-wide">Scope</dt>
+          <dd className="mt-1">{conflict.scope}{conflict.shopId ? ` · ${conflict.shopId}` : ""}</dd>
+        </div>
+        {detailRows.map(([key, value]) => (
+          <div key={key} className="min-w-0">
+            <dt className="font-semibold uppercase tracking-wide">{key}</dt>
+            <dd className="mt-1 break-all font-mono">{Array.isArray(value) ? value.join(", ") : String(value)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
 
 const inputClass = "mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]";
 
@@ -131,7 +169,6 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
 
 export function AgentInstructionsConsole({ data }: { data: Data }) {
   const selected = data.selectedShop;
-  const configurationVersion = data.shopData?.configuration?.promptEditVersion ?? 1;
   return (
     <>
       <div className="mb-6">
@@ -141,8 +178,14 @@ export function AgentInstructionsConsole({ data }: { data: Data }) {
       <div className="grid gap-8 xl:grid-cols-2">
         <section className="min-w-0">
           <h2 className="text-lg font-semibold text-gray-900">Platform Instructions</h2>
-          <p className="mt-1 text-xs text-gray-500">Active revision: {data.platform?.active?.revisionNumber ?? "None"} · Configuration edit version: {data.platform?.configuration?.promptEditVersion ?? 1}</p>
-          {data.platform ? <PromptEditor key={`${data.platform.draft?.id ?? "none"}:${data.platform.draft?.editVersion ?? 0}`} data={data.platform} configurationVersion={data.platform.configuration?.promptEditVersion ?? 1} /> : null}
+          {isScopeConflict(data.platform) ? (
+            <ConflictDetails conflict={data.platform} />
+          ) : (
+            <>
+              <p className="mt-1 text-xs text-gray-500">Active revision: {data.platform.active?.revisionNumber ?? "None"} · Configuration edit version: {data.platform.configuration?.promptEditVersion ?? 1}</p>
+              <PromptEditor key={`${data.platform.draft?.id ?? "none"}:${data.platform.draft?.editVersion ?? 0}`} data={data.platform} configurationVersion={data.platform.configuration?.promptEditVersion ?? 1} />
+            </>
+          )}
         </section>
         <section className="min-w-0">
           <h2 className="text-lg font-semibold text-gray-900">Shop Instructions</h2>
@@ -159,10 +202,19 @@ export function AgentInstructionsConsole({ data }: { data: Data }) {
             </label>
             <button className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold sm:col-span-2 sm:justify-self-end" type="submit">Load Shop</button>
           </form>
-          {selected && data.shopData ? <>
-            <p className="mb-3 text-xs text-gray-500">{selected.domain} · Configuration edit version: {configurationVersion}</p>
-            <PromptEditor key={`${selected.id}:${data.shopData.draft?.id ?? "none"}:${data.shopData.draft?.editVersion ?? 0}`} data={data.shopData} configurationVersion={configurationVersion} />
-          </> : <p className="border-y border-gray-200 py-6 text-sm text-gray-600">Search for and select a Shop to manage Shop Instructions.</p>}
+          {selected && data.shopData ? (
+            isScopeConflict(data.shopData) ? (
+              <>
+                <p className="mb-3 text-xs text-gray-500">{selected.domain}</p>
+                <ConflictDetails conflict={data.shopData} />
+              </>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-gray-500">{selected.domain} · Configuration edit version: {data.shopData.configuration?.promptEditVersion ?? 1}</p>
+                <PromptEditor key={`${selected.id}:${data.shopData.draft?.id ?? "none"}:${data.shopData.draft?.editVersion ?? 0}`} data={data.shopData} configurationVersion={data.shopData.configuration?.promptEditVersion ?? 1} />
+              </>
+            )
+          ) : <p className="border-y border-gray-200 py-6 text-sm text-gray-600">Search for and select a Shop to manage Shop Instructions.</p>}
         </section>
       </div>
     </>
