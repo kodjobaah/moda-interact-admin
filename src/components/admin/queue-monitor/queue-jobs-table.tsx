@@ -2,6 +2,7 @@
 
 import { adminI18n, adminStatusLabel } from "@/i18n";
 
+import { formatQueueJobShop } from "./queue-job-shop";
 import { formatQueueMonitorTime } from "./queue-summary-table";
 import type { useQueueJobs } from "./use-queue-jobs";
 
@@ -216,10 +217,7 @@ export function QueueJobsTable({
                         </button>
                       </td>
                       <td className="px-4 py-3 text-gray-700">
-                        {job.shop ??
-                          (job.attribution === "unresolved"
-                            ? adminI18n.t("queue.unresolved")
-                            : adminI18n.t("queue.orphanShop"))}
+                        {formatQueueJobShop(job.shop, job.attribution)}
                       </td>
                       <td className="px-4 py-3 text-gray-700">{job.name}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600">

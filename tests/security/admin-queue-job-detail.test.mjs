@@ -59,6 +59,33 @@ test('normalizes active detail with the same shop projection as list rows', asyn
   });
 });
 
+
+test('keeps merchant knowledge shop IDs attributed instead of marking them orphaned', async () => {
+  const { readQueueJobDetail } = await importQueueMonitor();
+  const detail = await readQueueJobDetail({
+    redisUrl: 'redis://merchant-knowledge-detail.test.invalid',
+    queueName: 'merchant-knowledge',
+    status: 'waiting',
+    jobId: 'knowledge-123',
+    queueFactory: queueFactory({
+      id: 'knowledge-123',
+      name: 'process-source-revision',
+      attemptsMade: 0,
+      timestamp: 1710000000000,
+      data: {
+        schemaVersion: 1,
+        shopId: 'cmu8d6ypo0008qr0i5pvwjzux',
+        sourceRevisionId: 'revision-1',
+        generation: 1,
+        requestedAt: '2026-10-04T11:59:35.230Z',
+      },
+    }, 'waiting'),
+  });
+
+  assert.equal(detail.shop, 'cmu8d6ypo0008qr0i5pvwjzux');
+  assert.equal(detail.attribution, 'identified');
+});
+
 test('keeps failed detail inspectable through the generic reader', async () => {
   const { readQueueJobDetail } = await importQueueMonitor();
   const detail = await readQueueJobDetail({

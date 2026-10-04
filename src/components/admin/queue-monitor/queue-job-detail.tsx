@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { adminI18n, adminStatusLabel } from "@/i18n";
 
+import { formatQueueJobShop } from "./queue-job-shop";
 import type { useQueueJobDetail } from "./use-queue-job-detail";
 
 type QueueJobDetailProps = {
@@ -116,10 +117,7 @@ export function QueueJobDetail({ state, showAllJobs }: QueueJobDetailProps) {
               [adminI18n.t("queue.status"), adminStatusLabel(jobDetail.status)],
               [
                 adminI18n.t("queue.shop"),
-                jobDetail.shop ??
-                  (jobDetail.attribution === "unresolved"
-                    ? adminI18n.t("queue.unresolved")
-                    : adminI18n.t("queue.orphanShop")),
+                formatQueueJobShop(jobDetail.shop, jobDetail.attribution),
               ],
               [
                 adminI18n.t("queue.attemptsMade"),

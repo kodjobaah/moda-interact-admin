@@ -1,7 +1,7 @@
 export type QueueJobStatus = "failed" | "active" | "waiting" | "delayed";
 export type QueueJobShop = "*" | "__orphan__" | "__unresolved__" | string;
 export type QueueJobDirection = "asc" | "desc";
-export type QueueJobAttribution = "known" | "unresolved" | "orphan";
+export type QueueJobAttribution = "known" | "identified" | "unresolved" | "orphan";
 
 export type QueueMonitorSnapshot = {
   observedAt: string;

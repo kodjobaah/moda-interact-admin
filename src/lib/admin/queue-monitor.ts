@@ -2,12 +2,36 @@ import { Queue, type JobType } from 'bullmq';
 import Redis from 'ioredis';
 
 import {
+  BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME,
+  BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME,
+} from '@modainteract/moda-interact-shared/billing';
+import {
   MERCHANT_COMMUNICATIONS_JOB_NAMES,
   MERCHANT_COMMUNICATIONS_QUEUE_NAME,
 } from '@modainteract/moda-interact-shared/merchant-communications';
+import {
+  MERCHANT_KNOWLEDGE_PROCESS_JOB_NAME,
+  MERCHANT_KNOWLEDGE_QUEUE_NAME,
+} from '@modainteract/moda-interact-shared/merchant-knowledge';
 import { SHOPIFY_WEBHOOK_QUEUE_CONTRACTS } from '@modainteract/moda-interact-shared/shopify';
 
 const QUEUE_OPERATION_TIMEOUT_MS = 2_500;
+
+// These queue names are currently owned by moda-interact-background and are not
+// yet published as Shared runtime contracts. Keep them centralized here so the
+// Admin operational registry has one bounded source for every platform queue.
+const PENDING_RECOVERY_CANDIDATE_QUEUE = 'pending-recovery-candidates';
+const EVALUATE_PENDING_RECOVERY_JOB = 'evaluate-pending-recovery';
+const RECOVERY_CAPACITY_RESUME_QUEUE = 'recovery-capacity-resume';
+const RESUME_CAPACITY_BLOCKED_RECOVERIES_JOB = 'resume-capacity-blocked-recoveries';
+const RECOVERY_OUTREACH_FOLLOW_UP_QUEUE = 'recovery-outreach-follow-up';
+const RECOVERY_OUTREACH_FOLLOW_UP_JOB = 'recovery-outreach-follow-up';
+const WHATSAPP_QUEUE_NAME = 'whatsapp-events';
+const WHATSAPP_JOB_NAMES = [
+  'message-received',
+  'message-status',
+  'process-conversation-turn',
+] as const;
 
 export type QueueMonitorCounts = {
   waiting: number;
@@ -100,7 +124,7 @@ export type QueueJobSummary = {
   failedReason: string;
 };
 
-export type QueueJobAttribution = 'known' | 'unresolved' | 'orphan';
+export type QueueJobAttribution = 'known' | 'identified' | 'unresolved' | 'orphan';
 
 export type QueueJobFacets = {
   shops: Array<{ value: string; label: string }>;
@@ -240,6 +264,7 @@ const queueDefinitions: QueueMonitorDefinition[] = [
     jobNames: [
       SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_EVENTS.jobName,
       SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_UPDATED_EVENTS.jobName,
+      SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CART_ACTIVITY_EVENTS.jobName,
     ],
   },
   {
@@ -247,17 +272,37 @@ const queueDefinitions: QueueMonitorDefinition[] = [
     jobNames: [SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.ORDER_EVENTS.jobName],
   },
   {
-    queueName: 'pending-recovery-candidates',
-    jobNames: ['evaluate-pending-recovery'],
-    supportedJobNames: ['evaluate-pending-recovery'],
+    queueName: PENDING_RECOVERY_CANDIDATE_QUEUE,
+    jobNames: [EVALUATE_PENDING_RECOVERY_JOB],
+    supportedJobNames: [EVALUATE_PENDING_RECOVERY_JOB],
   },
   {
-    queueName: 'whatsapp-events',
-    jobNames: ['whatsapp-events'],
+    queueName: RECOVERY_CAPACITY_RESUME_QUEUE,
+    jobNames: [RESUME_CAPACITY_BLOCKED_RECOVERIES_JOB],
+  },
+  {
+    queueName: RECOVERY_OUTREACH_FOLLOW_UP_QUEUE,
+    jobNames: [RECOVERY_OUTREACH_FOLLOW_UP_JOB],
+  },
+  {
+    queueName: SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName,
+    jobNames: [SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.jobName],
+  },
+  {
+    queueName: BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME,
+    jobNames: [BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME],
+  },
+  {
+    queueName: WHATSAPP_QUEUE_NAME,
+    jobNames: [...WHATSAPP_JOB_NAMES],
   },
   {
     queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
     jobNames: Object.values(MERCHANT_COMMUNICATIONS_JOB_NAMES),
+  },
+  {
+    queueName: MERCHANT_KNOWLEDGE_QUEUE_NAME,
+    jobNames: [MERCHANT_KNOWLEDGE_PROCESS_JOB_NAME],
   },
 ];
 
@@ -271,16 +316,36 @@ const queueOverviewDefinitions: QueueOverviewDefinition[] = [
     labelKey: 'queue.orderEvents',
   },
   {
-    queueName: 'pending-recovery-candidates',
+    queueName: PENDING_RECOVERY_CANDIDATE_QUEUE,
     labelKey: 'queue.pendingRecoveries',
   },
   {
-    queueName: 'whatsapp-events',
+    queueName: RECOVERY_CAPACITY_RESUME_QUEUE,
+    labelKey: 'queue.recoveryCapacityResume',
+  },
+  {
+    queueName: RECOVERY_OUTREACH_FOLLOW_UP_QUEUE,
+    labelKey: 'queue.recoveryOutreachFollowUp',
+  },
+  {
+    queueName: SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName,
+    labelKey: 'queue.shopifyDiscountSync',
+  },
+  {
+    queueName: BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME,
+    labelKey: 'queue.billingSubscriptionReconcile',
+  },
+  {
+    queueName: WHATSAPP_QUEUE_NAME,
     labelKey: 'queue.whatsappEvents',
   },
   {
     queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
     labelKey: 'queue.merchantCommunications',
+  },
+  {
+    queueName: MERCHANT_KNOWLEDGE_QUEUE_NAME,
+    labelKey: 'queue.merchantKnowledge',
   },
 ];
 
@@ -479,8 +544,16 @@ function normalizeShopValue(value: unknown): string | null {
   return normalized;
 }
 
+function normalizeShopId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (normalized.length === 0 || normalized.length > 128) return null;
+  if (/[^\x21-\x7e]/.test(normalized)) return null;
+  return normalized;
+}
+
 function isWhatsAppQueue(queueName: string) {
-  return queueName === 'whatsapp-events';
+  return queueName === WHATSAPP_QUEUE_NAME;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -495,6 +568,8 @@ export function extractQueueJobShop(
   const isShopifyQueue =
     queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_EVENTS.queueName ||
     queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.ORDER_EVENTS.queueName;
+  const isShopifyDiscountSyncQueue =
+    queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName;
   if (!isRecord(data)) return null;
 
   const definition = getQueueDefinition(queueName);
@@ -504,9 +579,45 @@ export function extractQueueJobShop(
     if (!isRecord(data.tenant)) return null;
     return normalizeShopValue(data.tenant.shopDomain);
   }
-  if (queueName === 'pending-recovery-candidates') {
+  if (isShopifyDiscountSyncQueue) {
     return normalizeShopValue(data.shopDomain);
   }
+  if (queueName === PENDING_RECOVERY_CANDIDATE_QUEUE) {
+    return normalizeShopValue(data.shopDomain);
+  }
+  return null;
+}
+
+
+export function extractQueueJobShopId(
+  queueName: string,
+  jobName: string,
+  data: unknown,
+): string | null {
+  if (!isRecord(data)) return null;
+
+  const definition = getQueueDefinition(queueName);
+  const supportedJobNames = definition?.supportedJobNames ?? definition?.jobNames ?? [];
+  if (!supportedJobNames.includes(jobName)) return null;
+
+  if (
+    queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_EVENTS.queueName ||
+    queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.ORDER_EVENTS.queueName
+  ) {
+    if (!isRecord(data.tenant)) return null;
+    return normalizeShopId(data.tenant.shopId);
+  }
+
+  if (
+    queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName ||
+    queueName === PENDING_RECOVERY_CANDIDATE_QUEUE ||
+    queueName === RECOVERY_CAPACITY_RESUME_QUEUE ||
+    queueName === BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME ||
+    queueName === MERCHANT_KNOWLEDGE_QUEUE_NAME
+  ) {
+    return normalizeShopId(data.shopId);
+  }
+
   return null;
 }
 
@@ -517,6 +628,10 @@ function classifyQueueJob(
 ): { shop: string | null; attribution: QueueJobAttribution } {
   const shop = extractQueueJobShop(queueName, jobName, data);
   if (shop) return { shop, attribution: 'known' };
+
+  const shopId = extractQueueJobShopId(queueName, jobName, data);
+  if (shopId) return { shop: shopId, attribution: 'identified' };
+
   return {
     shop: null,
     attribution: isWhatsAppQueue(queueName) ? 'unresolved' : 'orphan',
@@ -555,6 +670,11 @@ function parseQueueJobDirection(value: string | undefined): QueueJobDirection {
 function parseQueueJobShop(value: string | undefined): string {
   if (value === undefined || value === '*') return '*';
   if (value === '__orphan__' || value === '__unresolved__') return value;
+  if (value.startsWith('id:')) {
+    const shopId = normalizeShopId(value.slice(3));
+    if (!shopId) throw new InvalidQueueJobQueryError();
+    return `id:${shopId}`;
+  }
   const normalized = normalizeShopValue(value);
   if (!normalized) throw new InvalidQueueJobQueryError();
   return normalized;
@@ -611,7 +731,10 @@ function matchesQueueJobShop(job: QueueJobSummary, filter: string) {
   if (filter === '*') return true;
   if (filter === '__orphan__') return job.attribution === 'orphan';
   if (filter === '__unresolved__') return job.attribution === 'unresolved';
-  return job.shop === filter;
+  if (filter.startsWith('id:')) {
+    return job.attribution === 'identified' && job.shop === filter.slice(3);
+  }
+  return job.attribution === 'known' && job.shop === filter;
 }
 
 function compareQueueJobs(left: QueueJobSummary, right: QueueJobSummary, direction: QueueJobDirection) {
@@ -624,9 +747,22 @@ function buildQueueJobFacets(
   summaries: QueueJobSummary[],
   scanTruncated: boolean,
 ): QueueJobFacets {
-  const shops = [...new Set(summaries.flatMap((job) => job.shop ? [job.shop] : []))]
-    .sort((left, right) => left.localeCompare(right))
-    .map((value) => ({ value, label: value }));
+  const shops = summaries
+    .flatMap((job) => {
+      if (!job.shop) return [];
+      if (job.attribution === 'identified') {
+        return [{ value: `id:${job.shop}`, label: `Shop ID · ${job.shop}` }];
+      }
+      if (job.attribution === 'known') {
+        return [{ value: job.shop, label: job.shop }];
+      }
+      return [];
+    })
+    .filter(
+      (shop, index, items) =>
+        items.findIndex((candidate) => candidate.value === shop.value) === index,
+    )
+    .sort((left, right) => left.label.localeCompare(right.label));
   return {
     shops,
     hasOrphans: summaries.some((job) => job.attribution === 'orphan'),

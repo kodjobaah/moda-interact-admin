@@ -74,6 +74,80 @@ test('projects only documented Shopify tenant shop domains', async () => {
   );
 });
 
+
+test('projects documented internal shop IDs when a queue payload has no shop domain', async () => {
+  const { extractQueueJobShopId, readQueueJobSnapshot } = await importQueueMonitor();
+
+  assert.equal(
+    extractQueueJobShopId(
+      'merchant-knowledge',
+      'process-source-revision',
+      { shopId: 'cmu8d6ypo0008qr0i5pvwjzux' },
+    ),
+    'cmu8d6ypo0008qr0i5pvwjzux',
+  );
+  assert.equal(
+    extractQueueJobShopId(
+      'billing-subscription-reconcile',
+      'reconcile-subscription',
+      { shopId: 'shop-1' },
+    ),
+    'shop-1',
+  );
+
+  const snapshot = await readQueueJobSnapshot({
+    redisUrl: 'redis://queue-shop-id.test.invalid',
+    queueName: 'merchant-knowledge',
+    status: 'waiting',
+    queueFactory: queueFactory({
+      waiting: [
+        {
+          id: 'knowledge-1',
+          name: 'process-source-revision',
+          attemptsMade: 0,
+          timestamp: 1710000000000,
+          data: {
+            schemaVersion: 1,
+            shopId: 'cmu8d6ypo0008qr0i5pvwjzux',
+            sourceRevisionId: 'revision-1',
+            generation: 1,
+            requestedAt: '2026-10-04T11:59:35.230Z',
+          },
+        },
+      ],
+    }),
+  });
+
+  assert.equal(snapshot.jobs[0].shop, 'cmu8d6ypo0008qr0i5pvwjzux');
+  assert.equal(snapshot.jobs[0].attribution, 'identified');
+  assert.deepEqual(snapshot.facets.shops, [
+    {
+      value: 'id:cmu8d6ypo0008qr0i5pvwjzux',
+      label: 'Shop ID · cmu8d6ypo0008qr0i5pvwjzux',
+    },
+  ]);
+  assert.equal(snapshot.facets.hasOrphans, false);
+
+  const filtered = await readQueueJobSnapshot({
+    redisUrl: 'redis://queue-shop-id-filter.test.invalid',
+    queueName: 'merchant-knowledge',
+    status: 'waiting',
+    shop: 'id:cmu8d6ypo0008qr0i5pvwjzux',
+    queueFactory: queueFactory({
+      waiting: [
+        {
+          id: 'knowledge-1',
+          name: 'process-source-revision',
+          attemptsMade: 0,
+          timestamp: 1710000000000,
+          data: { shopId: 'cmu8d6ypo0008qr0i5pvwjzux' },
+        },
+      ],
+    }),
+  });
+  assert.deepEqual(filtered.jobs.map((job) => job.id), ['knowledge-1']);
+});
+
 test('reads failed and active jobs with shop facets and redacted list fields', async () => {
   const { readQueueJobSnapshot } = await importQueueMonitor();
   const snapshot = await readQueueJobSnapshot({

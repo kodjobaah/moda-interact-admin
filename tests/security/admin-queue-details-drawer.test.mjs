@@ -200,3 +200,28 @@ test("queue drawer exposes persistent auto-refresh controls while browsing jobs"
     /disabled=\{summaryLoading \|\| jobDetailState\.selectedJobId !== null\}/,
   );
 });
+
+
+test("queue drawer exposes breadcrumb navigation for the queue list and selected jobs", async () => {
+  const source = await readQueueMonitorSources();
+
+  assert.match(source, /queue\.breadcrumbs/);
+  assert.match(source, /adminI18n\.t\("nav\.platformQueues"\)/);
+  assert.match(source, /jobDetailState\.clearSelection\(\)/);
+  assert.match(source, /setSelectedQueueName\(null\)/);
+  assert.match(source, /queueJobsState\.showAllJobs/);
+  assert.match(source, /adminI18n\.t\("queue\.recentJobs"\)/);
+  assert.match(source, /adminI18n\.t\("queue\.allJobs"\)/);
+  assert.match(source, /adminI18n\.t\("queue\.jobDetails"\)/);
+  assert.match(source, /<nav[\s\S]*aria-label=\{adminI18n\.t\("queue\.breadcrumbs"\)\}/);
+});
+
+
+test("queue jobs distinguish internal shop IDs from orphan jobs", async () => {
+  const source = await readQueueMonitorSources();
+
+  assert.match(source, /QueueJobAttribution = "known" \| "identified" \| "unresolved" \| "orphan"/);
+  assert.match(source, /queue\.shopIdLabel/);
+  assert.match(source, /formatQueueJobShop\(job\.shop, job\.attribution\)/);
+  assert.match(source, /formatQueueJobShop\(jobDetail\.shop, jobDetail\.attribution\)/);
+});
