@@ -10,6 +10,7 @@ import {
   createStoreCategoryAuthoringClientId,
   storeCategoryAuthoringNow,
 } from "./store-category-authoring-runtime";
+import { ShopifyTaxonomyPicker } from "./shopify-taxonomy-picker";
 import {
   STORE_CATEGORY_AUTHORING_INPUT_CLASS,
   StoreCategoryAuthoringErrorList,
@@ -37,7 +38,7 @@ export function StoreCategoryMappingsStep({
             Shopify taxonomy mappings
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Optional. Add taxonomy categories that should suggest this Store Category.
+            Optional. Select Shopify product taxonomy categories that should suggest this Store Category during onboarding. Mapping weights are summed; the highest score wins.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -71,30 +72,30 @@ export function StoreCategoryMappingsStep({
           {session.shopifyMappings.map((mapping, index) => (
             <div
               key={mapping.clientId}
-              className="grid gap-3 rounded-md border border-gray-200 bg-gray-50 p-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"
+              className="grid gap-3 rounded-md border border-gray-200 bg-gray-50 p-4 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
             >
-              <label className="text-sm font-medium text-gray-700">
-                Shopify taxonomy category ID {index + 1}
-                <input
-                  className={STORE_CATEGORY_AUTHORING_INPUT_CLASS}
-                  value={mapping.shopifyTaxonomyCategoryId}
-                  maxLength={255}
-                  onChange={(event) =>
-                    dispatch({
-                      type: "mapping.changed",
-                      clientId: mapping.clientId,
-                      patch: {
-                        shopifyTaxonomyCategoryId: event.target.value,
-                      },
-                      now: storeCategoryAuthoringNow(),
-                    })
-                  }
-                  placeholder="gid://shopify/TaxonomyCategory/..."
-                />
-              </label>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-700">
+                  Shopify taxonomy category {index + 1}
+                </p>
+                <div className="mt-1">
+                  <ShopifyTaxonomyPicker
+                    id={`author-shopify-taxonomy-${mapping.clientId}`}
+                    value={mapping.shopifyTaxonomyCategoryId}
+                    onChange={(shopifyTaxonomyCategoryId) =>
+                      dispatch({
+                        type: "mapping.changed",
+                        clientId: mapping.clientId,
+                        patch: { shopifyTaxonomyCategoryId },
+                        now: storeCategoryAuthoringNow(),
+                      })
+                    }
+                  />
+                </div>
+              </div>
 
               <label className="text-sm font-medium text-gray-700">
-                Weight
+                Suggestion weight
                 <input
                   className={STORE_CATEGORY_AUTHORING_INPUT_CLASS}
                   type="number"

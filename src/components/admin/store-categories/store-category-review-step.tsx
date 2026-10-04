@@ -7,6 +7,7 @@ import type {
   StoreCategoryAuthoringValidation,
 } from "./store-category-authoring-session";
 import { storeCategoryAuthoringNow } from "./store-category-authoring-runtime";
+import { ShopifyTaxonomyCategoryLabel } from "./shopify-taxonomy-picker";
 import {
   STORE_CATEGORY_AUTHORING_INPUT_CLASS,
   StoreCategoryAuthoringErrorList,
@@ -98,6 +99,21 @@ export function StoreCategoryReviewStep({
               ? "Optional mappings can be added later."
               : "Mappings will be created with this category."}
           </p>
+          {session.shopifyMappings.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {session.shopifyMappings.map((mapping) => (
+                <li key={mapping.clientId} className="rounded-md bg-gray-50 p-2 text-sm">
+                  <ShopifyTaxonomyCategoryLabel
+                    taxonomyCategoryId={mapping.shopifyTaxonomyCategoryId}
+                    compact
+                  />
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Weight {mapping.weight.toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       </div>
 
