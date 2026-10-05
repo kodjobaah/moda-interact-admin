@@ -1,9 +1,11 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import { StoreCategoryCatalog } from "@/components/admin/store-categories/store-category-catalog";
 import { getStoreCategoryCatalogue } from "@/lib/admin/store-categories";
+import { getReferenceTaxonomyIndexStatus } from "@/lib/admin/shopify-taxonomy-index-management";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 type StoreCategoryTab = "details" | "templates" | "taxonomy";
 
@@ -18,8 +20,11 @@ type StoreCategoriesPageProps = {
 export default async function StoreCategoriesPage({
   searchParams,
 }: StoreCategoriesPageProps) {
-  await requirePlatformAdminPage();
-  const catalogue = await getStoreCategoryCatalogue();
+  const principal = await requirePlatformAdminPage();
+  const [catalogue, taxonomyIndexStatus] = await Promise.all([
+    getStoreCategoryCatalogue(),
+    getReferenceTaxonomyIndexStatus(),
+  ]);
   const params = await searchParams;
   const rawCategory = params.category;
   const selectedCategoryId = Array.isArray(rawCategory)
@@ -41,6 +46,8 @@ export default async function StoreCategoriesPage({
           selectedCategoryId={selectedCategoryId}
           selectedTab={selectedTab}
           selectedTemplateId={selectedTemplateId}
+          taxonomyIndexStatus={taxonomyIndexStatus}
+          canManageTaxonomy={principal.role === "SUPER_ADMIN"}
         />
       </div>
     </AdminShell>

@@ -11,6 +11,7 @@ import {
   DEFAULT_SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS,
   loadShopifyTaxonomyEmbeddingConfig,
   loadShopifyTaxonomyQueryEmbeddingConfig,
+  loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime,
   shopifyTaxonomyVectorBuffer,
   ShopifyTaxonomyEmbeddingConfigurationError,
 } from "../../src/lib/admin/shopify-taxonomy-embedding.ts";
@@ -62,7 +63,7 @@ test("builds bounded KNN queries and escapes exact root taxonomy tags", () => {
       limit: 10,
       rootId: "gid://shopify/TaxonomyCategory/aa",
     }),
-    "(@rootId:{gid\\:\/\/shopify\/TaxonomyCategory\/aa})=>[KNN 10 @embedding $queryVector AS vectorScore]",
+    String.raw`(@rootId:{gid\:\/\/shopify\/TaxonomyCategory\/aa})=>[KNN 10 @embedding $queryVector AS vectorScore]`,
   );
   assert.equal(escapeRedisTagValue("aa-1"), "aa\\-1");
 });
@@ -89,6 +90,7 @@ test("validates the active Redis taxonomy metadata contract", () => {
 
 test("uses the same compact taxonomy embedding dimensions for Admin queries", () => {
   const config = loadShopifyTaxonomyEmbeddingConfig({
+    NODE_ENV: "test",
     EMBEDDING_PROVIDER: "openai",
     EMBEDDING_MODEL: "text-embedding-3-small",
     EMBEDDING_DIMENSIONS: "1536",
@@ -109,6 +111,7 @@ test("uses the active Redis index embedding metadata for Admin query vectors", (
       embeddingIndexVersion: "v1",
     },
     {
+      NODE_ENV: "test",
       EMBEDDING_API_KEY: "test-key",
       EMBEDDING_MODEL: "text-embedding-3-large",
       SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS: "256",
@@ -132,7 +135,7 @@ test("reports a missing Admin embedding credential explicitly for semantic taxon
           embeddingDimensions: 384,
           embeddingIndexVersion: "v1",
         },
-        {} as NodeJS.ProcessEnv,
+        { NODE_ENV: "test" } as NodeJS.ProcessEnv,
       ),
     (error: unknown) => {
       assert.ok(error instanceof ShopifyTaxonomyEmbeddingConfigurationError);
@@ -152,11 +155,61 @@ test("distinguishes invalid active index embedding metadata from a missing crede
           embeddingDimensions: 2048,
           embeddingIndexVersion: "v1",
         },
-        { EMBEDDING_API_KEY: "test-key" } as NodeJS.ProcessEnv,
+        { NODE_ENV: "test", EMBEDDING_API_KEY: "test-key" } as NodeJS.ProcessEnv,
       ),
     (error: unknown) => {
       assert.ok(error instanceof ShopifyTaxonomyEmbeddingConfigurationError);
       assert.equal(error.code, "INVALID_INDEX_METADATA");
+      return true;
+    },
+  );
+});
+
+
+test("uses the database runtime embedding configuration when it matches the active Redis index", () => {
+  const config = loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime(
+    {
+      embeddingProvider: "openai",
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: 384,
+      embeddingIndexVersion: "reference-taxonomy-v1",
+    },
+    {
+      embeddingProvider: "openai",
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: 384,
+      embeddingIndexVersion: "reference-taxonomy-v1",
+      apiKey: "database-secret",
+    },
+  );
+
+  assert.equal(config.model, "text-embedding-3-small");
+  assert.equal(config.dimensions, 384);
+  assert.equal(config.indexVersion, "reference-taxonomy-v1");
+  assert.equal(config.apiKey, "database-secret");
+});
+
+test("requires a Redis taxonomy re-sync when the database embedding configuration changes", () => {
+  assert.throws(
+    () =>
+      loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime(
+        {
+          embeddingProvider: "openai",
+          embeddingModel: "text-embedding-3-small",
+          embeddingDimensions: 384,
+          embeddingIndexVersion: "reference-taxonomy-v1",
+        },
+        {
+          embeddingProvider: "openai",
+          embeddingModel: "text-embedding-3-small",
+          embeddingDimensions: 512,
+          embeddingIndexVersion: "reference-taxonomy-v2",
+          apiKey: "database-secret",
+        },
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof ShopifyTaxonomyEmbeddingConfigurationError);
+      assert.equal(error.code, "INDEX_CONFIGURATION_MISMATCH");
       return true;
     },
   );

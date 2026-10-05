@@ -19,6 +19,9 @@ export type ShopifyTaxonomyEmbeddingConfig = {
 
 export type ShopifyTaxonomyEmbeddingConfigurationCode =
   | "MISSING_API_KEY"
+  | "MISSING_DATABASE_CONFIGURATION"
+  | "RUNTIME_CONFIGURATION_UNAVAILABLE"
+  | "INDEX_CONFIGURATION_MISMATCH"
   | "INVALID_CONFIGURATION"
   | "INVALID_INDEX_METADATA";
 
@@ -121,6 +124,78 @@ export function loadShopifyTaxonomyQueryEmbeddingConfig(
     dimensions: embeddingDimensions,
     indexVersion: embeddingIndexVersion,
     apiKey,
+  };
+}
+
+
+export type ShopifyTaxonomyRuntimeEmbeddingConfiguration = {
+  embeddingProvider: string;
+  embeddingModel: string;
+  embeddingDimensions: number;
+  embeddingIndexVersion: string;
+  apiKey: string;
+};
+
+export function loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime(
+  metadata: ShopifyTaxonomyIndexEmbeddingMetadata,
+  runtime: ShopifyTaxonomyRuntimeEmbeddingConfiguration,
+): ShopifyTaxonomyEmbeddingConfig {
+  const {
+    embeddingProvider,
+    embeddingModel,
+    embeddingDimensions,
+    embeddingIndexVersion,
+  } = metadata;
+
+  if (
+    embeddingProvider !== "openai" ||
+    !/^text-embedding-3-(?:small|large)$/.test(embeddingModel) ||
+    !Number.isSafeInteger(embeddingDimensions) ||
+    embeddingDimensions <= 0 ||
+    embeddingDimensions > MAX_SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS ||
+    !embeddingIndexVersion ||
+    embeddingIndexVersion.length > 64
+  ) {
+    throw new ShopifyTaxonomyEmbeddingConfigurationError(
+      "INVALID_INDEX_METADATA",
+      "Reference taxonomy index embedding metadata is invalid.",
+    );
+  }
+
+  if (
+    runtime.embeddingProvider !== "openai" ||
+    !/^text-embedding-3-(?:small|large)$/.test(runtime.embeddingModel) ||
+    !Number.isSafeInteger(runtime.embeddingDimensions) ||
+    runtime.embeddingDimensions <= 0 ||
+    runtime.embeddingDimensions > MAX_SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS ||
+    !runtime.embeddingIndexVersion ||
+    runtime.embeddingIndexVersion.length > 64 ||
+    !runtime.apiKey.trim()
+  ) {
+    throw new ShopifyTaxonomyEmbeddingConfigurationError(
+      "RUNTIME_CONFIGURATION_UNAVAILABLE",
+      "Reference taxonomy embedding runtime configuration is unavailable.",
+    );
+  }
+
+  if (
+    runtime.embeddingProvider !== embeddingProvider ||
+    runtime.embeddingModel !== embeddingModel ||
+    runtime.embeddingDimensions !== embeddingDimensions ||
+    runtime.embeddingIndexVersion !== embeddingIndexVersion
+  ) {
+    throw new ShopifyTaxonomyEmbeddingConfigurationError(
+      "INDEX_CONFIGURATION_MISMATCH",
+      "Reference taxonomy search index was built with a different embedding configuration.",
+    );
+  }
+
+  return {
+    provider: "openai",
+    model: runtime.embeddingModel,
+    dimensions: runtime.embeddingDimensions,
+    indexVersion: runtime.embeddingIndexVersion,
+    apiKey: runtime.apiKey,
   };
 }
 

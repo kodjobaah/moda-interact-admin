@@ -7,12 +7,19 @@ import {
   storeCategoryAuthoringReducer,
 } from "./store-category-authoring-session";
 import { StoreCategoryAuthoringWorkspace } from "./store-category-authoring-workspace";
+import type { AssignedReferenceTaxonomyCategory } from "./store-category-authoring-types";
 import {
   createStoreCategoryAuthoringClientId,
   storeCategoryAuthoringNow,
 } from "./store-category-authoring-runtime";
 
-export function StoreCategoryCreationWorkspace() {
+export function StoreCategoryCreationWorkspace({
+  taxonomyReady,
+  assignedReferenceTaxonomy,
+}: {
+  taxonomyReady: boolean;
+  assignedReferenceTaxonomy: AssignedReferenceTaxonomyCategory[];
+}) {
   const [session, dispatch] = useReducer(storeCategoryAuthoringReducer, null);
   const [hydrated, setHydrated] = useState(false);
 
@@ -56,10 +63,16 @@ export function StoreCategoryCreationWorkspace() {
           <p className="mt-1 text-sm text-gray-600">
             Create the reference-backed category identity, required default template, and optional category mappings as one configuration.
           </p>
+          {!taxonomyReady ? (
+            <p className="mt-2 text-sm font-medium text-amber-700">
+              Synchronize the reference taxonomy search index before starting a new Store Category.
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
-          className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
+          className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!taxonomyReady}
           onClick={() =>
             dispatch({
               type: "session.started",
@@ -74,5 +87,12 @@ export function StoreCategoryCreationWorkspace() {
     );
   }
 
-  return <StoreCategoryAuthoringWorkspace session={session} dispatch={dispatch} />;
+  return (
+    <StoreCategoryAuthoringWorkspace
+      session={session}
+      dispatch={dispatch}
+      taxonomyReady={taxonomyReady}
+      assignedReferenceTaxonomy={assignedReferenceTaxonomy}
+    />
+  );
 }

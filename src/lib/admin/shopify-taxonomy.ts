@@ -1,12 +1,18 @@
+import { CommerceEmbeddingPurpose } from "@prisma/client";
 import Redis from "ioredis";
 
 import {
   embedShopifyTaxonomyQuery,
-  loadShopifyTaxonomyQueryEmbeddingConfig,
+  loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime,
   shopifyTaxonomyVectorBuffer,
   ShopifyTaxonomyEmbeddingConfigurationError,
   ShopifyTaxonomyEmbeddingError,
 } from "./shopify-taxonomy-embedding.ts";
+import {
+  EMBEDDING_CONFIGURATION_ERRORS,
+  getEmbeddingRuntimeConfiguration,
+} from "./embedding-configuration.ts";
+import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "./embedding-configuration-crypto.ts";
 
 export const SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS =
   "idx:moda:shopify-taxonomy:top";
@@ -375,13 +381,38 @@ async function searchIndex(
   );
 }
 
-function queryEmbeddingConfigFromIndex(metadata: ShopifyTaxonomyMetadata) {
-  return loadShopifyTaxonomyQueryEmbeddingConfig({
-    embeddingProvider: metadata.embeddingProvider,
-    embeddingModel: metadata.embeddingModel,
-    embeddingDimensions: metadata.embeddingDimensions,
-    embeddingIndexVersion: metadata.embeddingIndexVersion,
-  });
+async function queryEmbeddingConfigFromIndex(metadata: ShopifyTaxonomyMetadata) {
+  let runtime;
+  try {
+    runtime = await getEmbeddingRuntimeConfiguration(
+      CommerceEmbeddingPurpose.REFERENCE_TAXONOMY,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === EMBEDDING_CONFIGURATION_ERRORS.notConfigured) {
+      throw new ShopifyTaxonomyEmbeddingConfigurationError(
+        "MISSING_DATABASE_CONFIGURATION",
+        "Reference taxonomy embedding configuration is not configured for this Commerce environment.",
+      );
+    }
+    if (message === EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE) {
+      throw new ShopifyTaxonomyEmbeddingConfigurationError(
+        "RUNTIME_CONFIGURATION_UNAVAILABLE",
+        "Reference taxonomy embedding credential could not be decrypted.",
+      );
+    }
+    throw error;
+  }
+
+  return loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime(
+    {
+      embeddingProvider: metadata.embeddingProvider,
+      embeddingModel: metadata.embeddingModel,
+      embeddingDimensions: metadata.embeddingDimensions,
+      embeddingIndexVersion: metadata.embeddingIndexVersion,
+    },
+    runtime,
+  );
 }
 
 export async function searchShopifyTaxonomy(input: {
@@ -401,7 +432,7 @@ export async function searchShopifyTaxonomy(input: {
     try {
       vector = await embedShopifyTaxonomyQuery(
         query,
-        queryEmbeddingConfigFromIndex(metadata),
+        await queryEmbeddingConfigFromIndex(metadata),
       );
     } catch (error) {
       if (error instanceof ShopifyTaxonomyEmbeddingConfigurationError) {

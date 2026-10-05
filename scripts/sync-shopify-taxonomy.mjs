@@ -96,6 +96,23 @@ function formatMiB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
+function createCountProgressReporter(label, total, interval = 1_000) {
+  let nextThreshold = Math.min(interval, total);
+
+  return ({ completed, batchNumber, batchCount }) => {
+    if (completed < nextThreshold && completed < total) return;
+
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 100;
+    process.stdout.write(
+      `${label}: ${completed}/${total} (${percentage}%; batch ${batchNumber}/${batchCount}).\n`,
+    );
+
+    while (nextThreshold <= completed && nextThreshold < total) {
+      nextThreshold = Math.min(nextThreshold + interval, total);
+    }
+  };
+}
+
 async function inspectRedisMemory(redis, estimatedRedisBytes, rawVectorBytes) {
   let memory;
   try {
@@ -139,10 +156,16 @@ async function createIndex(redis, args) {
   await redis.call(...args);
 }
 
-async function writeDocuments(redis, documents, vectors, prefix) {
+async function writeDocuments(redis, documents, vectors, prefix, label) {
   if (documents.length !== vectors.length) {
     fail("taxonomy document/vector counts do not match");
   }
+
+  const reportProgress = createCountProgressReporter(
+    `Writing ${label} taxonomy documents to Redis`,
+    documents.length,
+  );
+  const batchCount = Math.ceil(documents.length / PIPELINE_BATCH_SIZE);
 
   for (let start = 0; start < documents.length; start += PIPELINE_BATCH_SIZE) {
     const pipeline = redis.pipeline();
@@ -179,6 +202,13 @@ async function writeDocuments(redis, documents, vectors, prefix) {
           `(${start + 1}-${end} of ${documents.length}): ${rejection.message}`,
       );
     }
+
+    reportProgress({
+      completed: end,
+      total: documents.length,
+      batchNumber: Math.floor(start / PIPELINE_BATCH_SIZE) + 1,
+      batchCount,
+    });
   }
 }
 
@@ -339,14 +369,13 @@ let previousMetadata = {};
 try {
   await redis.connect();
   await ensureRedisSearch(redis);
+  process.stdout.write("Connected to Redis and verified Redis Search support.\n");
   previousMetadata = await redis.hgetall(SHOPIFY_TAXONOMY_METADATA_KEY);
   const previous = oldIndexMetadata(previousMetadata);
   const staleIndexCount = await cleanupStaleTaxonomyIndexes(redis, previous);
-  if (staleIndexCount > 0) {
-    process.stdout.write(
-      `Removed ${staleIndexCount} stale Shopify taxonomy index${staleIndexCount === 1 ? "" : "es"} from an earlier incomplete sync.\n`,
-    );
-  }
+  process.stdout.write(
+    `Stale taxonomy index cleanup complete: removed ${staleIndexCount} index${staleIndexCount === 1 ? "" : "es"}.\n`,
+  );
 
   process.stdout.write(
     `Downloading Shopify taxonomy ${manifest.version} from the pinned release...\n`,
@@ -354,6 +383,9 @@ try {
   const { snapshot, sourceSha256 } = await downloadTaxonomy();
   const { topLevel, subcategories } = buildTaxonomyIndexDocuments(snapshot.categories);
   const documentCount = topLevel.length + subcategories.length;
+  process.stdout.write(
+    `Downloaded and parsed Shopify taxonomy ${snapshot.version}: ${topLevel.length} top-level categories, ${subcategories.length} subcategories.\n`,
+  );
   const rawVectorBytes = estimateRawVectorBytes(documentCount, config.dimensions);
   const estimatedRedisBytes = estimateTaxonomyRedisBytes(
     documentCount,
@@ -370,12 +402,26 @@ try {
   const topVectors = await embedTaxonomyTexts(
     topLevel.map((document) => document.fullName),
     config,
+    {
+      onProgress: createCountProgressReporter(
+        "Embedding top-level taxonomy categories",
+        topLevel.length,
+      ),
+    },
   );
   const subcategoryVectors = await embedTaxonomyTexts(
     subcategories.map((document) => document.fullName),
     config,
+    {
+      onProgress: createCountProgressReporter(
+        "Embedding taxonomy subcategories",
+        subcategories.length,
+      ),
+    },
   );
+  process.stdout.write("Taxonomy embedding generation complete.\n");
 
+  process.stdout.write("Creating replacement Redis vector indexes.\n");
   await createIndex(
     redis,
     indexCreateArguments({
@@ -396,21 +442,33 @@ try {
     }),
   );
   subcategoryCreated = true;
+  process.stdout.write(
+    `Created replacement indexes ${names.topIndex} and ${names.subcategoryIndex}.\n`,
+  );
 
-  await writeDocuments(redis, topLevel, topVectors, names.topPrefix);
+  await writeDocuments(redis, topLevel, topVectors, names.topPrefix, "top-level");
   await writeDocuments(
     redis,
     subcategories,
     subcategoryVectors,
     names.subcategoryPrefix,
+    "subcategory",
   );
+  process.stdout.write("Redis taxonomy document writes complete.\n");
+
+  process.stdout.write("Waiting for Redis Search to index replacement documents.\n");
   await waitForIndex(redis, names.topIndex, topLevel.length);
   await waitForIndex(redis, names.subcategoryIndex, subcategories.length);
+  process.stdout.write("Redis Search replacement indexes reached expected document counts.\n");
+
+  process.stdout.write("Running vector smoke searches against replacement indexes.\n");
   await smokeVectorSearch(redis, names.topIndex, topVectors[0]);
   await smokeVectorSearch(redis, names.subcategoryIndex, subcategoryVectors[0]);
+  process.stdout.write("Replacement index vector smoke searches passed.\n");
 
   await replaceAliases(redis, previous, names);
   aliasesReplaced = true;
+  process.stdout.write("Switched stable taxonomy aliases to the replacement indexes.\n");
   try {
     await persistMetadata(redis, {
       taxonomyVersion: snapshot.version,
@@ -426,6 +484,7 @@ try {
       subcategoryIndex: names.subcategoryIndex,
       syncedAt: new Date().toISOString(),
     });
+    process.stdout.write("Persisted active taxonomy index metadata.\n");
   } catch (error) {
     await restoreAlias(redis, SHOPIFY_TAXONOMY_TOP_ALIAS, previous.topIndex).catch(
       () => {},

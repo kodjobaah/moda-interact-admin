@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { StoreCategoryCatalogue } from "@/lib/admin/store-categories";
+import type { ReferenceTaxonomyIndexStatus } from "@/lib/admin/shopify-taxonomy-index-management";
 import { StoreCategoryCreationWorkspace } from "./store-category-creation-workspace";
 import { StoreCategoryEditor } from "./store-category-editor";
+import { ReferenceTaxonomyIndexPanel } from "./reference-taxonomy-index-panel";
 
 export type StoreCategoryTab = "details" | "templates" | "taxonomy";
 
@@ -10,15 +12,31 @@ export function StoreCategoryCatalog({
   selectedCategoryId,
   selectedTab = "details",
   selectedTemplateId,
+  taxonomyIndexStatus,
+  canManageTaxonomy,
 }: {
   catalogue: StoreCategoryCatalogue;
   selectedCategoryId?: string;
   selectedTab?: StoreCategoryTab;
   selectedTemplateId?: string;
+  taxonomyIndexStatus: ReferenceTaxonomyIndexStatus;
+  canManageTaxonomy: boolean;
 }) {
   const selectedCategory =
     catalogue.categories.find((category) => category.id === selectedCategoryId) ??
     catalogue.categories[0];
+
+  const assignedReferenceTaxonomy = catalogue.categories.flatMap((category) => {
+    const categoryId = category.referenceTaxonomyCategoryId?.trim();
+    return categoryId
+      ? [
+          {
+            categoryId,
+            storeCategoryDisplayName: category.displayName,
+          },
+        ]
+      : [];
+  });
 
   return (
     <>
@@ -31,7 +49,15 @@ export function StoreCategoryCatalog({
         </p>
       </div>
 
-      <StoreCategoryCreationWorkspace />
+      <ReferenceTaxonomyIndexPanel
+        status={taxonomyIndexStatus}
+        canManage={canManageTaxonomy}
+      />
+
+      <StoreCategoryCreationWorkspace
+        taxonomyReady={taxonomyIndexStatus.state === "READY"}
+        assignedReferenceTaxonomy={assignedReferenceTaxonomy}
+      />
 
       {catalogue.categories.length === 0 ? (
         <p className="border-y border-gray-200 py-8 text-sm text-gray-600">

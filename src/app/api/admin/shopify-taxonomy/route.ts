@@ -112,9 +112,15 @@ export async function GET(request: Request) {
           {
             error: "embedding_configuration",
             reason:
-              error.detail === "MISSING_API_KEY"
-                ? "missing_api_key"
-                : "invalid_index_metadata",
+              error.detail === "MISSING_DATABASE_CONFIGURATION"
+                ? "not_configured"
+                : error.detail === "INDEX_CONFIGURATION_MISMATCH"
+                  ? "configuration_mismatch"
+                  : error.detail === "RUNTIME_CONFIGURATION_UNAVAILABLE"
+                    ? "runtime_configuration_unavailable"
+                    : error.detail === "MISSING_API_KEY"
+                      ? "missing_api_key"
+                      : "invalid_index_metadata",
           },
           { status: 503, headers: NO_STORE_HEADERS },
         );

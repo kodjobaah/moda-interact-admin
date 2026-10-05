@@ -51,9 +51,10 @@ export function vectorToFloat32Buffer(vector, dimensions) {
 export async function embedTaxonomyTexts(
   texts,
   config,
-  { fetchImpl = fetch, batchSize = 100 } = {},
+  { fetchImpl = fetch, batchSize = 100, onProgress } = {},
 ) {
   const output = [];
+  const batchCount = Math.ceil(texts.length / batchSize);
   for (let start = 0; start < texts.length; start += batchSize) {
     const batch = texts.slice(start, start + batchSize);
     const response = await fetchImpl("https://api.openai.com/v1/embeddings", {
@@ -78,6 +79,17 @@ export async function embedTaxonomyTexts(
     const sorted = [...payload.data].sort((left, right) => left.index - right.index);
     for (const item of sorted) {
       output.push(vectorToFloat32Buffer(item.embedding, config.dimensions));
+    }
+
+    try {
+      onProgress?.({
+        completed: Math.min(start + batch.length, texts.length),
+        total: texts.length,
+        batchNumber: Math.floor(start / batchSize) + 1,
+        batchCount,
+      });
+    } catch {
+      // Progress reporting is diagnostic only and must not affect synchronization.
     }
   }
   return output;

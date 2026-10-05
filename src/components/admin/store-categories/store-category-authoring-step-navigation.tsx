@@ -40,9 +40,11 @@ export const STORE_CATEGORY_AUTHORING_STEPS: Array<{
 export function StoreCategoryAuthoringStepNavigation({
   session,
   dispatch,
+  categoryReferenceAvailable,
 }: {
   session: StoreCategoryAuthoringSession;
   dispatch: Dispatch<StoreCategoryAuthoringAction>;
+  categoryReferenceAvailable: boolean;
 }) {
   const currentStepIndex = STORE_CATEGORY_AUTHORING_STEPS.findIndex(
     (entry) => entry.step === session.step,
@@ -57,10 +59,9 @@ export function StoreCategoryAuthoringStepNavigation({
       <ol className="grid gap-0 md:grid-cols-4">
         {STORE_CATEGORY_AUTHORING_STEPS.map((entry, index) => {
           const active = entry.step === session.step;
-          const accessible = canEnterStoreCategoryAuthoringStep(
-            session,
-            entry.step,
-          );
+          const accessible =
+            canEnterStoreCategoryAuthoringStep(session, entry.step) &&
+            (categoryReferenceAvailable || entry.step === "category");
           const completed =
             index < currentStepIndex ||
             (entry.step === "review" && reviewCurrent);

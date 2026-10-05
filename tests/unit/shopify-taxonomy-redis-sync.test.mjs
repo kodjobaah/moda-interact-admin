@@ -6,6 +6,7 @@ import {
   SHOPIFY_TAXONOMY_SUBCATEGORY_ALIAS,
   SHOPIFY_TAXONOMY_TOP_ALIAS,
   buildTaxonomyIndexDocuments,
+  embedTaxonomyTexts,
   estimateRawVectorBytes,
   estimateTaxonomyRedisBytes,
   indexCreateArguments,
@@ -109,6 +110,44 @@ test("sync allows a bounded taxonomy dimension override without reusing the glob
   });
 
   assert.equal(config.dimensions, 384);
+});
+
+
+test("embedding batches report progress without exposing embedding payloads", async () => {
+  const progress = [];
+  const texts = ["one", "two", "three", "four", "five"];
+  const config = {
+    model: "text-embedding-3-small",
+    dimensions: 2,
+    apiKey: "test-key",
+  };
+
+  const vectors = await embedTaxonomyTexts(texts, config, {
+    batchSize: 2,
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            data: body.input.map((_text, index) => ({
+              index,
+              embedding: [index + 0.25, index + 0.5],
+            })),
+          };
+        },
+      };
+    },
+    onProgress: (entry) => progress.push(entry),
+  });
+
+  assert.equal(vectors.length, 5);
+  assert.deepEqual(progress, [
+    { completed: 2, total: 5, batchNumber: 1, batchCount: 3 },
+    { completed: 4, total: 5, batchNumber: 2, batchCount: 3 },
+    { completed: 5, total: 5, batchNumber: 3, batchCount: 3 },
+  ]);
 });
 
 test("sync estimates raw vectors and HASH plus FLAT Redis storage", () => {

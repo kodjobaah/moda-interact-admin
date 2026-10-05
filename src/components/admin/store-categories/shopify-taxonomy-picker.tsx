@@ -60,6 +60,12 @@ class TaxonomyFetchError extends Error {
   }
 }
 
+type UnavailableTaxonomySelection = {
+  categoryId: string;
+  reason: string;
+  actionLabel?: string;
+};
+
 type ShopifyTaxonomyPickerProps = {
   id: string;
   name?: string;
@@ -70,6 +76,10 @@ type ShopifyTaxonomyPickerProps = {
   rootId?: string | null;
   allowRawId?: boolean;
   fallbackSelection?: StoreCategoryTaxonomyReference | null;
+  unavailableSelections?: UnavailableTaxonomySelection[];
+  showSelectionSummary?: boolean;
+  selectionActionLabel?: string;
+  selectionPendingLabel?: string;
   onChange?: (taxonomyCategoryId: string) => void;
   onSelectionChange?: (selection: StoreCategoryTaxonomyReference | null) => void;
 };
@@ -116,16 +126,25 @@ async function fetchTaxonomy(
 function taxonomySearchErrorMessage(error: unknown): string {
   if (error instanceof TaxonomyFetchError) {
     if (error.code === "embedding_configuration") {
-      if (error.reason === "missing_api_key") {
-        return "Reference taxonomy semantic search is unavailable because the Admin embedding credential is not configured.";
+      if (error.reason === "not_configured") {
+        return "Reference taxonomy semantic search is unavailable because Reference Taxonomy embeddings are not configured. Open System Controls → Embeddings.";
       }
-      return "Reference taxonomy semantic search is unavailable because the active index embedding metadata is invalid. Re-run the taxonomy sync.";
+      if (error.reason === "configuration_mismatch") {
+        return "Reference taxonomy embedding settings changed after this Redis index was built. Re-sync the taxonomy search index.";
+      }
+      if (error.reason === "runtime_configuration_unavailable") {
+        return "Reference taxonomy embedding credentials could not be decrypted. Verify the Commerce credential keyring.";
+      }
+      if (error.reason === "missing_api_key") {
+        return "Reference taxonomy semantic search is unavailable because the embedding credential is not configured.";
+      }
+      return "Reference taxonomy semantic search is unavailable because the active index embedding metadata is invalid. Re-sync the taxonomy search index.";
     }
     if (error.code === "embedding_request_failed") {
       return "Reference taxonomy semantic search could not reach the embedding service. Try again.";
     }
   }
-  return "Reference taxonomy search is unavailable. Verify the taxonomy sync and Admin embedding credentials.";
+  return "Reference taxonomy search is unavailable. Sync the taxonomy search index from Store Categories and verify the Reference Taxonomy embedding settings.";
 }
 
 function TaxonomyPath({ fullName }: { fullName: string }) {
@@ -236,6 +255,10 @@ export function ShopifyTaxonomyPicker({
   rootId = null,
   allowRawId = true,
   fallbackSelection = null,
+  unavailableSelections = [],
+  showSelectionSummary = true,
+  selectionActionLabel = "Select",
+  selectionPendingLabel = "Selecting…",
   onChange,
   onSelectionChange,
 }: ShopifyTaxonomyPickerProps) {
@@ -257,10 +280,24 @@ export function ShopifyTaxonomyPicker({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [catalogueVersion, setCatalogueVersion] = useState<string | null>(null);
+  const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
   const searchGenerationRef = useRef(0);
+  const selectionCommitRef = useRef(false);
+  const selectionUnlockTimerRef = useRef<number | null>(null);
 
   const trimmedQuery = query.trim();
   const searchMode = trimmedQuery.length > 0;
+  const displayedVersion = version ?? catalogueVersion;
+  const unavailableSelectionsById = useMemo(
+    () =>
+      new Map(
+        unavailableSelections.map((selection) => [
+          selection.categoryId,
+          selection,
+        ]),
+      ),
+    [unavailableSelections],
+  );
 
   function commit(
     nextValue: string,
@@ -271,6 +308,41 @@ export function ShopifyTaxonomyPicker({
     onChange?.(nextValue);
     onSelectionChange?.(selection);
   }
+
+  function commitResultSelection(category: ShopifyTaxonomyCategory) {
+    if (
+      selectionCommitRef.current ||
+      category.id === selectedId ||
+      unavailableSelectionsById.has(category.id)
+    ) {
+      return;
+    }
+
+    selectionCommitRef.current = true;
+    setPendingSelectionId(category.id);
+    commit(
+      category.id,
+      taxonomySelection(category, catalogueVersion ?? displayedVersion ?? ""),
+    );
+
+    if (selectionUnlockTimerRef.current !== null) {
+      window.clearTimeout(selectionUnlockTimerRef.current);
+    }
+    selectionUnlockTimerRef.current = window.setTimeout(() => {
+      selectionCommitRef.current = false;
+      setPendingSelectionId(null);
+      selectionUnlockTimerRef.current = null;
+    }, 600);
+  }
+
+  useEffect(
+    () => () => {
+      if (selectionUnlockTimerRef.current !== null) {
+        window.clearTimeout(selectionUnlockTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (allowRawId || !selectedId || !selectedNotFound) return;
@@ -337,7 +409,6 @@ export function ShopifyTaxonomyPicker({
     };
   }, [browseParentId, rootId, scope, searchMode, trimmedQuery]);
 
-  const displayedVersion = version ?? catalogueVersion;
   const resolvedSelection = useMemo(() => {
     if (committedSelection?.categoryId === selectedId) return committedSelection;
     if (selectedCategory && displayedVersion) {
@@ -386,47 +457,55 @@ export function ShopifyTaxonomyPicker({
         </>
       ) : null}
 
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Selected reference category
-          </p>
-          <div className="mt-1 text-sm text-gray-900" aria-live="polite">
-            {resolvedSelection ? (
-              <span className="min-w-0">
-                <span className="block font-medium text-gray-900">
-                  <TaxonomyPath fullName={resolvedSelection.fullName} />
+      {showSelectionSummary ? (
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Selected reference category
+            </p>
+            <div className="mt-1 text-sm text-gray-900" aria-live="polite">
+              {resolvedSelection ? (
+                <span className="min-w-0">
+                  <span className="block font-medium text-gray-900">
+                    <TaxonomyPath fullName={resolvedSelection.fullName} />
+                  </span>
+                  <span className="mt-1 block break-all font-mono text-xs text-gray-500">
+                    {resolvedSelection.categoryId}
+                  </span>
                 </span>
-                <span className="mt-1 block break-all font-mono text-xs text-gray-500">
-                  {resolvedSelection.categoryId}
+              ) : (
+                <span className={selectedId ? "font-mono text-xs" : "text-gray-500"}>
+                  {selectionDescription}
                 </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {displayedVersion ? (
+              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                Reference taxonomy · {displayedVersion}
               </span>
-            ) : (
-              <span className={selectedId ? "font-mono text-xs" : "text-gray-500"}>
-                {selectionDescription}
-              </span>
-            )}
+            ) : null}
+            {selectedId ? (
+              <button
+                type="button"
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => commit("")}
+              >
+                Clear
+              </button>
+            ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {displayedVersion ? (
-            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
-              Reference taxonomy · {displayedVersion}
-            </span>
-          ) : null}
-          {selectedId ? (
-            <button
-              type="button"
-              className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-              onClick={() => commit("")}
-            >
-              Clear
-            </button>
-          ) : null}
+      ) : displayedVersion ? (
+        <div className="flex justify-end">
+          <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+            Reference taxonomy · {displayedVersion}
+          </span>
         </div>
-      </div>
+      ) : null}
 
-      <div className="mt-4">
+      <div className={showSelectionSummary || displayedVersion ? "mt-4" : ""}>
         <label htmlFor={`${id}-search`} className="text-sm font-medium text-gray-700">
           Search reference taxonomy
         </label>
@@ -481,47 +560,65 @@ export function ShopifyTaxonomyPicker({
           </p>
         ) : (
           <ul className="divide-y divide-gray-200">
-            {results.map((category) => (
-              <li key={category.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 text-sm">
-                  <p className="font-medium text-gray-900">
-                    <TaxonomyPath fullName={category.fullName} />
-                  </p>
-                  <p className="mt-1 break-all font-mono text-xs text-gray-500">
-                    {category.id}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {scope !== "top-level" && category.hasChildren ? (
+            {results.map((category) => {
+              const unavailableSelection = unavailableSelectionsById.get(category.id);
+              const unavailableReason = unavailableSelection?.reason;
+              const alreadySelected = category.id === selectedId;
+              const selectionDisabled =
+                Boolean(unavailableSelection) ||
+                alreadySelected ||
+                pendingSelectionId !== null;
+
+              return (
+                <li
+                  key={category.id}
+                  className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium text-gray-900">
+                      <TaxonomyPath fullName={category.fullName} />
+                    </p>
+                    <p className="mt-1 break-all font-mono text-xs text-gray-500">
+                      {category.id}
+                    </p>
+                    {unavailableReason ? (
+                      <p className="mt-1 text-xs font-medium text-amber-700">
+                        {unavailableReason}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {scope !== "top-level" && category.hasChildren ? (
+                      <button
+                        type="button"
+                        className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        onClick={() => {
+                          setQuery("");
+                          setBrowseParentId(category.id);
+                        }}
+                      >
+                        Browse
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                      onClick={() => {
-                        setQuery("");
-                        setBrowseParentId(category.id);
-                      }}
+                      className="rounded-md bg-[var(--brand-700)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600"
+                      disabled={selectionDisabled}
+                      title={unavailableReason ?? undefined}
+                      onClick={() => commitResultSelection(category)}
                     >
-                      Browse
+                      {unavailableSelection
+                        ? unavailableSelection.actionLabel ?? "Assigned"
+                        : alreadySelected
+                          ? "Selected"
+                          : pendingSelectionId === category.id
+                            ? selectionPendingLabel
+                            : selectionActionLabel}
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="rounded-md bg-[var(--brand-700)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--brand-800)]"
-                    onClick={() =>
-                      commit(
-                        category.id,
-                        taxonomySelection(
-                          category,
-                          catalogueVersion ?? displayedVersion ?? "",
-                        ),
-                      )
-                    }
-                  >
-                    Select
-                  </button>
-                </div>
-              </li>
-            ))}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

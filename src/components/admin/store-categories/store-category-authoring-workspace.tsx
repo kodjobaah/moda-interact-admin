@@ -23,13 +23,18 @@ import { StoreCategoryTemplateStep } from "./store-category-template-step";
 import { StoreCategoryMappingsStep } from "./store-category-mappings-step";
 import { StoreCategoryReviewStep } from "./store-category-review-step";
 import { storeCategoryAuthoringNow } from "./store-category-authoring-runtime";
+import type { AssignedReferenceTaxonomyCategory } from "./store-category-authoring-types";
 
 export function StoreCategoryAuthoringWorkspace({
   session,
   dispatch,
+  taxonomyReady,
+  assignedReferenceTaxonomy,
 }: {
   session: StoreCategoryAuthoringSession;
   dispatch: Dispatch<StoreCategoryAuthoringAction>;
+  taxonomyReady: boolean;
+  assignedReferenceTaxonomy: AssignedReferenceTaxonomyCategory[];
 }) {
   const router = useRouter();
   const createInFlightRef = useRef(false);
@@ -42,13 +47,23 @@ export function StoreCategoryAuthoringWorkspace({
   const reviewStale =
     session.reviewedRevision !== null &&
     session.reviewedRevision !== session.validationRevision;
+  const selectedReferenceAssignment = assignedReferenceTaxonomy.find(
+    (assignment) =>
+      assignment.categoryId === session.category.referenceTaxonomy?.categoryId,
+  );
+  const categoryReferenceAvailable = !selectedReferenceAssignment;
 
   function changeStep(step: StoreCategoryAuthoringStep) {
+    if (!categoryReferenceAvailable && step !== "category") return;
     dispatch({ type: "step.changed", step, now: storeCategoryAuthoringNow() });
   }
 
   async function createCategory() {
-    if (createInFlightRef.current || !canCreateStoreCategoryFromSession(session)) {
+    if (
+      createInFlightRef.current ||
+      !categoryReferenceAvailable ||
+      !canCreateStoreCategoryFromSession(session)
+    ) {
       return;
     }
     createInFlightRef.current = true;
@@ -100,6 +115,21 @@ export function StoreCategoryAuthoringWorkspace({
           <p className="mt-1 font-mono text-xs text-gray-400">
             Session {session.sessionId}
           </p>
+          {!taxonomyReady ? (
+            <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+              The reference taxonomy search index is not ready. Your browser draft is preserved, but synchronize the index before selecting taxonomy categories or creating this Store Category.
+            </p>
+          ) : null}
+          {selectedReferenceAssignment ? (
+            <p
+              className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800"
+              role="status"
+            >
+              The selected reference taxonomy category is already assigned to Store
+              Category “{selectedReferenceAssignment.storeCategoryDisplayName}”.
+              Return to Category and choose another reference category.
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -121,11 +151,16 @@ export function StoreCategoryAuthoringWorkspace({
       <StoreCategoryAuthoringStepNavigation
         session={session}
         dispatch={dispatch}
+        categoryReferenceAvailable={categoryReferenceAvailable}
       />
 
       <div className="px-5 py-6">
         {session.step === "category" ? (
-          <StoreCategoryCategoryStep session={session} dispatch={dispatch} />
+          <StoreCategoryCategoryStep
+            session={session}
+            dispatch={dispatch}
+            assignedReferenceTaxonomy={assignedReferenceTaxonomy}
+          />
         ) : null}
         {session.step === "template" ? (
           <StoreCategoryTemplateStep session={session} dispatch={dispatch} />
@@ -171,6 +206,7 @@ export function StoreCategoryAuthoringWorkspace({
               className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:opacity-40"
               disabled={
                 session.status === "SAVING" ||
+                !categoryReferenceAvailable ||
                 !canEnterStoreCategoryAuthoringStep(
                   session,
                   STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex + 1]!.step,
@@ -188,7 +224,12 @@ export function StoreCategoryAuthoringWorkspace({
             <button
               type="button"
               className="rounded-md bg-[var(--brand-700)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!canCreate || session.status === "SAVING"}
+              disabled={
+                !taxonomyReady ||
+                !categoryReferenceAvailable ||
+                !canCreate ||
+                session.status === "SAVING"
+              }
               onClick={() => void createCategory()}
             >
               {session.status === "SAVING"
