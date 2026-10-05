@@ -21,6 +21,7 @@ export function Sidebar({
     | "store-categories"
     | "agent-instructions"
     | "embeddings"
+    | "translations"
     | "model-availability"
     | "model-catalogue"
     | "openrouter-credentials";
@@ -37,7 +38,8 @@ export function Sidebar({
     active === "background-runtime" ||
     active === "store-categories" ||
     active === "agent-instructions" ||
-    active === "embeddings";
+    active === "embeddings" ||
+    active === "translations";
   const observabilityActive = active === "observability" || active === "queues";
   const commerceModelsActive =
     active === "model-availability" ||
@@ -188,6 +190,13 @@ export function Sidebar({
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "embeddings" ? selected : idle}`}
               >
                 Embeddings
+              </Link>
+              <Link
+                href="/system-controls/translations"
+                aria-current={active === "translations" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "translations" ? selected : idle}`}
+              >
+                Translations
               </Link>
             </div>
           ) : null}

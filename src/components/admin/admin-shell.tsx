@@ -20,6 +20,7 @@ export async function AdminShell({
     | "store-categories"
     | "agent-instructions"
     | "embeddings"
+    | "translations"
     | "model-availability"
     | "model-catalogue"
     | "openrouter-credentials";
