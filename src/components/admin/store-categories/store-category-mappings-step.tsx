@@ -35,10 +35,10 @@ export function StoreCategoryMappingsStep({
             id="author-mappings-title"
             className="text-lg font-semibold text-gray-950"
           >
-            Shopify taxonomy mappings
+            Category mappings
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Optional. Select Shopify product taxonomy categories that should suggest this Store Category during onboarding. Mapping weights are summed; the highest score wins.
+            Optional. Search the reference taxonomy for subcategories that should suggest this Store Category. Shopify consumes the exact taxonomy ID; WooCommerce can use the persisted name/full path. Mapping weights are summed; the highest score wins.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -51,7 +51,7 @@ export function StoreCategoryMappingsStep({
                 type: "mapping.added",
                 mapping: {
                   clientId: createStoreCategoryAuthoringClientId(),
-                  shopifyTaxonomyCategoryId: "",
+                  taxonomy: null,
                   weight: 1,
                 },
                 now: storeCategoryAuthoringNow(),
@@ -65,7 +65,7 @@ export function StoreCategoryMappingsStep({
 
       {session.shopifyMappings.length === 0 ? (
         <div className="mt-5 rounded-md border border-dashed border-gray-300 p-6 text-sm text-gray-600">
-          No Shopify mappings. You can continue without mappings and add them later.
+          No category mappings. You can continue without mappings and add them later.
         </div>
       ) : (
         <div className="mt-5 space-y-3">
@@ -76,17 +76,21 @@ export function StoreCategoryMappingsStep({
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-700">
-                  Shopify taxonomy category {index + 1}
+                  Reference taxonomy category {index + 1}
                 </p>
                 <div className="mt-1">
                   <ShopifyTaxonomyPicker
                     id={`author-shopify-taxonomy-${mapping.clientId}`}
-                    value={mapping.shopifyTaxonomyCategoryId}
-                    onChange={(shopifyTaxonomyCategoryId) =>
+                    value={mapping.taxonomy?.categoryId ?? ""}
+                    scope="subcategories"
+                    rootId={session.category.referenceTaxonomy?.categoryId ?? null}
+                    allowRawId={false}
+                    fallbackSelection={mapping.taxonomy}
+                    onSelectionChange={(taxonomy) =>
                       dispatch({
                         type: "mapping.changed",
                         clientId: mapping.clientId,
-                        patch: { shopifyTaxonomyCategoryId },
+                        patch: { taxonomy },
                         now: storeCategoryAuthoringNow(),
                       })
                     }

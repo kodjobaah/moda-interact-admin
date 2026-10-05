@@ -27,7 +27,7 @@ export const STORE_CATEGORY_AUTHORING_STEPS: Array<{
   },
   {
     step: "mappings",
-    label: "Shopify mappings",
+    label: "Category mappings",
     description: "Optional taxonomy suggestions",
   },
   {

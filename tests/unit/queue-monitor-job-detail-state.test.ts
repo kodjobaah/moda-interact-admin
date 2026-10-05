@@ -23,6 +23,7 @@ const previousDetail: QueueJobDetail = {
   name: "order-created",
   status: "failed",
   shop: "shop-a",
+  shopDomain: null,
   attribution: "known",
   attemptsMade: 1,
   timestamp: null,

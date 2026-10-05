@@ -1,13 +1,14 @@
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import { NextResponse } from "next/server";
 
 import {
   browseShopifyTaxonomy,
-  getShopifyTaxonomyCatalogue,
   resolveShopifyTaxonomyCategory,
   searchShopifyTaxonomy,
   ShopifyTaxonomyInvalidQueryError,
   ShopifyTaxonomyUnavailableError,
 } from "@/lib/admin/shopify-taxonomy";
+import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
 import {
   PlatformAdminUnauthorizedError,
   requirePlatformAdminRead,
@@ -18,6 +19,12 @@ export const revalidate = 0;
 export const runtime = "nodejs";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
+
+const taxonomyLogger = createLogger({
+  serviceNamespace: "moda-interact",
+  serviceName: "moda-interact-admin",
+  environment: resolveDeploymentEnvironmentName(),
+});
 
 export async function GET(request: Request) {
   try {
@@ -36,45 +43,56 @@ export async function GET(request: Request) {
   }
 
   try {
-    const catalogue = await getShopifyTaxonomyCatalogue();
     const params = new URL(request.url).searchParams;
     const id = params.get("id");
     const query = params.get("q");
     const parent = params.get("parent");
     const limit = params.get("limit");
+    const scopeValue = params.get("scope");
+    const rootId = params.get("root");
+    const scope =
+      scopeValue === "top-level" || scopeValue === "subcategories"
+        ? scopeValue
+        : "all";
 
     if (id) {
-      const category = resolveShopifyTaxonomyCategory(catalogue, id);
-      if (!category) {
+      const resolved = await resolveShopifyTaxonomyCategory(id, scope);
+      if (!resolved.category) {
         return NextResponse.json(
-          { error: "not_found", version: catalogue.version },
+          { error: "not_found", version: resolved.version },
           { status: 404, headers: NO_STORE_HEADERS },
         );
       }
       return NextResponse.json(
-        { mode: "resolve", version: catalogue.version, category },
+        { mode: "resolve", ...resolved },
         { headers: NO_STORE_HEADERS },
       );
     }
 
     if (query) {
+      const result = await searchShopifyTaxonomy({
+        query,
+        limitValue: limit,
+        scope,
+        rootId,
+      });
       return NextResponse.json(
-        {
-          mode: "search",
-          version: catalogue.version,
-          categories: searchShopifyTaxonomy(catalogue, query, limit),
-        },
+        { mode: "search", ...result },
         { headers: NO_STORE_HEADERS },
       );
     }
 
-    const browse = browseShopifyTaxonomy(catalogue, parent);
+    if (scope === "top-level" && parent) {
+      throw new ShopifyTaxonomyInvalidQueryError(
+        "Top-level taxonomy browsing cannot descend into subcategories.",
+      );
+    }
+
+    const effectiveParent =
+      scope === "subcategories" && !parent && rootId ? rootId : parent;
+    const browse = await browseShopifyTaxonomy(effectiveParent);
     return NextResponse.json(
-      {
-        mode: "browse",
-        version: catalogue.version,
-        ...browse,
-      },
+      { mode: "browse", ...browse },
       { headers: NO_STORE_HEADERS },
     );
   } catch (error) {
@@ -85,6 +103,28 @@ export async function GET(request: Request) {
       );
     }
     if (error instanceof ShopifyTaxonomyUnavailableError) {
+      taxonomyLogger.info("admin.shopify_taxonomy.unavailable", {
+        code: error.code,
+        detail: error.detail,
+      });
+      if (error.code === "EMBEDDING_CONFIGURATION") {
+        return NextResponse.json(
+          {
+            error: "embedding_configuration",
+            reason:
+              error.detail === "MISSING_API_KEY"
+                ? "missing_api_key"
+                : "invalid_index_metadata",
+          },
+          { status: 503, headers: NO_STORE_HEADERS },
+        );
+      }
+      if (error.code === "EMBEDDING_REQUEST_FAILED") {
+        return NextResponse.json(
+          { error: "embedding_request_failed" },
+          { status: 503, headers: NO_STORE_HEADERS },
+        );
+      }
       return NextResponse.json(
         { error: "unavailable" },
         { status: 503, headers: NO_STORE_HEADERS },

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
+import { resolveShopifyTaxonomyCategory } from "@/lib/admin/shopify-taxonomy";
+import type { StoreCategoryTaxonomyReference } from "@/lib/admin/store-category-taxonomy-reference";
 import {
   createStoreCategoryBundle,
   mutateStoreCategoryCatalogue,
@@ -20,6 +22,38 @@ import {
   parseUpdateStoreCategoryForm,
   parseUpdateTaxonomyMappingForm,
 } from "@/lib/admin/store-category-validation";
+
+async function assertTopLevelStoreCategoryReference(
+  reference: StoreCategoryTaxonomyReference,
+): Promise<void> {
+  const resolved = await resolveShopifyTaxonomyCategory(
+    reference.categoryId,
+    "top-level",
+  );
+  const category = resolved.category;
+
+  if (
+    !category ||
+    category.level !== 0 ||
+    category.parentId !== null ||
+    category.ancestors.length !== 0
+  ) {
+    throw new Error(
+      "Store Category reference taxonomy must be a top-level category.",
+    );
+  }
+
+  if (
+    resolved.version !== reference.version ||
+    category.id !== reference.categoryId ||
+    category.name !== reference.name ||
+    category.fullName !== reference.fullName
+  ) {
+    throw new Error(
+      "Reference taxonomy selection is stale; reselect the top-level category and retry.",
+    );
+  }
+}
 
 function databaseCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) {
@@ -39,8 +73,11 @@ function uniqueConstraintMessage(error: unknown): string {
       : "";
   if (target.includes("slug")) return "A category with this slug already exists.";
   if (target.includes("key")) return "A prompt template with this key already exists.";
+  if (target.includes("referenceTaxonomyCategoryId")) {
+    return "This reference taxonomy category is already used by another Store Category.";
+  }
   if (target.includes("shopifyTaxonomyCategoryId")) {
-    return "This Shopify taxonomy category is already mapped.";
+    return "This reference taxonomy category is already mapped.";
   }
   return "A catalogue identifier is already in use.";
 }
@@ -109,6 +146,7 @@ export async function createStoreCategoryBundleAction(
     throw new Error("SUPER_ADMIN access is required.");
   }
   const input = parseCreateStoreCategoryBundleInput(payload);
+  await assertTopLevelStoreCategoryReference(input.category.referenceTaxonomy);
   try {
     const categoryId = await prisma.$transaction(
       async (transaction) => {

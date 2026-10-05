@@ -48,6 +48,7 @@ test("Admin catalogue introduces no translation persistence or queue surface", a
     "src/components/admin/store-categories/store-category-maintenance-tabs.tsx",
     "src/components/admin/store-categories/store-category-workspace-header.tsx",
     "src/components/admin/store-categories/taxonomy-mapping-editor.tsx",
+    "src/lib/admin/store-category-taxonomy-reference.ts",
   ];
   const contents = (await Promise.all(files.map(source))).join("\n");
   assert.doesNotMatch(contents, /CommercePromptTemplateTranslation|TranslationJob|Queue\.add|queue\.add/i);
@@ -81,7 +82,7 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   assert.match(workspace, /StoreCategoryReviewStep/);
   assert.match(categoryStep, /Category identity/);
   assert.match(templateStep, /Default prompt template/);
-  assert.match(mappingsStep, /Shopify taxonomy mappings/);
+  assert.match(mappingsStep, /Category mappings/);
   assert.match(reviewStep, /Review Store Category/);
   assert.match(session, /validationRevision/);
   assert.match(session, /reviewedRevision/);
@@ -94,7 +95,7 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   assert.match(maintenanceTabs, /aria-label="Store category sections"/);
   assert.match(maintenanceTabs, /Category details/);
   assert.match(maintenanceTabs, /Prompt templates \(\$\{templateCount\}\)/);
-  assert.match(maintenanceTabs, /Shopify mappings \(\$\{mappingCount\}\)/);
+  assert.match(maintenanceTabs, /Category mappings \(\$\{mappingCount\}\)/);
 
   const templateWorkspace = await source("src/components/admin/store-categories/prompt-template-workspace.tsx");
   const templateList = await source("src/components/admin/store-categories/prompt-template-list.tsx");
@@ -112,4 +113,20 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   assert.match(templateList, /Default/);
   assert.match(workspaceHeader, /Active profiles/);
   assert.match(workspaceHeader, /Default template/);
+});
+
+
+test("Store Category authoring persists human-readable reference taxonomy metadata for cross-platform use", async () => {
+  const categoryStep = await source("src/components/admin/store-categories/store-category-category-step.tsx");
+  const mappingStep = await source("src/components/admin/store-categories/store-category-mappings-step.tsx");
+  const validation = await source("src/lib/admin/store-category-validation.ts");
+  const service = await source("src/lib/admin/store-categories.ts");
+
+  assert.match(categoryStep, /scope="top-level"/);
+  assert.match(mappingStep, /scope="subcategories"/);
+  assert.match(mappingStep, /rootId=\{session\.category\.referenceTaxonomy\?\.categoryId/);
+  assert.match(validation, /taxonomyCategoryFullName/);
+  assert.match(service, /referenceTaxonomyCategoryFullName/);
+  assert.match(service, /taxonomyCategoryName: mapping\.taxonomy\.name/);
+  assert.match(service, /taxonomyCategoryFullName: mapping\.taxonomy\.fullName/);
 });

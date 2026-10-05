@@ -1,4 +1,5 @@
 import type { CreateStoreCategoryBundleInput } from "../../../lib/admin/store-category-validation.ts";
+import { isStoreCategoryTaxonomyReference } from "../../../lib/admin/store-category-taxonomy-reference.ts";
 import {
   canEnterStoreCategoryAuthoringStep,
   isStoreCategoryReviewCurrent,
@@ -23,9 +24,9 @@ export type {
   StoreCategoryAuthoringValidation,
 } from "./store-category-authoring-types.ts";
 
-export const STORE_CATEGORY_AUTHORING_SCHEMA_VERSION = 1 as const;
+export const STORE_CATEGORY_AUTHORING_SCHEMA_VERSION = 2 as const;
 export const STORE_CATEGORY_AUTHORING_STORAGE_KEY =
-  "moda.admin.store-category-authoring.v1";
+  "moda.admin.store-category-authoring.v2";
 
 export function createStoreCategoryAuthoringSession(
   sessionId: string,
@@ -38,6 +39,7 @@ export function createStoreCategoryAuthoringSession(
     step: "category",
     status: "DRAFT",
     category: {
+      referenceTaxonomy: null,
       slug: "",
       displayName: "",
       description: "",
@@ -221,8 +223,21 @@ export function restoreStoreCategoryAuthoringSession(
 export function createStoreCategoryBundlePayload(
   session: StoreCategoryAuthoringSession,
 ): CreateStoreCategoryBundleInput {
+  const referenceTaxonomy = session.category.referenceTaxonomy;
+  if (!isStoreCategoryTaxonomyReference(referenceTaxonomy)) {
+    throw new Error("Store category reference taxonomy is incomplete.");
+  }
+
+  const shopifyMappings = session.shopifyMappings.map((mapping) => {
+    if (!isStoreCategoryTaxonomyReference(mapping.taxonomy)) {
+      throw new Error("Store category mapping taxonomy is incomplete.");
+    }
+    return { taxonomy: mapping.taxonomy, weight: mapping.weight };
+  });
+
   return {
     category: {
+      referenceTaxonomy,
       slug: session.category.slug.trim(),
       displayName: session.category.displayName.trim(),
       description: session.category.description.trim(),
@@ -234,10 +249,7 @@ export function createStoreCategoryBundlePayload(
       description: session.defaultTemplate.description.trim(),
       promptText: session.defaultTemplate.promptText.trim(),
     },
-    shopifyMappings: session.shopifyMappings.map((mapping) => ({
-      shopifyTaxonomyCategoryId: mapping.shopifyTaxonomyCategoryId.trim(),
-      weight: mapping.weight,
-    })),
+    shopifyMappings,
     reason: session.auditReason.trim(),
   };
 }

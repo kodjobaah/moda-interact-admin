@@ -99,6 +99,10 @@ export async function getStoreCategoryCatalogue() {
           id: true,
           categoryId: true,
           shopifyTaxonomyCategoryId: true,
+          taxonomySource: true,
+          taxonomyVersion: true,
+          taxonomyCategoryName: true,
+          taxonomyCategoryFullName: true,
           weight: true,
         },
       },
@@ -120,6 +124,10 @@ export async function getStoreCategoryCatalogue() {
     taxonomySuggestions: categories.flatMap((category) =>
       category.taxonomyMappings.map((mapping) => ({
         shopifyTaxonomyCategoryId: mapping.shopifyTaxonomyCategoryId,
+        taxonomySource: mapping.taxonomySource,
+        taxonomyVersion: mapping.taxonomyVersion,
+        taxonomyCategoryName: mapping.taxonomyCategoryName,
+        taxonomyCategoryFullName: mapping.taxonomyCategoryFullName,
         weight: mapping.weight,
         category: {
           displayOrder: category.displayOrder,
@@ -147,6 +155,11 @@ export async function createStoreCategoryBundle(
       displayName: input.category.displayName,
       description: input.category.description,
       displayOrder: input.category.displayOrder,
+      referenceTaxonomySource: input.category.referenceTaxonomy.source,
+      referenceTaxonomyVersion: input.category.referenceTaxonomy.version,
+      referenceTaxonomyCategoryId: input.category.referenceTaxonomy.categoryId,
+      referenceTaxonomyCategoryName: input.category.referenceTaxonomy.name,
+      referenceTaxonomyCategoryFullName: input.category.referenceTaxonomy.fullName,
       enabled: false,
       editVersion: 1,
       createdByAdminId: actorAdminId,
@@ -184,7 +197,11 @@ export async function createStoreCategoryBundle(
     await transaction.commerceStoreCategoryTaxonomyMapping.create({
       data: {
         categoryId: category.id,
-        shopifyTaxonomyCategoryId: mapping.shopifyTaxonomyCategoryId,
+        shopifyTaxonomyCategoryId: mapping.taxonomy.categoryId,
+        taxonomySource: mapping.taxonomy.source,
+        taxonomyVersion: mapping.taxonomy.version,
+        taxonomyCategoryName: mapping.taxonomy.name,
+        taxonomyCategoryFullName: mapping.taxonomy.fullName,
         weight: mapping.weight,
       },
     });
@@ -199,6 +216,13 @@ export async function createStoreCategoryBundle(
       creationMode: "ATOMIC_AUTHORING",
       defaultTemplateId: template.id,
       taxonomyMappingCount: input.shopifyMappings.length,
+      referenceTaxonomy: {
+        source: input.category.referenceTaxonomy.source,
+        version: input.category.referenceTaxonomy.version,
+        categoryId: input.category.referenceTaxonomy.categoryId,
+        name: input.category.referenceTaxonomy.name,
+        fullName: input.category.referenceTaxonomy.fullName,
+      },
     },
   });
   await audit(transaction, {
@@ -428,7 +452,11 @@ export async function mutateStoreCategoryCatalogue(
     await transaction.commerceStoreCategoryTaxonomyMapping.create({
       data: {
         categoryId: input.categoryId,
-        shopifyTaxonomyCategoryId: input.shopifyTaxonomyCategoryId,
+        shopifyTaxonomyCategoryId: input.taxonomy.categoryId,
+        taxonomySource: input.taxonomy.source,
+        taxonomyVersion: input.taxonomy.version,
+        taxonomyCategoryName: input.taxonomy.name,
+        taxonomyCategoryFullName: input.taxonomy.fullName,
         weight: input.weight,
       },
     });
@@ -437,7 +465,14 @@ export async function mutateStoreCategoryCatalogue(
       actorAdminId,
       reason: input.reason,
       categoryId: input.categoryId,
-      metadata: { changeKind: "TAXONOMY_MAPPING" },
+      metadata: {
+        changeKind: "TAXONOMY_MAPPING",
+        taxonomySource: input.taxonomy.source,
+        taxonomyVersion: input.taxonomy.version,
+        taxonomyCategoryId: input.taxonomy.categoryId,
+        taxonomyCategoryName: input.taxonomy.name,
+        taxonomyCategoryFullName: input.taxonomy.fullName,
+      },
     });
     return;
   }
@@ -457,7 +492,11 @@ export async function mutateStoreCategoryCatalogue(
       },
       data: {
         categoryId: input.categoryId,
-        shopifyTaxonomyCategoryId: input.shopifyTaxonomyCategoryId,
+        shopifyTaxonomyCategoryId: input.taxonomy.categoryId,
+        taxonomySource: input.taxonomy.source,
+        taxonomyVersion: input.taxonomy.version,
+        taxonomyCategoryName: input.taxonomy.name,
+        taxonomyCategoryFullName: input.taxonomy.fullName,
         weight: input.weight,
       },
     });
@@ -467,7 +506,14 @@ export async function mutateStoreCategoryCatalogue(
       actorAdminId,
       reason: input.reason,
       categoryId: input.categoryId,
-      metadata: { changeKind: "TAXONOMY_MAPPING" },
+      metadata: {
+        changeKind: "TAXONOMY_MAPPING",
+        taxonomySource: input.taxonomy.source,
+        taxonomyVersion: input.taxonomy.version,
+        taxonomyCategoryId: input.taxonomy.categoryId,
+        taxonomyCategoryName: input.taxonomy.name,
+        taxonomyCategoryFullName: input.taxonomy.fullName,
+      },
     });
     return;
   }

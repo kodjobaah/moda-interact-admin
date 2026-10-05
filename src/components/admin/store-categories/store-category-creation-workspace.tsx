@@ -54,7 +54,7 @@ export function StoreCategoryCreationWorkspace() {
             Create Store Category
           </h2>
           <p className="mt-1 text-sm text-gray-600">
-            Create the category identity, required default template, and optional Shopify mappings as one configuration.
+            Create the reference-backed category identity, required default template, and optional category mappings as one configuration.
           </p>
         </div>
         <button

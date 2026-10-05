@@ -10,11 +10,28 @@ import {
 
 const T0 = "2026-10-04T18:00:00.000Z";
 
+const TOP_LEVEL = {
+  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY" as const,
+  version: "2026-08",
+  categoryId: "gid://shopify/TaxonomyCategory/aa",
+  name: "Apparel & Accessories",
+  fullName: "Apparel & Accessories",
+};
+
+const SUBCATEGORY = {
+  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY" as const,
+  version: "2026-08",
+  categoryId: "gid://shopify/TaxonomyCategory/aa-1",
+  name: "Clothing",
+  fullName: "Apparel & Accessories > Clothing",
+};
+
 function completeSession() {
   let session = createStoreCategoryAuthoringSession("session-1", T0);
   session = storeCategoryAuthoringReducer(session, {
     type: "category.changed",
     patch: {
+      referenceTaxonomy: TOP_LEVEL,
       slug: "fashion-apparel",
       displayName: "Fashion & Apparel",
       description: "Clothing and accessories",
@@ -56,7 +73,11 @@ test("authoring session blocks progression until required category and default-t
 
   session = storeCategoryAuthoringReducer(session, {
     type: "category.changed",
-    patch: { slug: "fashion-apparel", displayName: "Fashion & Apparel" },
+    patch: {
+      referenceTaxonomy: TOP_LEVEL,
+      slug: "fashion-apparel",
+      displayName: "Fashion & Apparel",
+    },
     now: T0,
   })!;
   session = storeCategoryAuthoringReducer(session, {
@@ -99,13 +120,13 @@ test("review readiness becomes stale whenever reviewed category configuration ch
   assert.equal(canCreateStoreCategoryFromSession(session), true);
 });
 
-test("Shopify mappings are optional but every supplied mapping must be valid and unique", () => {
+test("category mappings are optional but every supplied mapping must be complete and unique", () => {
   let session = completeSession();
   assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, true);
 
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.added",
-    mapping: { clientId: "m1", shopifyTaxonomyCategoryId: "", weight: 1 },
+    mapping: { clientId: "m1", taxonomy: null, weight: 1 },
     now: T0,
   })!;
   assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, false);
@@ -113,14 +134,14 @@ test("Shopify mappings are optional but every supplied mapping must be valid and
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.changed",
     clientId: "m1",
-    patch: { shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa" },
+    patch: { taxonomy: SUBCATEGORY },
     now: T0,
   })!;
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.added",
     mapping: {
       clientId: "m2",
-      shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa",
+      taxonomy: SUBCATEGORY,
       weight: 2,
     },
     now: T0,

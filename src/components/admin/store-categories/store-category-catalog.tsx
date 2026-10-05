@@ -27,7 +27,7 @@ export function StoreCategoryCatalog({
           Store Categories
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-gray-600">
-          Manage category identities, their current default prompts, and Shopify taxonomy mappings.
+          Manage category identities, their current default prompts, and cross-platform category mappings.
         </p>
       </div>
 

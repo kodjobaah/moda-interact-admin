@@ -1,9 +1,15 @@
+import {
+  STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE,
+  type StoreCategoryTaxonomyReference,
+} from "./store-category-taxonomy-reference.ts";
+
 export const STORE_CATEGORY_SLUG_PATTERN = /^[a-z][a-z0-9-]{0,127}$/;
 export const PROMPT_TEMPLATE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,127}$/;
 
 
 export type CreateStoreCategoryBundleInput = {
   category: {
+    referenceTaxonomy: StoreCategoryTaxonomyReference;
     slug: string;
     displayName: string;
     description: string;
@@ -16,7 +22,7 @@ export type CreateStoreCategoryBundleInput = {
     promptText: string;
   };
   shopifyMappings: Array<{
-    shopifyTaxonomyCategoryId: string;
+    taxonomy: StoreCategoryTaxonomyReference;
     weight: number;
   }>;
   reason: string;
@@ -70,7 +76,7 @@ export type SelectDefaultTemplateInput = {
 
 export type CreateTaxonomyMappingInput = {
   categoryId: string;
-  shopifyTaxonomyCategoryId: string;
+  taxonomy: StoreCategoryTaxonomyReference;
   weight: number;
   reason: string;
 };
@@ -234,16 +240,26 @@ export function parseSelectDefaultTemplateForm(
   };
 }
 
+function taxonomyReferenceFromForm(formData: FormData): StoreCategoryTaxonomyReference {
+  const source = requiredText(formData, "taxonomySource", 64);
+  if (source !== STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE) {
+    throw new Error("taxonomySource is invalid.");
+  }
+  return {
+    source,
+    version: requiredText(formData, "taxonomyVersion", 32),
+    categoryId: requiredText(formData, "shopifyTaxonomyCategoryId", 255),
+    name: requiredText(formData, "taxonomyCategoryName", 255),
+    fullName: requiredText(formData, "taxonomyCategoryFullName", 2000),
+  };
+}
+
 export function parseCreateTaxonomyMappingForm(
   formData: FormData,
 ): CreateTaxonomyMappingInput {
   return {
     categoryId: requiredText(formData, "categoryId", 255),
-    shopifyTaxonomyCategoryId: requiredText(
-      formData,
-      "shopifyTaxonomyCategoryId",
-      255,
-    ),
+    taxonomy: taxonomyReferenceFromForm(formData),
     weight: integer(formData, "weight", 1, 1_000_000),
     reason: reason(formData),
   };
@@ -311,6 +327,24 @@ function objectInteger(
   return result;
 }
 
+function objectTaxonomyReference(
+  input: unknown,
+  name: string,
+): StoreCategoryTaxonomyReference {
+  const value = objectValue(input, name);
+  const source = objectText(value, "source", 64);
+  if (source !== STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE) {
+    throw new Error(`${name}.source is invalid.`);
+  }
+  return {
+    source,
+    version: objectText(value, "version", 32),
+    categoryId: objectText(value, "categoryId", 255),
+    name: objectText(value, "name", 255),
+    fullName: objectText(value, "fullName", 2000),
+  };
+}
+
 export function parseCreateStoreCategoryBundleInput(
   input: unknown,
 ): CreateStoreCategoryBundleInput {
@@ -321,6 +355,10 @@ export function parseCreateStoreCategoryBundleInput(
   if (!STORE_CATEGORY_SLUG_PATTERN.test(slug)) {
     throw new Error("slug has an invalid format.");
   }
+  const referenceTaxonomy = objectTaxonomyReference(
+    category.referenceTaxonomy,
+    "category.referenceTaxonomy",
+  );
   const key = objectText(defaultTemplate, "key", 128);
   if (!PROMPT_TEMPLATE_KEY_PATTERN.test(key)) {
     throw new Error("key has an invalid format.");
@@ -332,23 +370,23 @@ export function parseCreateStoreCategoryBundleInput(
   const seen = new Set<string>();
   const shopifyMappings = mappings.map((mapping, index) => {
     const value = objectValue(mapping, `shopifyMappings[${index}]`);
-    const shopifyTaxonomyCategoryId = objectText(
-      value,
-      "shopifyTaxonomyCategoryId",
-      255,
+    const taxonomy = objectTaxonomyReference(
+      value.taxonomy,
+      `shopifyMappings[${index}].taxonomy`,
     );
-    if (seen.has(shopifyTaxonomyCategoryId)) {
-      throw new Error("Each Shopify taxonomy category may be mapped only once.");
+    if (seen.has(taxonomy.categoryId)) {
+      throw new Error("Each reference taxonomy category may be mapped only once.");
     }
-    seen.add(shopifyTaxonomyCategoryId);
+    seen.add(taxonomy.categoryId);
     return {
-      shopifyTaxonomyCategoryId,
+      taxonomy,
       weight: objectInteger(value, "weight", 1, 1_000_000),
     };
   });
 
   return {
     category: {
+      referenceTaxonomy,
       slug,
       displayName: objectText(category, "displayName", 255),
       description: objectText(category, "description", 2000, false),

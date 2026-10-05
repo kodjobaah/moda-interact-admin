@@ -48,3 +48,6 @@ node_modules/
 
 # local manual seed snapshots
 /.seed-state/
+
+# generated build inputs
+/.generated/

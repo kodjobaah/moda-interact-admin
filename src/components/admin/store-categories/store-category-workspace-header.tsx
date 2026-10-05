@@ -26,6 +26,9 @@ export function StoreCategoryWorkspaceHeader({ category }: { category: Category 
         <p className="mt-2 max-w-3xl text-sm text-gray-600">
           {category.description?.trim() || "No category description has been added."}
         </p>
+        <p className="mt-2 text-xs text-gray-500">
+          Reference taxonomy: {category.referenceTaxonomyCategoryFullName ?? "Not recorded for this legacy category"}
+        </p>
       </div>
 
       <dl className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-2 rounded-lg bg-gray-50 px-4 py-3 text-sm">

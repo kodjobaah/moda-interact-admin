@@ -1,14 +1,24 @@
-import { gunzipSync } from "node:zlib";
+import Redis from "ioredis";
 
-export const SHOPIFY_TAXONOMY_VERSION = "2026-08";
-export const SHOPIFY_TAXONOMY_ASSET_URL =
-  `https://github.com/Shopify/product-taxonomy/releases/download/v${SHOPIFY_TAXONOMY_VERSION}/categories.en.json.gz`;
+import {
+  embedShopifyTaxonomyQuery,
+  loadShopifyTaxonomyQueryEmbeddingConfig,
+  shopifyTaxonomyVectorBuffer,
+  ShopifyTaxonomyEmbeddingConfigurationError,
+  ShopifyTaxonomyEmbeddingError,
+} from "./shopify-taxonomy-embedding.ts";
 
-const SHOPIFY_TAXONOMY_FETCH_TIMEOUT_MS = 10_000;
-const SHOPIFY_TAXONOMY_MAX_COMPRESSED_BYTES = 5 * 1024 * 1024;
-const SHOPIFY_TAXONOMY_MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024;
-const SHOPIFY_TAXONOMY_DEFAULT_LIMIT = 30;
-const SHOPIFY_TAXONOMY_MAX_LIMIT = 50;
+export const SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS =
+  "idx:moda:shopify-taxonomy:top";
+export const SHOPIFY_TAXONOMY_SUBCATEGORY_INDEX_ALIAS =
+  "idx:moda:shopify-taxonomy:sub";
+export const SHOPIFY_TAXONOMY_METADATA_KEY =
+  "moda:shopify-taxonomy:metadata";
+
+const SHOPIFY_TAXONOMY_DEFAULT_LIMIT = 10;
+const SHOPIFY_TAXONOMY_MAX_LIMIT = 10;
+const REDIS_OPERATION_TIMEOUT_MS = 2_500;
+const MAX_BROWSE_RESULTS = 250;
 
 export type ShopifyTaxonomyAncestor = {
   id: string;
@@ -25,150 +35,52 @@ export type ShopifyTaxonomyCategory = {
   ancestors: ShopifyTaxonomyAncestor[];
 };
 
-export type ShopifyTaxonomyCatalogue = {
-  version: string;
-  categories: ShopifyTaxonomyCategory[];
-  byId: Map<string, ShopifyTaxonomyCategory>;
+export type ShopifyTaxonomySearchScope = "all" | "top-level" | "subcategories";
+
+export type ShopifyTaxonomyMetadata = {
+  taxonomyVersion: string;
+  sourceUrl: string;
+  sourceSha256: string;
+  embeddingProvider: "openai";
+  embeddingModel: string;
+  embeddingDimensions: number;
+  embeddingIndexVersion: string;
+  topLevelCount: number;
+  subcategoryCount: number;
+  syncedAt: string;
 };
 
-type ShopifyTaxonomyDistributionCategory = {
-  id?: unknown;
-  level?: unknown;
-  name?: unknown;
-  full_name?: unknown;
-  parent_id?: unknown;
-  children?: unknown;
-  ancestors?: unknown;
+type ScoredCategory = {
+  category: ShopifyTaxonomyCategory;
+  score: number;
 };
 
-type ShopifyTaxonomyDistributionVertical = {
-  categories?: unknown;
-};
-
-type ShopifyTaxonomyDistribution = {
-  version?: unknown;
-  verticals?: unknown;
-};
+export type ShopifyTaxonomyUnavailableCode =
+  | "UNAVAILABLE"
+  | "EMBEDDING_CONFIGURATION"
+  | "EMBEDDING_REQUEST_FAILED";
 
 export class ShopifyTaxonomyUnavailableError extends Error {
-  constructor(message = "Shopify taxonomy is unavailable.") {
+  readonly code: ShopifyTaxonomyUnavailableCode;
+  readonly detail: string | null;
+
+  constructor(
+    message = "Reference taxonomy search is unavailable.",
+    code: ShopifyTaxonomyUnavailableCode = "UNAVAILABLE",
+    detail: string | null = null,
+  ) {
     super(message);
     this.name = "ShopifyTaxonomyUnavailableError";
+    this.code = code;
+    this.detail = detail;
   }
 }
 
 export class ShopifyTaxonomyInvalidQueryError extends Error {
-  constructor(message = "Shopify taxonomy query is invalid.") {
+  constructor(message = "Reference taxonomy query is invalid.") {
     super(message);
     this.name = "ShopifyTaxonomyInvalidQueryError";
   }
-}
-
-function requiredString(value: unknown, field: string): string {
-  if (typeof value !== "string" || !value.trim()) {
-    throw new ShopifyTaxonomyUnavailableError(
-      `Shopify taxonomy distribution is missing ${field}.`,
-    );
-  }
-  return value.trim();
-}
-
-function optionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function requiredLevel(value: unknown): number {
-  if (!Number.isSafeInteger(value) || Number(value) < 0) {
-    throw new ShopifyTaxonomyUnavailableError(
-      "Shopify taxonomy distribution contains an invalid level.",
-    );
-  }
-  return Number(value);
-}
-
-function parseAncestors(value: unknown): ShopifyTaxonomyAncestor[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((ancestor) => {
-    if (!ancestor || typeof ancestor !== "object") {
-      throw new ShopifyTaxonomyUnavailableError(
-        "Shopify taxonomy distribution contains an invalid ancestor.",
-      );
-    }
-    const candidate = ancestor as Record<string, unknown>;
-    return {
-      id: requiredString(candidate.id, "ancestor id"),
-      name: requiredString(candidate.name, "ancestor name"),
-    };
-  });
-}
-
-function hasChildren(value: unknown): boolean {
-  return Array.isArray(value) && value.length > 0;
-}
-
-/**
- * Convert Shopify's official categories.<locale>.json distribution into the
- * compact shape the Admin UI needs. Keeping this parser independent from the
- * network loader makes the release format testable without a live download.
- */
-export function buildShopifyTaxonomyCatalogue(
-  raw: unknown,
-): ShopifyTaxonomyCatalogue {
-  if (!raw || typeof raw !== "object") {
-    throw new ShopifyTaxonomyUnavailableError(
-      "Shopify taxonomy distribution is invalid.",
-    );
-  }
-
-  const distribution = raw as ShopifyTaxonomyDistribution;
-  const version = requiredString(distribution.version, "version");
-  if (!Array.isArray(distribution.verticals)) {
-    throw new ShopifyTaxonomyUnavailableError(
-      "Shopify taxonomy distribution is missing verticals.",
-    );
-  }
-
-  const byId = new Map<string, ShopifyTaxonomyCategory>();
-
-  for (const verticalValue of distribution.verticals) {
-    if (!verticalValue || typeof verticalValue !== "object") continue;
-    const vertical = verticalValue as ShopifyTaxonomyDistributionVertical;
-    if (!Array.isArray(vertical.categories)) continue;
-
-    for (const categoryValue of vertical.categories) {
-      if (!categoryValue || typeof categoryValue !== "object") continue;
-      const category = categoryValue as ShopifyTaxonomyDistributionCategory;
-      const id = requiredString(category.id, "category id");
-      const parsed: ShopifyTaxonomyCategory = {
-        id,
-        level: requiredLevel(category.level),
-        name: requiredString(category.name, "category name"),
-        fullName: requiredString(category.full_name, "category full_name"),
-        parentId: optionalString(category.parent_id),
-        hasChildren: hasChildren(category.children),
-        ancestors: parseAncestors(category.ancestors),
-      };
-
-      const existing = byId.get(id);
-      if (existing && existing.fullName !== parsed.fullName) {
-        throw new ShopifyTaxonomyUnavailableError(
-          `Shopify taxonomy contains duplicate category id ${id}.`,
-        );
-      }
-      byId.set(id, parsed);
-    }
-  }
-
-  const categories = [...byId.values()].sort((left, right) =>
-    left.fullName.localeCompare(right.fullName),
-  );
-  if (categories.length === 0) {
-    throw new ShopifyTaxonomyUnavailableError(
-      "Shopify taxonomy distribution contains no categories.",
-    );
-  }
-
-  return { version, categories, byId };
 }
 
 function parseLimit(value: string | null): number {
@@ -181,164 +93,502 @@ function parseLimit(value: string | null): number {
   return parsed;
 }
 
-function normalizeSearch(value: string): string {
-  return value.trim().toLocaleLowerCase("en");
+function scalar(value: unknown): string {
+  if (Buffer.isBuffer(value)) return value.toString("utf8");
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return "";
 }
 
-function scoreCategory(
-  category: ShopifyTaxonomyCategory,
-  normalizedQuery: string,
-): number | null {
-  const name = category.name.toLocaleLowerCase("en");
-  const fullName = category.fullName.toLocaleLowerCase("en");
-  const id = category.id.toLocaleLowerCase("en");
-
-  if (name === normalizedQuery) return 0;
-  if (name.startsWith(normalizedQuery)) return 1;
-  if (fullName.startsWith(normalizedQuery)) return 2;
-  if (name.includes(normalizedQuery)) return 3;
-  if (fullName.includes(normalizedQuery)) return 4;
-  if (id.includes(normalizedQuery)) return 5;
-  return null;
-}
-
-export function searchShopifyTaxonomy(
-  catalogue: ShopifyTaxonomyCatalogue,
-  query: string,
-  limitValue?: string | null,
-): ShopifyTaxonomyCategory[] {
-  const normalizedQuery = normalizeSearch(query);
-  if (!normalizedQuery || normalizedQuery.length > 200) {
-    throw new ShopifyTaxonomyInvalidQueryError();
+function parseAncestors(value: string): ShopifyTaxonomyAncestor[] {
+  if (!value) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new ShopifyTaxonomyUnavailableError(
+      "Reference taxonomy index contains invalid ancestor metadata.",
+    );
   }
-  const limit = parseLimit(limitValue ?? null);
-
-  return catalogue.categories
-    .map((category) => ({
-      category,
-      score: scoreCategory(category, normalizedQuery),
-    }))
-    .filter(
-      (candidate): candidate is { category: ShopifyTaxonomyCategory; score: number } =>
-        candidate.score !== null,
-    )
-    .sort(
-      (left, right) =>
-        left.score - right.score ||
-        left.category.fullName.localeCompare(right.category.fullName),
-    )
-    .slice(0, limit)
-    .map(({ category }) => category);
+  if (!Array.isArray(parsed)) {
+    throw new ShopifyTaxonomyUnavailableError(
+      "Reference taxonomy index contains invalid ancestor metadata.",
+    );
+  }
+  return parsed.map((ancestor) => {
+    if (!ancestor || typeof ancestor !== "object") {
+      throw new ShopifyTaxonomyUnavailableError(
+        "Reference taxonomy index contains invalid ancestor metadata.",
+      );
+    }
+    const candidate = ancestor as Record<string, unknown>;
+    const id = scalar(candidate.id).trim();
+    const name = scalar(candidate.name).trim();
+    if (!id || !name) {
+      throw new ShopifyTaxonomyUnavailableError(
+        "Reference taxonomy index contains invalid ancestor metadata.",
+      );
+    }
+    return { id, name };
+  });
 }
 
-export function browseShopifyTaxonomy(
-  catalogue: ShopifyTaxonomyCatalogue,
-  parentId: string | null,
-): {
-  parent: ShopifyTaxonomyCategory | null;
-  breadcrumbs: ShopifyTaxonomyAncestor[];
-  categories: ShopifyTaxonomyCategory[];
-} {
-  const normalizedParentId = parentId?.trim() || null;
-  const parent = normalizedParentId
-    ? catalogue.byId.get(normalizedParentId) ?? null
-    : null;
-  if (normalizedParentId && !parent) {
-    throw new ShopifyTaxonomyInvalidQueryError(
-      "Shopify taxonomy parent category was not found.",
+function parseCategory(fields: Record<string, string>): ShopifyTaxonomyCategory {
+  const id = fields.categoryId?.trim();
+  const name = fields.name?.trim();
+  const fullName = fields.fullName?.trim();
+  const level = Number(fields.level);
+  if (!id || !name || !fullName || !Number.isSafeInteger(level) || level < 0) {
+    throw new ShopifyTaxonomyUnavailableError(
+      "Reference taxonomy index contains an invalid category document.",
+    );
+  }
+  return {
+    id,
+    name,
+    fullName,
+    level,
+    parentId: fields.parentId?.trim() || null,
+    hasChildren: fields.hasChildren === "1",
+    ancestors: parseAncestors(fields.ancestorsJson ?? "[]"),
+  };
+}
+
+export function parseRedisSearchReply(reply: unknown): ScoredCategory[] {
+  if (!Array.isArray(reply) || reply.length < 1) {
+    throw new ShopifyTaxonomyUnavailableError(
+      "Reference taxonomy search returned an invalid response.",
     );
   }
 
-  const categories = catalogue.categories.filter(
-    (category) => category.parentId === normalizedParentId,
-  );
-  const breadcrumbs = parent ? [...parent.ancestors, { id: parent.id, name: parent.name }] : [];
-
-  return { parent, breadcrumbs, categories };
+  const results: ScoredCategory[] = [];
+  for (let index = 1; index < reply.length; index += 2) {
+    const fieldsValue = reply[index + 1];
+    if (!Array.isArray(fieldsValue)) continue;
+    const fields: Record<string, string> = {};
+    for (let fieldIndex = 0; fieldIndex < fieldsValue.length; fieldIndex += 2) {
+      const field = scalar(fieldsValue[fieldIndex]);
+      if (!field) continue;
+      fields[field] = scalar(fieldsValue[fieldIndex + 1]);
+    }
+    results.push({
+      category: parseCategory(fields),
+      score: Number.isFinite(Number(fields.vectorScore))
+        ? Number(fields.vectorScore)
+        : 0,
+    });
+  }
+  return results;
 }
 
-export function resolveShopifyTaxonomyCategory(
-  catalogue: ShopifyTaxonomyCatalogue,
+export function escapeRedisTagValue(value: string): string {
+  return value.replace(/([\\,.<>{}\[\]"':;!@#$%^&*()\-+=~|\/\s])/g, "\\$1");
+}
+
+export function buildShopifyTaxonomyVectorQuery(input: {
+  limit: number;
+  rootId?: string | null;
+}): string {
+  const filter = input.rootId
+    ? `(@rootId:{${escapeRedisTagValue(input.rootId)}})`
+    : "(*)";
+  return `${filter}=>[KNN ${input.limit} @embedding $queryVector AS vectorScore]`;
+}
+
+let cachedRedis: Redis | null = null;
+let cachedRedisUrl: string | null = null;
+
+function getRedis(): Redis {
+  const redisUrl = process.env.REDIS_URL?.trim();
+  if (!redisUrl) {
+    throw new ShopifyTaxonomyUnavailableError(
+      "Reference taxonomy search requires REDIS_URL.",
+    );
+  }
+
+  if (cachedRedis && cachedRedisUrl === redisUrl) return cachedRedis;
+  cachedRedis?.disconnect();
+  cachedRedisUrl = redisUrl;
+  cachedRedis = new Redis(redisUrl, {
+    // ioredis v6 defaults to RESP3. FT.SEARCH uses a map in RESP3, whereas
+    // this bounded adapter intentionally consumes the stable RESP2 array form.
+    protocol: 2,
+    lazyConnect: true,
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 1,
+    connectTimeout: REDIS_OPERATION_TIMEOUT_MS,
+    commandTimeout: REDIS_OPERATION_TIMEOUT_MS,
+  });
+  return cachedRedis;
+}
+
+async function ensureRedisReady(redis: Redis): Promise<void> {
+  if (redis.status === "ready") return;
+  if (redis.status === "wait" || redis.status === "end") {
+    await redis.connect();
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const onReady = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = () => {
+      redis.off("ready", onReady);
+      redis.off("error", onError);
+    };
+    redis.once("ready", onReady);
+    redis.once("error", onError);
+  });
+}
+
+function requiredMetadataString(
+  metadata: Record<string, string>,
+  field: string,
+): string {
+  const value = metadata[field]?.trim();
+  if (!value) {
+    throw new ShopifyTaxonomyUnavailableError(
+      "Reference taxonomy index has not been synchronized.",
+    );
+  }
+  return value;
+}
+
+export function parseShopifyTaxonomyMetadata(
+  metadata: Record<string, string>,
+): ShopifyTaxonomyMetadata {
+  const embeddingProvider = requiredMetadataString(metadata, "embeddingProvider");
+  const embeddingDimensions = Number(
+    requiredMetadataString(metadata, "embeddingDimensions"),
+  );
+  const topLevelCount = Number(requiredMetadataString(metadata, "topLevelCount"));
+  const subcategoryCount = Number(
+    requiredMetadataString(metadata, "subcategoryCount"),
+  );
+
+  if (
+    embeddingProvider !== "openai" ||
+    !Number.isSafeInteger(embeddingDimensions) ||
+    embeddingDimensions <= 0 ||
+    !Number.isSafeInteger(topLevelCount) ||
+    topLevelCount <= 0 ||
+    !Number.isSafeInteger(subcategoryCount) ||
+    subcategoryCount <= 0
+  ) {
+    throw new ShopifyTaxonomyUnavailableError(
+      "Reference taxonomy index metadata is invalid.",
+    );
+  }
+
+  return {
+    taxonomyVersion: requiredMetadataString(metadata, "taxonomyVersion"),
+    sourceUrl: requiredMetadataString(metadata, "sourceUrl"),
+    sourceSha256: requiredMetadataString(metadata, "sourceSha256"),
+    embeddingProvider: "openai",
+    embeddingModel: requiredMetadataString(metadata, "embeddingModel"),
+    embeddingDimensions,
+    embeddingIndexVersion: requiredMetadataString(
+      metadata,
+      "embeddingIndexVersion",
+    ),
+    topLevelCount,
+    subcategoryCount,
+    syncedAt: requiredMetadataString(metadata, "syncedAt"),
+  };
+}
+
+async function readMetadata(redis: Redis): Promise<ShopifyTaxonomyMetadata> {
+  const metadata = await redis.hgetall(SHOPIFY_TAXONOMY_METADATA_KEY);
+  return parseShopifyTaxonomyMetadata(metadata);
+}
+
+const CATEGORY_RETURN_FIELDS = [
+  "categoryId",
+  "name",
+  "fullName",
+  "parentId",
+  "level",
+  "hasChildren",
+  "ancestorsJson",
+] as const;
+
+async function callSearch(
+  redis: Redis,
+  indexName: string,
+  query: string,
+  options: {
+    limit: number;
+    vector?: Buffer;
+    sortByFullName?: boolean;
+  },
+): Promise<ScoredCategory[]> {
+  const args: Array<string | number | Buffer> = [indexName, query];
+  if (options.vector) {
+    args.push("PARAMS", 2, "queryVector", options.vector);
+  }
+  if (options.sortByFullName) args.push("SORTBY", "fullName", "ASC");
+  args.push(
+    "RETURN",
+    options.vector ? CATEGORY_RETURN_FIELDS.length + 1 : CATEGORY_RETURN_FIELDS.length,
+    ...CATEGORY_RETURN_FIELDS,
+  );
+  if (options.vector) args.push("vectorScore");
+  args.push("LIMIT", 0, options.limit, "DIALECT", 2);
+
+  const reply = await redis.call("FT.SEARCH", ...args);
+  return parseRedisSearchReply(reply);
+}
+
+async function withRedis<T>(operation: (redis: Redis) => Promise<T>): Promise<T> {
+  const redis = getRedis();
+  try {
+    await ensureRedisReady(redis);
+    return await operation(redis);
+  } catch (error) {
+    if (
+      error instanceof ShopifyTaxonomyInvalidQueryError ||
+      error instanceof ShopifyTaxonomyUnavailableError
+    ) {
+      throw error;
+    }
+    throw new ShopifyTaxonomyUnavailableError();
+  }
+}
+
+async function searchIndex(
+  redis: Redis,
+  indexName: string,
+  queryVector: Buffer,
+  limit: number,
+  rootId: string | null,
+): Promise<ScoredCategory[]> {
+  return callSearch(
+    redis,
+    indexName,
+    buildShopifyTaxonomyVectorQuery({ limit, rootId }),
+    { limit, vector: queryVector },
+  );
+}
+
+function queryEmbeddingConfigFromIndex(metadata: ShopifyTaxonomyMetadata) {
+  return loadShopifyTaxonomyQueryEmbeddingConfig({
+    embeddingProvider: metadata.embeddingProvider,
+    embeddingModel: metadata.embeddingModel,
+    embeddingDimensions: metadata.embeddingDimensions,
+    embeddingIndexVersion: metadata.embeddingIndexVersion,
+  });
+}
+
+export async function searchShopifyTaxonomy(input: {
+  query: string;
+  limitValue?: string | null;
+  scope?: ShopifyTaxonomySearchScope;
+  rootId?: string | null;
+}): Promise<{ version: string; categories: ShopifyTaxonomyCategory[] }> {
+  const query = input.query.trim();
+  if (!query || query.length > 200) throw new ShopifyTaxonomyInvalidQueryError();
+  const limit = parseLimit(input.limitValue ?? null);
+  const scope = input.scope ?? "all";
+
+  return withRedis(async (redis) => {
+    const metadata = await readMetadata(redis);
+    let vector: number[];
+    try {
+      vector = await embedShopifyTaxonomyQuery(
+        query,
+        queryEmbeddingConfigFromIndex(metadata),
+      );
+    } catch (error) {
+      if (error instanceof ShopifyTaxonomyEmbeddingConfigurationError) {
+        throw new ShopifyTaxonomyUnavailableError(
+          error.message,
+          "EMBEDDING_CONFIGURATION",
+          error.code,
+        );
+      }
+      if (error instanceof ShopifyTaxonomyEmbeddingError) {
+        throw new ShopifyTaxonomyUnavailableError(
+          error.message,
+          "EMBEDDING_REQUEST_FAILED",
+        );
+      }
+      throw error;
+    }
+    const vectorBuffer = shopifyTaxonomyVectorBuffer(vector);
+
+    if (scope === "top-level") {
+      const results = await searchIndex(
+        redis,
+        SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS,
+        vectorBuffer,
+        limit,
+        null,
+      );
+      return { version: metadata.taxonomyVersion, categories: results.map((r) => r.category) };
+    }
+
+    if (scope === "subcategories") {
+      const results = await searchIndex(
+        redis,
+        SHOPIFY_TAXONOMY_SUBCATEGORY_INDEX_ALIAS,
+        vectorBuffer,
+        limit,
+        input.rootId?.trim() || null,
+      );
+      return { version: metadata.taxonomyVersion, categories: results.map((r) => r.category) };
+    }
+
+    const [top, subcategories] = await Promise.all([
+      searchIndex(
+        redis,
+        SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS,
+        vectorBuffer,
+        limit,
+        null,
+      ),
+      searchIndex(
+        redis,
+        SHOPIFY_TAXONOMY_SUBCATEGORY_INDEX_ALIAS,
+        vectorBuffer,
+        limit,
+        input.rootId?.trim() || null,
+      ),
+    ]);
+    const categories = [...top, ...subcategories]
+      .sort(
+        (left, right) =>
+          left.score - right.score ||
+          left.category.fullName.localeCompare(right.category.fullName),
+      )
+      .slice(0, limit)
+      .map((result) => result.category);
+    return { version: metadata.taxonomyVersion, categories };
+  });
+}
+
+async function resolveFromIndex(
+  redis: Redis,
+  indexName: string,
   id: string,
-): ShopifyTaxonomyCategory | null {
+): Promise<ShopifyTaxonomyCategory | null> {
+  const results = await callSearch(
+    redis,
+    indexName,
+    `@categoryId:{${escapeRedisTagValue(id)}}`,
+    { limit: 1 },
+  );
+  return results[0]?.category ?? null;
+}
+
+export async function resolveShopifyTaxonomyCategory(
+  id: string,
+  scope: ShopifyTaxonomySearchScope = "all",
+): Promise<{ version: string; category: ShopifyTaxonomyCategory | null }> {
   const normalizedId = id.trim();
   if (!normalizedId || normalizedId.length > 255) {
     throw new ShopifyTaxonomyInvalidQueryError();
   }
-  return catalogue.byId.get(normalizedId) ?? null;
+
+  return withRedis(async (redis) => {
+    const metadata = await readMetadata(redis);
+
+    if (scope === "top-level") {
+      return {
+        version: metadata.taxonomyVersion,
+        category: await resolveFromIndex(
+          redis,
+          SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS,
+          normalizedId,
+        ),
+      };
+    }
+
+    if (scope === "subcategories") {
+      return {
+        version: metadata.taxonomyVersion,
+        category: await resolveFromIndex(
+          redis,
+          SHOPIFY_TAXONOMY_SUBCATEGORY_INDEX_ALIAS,
+          normalizedId,
+        ),
+      };
+    }
+
+    const top = await resolveFromIndex(
+      redis,
+      SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS,
+      normalizedId,
+    );
+    if (top) return { version: metadata.taxonomyVersion, category: top };
+    return {
+      version: metadata.taxonomyVersion,
+      category: await resolveFromIndex(
+        redis,
+        SHOPIFY_TAXONOMY_SUBCATEGORY_INDEX_ALIAS,
+        normalizedId,
+      ),
+    };
+  });
 }
 
-let cataloguePromise: Promise<ShopifyTaxonomyCatalogue> | null = null;
+export async function browseShopifyTaxonomy(
+  parentId: string | null,
+): Promise<{
+  version: string;
+  parent: ShopifyTaxonomyCategory | null;
+  breadcrumbs: ShopifyTaxonomyAncestor[];
+  categories: ShopifyTaxonomyCategory[];
+}> {
+  const normalizedParentId = parentId?.trim() || null;
 
-async function downloadShopifyTaxonomy(): Promise<ShopifyTaxonomyCatalogue> {
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    SHOPIFY_TAXONOMY_FETCH_TIMEOUT_MS,
-  );
-
-  try {
-    const response = await fetch(SHOPIFY_TAXONOMY_ASSET_URL, {
-      redirect: "follow",
-      signal: controller.signal,
-      headers: { Accept: "application/octet-stream" },
-    });
-    if (!response.ok) throw new ShopifyTaxonomyUnavailableError();
-
-    const declaredLength = Number(response.headers.get("content-length"));
-    if (
-      Number.isFinite(declaredLength) &&
-      declaredLength > SHOPIFY_TAXONOMY_MAX_COMPRESSED_BYTES
-    ) {
-      throw new ShopifyTaxonomyUnavailableError(
-        "Shopify taxonomy download exceeded the compressed size limit.",
+  return withRedis(async (redis) => {
+    const metadata = await readMetadata(redis);
+    if (!normalizedParentId) {
+      const categories = await callSearch(
+        redis,
+        SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS,
+        "*",
+        { limit: MAX_BROWSE_RESULTS, sortByFullName: true },
       );
+      return {
+        version: metadata.taxonomyVersion,
+        parent: null,
+        breadcrumbs: [],
+        categories: categories.map((result) => result.category),
+      };
     }
 
-    const compressed = new Uint8Array(await response.arrayBuffer());
-    if (compressed.byteLength > SHOPIFY_TAXONOMY_MAX_COMPRESSED_BYTES) {
-      throw new ShopifyTaxonomyUnavailableError(
-        "Shopify taxonomy download exceeded the compressed size limit.",
+    const resolved = await resolveShopifyTaxonomyCategory(normalizedParentId);
+    if (!resolved.category) {
+      throw new ShopifyTaxonomyInvalidQueryError(
+        "Reference taxonomy parent category was not found.",
       );
     }
-
-    const decompressed = gunzipSync(Buffer.from(compressed), {
-      maxOutputLength: SHOPIFY_TAXONOMY_MAX_DECOMPRESSED_BYTES,
-    });
-    if (decompressed.byteLength > SHOPIFY_TAXONOMY_MAX_DECOMPRESSED_BYTES) {
-      throw new ShopifyTaxonomyUnavailableError(
-        "Shopify taxonomy download exceeded the decompressed size limit.",
-      );
-    }
-
-    let raw: unknown;
-    try {
-      raw = JSON.parse(decompressed.toString("utf8"));
-    } catch {
-      throw new ShopifyTaxonomyUnavailableError(
-        "Shopify taxonomy distribution could not be parsed.",
-      );
-    }
-
-    return buildShopifyTaxonomyCatalogue(raw);
-  } catch (error) {
-    if (error instanceof ShopifyTaxonomyUnavailableError) throw error;
-    throw new ShopifyTaxonomyUnavailableError();
-  } finally {
-    clearTimeout(timeout);
-  }
+    const categories = await callSearch(
+      redis,
+      SHOPIFY_TAXONOMY_SUBCATEGORY_INDEX_ALIAS,
+      `@parentId:{${escapeRedisTagValue(normalizedParentId)}}`,
+      { limit: MAX_BROWSE_RESULTS, sortByFullName: true },
+    );
+    return {
+      version: metadata.taxonomyVersion,
+      parent: resolved.category,
+      breadcrumbs: [
+        ...resolved.category.ancestors,
+        { id: resolved.category.id, name: resolved.category.name },
+      ],
+      categories: categories.map((result) => result.category),
+    };
+  });
 }
 
-export async function getShopifyTaxonomyCatalogue(): Promise<ShopifyTaxonomyCatalogue> {
-  if (!cataloguePromise) {
-    cataloguePromise = downloadShopifyTaxonomy().catch((error) => {
-      cataloguePromise = null;
-      throw error;
-    });
-  }
-  return cataloguePromise;
-}
-
-export function resetShopifyTaxonomyCatalogueForTests() {
-  cataloguePromise = null;
+export function resetShopifyTaxonomyRedisForTests() {
+  cachedRedis?.disconnect();
+  cachedRedis = null;
+  cachedRedisUrl = null;
 }

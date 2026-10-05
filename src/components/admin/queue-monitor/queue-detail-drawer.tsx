@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { adminI18n, adminQueueJobLabel } from "@/i18n";
 
 import { isRefreshValue, REFRESH_OPTIONS } from "../queue-monitor-refresh";
+import type { QueueRefreshMs } from "../queue-monitor-refresh";
 import { QueueJobDetail } from "./queue-job-detail";
 import { QueueJobsTable } from "./queue-jobs-table";
 import { formatQueueMonitorTime } from "./queue-summary-table";
@@ -18,8 +19,8 @@ type QueueDetailDrawerProps = {
   queueJobsState: ReturnType<typeof useQueueJobs>;
   jobDetailState: ReturnType<typeof useQueueJobDetail>;
   drawerState: ReturnType<typeof useResizableDrawer>;
-  refreshMs: number;
-  setRefreshMs: (refreshMs: number) => void;
+  refreshMs: QueueRefreshMs;
+  setRefreshMs: (refreshMs: QueueRefreshMs) => void;
   summaryLoading: boolean;
   refreshSummary: () => Promise<void>;
   setSelectedQueueName: (queueName: string | null) => void;

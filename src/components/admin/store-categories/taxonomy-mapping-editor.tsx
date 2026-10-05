@@ -1,5 +1,6 @@
 import { mutateStoreCategoryCatalogueAction } from "@/app/actions/store-categories";
 import type { StoreCategoryCatalogue } from "@/lib/admin/store-categories";
+import { STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE } from "@/lib/admin/store-category-taxonomy-reference";
 import { ShopifyTaxonomyPicker } from "./shopify-taxonomy-picker";
 
 type Category = StoreCategoryCatalogue["categories"][number];
@@ -14,19 +15,20 @@ export function TaxonomyMappingEditor({
   categories: Category[];
 }) {
   return (
-    <section aria-labelledby="shopify-taxonomy-mappings-title">
+    <section aria-labelledby="category-taxonomy-mappings-title">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h3
-            id="shopify-taxonomy-mappings-title"
+            id="category-taxonomy-mappings-title"
             className="text-lg font-semibold text-gray-950"
           >
-            Shopify taxonomy mappings
+            Category mappings
           </h3>
           <p className="mt-1 max-w-3xl text-sm text-gray-600">
-            Select categories from Shopify&apos;s standardized product taxonomy. During
-            onboarding, matching mapping weights are summed for each Store Category;
-            the highest score wins. The merchant can still change the suggestion.
+            Search Shopify&apos;s Standard Product Taxonomy as Moda&apos;s reference taxonomy.
+            Shopify consumes the exact taxonomy ID; WooCommerce can consume the persisted
+            name/full path. During onboarding, matching mapping weights are summed for each
+            Store Category; the highest score wins.
           </p>
         </div>
         <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
@@ -38,8 +40,8 @@ export function TaxonomyMappingEditor({
       <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
         <h4 className="text-sm font-semibold text-gray-900">Add mapping</h4>
         <p className="mt-1 text-xs text-gray-600">
-          Search by a familiar Shopify category name or browse the hierarchy. Moda
-          stores the exact Shopify taxonomy GID after selection.
+          Search by a familiar category name or browse the hierarchy. Moda stores the
+          exact Shopify taxonomy GID plus its human-readable name/full path.
         </p>
         <form action={mutateStoreCategoryCatalogueAction} className="mt-4 space-y-4">
           <input type="hidden" name="intent" value="create-taxonomy-mapping" />
@@ -47,6 +49,8 @@ export function TaxonomyMappingEditor({
           <ShopifyTaxonomyPicker
             id={`create-taxonomy-${category.id}`}
             name="shopifyTaxonomyCategoryId"
+            scope="subcategories"
+            rootId={category.referenceTaxonomyCategoryId}
             required
           />
           <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end">
@@ -78,7 +82,7 @@ export function TaxonomyMappingEditor({
 
       {category.taxonomyMappings.length === 0 ? (
         <div className="mt-5 rounded-md border border-dashed border-gray-300 p-6 text-sm text-gray-600">
-          No Shopify taxonomy mappings yet. Mappings are optional and can be added at
+          No Category mappings yet. Mappings are optional and can be added at
           any time.
         </div>
       ) : (
@@ -95,6 +99,22 @@ export function TaxonomyMappingEditor({
                   id={`taxonomy-${mapping.id}`}
                   name="shopifyTaxonomyCategoryId"
                   defaultValue={mapping.shopifyTaxonomyCategoryId}
+                  scope="subcategories"
+                  rootId={category.referenceTaxonomyCategoryId}
+                  fallbackSelection={
+                    mapping.taxonomySource === STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE &&
+                    mapping.taxonomyVersion &&
+                    mapping.taxonomyCategoryName &&
+                    mapping.taxonomyCategoryFullName
+                      ? {
+                          source: STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE,
+                          version: mapping.taxonomyVersion,
+                          categoryId: mapping.shopifyTaxonomyCategoryId,
+                          name: mapping.taxonomyCategoryName,
+                          fullName: mapping.taxonomyCategoryFullName,
+                        }
+                      : null
+                  }
                   required
                 />
                 <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1fr)_10rem_minmax(0,2fr)_auto] lg:items-end">

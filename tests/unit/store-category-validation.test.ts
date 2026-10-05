@@ -14,6 +14,31 @@ function form(values: Record<string, string>): FormData {
   return result;
 }
 
+
+const taxonomyFields = {
+  taxonomySource: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
+  taxonomyVersion: "2026-08",
+  shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa-1",
+  taxonomyCategoryName: "Clothing",
+  taxonomyCategoryFullName: "Apparel & Accessories > Clothing",
+};
+
+const topLevelTaxonomy = {
+  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
+  version: "2026-08",
+  categoryId: "gid://shopify/TaxonomyCategory/aa",
+  name: "Apparel & Accessories",
+  fullName: "Apparel & Accessories",
+};
+
+const clothingTaxonomy = {
+  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
+  version: "2026-08",
+  categoryId: "gid://shopify/TaxonomyCategory/aa-1",
+  name: "Clothing",
+  fullName: "Apparel & Accessories > Clothing",
+};
+
 const categoryValues = {
   slug: " home-goods ",
   displayName: " Home Goods ",
@@ -115,7 +140,7 @@ test("template create/update require immutable identity and nonblank bounded pro
 test("taxonomy mapping weight must be a positive bounded integer", () => {
   const values = {
     categoryId: "category-1",
-    shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa-1",
+    ...taxonomyFields,
     weight: "1",
     reason: "Add mapping",
   };
@@ -133,6 +158,7 @@ test("atomic category bundle validates category, required default template, mapp
   );
   const payload = {
     category: {
+      referenceTaxonomy: topLevelTaxonomy,
       slug: " fashion-apparel ",
       displayName: " Fashion & Apparel ",
       description: " Clothing and accessories ",
@@ -146,7 +172,7 @@ test("atomic category bundle validates category, required default template, mapp
     },
     shopifyMappings: [
       {
-        shopifyTaxonomyCategoryId: " gid://shopify/TaxonomyCategory/aa ",
+        taxonomy: clothingTaxonomy,
         weight: 100,
       },
     ],
@@ -155,6 +181,7 @@ test("atomic category bundle validates category, required default template, mapp
 
   assert.deepEqual(parseCreateStoreCategoryBundleInput(payload), {
     category: {
+      referenceTaxonomy: topLevelTaxonomy,
       slug: "fashion-apparel",
       displayName: "Fashion & Apparel",
       description: "Clothing and accessories",
@@ -168,7 +195,7 @@ test("atomic category bundle validates category, required default template, mapp
     },
     shopifyMappings: [
       {
-        shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa",
+        taxonomy: clothingTaxonomy,
         weight: 100,
       },
     ],

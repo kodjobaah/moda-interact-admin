@@ -1,3 +1,5 @@
+import type { StoreCategoryTaxonomyReference } from "../../../lib/admin/store-category-taxonomy-reference.ts";
+
 export type StoreCategoryAuthoringStep =
   | "category"
   | "template"
@@ -13,17 +15,18 @@ export type StoreCategoryAuthoringStatus =
 
 export type StoreCategoryAuthoringMapping = {
   clientId: string;
-  shopifyTaxonomyCategoryId: string;
+  taxonomy: StoreCategoryTaxonomyReference | null;
   weight: number;
 };
 
 export type StoreCategoryAuthoringSession = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   sessionId: string;
   mode: "CREATE";
   step: StoreCategoryAuthoringStep;
   status: StoreCategoryAuthoringStatus;
   category: {
+    referenceTaxonomy: StoreCategoryTaxonomyReference | null;
     slug: string;
     displayName: string;
     description: string;

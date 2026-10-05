@@ -2,120 +2,169 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  browseShopifyTaxonomy,
-  buildShopifyTaxonomyCatalogue,
-  resolveShopifyTaxonomyCategory,
-  searchShopifyTaxonomy,
-  ShopifyTaxonomyInvalidQueryError,
+  buildShopifyTaxonomyVectorQuery,
+  escapeRedisTagValue,
+  parseRedisSearchReply,
+  parseShopifyTaxonomyMetadata,
 } from "../../src/lib/admin/shopify-taxonomy.ts";
+import {
+  DEFAULT_SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS,
+  loadShopifyTaxonomyEmbeddingConfig,
+  loadShopifyTaxonomyQueryEmbeddingConfig,
+  shopifyTaxonomyVectorBuffer,
+  ShopifyTaxonomyEmbeddingConfigurationError,
+} from "../../src/lib/admin/shopify-taxonomy-embedding.ts";
 
-const fixture = {
-  version: "2026-08",
-  verticals: [
-    {
-      name: "Apparel & Accessories",
-      prefix: "aa",
-      categories: [
-        {
-          id: "gid://shopify/TaxonomyCategory/aa",
-          level: 0,
-          name: "Apparel & Accessories",
-          full_name: "Apparel & Accessories",
-          parent_id: null,
-          children: [
-            { id: "gid://shopify/TaxonomyCategory/aa-1", name: "Clothing" },
-          ],
-          ancestors: [],
-        },
-        {
-          id: "gid://shopify/TaxonomyCategory/aa-1",
-          level: 1,
-          name: "Clothing",
-          full_name: "Apparel & Accessories > Clothing",
-          parent_id: "gid://shopify/TaxonomyCategory/aa",
-          children: [
-            { id: "gid://shopify/TaxonomyCategory/aa-1-9", name: "Shirts & Tops" },
-          ],
-          ancestors: [
-            { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
-          ],
-        },
-        {
-          id: "gid://shopify/TaxonomyCategory/aa-1-9",
-          level: 2,
-          name: "Shirts & Tops",
-          full_name: "Apparel & Accessories > Clothing > Shirts & Tops",
-          parent_id: "gid://shopify/TaxonomyCategory/aa-1",
-          children: [],
-          ancestors: [
-            { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
-            { id: "gid://shopify/TaxonomyCategory/aa-1", name: "Clothing" },
-          ],
-        },
-      ],
-    },
-  ],
-};
+const categoryFields = [
+  "categoryId",
+  "gid://shopify/TaxonomyCategory/aa-1-9",
+  "name",
+  "Shirts & Tops",
+  "fullName",
+  "Apparel & Accessories > Clothing > Shirts & Tops",
+  "parentId",
+  "gid://shopify/TaxonomyCategory/aa-1",
+  "level",
+  "2",
+  "hasChildren",
+  "0",
+  "ancestorsJson",
+  JSON.stringify([
+    { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
+    { id: "gid://shopify/TaxonomyCategory/aa-1", name: "Clothing" },
+  ]),
+  "vectorScore",
+  "0.125",
+];
 
-test("builds the compact Shopify taxonomy catalogue from the official distribution shape", () => {
-  const catalogue = buildShopifyTaxonomyCatalogue(fixture);
+test("parses Redis Search taxonomy documents into the Admin category contract", () => {
+  const parsed = parseRedisSearchReply([1, "doc-key", categoryFields]);
 
-  assert.equal(catalogue.version, "2026-08");
-  assert.equal(catalogue.categories.length, 3);
-  assert.deepEqual(catalogue.byId.get("gid://shopify/TaxonomyCategory/aa-1"), {
-    id: "gid://shopify/TaxonomyCategory/aa-1",
-    level: 1,
-    name: "Clothing",
-    fullName: "Apparel & Accessories > Clothing",
-    parentId: "gid://shopify/TaxonomyCategory/aa",
-    hasChildren: true,
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0]?.score, 0.125);
+  assert.deepEqual(parsed[0]?.category, {
+    id: "gid://shopify/TaxonomyCategory/aa-1-9",
+    level: 2,
+    name: "Shirts & Tops",
+    fullName: "Apparel & Accessories > Clothing > Shirts & Tops",
+    parentId: "gid://shopify/TaxonomyCategory/aa-1",
+    hasChildren: false,
     ancestors: [
       { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
+      { id: "gid://shopify/TaxonomyCategory/aa-1", name: "Clothing" },
     ],
   });
 });
 
-test("search ranks familiar category names and keeps results bounded", () => {
-  const catalogue = buildShopifyTaxonomyCatalogue(fixture);
-  const results = searchShopifyTaxonomy(catalogue, "shirt", "1");
-
-  assert.equal(results.length, 1);
-  assert.equal(results[0]?.id, "gid://shopify/TaxonomyCategory/aa-1-9");
-});
-
-test("browse returns roots, children, and breadcrumb context", () => {
-  const catalogue = buildShopifyTaxonomyCatalogue(fixture);
-
-  const roots = browseShopifyTaxonomy(catalogue, null);
-  assert.deepEqual(roots.categories.map((category) => category.id), [
-    "gid://shopify/TaxonomyCategory/aa",
-  ]);
-
-  const clothing = browseShopifyTaxonomy(
-    catalogue,
-    "gid://shopify/TaxonomyCategory/aa-1",
-  );
-  assert.equal(clothing.parent?.name, "Clothing");
-  assert.deepEqual(clothing.breadcrumbs, [
-    { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
-    { id: "gid://shopify/TaxonomyCategory/aa-1", name: "Clothing" },
-  ]);
-  assert.equal(clothing.categories[0]?.name, "Shirts & Tops");
-});
-
-test("resolve returns the exact Shopify GID and invalid query limits are rejected", () => {
-  const catalogue = buildShopifyTaxonomyCatalogue(fixture);
-
+test("builds bounded KNN queries and escapes exact root taxonomy tags", () => {
   assert.equal(
-    resolveShopifyTaxonomyCategory(
-      catalogue,
-      "gid://shopify/TaxonomyCategory/aa-1-9",
-    )?.fullName,
-    "Apparel & Accessories > Clothing > Shirts & Tops",
+    buildShopifyTaxonomyVectorQuery({
+      limit: 10,
+      rootId: "gid://shopify/TaxonomyCategory/aa",
+    }),
+    "(@rootId:{gid\\:\/\/shopify\/TaxonomyCategory\/aa})=>[KNN 10 @embedding $queryVector AS vectorScore]",
+  );
+  assert.equal(escapeRedisTagValue("aa-1"), "aa\\-1");
+});
+
+test("validates the active Redis taxonomy metadata contract", () => {
+  const metadata = parseShopifyTaxonomyMetadata({
+    taxonomyVersion: "2026-08",
+    sourceUrl: "https://example.test/categories.en.txt.gz",
+    sourceSha256: "abc123",
+    embeddingProvider: "openai",
+    embeddingModel: "text-embedding-3-small",
+    embeddingDimensions: "1536",
+    embeddingIndexVersion: "v1",
+    topLevelCount: "26",
+    subcategoryCount: "5000",
+    syncedAt: "2026-10-05T00:00:00.000Z",
+  });
+
+  assert.equal(metadata.embeddingDimensions, 1536);
+  assert.equal(metadata.topLevelCount, 26);
+  assert.equal(metadata.subcategoryCount, 5000);
+});
+
+
+test("uses the same compact taxonomy embedding dimensions for Admin queries", () => {
+  const config = loadShopifyTaxonomyEmbeddingConfig({
+    EMBEDDING_PROVIDER: "openai",
+    EMBEDDING_MODEL: "text-embedding-3-small",
+    EMBEDDING_DIMENSIONS: "1536",
+    EMBEDDING_INDEX_VERSION: "v1",
+    EMBEDDING_API_KEY: "test-key",
+  } as NodeJS.ProcessEnv);
+
+  assert.equal(DEFAULT_SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS, 256);
+  assert.equal(config.dimensions, 256);
+});
+
+test("uses the active Redis index embedding metadata for Admin query vectors", () => {
+  const config = loadShopifyTaxonomyQueryEmbeddingConfig(
+    {
+      embeddingProvider: "openai",
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: 384,
+      embeddingIndexVersion: "v1",
+    },
+    {
+      EMBEDDING_API_KEY: "test-key",
+      EMBEDDING_MODEL: "text-embedding-3-large",
+      SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS: "256",
+      EMBEDDING_INDEX_VERSION: "v2",
+    } as NodeJS.ProcessEnv,
   );
 
+  assert.equal(config.model, "text-embedding-3-small");
+  assert.equal(config.dimensions, 384);
+  assert.equal(config.indexVersion, "v1");
+  assert.equal(config.apiKey, "test-key");
+});
+
+test("reports a missing Admin embedding credential explicitly for semantic taxonomy search", () => {
   assert.throws(
-    () => searchShopifyTaxonomy(catalogue, "shirt", "999"),
-    ShopifyTaxonomyInvalidQueryError,
+    () =>
+      loadShopifyTaxonomyQueryEmbeddingConfig(
+        {
+          embeddingProvider: "openai",
+          embeddingModel: "text-embedding-3-small",
+          embeddingDimensions: 384,
+          embeddingIndexVersion: "v1",
+        },
+        {} as NodeJS.ProcessEnv,
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof ShopifyTaxonomyEmbeddingConfigurationError);
+      assert.equal(error.code, "MISSING_API_KEY");
+      return true;
+    },
   );
+});
+
+test("distinguishes invalid active index embedding metadata from a missing credential", () => {
+  assert.throws(
+    () =>
+      loadShopifyTaxonomyQueryEmbeddingConfig(
+        {
+          embeddingProvider: "openai",
+          embeddingModel: "text-embedding-3-small",
+          embeddingDimensions: 2048,
+          embeddingIndexVersion: "v1",
+        },
+        { EMBEDDING_API_KEY: "test-key" } as NodeJS.ProcessEnv,
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof ShopifyTaxonomyEmbeddingConfigurationError);
+      assert.equal(error.code, "INVALID_INDEX_METADATA");
+      return true;
+    },
+  );
+});
+
+test("encodes query vectors as Redis FLOAT32 blobs", () => {
+  const buffer = shopifyTaxonomyVectorBuffer([1.5, -2.25]);
+  assert.equal(buffer.byteLength, 8);
+  assert.equal(buffer.readFloatLE(0), 1.5);
+  assert.equal(buffer.readFloatLE(4), -2.25);
 });

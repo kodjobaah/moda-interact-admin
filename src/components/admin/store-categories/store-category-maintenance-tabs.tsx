@@ -15,7 +15,7 @@ export function StoreCategoryMaintenanceTabs({
   const tabs: Array<[StoreCategoryTab, string]> = [
     ["details", "Category details"],
     ["templates", `Prompt templates (${templateCount})`],
-    ["taxonomy", `Shopify mappings (${mappingCount})`],
+    ["taxonomy", `Category mappings (${mappingCount})`],
   ];
 
   return (

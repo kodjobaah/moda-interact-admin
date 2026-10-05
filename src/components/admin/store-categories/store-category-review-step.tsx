@@ -7,7 +7,6 @@ import type {
   StoreCategoryAuthoringValidation,
 } from "./store-category-authoring-session";
 import { storeCategoryAuthoringNow } from "./store-category-authoring-runtime";
-import { ShopifyTaxonomyCategoryLabel } from "./shopify-taxonomy-picker";
 import {
   STORE_CATEGORY_AUTHORING_INPUT_CLASS,
   StoreCategoryAuthoringErrorList,
@@ -67,7 +66,12 @@ export function StoreCategoryReviewStep({
           <p className="mt-1 font-mono text-xs text-gray-500">
             {session.category.slug}
           </p>
-          <p className="mt-3 text-sm text-gray-600">
+          {session.category.referenceTaxonomy ? (
+            <p className="mt-3 text-sm text-gray-600">
+              Reference: {session.category.referenceTaxonomy.fullName}
+            </p>
+          ) : null}
+          <p className="mt-2 text-sm text-gray-600">
             Created disabled · display order {session.category.displayOrder}
           </p>
         </div>
@@ -89,7 +93,7 @@ export function StoreCategoryReviewStep({
 
         <div className="rounded-lg border border-gray-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Shopify mappings
+            Category mappings
           </p>
           <p className="mt-2 text-2xl font-semibold text-gray-950">
             {session.shopifyMappings.length}
@@ -103,10 +107,14 @@ export function StoreCategoryReviewStep({
             <ul className="mt-3 space-y-2">
               {session.shopifyMappings.map((mapping) => (
                 <li key={mapping.clientId} className="rounded-md bg-gray-50 p-2 text-sm">
-                  <ShopifyTaxonomyCategoryLabel
-                    taxonomyCategoryId={mapping.shopifyTaxonomyCategoryId}
-                    compact
-                  />
+                  <span className="block font-medium text-gray-900">
+                    {mapping.taxonomy?.fullName ?? "Taxonomy selection required"}
+                  </span>
+                  {mapping.taxonomy ? (
+                    <span className="mt-1 block font-mono text-xs text-gray-500">
+                      {mapping.taxonomy.categoryId}
+                    </span>
+                  ) : null}
                   <span className="mt-1 block text-xs text-gray-500">
                     Weight {mapping.weight.toLocaleString()}
                   </span>
@@ -129,7 +137,7 @@ export function StoreCategoryReviewStep({
             {validation.defaultTemplate.valid ? "✓" : "✕"} Default prompt configured
           </li>
           <li>
-            {validation.shopifyMappings.valid ? "✓" : "✕"} Shopify mappings valid
+            {validation.shopifyMappings.valid ? "✓" : "✕"} Category mappings valid
           </li>
           <li>{reviewCurrent ? "✓" : "✕"} Review matches current configuration</li>
           <li>{validation.auditReason.valid ? "✓" : "✕"} Audit reason supplied</li>

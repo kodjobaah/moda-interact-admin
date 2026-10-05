@@ -7,11 +7,21 @@ import {
   type StoreCategoryAuthoringSession,
 } from "./store-category-authoring-session";
 import { storeCategoryAuthoringNow } from "./store-category-authoring-runtime";
+import { ShopifyTaxonomyPicker } from "./shopify-taxonomy-picker";
 import {
   STORE_CATEGORY_AUTHORING_INPUT_CLASS,
   StoreCategoryAuthoringErrorList,
   StoreCategoryAuthoringSectionStatus,
 } from "./store-category-authoring-ui";
+
+function suggestedSlug(name: string): string {
+  return name
+    .toLocaleLowerCase("en")
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 128);
+}
 
 export function StoreCategoryCategoryStep({
   session,
@@ -33,10 +43,42 @@ export function StoreCategoryCategoryStep({
             Category identity
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Define the immutable slug and merchant-facing category metadata.
+            Select the top-level reference taxonomy category, then define Moda's stable category identity and merchant-facing metadata.
           </p>
         </div>
         <StoreCategoryAuthoringSectionStatus valid={validation.valid} />
+      </div>
+
+      <div className="mt-5">
+        <ShopifyTaxonomyPicker
+          id="author-reference-taxonomy"
+          value={session.category.referenceTaxonomy?.categoryId ?? ""}
+          scope="top-level"
+          allowRawId={false}
+          onSelectionChange={(referenceTaxonomy) => {
+            if (!referenceTaxonomy) {
+              dispatch({
+                type: "category.changed",
+                patch: { referenceTaxonomy: null },
+                now: storeCategoryAuthoringNow(),
+              });
+              return;
+            }
+            dispatch({
+              type: "category.changed",
+              patch: {
+                referenceTaxonomy,
+                ...(session.category.displayName.trim()
+                  ? {}
+                  : { displayName: referenceTaxonomy.name }),
+                ...(session.category.slug.trim()
+                  ? {}
+                  : { slug: suggestedSlug(referenceTaxonomy.name) }),
+              },
+              now: storeCategoryAuthoringNow(),
+            });
+          }}
+        />
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

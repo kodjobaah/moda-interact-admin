@@ -57,7 +57,7 @@ test("catalogue reads are deterministically ordered and select profile counts on
   assert.doesNotMatch(catalogueSource, /prisma\.shop\.findMany|shop:\s*\{\s*include/);
   assert.match(
     catalogueSource,
-    /shopifyTaxonomyCategoryId: mapping\.shopifyTaxonomyCategoryId,[\s\S]*?weight: mapping\.weight,[\s\S]*?category:\s*\{\s*displayOrder: category\.displayOrder,[\s\S]*?id: category\.id/,
+    /shopifyTaxonomyCategoryId: mapping\.shopifyTaxonomyCategoryId,[\s\S]*?taxonomyCategoryFullName: mapping\.taxonomyCategoryFullName,[\s\S]*?weight: mapping\.weight,[\s\S]*?category:\s*\{\s*displayOrder: category\.displayOrder,[\s\S]*?id: category\.id/,
   );
 });
 
@@ -67,4 +67,26 @@ test("atomic category authoring uses the same authenticated serializable mutatio
   assert.match(actionSource, /return createStoreCategoryBundle\(transaction, input, principal\.id\)/);
   assert.match(actionSource, /ensureDevelopmentPlatformAdmin\(transaction, principal\)/);
   assert.match(actionSource, /isolationLevel: "Serializable"/);
+});
+
+
+test("category creation persists cross-platform reference taxonomy metadata", () => {
+  assert.match(catalogueSource, /referenceTaxonomySource: input\.category\.referenceTaxonomy\.source/);
+  assert.match(catalogueSource, /referenceTaxonomyCategoryFullName: input\.category\.referenceTaxonomy\.fullName/);
+  assert.match(catalogueSource, /taxonomyCategoryName: mapping\.taxonomy\.name/);
+  assert.match(catalogueSource, /taxonomyCategoryFullName: mapping\.taxonomy\.fullName/);
+});
+
+
+test("atomic Store Category creation revalidates the top-level taxonomy invariant server-side", () => {
+  assert.match(
+    actionSource,
+    /resolveShopifyTaxonomyCategory\(\s*reference\.categoryId,\s*"top-level"/,
+  );
+  assert.match(actionSource, /category\.level !== 0/);
+  assert.match(actionSource, /category\.parentId !== null/);
+  assert.match(
+    actionSource,
+    /await assertTopLevelStoreCategoryReference\(input\.category\.referenceTaxonomy\)/,
+  );
 });

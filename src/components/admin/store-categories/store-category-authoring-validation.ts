@@ -2,6 +2,7 @@ import {
   PROMPT_TEMPLATE_KEY_PATTERN,
   STORE_CATEGORY_SLUG_PATTERN,
 } from "../../../lib/admin/store-category-validation.ts";
+import { isStoreCategoryTaxonomyReference } from "../../../lib/admin/store-category-taxonomy-reference.ts";
 import type {
   StoreCategoryAuthoringSession,
   StoreCategoryAuthoringStep,
@@ -14,6 +15,9 @@ export function validateStoreCategoryAuthoringSession(
   const categoryIssues: string[] = [];
   const slug = session.category.slug.trim();
   const displayName = session.category.displayName.trim();
+  if (!isStoreCategoryTaxonomyReference(session.category.referenceTaxonomy)) {
+    categoryIssues.push("Select a top-level reference taxonomy category.");
+  }
   if (!STORE_CATEGORY_SLUG_PATTERN.test(slug)) {
     categoryIssues.push(
       "Stable slug must start with a letter and contain only lowercase letters, numbers, or hyphens.",
@@ -61,13 +65,14 @@ export function validateStoreCategoryAuthoringSession(
   const mappingIssues: string[] = [];
   const seenTaxonomyIds = new Set<string>();
   for (const mapping of session.shopifyMappings) {
-    const taxonomyId = mapping.shopifyTaxonomyCategoryId.trim();
-    if (taxonomyId.length < 1 || taxonomyId.length > 255) {
-      mappingIssues.push("Every Shopify taxonomy mapping needs a category ID.");
+    if (!isStoreCategoryTaxonomyReference(mapping.taxonomy)) {
+      mappingIssues.push("Every category mapping needs a complete taxonomy selection.");
+      continue;
     }
+    const taxonomyId = mapping.taxonomy.categoryId.trim();
     if (seenTaxonomyIds.has(taxonomyId)) {
       mappingIssues.push(
-        `Shopify taxonomy category ${taxonomyId} is mapped more than once.`,
+        `Reference taxonomy category ${mapping.taxonomy.fullName} is mapped more than once.`,
       );
     }
     seenTaxonomyIds.add(taxonomyId);
@@ -77,7 +82,7 @@ export function validateStoreCategoryAuthoringSession(
       mapping.weight > 1_000_000
     ) {
       mappingIssues.push(
-        "Every Shopify taxonomy mapping weight must be between 1 and 1,000,000.",
+        "Every category mapping weight must be between 1 and 1,000,000.",
       );
     }
   }

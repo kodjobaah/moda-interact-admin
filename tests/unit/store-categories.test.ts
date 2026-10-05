@@ -19,6 +19,31 @@ const categoryBase = {
   },
 };
 
+
+const topLevelTaxonomy = {
+  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
+  version: "2026-08",
+  categoryId: "gid://shopify/TaxonomyCategory/aa",
+  name: "Apparel & Accessories",
+  fullName: "Apparel & Accessories",
+} as const;
+
+const clothingTaxonomy = {
+  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
+  version: "2026-08",
+  categoryId: "gid://shopify/TaxonomyCategory/aa-1",
+  name: "Clothing",
+  fullName: "Apparel & Accessories > Clothing",
+} as const;
+
+const shoesTaxonomy = {
+  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
+  version: "2026-08",
+  categoryId: "gid://shopify/TaxonomyCategory/aa-8",
+  name: "Shoes",
+  fullName: "Apparel & Accessories > Shoes",
+} as const;
+
 const templateBase = {
   id: "template-1",
   key: "home_goods_default",
@@ -486,7 +511,7 @@ test("duplicate taxonomy IDs remain rejected by the database unique constraint",
         kind: "create-taxonomy-mapping",
         input: {
           categoryId: "category-1",
-          shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa-1",
+          taxonomy: clothingTaxonomy,
           weight: 1,
           reason: "Duplicate mapping",
         },
@@ -506,7 +531,7 @@ test("taxonomy mapping create, move/update, and remove use category audit metada
       kind: "create-taxonomy-mapping",
       input: {
         categoryId: "category-1",
-        shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/bb-2",
+        taxonomy: clothingTaxonomy,
         weight: 4,
         reason: "Add mapping",
       },
@@ -519,7 +544,14 @@ test("taxonomy mapping create, move/update, and remove use category audit metada
     reason: "Add mapping",
     promptTemplateCategoryId: "category-1",
     promptTemplateId: undefined,
-    metadata: { changeKind: "TAXONOMY_MAPPING" },
+    metadata: {
+      changeKind: "TAXONOMY_MAPPING",
+      taxonomySource: clothingTaxonomy.source,
+      taxonomyVersion: clothingTaxonomy.version,
+      taxonomyCategoryId: clothingTaxonomy.categoryId,
+      taxonomyCategoryName: clothingTaxonomy.name,
+      taxonomyCategoryFullName: clothingTaxonomy.fullName,
+    },
   });
 
   const update = transactionFor();
@@ -530,7 +562,7 @@ test("taxonomy mapping create, move/update, and remove use category audit metada
       input: {
         id: "mapping-1",
         categoryId: "category-2",
-        shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/cc-3",
+        taxonomy: shoesTaxonomy,
         weight: 7,
         reason: "Move mapping",
       },
@@ -539,11 +571,22 @@ test("taxonomy mapping create, move/update, and remove use category audit metada
   );
   assert.deepEqual(update.updates[0]?.data, {
     categoryId: "category-2",
-    shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/cc-3",
+    shopifyTaxonomyCategoryId: shoesTaxonomy.categoryId,
+    taxonomySource: shoesTaxonomy.source,
+    taxonomyVersion: shoesTaxonomy.version,
+    taxonomyCategoryName: shoesTaxonomy.name,
+    taxonomyCategoryFullName: shoesTaxonomy.fullName,
     weight: 7,
   });
   assert.equal(update.audits[0]?.promptTemplateCategoryId, "category-2");
-  assert.deepEqual(update.audits[0]?.metadata, { changeKind: "TAXONOMY_MAPPING" });
+  assert.deepEqual(update.audits[0]?.metadata, {
+    changeKind: "TAXONOMY_MAPPING",
+    taxonomySource: shoesTaxonomy.source,
+    taxonomyVersion: shoesTaxonomy.version,
+    taxonomyCategoryId: shoesTaxonomy.categoryId,
+    taxonomyCategoryName: shoesTaxonomy.name,
+    taxonomyCategoryFullName: shoesTaxonomy.fullName,
+  });
 
   const remove = transactionFor();
   await mutateStoreCategoryCatalogue(
@@ -571,6 +614,7 @@ test("atomic category bundle creates disabled category, enabled default template
         displayName: "Fashion & Apparel",
         description: "Clothing and accessories",
         displayOrder: 10,
+        referenceTaxonomy: topLevelTaxonomy,
       },
       defaultTemplate: {
         key: "fashion_apparel_default",
@@ -580,7 +624,7 @@ test("atomic category bundle creates disabled category, enabled default template
       },
       shopifyMappings: [
         {
-          shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa",
+          taxonomy: clothingTaxonomy,
           weight: 100,
         },
       ],

@@ -7,10 +7,12 @@ export const REFRESH_OPTIONS = [
   { labelKey: 'queue.refreshSeconds', value: 60_000, count: 60 },
 ] as const;
 
-export const DEFAULT_REFRESH_MS = 5_000;
+export type QueueRefreshMs = (typeof REFRESH_OPTIONS)[number]["value"];
+
+export const DEFAULT_REFRESH_MS: QueueRefreshMs = 5_000;
 export const STORAGE_KEY = 'moda-admin.queue-monitor.refresh-ms';
 
-export function isRefreshValue(value: number): value is (typeof REFRESH_OPTIONS)[number]['value'] {
+export function isRefreshValue(value: number): value is QueueRefreshMs {
   return REFRESH_OPTIONS.some((option) => option.value === value);
 }
 
