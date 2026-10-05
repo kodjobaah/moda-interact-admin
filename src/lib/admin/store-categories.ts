@@ -490,29 +490,18 @@ export async function mutateStoreCategoryCatalogue(
         shopifyTaxonomyCategoryId: existing.shopifyTaxonomyCategoryId,
         weight: existing.weight,
       },
-      data: {
-        categoryId: input.categoryId,
-        shopifyTaxonomyCategoryId: input.taxonomy.categoryId,
-        taxonomySource: input.taxonomy.source,
-        taxonomyVersion: input.taxonomy.version,
-        taxonomyCategoryName: input.taxonomy.name,
-        taxonomyCategoryFullName: input.taxonomy.fullName,
-        weight: input.weight,
-      },
+      data: { weight: input.weight },
     });
     if (updated.count !== 1) throw new Error("Taxonomy mapping changed; reload and retry.");
     await audit(transaction, {
       action: "UPDATE_PROMPT_TEMPLATE_CATEGORY",
       actorAdminId,
       reason: input.reason,
-      categoryId: input.categoryId,
+      categoryId: existing.categoryId,
       metadata: {
         changeKind: "TAXONOMY_MAPPING",
-        taxonomySource: input.taxonomy.source,
-        taxonomyVersion: input.taxonomy.version,
-        taxonomyCategoryId: input.taxonomy.categoryId,
-        taxonomyCategoryName: input.taxonomy.name,
-        taxonomyCategoryFullName: input.taxonomy.fullName,
+        taxonomyCategoryId: existing.shopifyTaxonomyCategoryId,
+        changedFields: ["weight"],
       },
     });
     return;

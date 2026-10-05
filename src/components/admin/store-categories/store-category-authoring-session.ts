@@ -219,12 +219,7 @@ export function storeCategoryAuthoringReducer(
         updatedAt: action.now,
       };
     case "save.succeeded":
-      return {
-        ...session,
-        status: "COMPLETE",
-        error: null,
-        updatedAt: action.now,
-      };
+      return null;
     default:
       return session;
   }

@@ -6,6 +6,7 @@ import {
   parseCreateTaxonomyMappingForm,
   parseUpdatePromptTemplateForm,
   parseUpdateStoreCategoryForm,
+  parseUpdateTaxonomyMappingForm,
 } from "../../src/lib/admin/store-category-validation.ts";
 
 function form(values: Record<string, string>): FormData {
@@ -151,6 +152,13 @@ test("taxonomy mapping weight must be a positive bounded integer", () => {
       /weight/,
     );
   }
+
+  assert.deepEqual(
+    parseUpdateTaxonomyMappingForm(
+      form({ id: "mapping-1", weight: "7", reason: "Adjust weighting" }),
+    ),
+    { id: "mapping-1", weight: 7, reason: "Adjust weighting" },
+  );
 });
 test("atomic category bundle validates category, required default template, mappings, and audit reason", async () => {
   const { parseCreateStoreCategoryBundleInput } = await import(

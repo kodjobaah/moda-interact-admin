@@ -36,14 +36,6 @@ const clothingTaxonomy = {
   fullName: "Apparel & Accessories > Clothing",
 } as const;
 
-const shoesTaxonomy = {
-  source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
-  version: "2026-08",
-  categoryId: "gid://shopify/TaxonomyCategory/aa-8",
-  name: "Shoes",
-  fullName: "Apparel & Accessories > Shoes",
-} as const;
-
 const templateBase = {
   id: "template-1",
   key: "home_goods_default",
@@ -523,7 +515,7 @@ test("duplicate taxonomy IDs remain rejected by the database unique constraint",
   assert.equal(fake.audits.length, 0);
 });
 
-test("taxonomy mapping create, move/update, and remove use category audit metadata", async () => {
+test("taxonomy mapping create, weight update, and remove use category audit metadata", async () => {
   const create = transactionFor();
   await mutateStoreCategoryCatalogue(
     create.transaction,
@@ -561,31 +553,18 @@ test("taxonomy mapping create, move/update, and remove use category audit metada
       kind: "update-taxonomy-mapping",
       input: {
         id: "mapping-1",
-        categoryId: "category-2",
-        taxonomy: shoesTaxonomy,
-        weight: 7,
-        reason: "Move mapping",
+        weight: 9,
+        reason: "Increase weighting",
       },
     },
     "admin-1",
   );
-  assert.deepEqual(update.updates[0]?.data, {
-    categoryId: "category-2",
-    shopifyTaxonomyCategoryId: shoesTaxonomy.categoryId,
-    taxonomySource: shoesTaxonomy.source,
-    taxonomyVersion: shoesTaxonomy.version,
-    taxonomyCategoryName: shoesTaxonomy.name,
-    taxonomyCategoryFullName: shoesTaxonomy.fullName,
-    weight: 7,
-  });
-  assert.equal(update.audits[0]?.promptTemplateCategoryId, "category-2");
+  assert.deepEqual(update.updates[0]?.data, { weight: 9 });
+  assert.equal(update.audits[0]?.promptTemplateCategoryId, "category-1");
   assert.deepEqual(update.audits[0]?.metadata, {
     changeKind: "TAXONOMY_MAPPING",
-    taxonomySource: shoesTaxonomy.source,
-    taxonomyVersion: shoesTaxonomy.version,
-    taxonomyCategoryId: shoesTaxonomy.categoryId,
-    taxonomyCategoryName: shoesTaxonomy.name,
-    taxonomyCategoryFullName: shoesTaxonomy.fullName,
+    taxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa-1",
+    changedFields: ["weight"],
   });
 
   const remove = transactionFor();

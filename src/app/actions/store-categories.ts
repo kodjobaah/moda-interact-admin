@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
+import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
 import { resolveShopifyTaxonomyCategory } from "@/lib/admin/shopify-taxonomy";
@@ -22,6 +24,16 @@ import {
   parseUpdateStoreCategoryForm,
   parseUpdateTaxonomyMappingForm,
 } from "@/lib/admin/store-category-validation";
+
+const storeCategoryLogger = createLogger({
+  serviceNamespace: "moda-interact",
+  serviceName: "moda-interact-admin",
+  environment: resolveDeploymentEnvironmentName(),
+});
+
+export type CreateStoreCategoryBundleActionResult =
+  | { ok: true; categoryId: string }
+  | { ok: false; message: string };
 
 async function assertTopLevelStoreCategoryReference(
   reference: StoreCategoryTaxonomyReference,
@@ -82,6 +94,29 @@ function uniqueConstraintMessage(error: unknown): string {
   return "A catalogue identifier is already in use.";
 }
 
+function createStoreCategoryBundleFailureMessage(error: unknown): string {
+  if (databaseCode(error) === "P2002") {
+    return uniqueConstraintMessage(error);
+  }
+  if (databaseCode(error) === "P2034") {
+    return "Catalogue changed; reload and retry.";
+  }
+
+  const message = error instanceof Error ? error.message : "";
+  if (
+    message === "SUPER_ADMIN access is required." ||
+    message === "Store Category reference taxonomy must be a top-level category." ||
+    message ===
+      "Reference taxonomy selection is stale; reselect the top-level category and retry."
+  ) {
+    return message;
+  }
+
+  return (
+    "The Store Category could not be created. Check the admin server logs and retry."
+  );
+}
+
 function mutationFromForm(formData: FormData): StoreCategoryMutation {
   const intent = formData.get("intent");
   switch (intent) {
@@ -140,14 +175,35 @@ export async function mutateStoreCategoryCatalogueAction(
 
 export async function createStoreCategoryBundleAction(
   payload: unknown,
-): Promise<{ categoryId: string }> {
-  const principal = await requirePlatformAdminMutation();
-  if (principal.role !== "SUPER_ADMIN") {
-    throw new Error("SUPER_ADMIN access is required.");
-  }
-  const input = parseCreateStoreCategoryBundleInput(payload);
-  await assertTopLevelStoreCategoryReference(input.category.referenceTaxonomy);
+): Promise<CreateStoreCategoryBundleActionResult> {
+  const startedAt = Date.now();
+  let actorAdminId: string | null = null;
+  let referenceTaxonomyCategoryId: string | null = null;
+  let categorySlug: string | null = null;
+  let mappingCount: number | null = null;
+
   try {
+    const principal = await requirePlatformAdminMutation();
+    actorAdminId = principal.id;
+    if (principal.role !== "SUPER_ADMIN") {
+      throw new Error("SUPER_ADMIN access is required.");
+    }
+
+    const input = parseCreateStoreCategoryBundleInput(payload);
+    referenceTaxonomyCategoryId = input.category.referenceTaxonomy.categoryId;
+    categorySlug = input.category.slug;
+    mappingCount = input.shopifyMappings.length;
+
+    storeCategoryLogger.info("admin.store_category.bundle_create", {
+      actorAdminId,
+      outcome: "started",
+      referenceTaxonomyCategoryId,
+      categorySlug,
+      mappingCount,
+    });
+
+    await assertTopLevelStoreCategoryReference(input.category.referenceTaxonomy);
+
     const categoryId = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
@@ -155,15 +211,40 @@ export async function createStoreCategoryBundleAction(
       },
       { isolationLevel: "Serializable" },
     );
-    revalidatePath("/system-controls/store-categories");
-    return { categoryId };
+
+    storeCategoryLogger.info("admin.store_category.bundle_create", {
+      actorAdminId,
+      outcome: "succeeded",
+      categoryId,
+      referenceTaxonomyCategoryId,
+      categorySlug,
+      mappingCount,
+      durationMs: Date.now() - startedAt,
+    });
+
+    try {
+      revalidatePath("/system-controls/store-categories");
+    } catch (error) {
+      storeCategoryLogger.info("admin.store_category.bundle_create.revalidate", {
+        actorAdminId,
+        outcome: "failed",
+        categoryId,
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    }
+
+    return { ok: true, categoryId };
   } catch (error) {
-    if (databaseCode(error) === "P2002") {
-      throw new Error(uniqueConstraintMessage(error));
-    }
-    if (databaseCode(error) === "P2034") {
-      throw new Error("Catalogue changed; reload and retry.");
-    }
-    throw error;
+    const message = createStoreCategoryBundleFailureMessage(error);
+    storeCategoryLogger.info("admin.store_category.bundle_create", {
+      actorAdminId,
+      outcome: "failed",
+      referenceTaxonomyCategoryId,
+      categorySlug,
+      mappingCount,
+      durationMs: Date.now() - startedAt,
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message };
   }
 }

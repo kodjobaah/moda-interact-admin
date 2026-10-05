@@ -336,3 +336,27 @@ test("creation readiness is derived from validation and the current review rathe
   assert.equal(staleStatus.reviewedRevision, staleStatus.validationRevision);
   assert.equal(canCreateStoreCategoryFromSession(staleStatus), true);
 });
+
+test("successful creation ends the browser authoring session and failures restore an actionable review", () => {
+  const ready = completeSession();
+  const saving = storeCategoryAuthoringReducer(ready, {
+    type: "save.started",
+    now: "2026-10-04T18:05:00.000Z",
+  })!;
+  assert.equal(saving.status, "SAVING");
+
+  const failed = storeCategoryAuthoringReducer(saving, {
+    type: "save.failed",
+    error: "A category with this slug already exists.",
+    now: "2026-10-04T18:06:00.000Z",
+  })!;
+  assert.equal(failed.status, "READY");
+  assert.equal(failed.error, "A category with this slug already exists.");
+  assert.equal(canCreateStoreCategoryFromSession(failed), true);
+
+  const completed = storeCategoryAuthoringReducer(saving, {
+    type: "save.succeeded",
+    now: "2026-10-04T18:07:00.000Z",
+  });
+  assert.equal(completed, null);
+});

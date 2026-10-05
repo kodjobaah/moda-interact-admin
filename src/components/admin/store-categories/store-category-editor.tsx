@@ -13,12 +13,10 @@ const inputClass =
 
 export function StoreCategoryEditor({
   category,
-  categories,
   activeTab,
   selectedTemplateId,
 }: {
   category: Category;
-  categories: Category[];
   activeTab: StoreCategoryTab;
   selectedTemplateId?: string;
 }) {
@@ -115,7 +113,7 @@ export function StoreCategoryEditor({
             </form>
 
             <p className="mt-3 text-sm text-gray-600">
-              Shopify localization keys must exist before merchants can select this category.
+              Merchant presentation falls back to this category display name and description when Shopify locale keys are unavailable.
             </p>
 
             <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -180,7 +178,7 @@ export function StoreCategoryEditor({
         ) : null}
 
         {activeTab === "taxonomy" ? (
-          <TaxonomyMappingEditor category={category} categories={categories} />
+          <TaxonomyMappingEditor category={category} />
         ) : null}
       </div>
     </section>

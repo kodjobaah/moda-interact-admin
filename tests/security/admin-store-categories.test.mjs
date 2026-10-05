@@ -46,13 +46,14 @@ test("Admin catalogue introduces no translation persistence or queue surface", a
     "src/components/admin/store-categories/prompt-template-list.tsx",
     "src/components/admin/store-categories/prompt-template-workspace.tsx",
     "src/components/admin/store-categories/store-category-maintenance-tabs.tsx",
+    "src/components/admin/store-categories/store-category-mapping-workspace.tsx",
     "src/components/admin/store-categories/store-category-workspace-header.tsx",
     "src/components/admin/store-categories/taxonomy-mapping-editor.tsx",
     "src/lib/admin/store-category-taxonomy-reference.ts",
   ];
   const contents = (await Promise.all(files.map(source))).join("\n");
   assert.doesNotMatch(contents, /CommercePromptTemplateTranslation|TranslationJob|Queue\.add|queue\.add/i);
-  assert.match(contents, /Shopify localization keys must exist before merchants can select this category/);
+  assert.match(contents, /Merchant presentation falls back to this category display name and description when Shopify locale keys are unavailable/);
 });
 
 test("Store Categories uses an atomic authoring session for creation and scoped tabs for maintenance", async () => {
@@ -119,12 +120,15 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
 test("Store Category authoring persists human-readable reference taxonomy metadata for cross-platform use", async () => {
   const categoryStep = await source("src/components/admin/store-categories/store-category-category-step.tsx");
   const mappingStep = await source("src/components/admin/store-categories/store-category-mappings-step.tsx");
+  const mappingWorkspace = await source("src/components/admin/store-categories/store-category-mapping-workspace.tsx");
   const validation = await source("src/lib/admin/store-category-validation.ts");
   const service = await source("src/lib/admin/store-categories.ts");
 
   assert.match(categoryStep, /scope="top-level"/);
-  assert.match(mappingStep, /scope="subcategories"/);
-  assert.match(mappingStep, /rootId=\{session\.category\.referenceTaxonomy\?\.categoryId/);
+  assert.match(mappingStep, /StoreCategoryMappingWorkspace/);
+  assert.match(mappingStep, /rootTaxonomy=\{session\.category\.referenceTaxonomy\}/);
+  assert.match(mappingWorkspace, /scope="subcategories"/);
+  assert.match(mappingWorkspace, /rootId=\{rootTaxonomy\.categoryId\}/);
   assert.match(validation, /taxonomyCategoryFullName/);
   assert.match(service, /referenceTaxonomyCategoryFullName/);
   assert.match(service, /taxonomyCategoryName: mapping\.taxonomy\.name/);
@@ -156,7 +160,7 @@ test("Store Category reference selection refreshes identity and blocks assigned 
   assert.match(categoryStep, /Already assigned to Store Category/);
   assert.match(picker, /unavailableSelections/);
   assert.match(picker, /selectionCommitRef/);
-  assert.match(picker, /disabled=\{selectionDisabled\}/);
+  assert.match(picker, /disabled=\{resultSelectionDisabled\}/);
   assert.match(picker, /actionLabel \?\? "Assigned"/);
   assert.match(action, /referenceTaxonomyCategoryId/);
   assert.match(action, /already used by another Store Category/);
@@ -170,19 +174,45 @@ test("Store Category reference selection refreshes identity and blocks assigned 
 });
 
 
-test("Store Category mapping authoring uses one picker and a compact added-mappings list", async () => {
+test("Store Category creation and maintenance reuse one compact mapping workspace", async () => {
   const mappingsStep = await source("src/components/admin/store-categories/store-category-mappings-step.tsx");
+  const mappingEditor = await source("src/components/admin/store-categories/taxonomy-mapping-editor.tsx");
+  const mappingWorkspace = await source("src/components/admin/store-categories/store-category-mapping-workspace.tsx");
   const picker = await source("src/components/admin/store-categories/shopify-taxonomy-picker.tsx");
 
-  assert.equal((mappingsStep.match(/<ShopifyTaxonomyPicker/g) ?? []).length, 1);
-  assert.match(mappingsStep, /Add a mapping/);
-  assert.match(mappingsStep, /Added mappings \(\{session\.shopifyMappings\.length\}\)/);
-  assert.match(mappingsStep, /showSelectionSummary=\{false\}/);
-  assert.match(mappingsStep, /selectionActionLabel="Add"/);
-  assert.match(mappingsStep, /Already added to this Store Category/);
-  assert.match(mappingsStep, /actionLabel: "Added"/);
+  assert.match(mappingsStep, /<StoreCategoryMappingWorkspace/);
+  assert.match(mappingEditor, /<StoreCategoryMappingWorkspace/);
+  assert.doesNotMatch(mappingEditor, /<ShopifyTaxonomyPicker/);
+  assert.doesNotMatch(mappingEditor, /<select/);
+  assert.equal((mappingWorkspace.match(/<ShopifyTaxonomyPicker/g) ?? []).length, 1);
+  assert.match(mappingWorkspace, /Add a mapping/);
+  assert.match(mappingWorkspace, /Added mappings \(\{mappings\.length\}\)/);
+  assert.match(mappingWorkspace, /showSelectionSummary=\{false\}/);
+  assert.match(mappingWorkspace, /selectionActionLabel="Add"/);
+  assert.match(mappingWorkspace, /Already added to this Store Category/);
+  assert.match(mappingWorkspace, /actionLabel: "Added"/);
   assert.match(mappingsStep, /mapping\.taxonomy\?\.categoryId === taxonomy\.categoryId/);
+  assert.match(mappingEditor, /Audit reason for additions/);
+  assert.match(mappingEditor, /value="update-taxonomy-mapping"/);
+  assert.doesNotMatch(mappingEditor, /<select/);
+  assert.match(mappingWorkspace, /To change a taxonomy category/);
   assert.match(picker, /showSelectionSummary/);
   assert.match(picker, /selectionActionLabel/);
   assert.match(picker, /selectionPendingLabel/);
+  assert.match(picker, /selectionDisabled/);
+});
+
+test("Store Category bundle creation clears committed drafts and surfaces structured server failures", async () => {
+  const action = await source("src/app/actions/store-categories.ts");
+  const workspace = await source("src/components/admin/store-categories/store-category-authoring-workspace.tsx");
+  const session = await source("src/components/admin/store-categories/store-category-authoring-session.ts");
+
+  assert.match(action, /@modainteract\/moda-interact-shared\/logging/);
+  assert.match(action, /admin\.store_category\.bundle_create/);
+  assert.match(action, /return \{ ok: true, categoryId \}/);
+  assert.match(action, /return \{ ok: false, message \}/);
+  assert.match(workspace, /if \(!result\.ok\)/);
+  assert.match(workspace, /error: result\.message/);
+  assert.match(workspace, /router\.replace\(/);
+  assert.match(session, /case "save\.succeeded":\s*return null;/);
 });

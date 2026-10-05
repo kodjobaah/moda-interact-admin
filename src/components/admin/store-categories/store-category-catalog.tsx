@@ -101,7 +101,6 @@ export function StoreCategoryCatalog({
           {selectedCategory ? (
             <StoreCategoryEditor
               category={selectedCategory}
-              categories={catalogue.categories}
               activeTab={selectedTab}
               selectedTemplateId={selectedTemplateId}
             />

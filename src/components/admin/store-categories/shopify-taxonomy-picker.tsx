@@ -80,6 +80,7 @@ type ShopifyTaxonomyPickerProps = {
   showSelectionSummary?: boolean;
   selectionActionLabel?: string;
   selectionPendingLabel?: string;
+  selectionDisabled?: boolean;
   onChange?: (taxonomyCategoryId: string) => void;
   onSelectionChange?: (selection: StoreCategoryTaxonomyReference | null) => void;
 };
@@ -259,6 +260,7 @@ export function ShopifyTaxonomyPicker({
   showSelectionSummary = true,
   selectionActionLabel = "Select",
   selectionPendingLabel = "Selecting…",
+  selectionDisabled = false,
   onChange,
   onSelectionChange,
 }: ShopifyTaxonomyPickerProps) {
@@ -564,7 +566,8 @@ export function ShopifyTaxonomyPicker({
               const unavailableSelection = unavailableSelectionsById.get(category.id);
               const unavailableReason = unavailableSelection?.reason;
               const alreadySelected = category.id === selectedId;
-              const selectionDisabled =
+              const resultSelectionDisabled =
+                selectionDisabled ||
                 Boolean(unavailableSelection) ||
                 alreadySelected ||
                 pendingSelectionId !== null;
@@ -603,7 +606,7 @@ export function ShopifyTaxonomyPicker({
                     <button
                       type="button"
                       className="rounded-md bg-[var(--brand-700)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--brand-800)] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600"
-                      disabled={selectionDisabled}
+                      disabled={resultSelectionDisabled}
                       title={unavailableReason ?? undefined}
                       onClick={() => commitResultSelection(category)}
                     >

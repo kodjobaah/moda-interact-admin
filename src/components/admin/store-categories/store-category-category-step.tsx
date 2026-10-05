@@ -189,7 +189,7 @@ export function StoreCategoryCategoryStep({
       </div>
 
       <p className="mt-4 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
-        New categories are created disabled. They can be enabled later once Shopify localization keys are available.
+        New categories are created disabled. Review the default template and mappings, then enable the category when it is ready for merchants.
       </p>
       <StoreCategoryAuthoringErrorList issues={validation.issues} />
     </section>

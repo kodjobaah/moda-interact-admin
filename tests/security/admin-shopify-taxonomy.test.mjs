@@ -85,6 +85,9 @@ test("Store Category taxonomy search is split between top-level authoring and su
   const mappingEditor = await source(
     "src/components/admin/store-categories/taxonomy-mapping-editor.tsx",
   );
+  const mappingWorkspace = await source(
+    "src/components/admin/store-categories/store-category-mapping-workspace.tsx",
+  );
 
   assert.match(route, /scopeValue === "top-level" \|\| scopeValue === "subcategories"/);
   assert.match(route, /const rootId = params\.get\("root"\)/);
@@ -98,8 +101,9 @@ test("Store Category taxonomy search is split between top-level authoring and su
     await source("src/components/admin/store-categories/shopify-taxonomy-picker.tsx"),
     /scope !== "top-level" && category\.hasChildren/,
   );
-  assert.match(mappingStep, /scope="subcategories"/);
-  assert.match(mappingEditor, /scope="subcategories"/);
+  assert.match(mappingStep, /StoreCategoryMappingWorkspace/);
+  assert.match(mappingEditor, /StoreCategoryMappingWorkspace/);
+  assert.match(mappingWorkspace, /scope="subcategories"/);
 });
 
 test("Store Category mapping UX persists exact IDs plus human-readable reference taxonomy metadata", async () => {
@@ -109,6 +113,9 @@ test("Store Category mapping UX persists exact IDs plus human-readable reference
   const mappingEditor = await source(
     "src/components/admin/store-categories/taxonomy-mapping-editor.tsx",
   );
+  const mappingWorkspace = await source(
+    "src/components/admin/store-categories/store-category-mapping-workspace.tsx",
+  );
   const reviewStep = await source(
     "src/components/admin/store-categories/store-category-review-step.tsx",
   );
@@ -116,7 +123,8 @@ test("Store Category mapping UX persists exact IDs plus human-readable reference
   assert.match(picker, /Search reference taxonomy/);
   assert.match(picker, /Reference taxonomy hierarchy/);
   assert.match(picker, /name="taxonomyCategoryFullName"/);
-  assert.match(mappingEditor, /<ShopifyTaxonomyPicker/);
+  assert.match(mappingWorkspace, /<ShopifyTaxonomyPicker/);
+  assert.match(mappingEditor, /formData\.set\("taxonomyCategoryFullName", taxonomy\.fullName\)/);
   assert.match(reviewStep, /mapping\.taxonomy\?\.fullName/);
 });
 

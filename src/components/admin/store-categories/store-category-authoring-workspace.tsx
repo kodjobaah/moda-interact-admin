@@ -72,9 +72,18 @@ export function StoreCategoryAuthoringWorkspace({
       const result = await createStoreCategoryBundleAction(
         createStoreCategoryBundlePayload(session),
       );
+      if (!result.ok) {
+        dispatch({
+          type: "save.failed",
+          error: result.message,
+          now: storeCategoryAuthoringNow(),
+        });
+        return;
+      }
+
       dispatch({ type: "save.succeeded", now: storeCategoryAuthoringNow() });
       window.sessionStorage.removeItem(STORE_CATEGORY_AUTHORING_STORAGE_KEY);
-      router.push(
+      router.replace(
         `/system-controls/store-categories?category=${encodeURIComponent(result.categoryId)}&tab=details`,
       );
       router.refresh();

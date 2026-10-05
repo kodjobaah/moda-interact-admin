@@ -81,8 +81,10 @@ export type CreateTaxonomyMappingInput = {
   reason: string;
 };
 
-export type UpdateTaxonomyMappingInput = CreateTaxonomyMappingInput & {
+export type UpdateTaxonomyMappingInput = {
   id: string;
+  weight: number;
+  reason: string;
 };
 
 export type RemoveTaxonomyMappingInput = {
@@ -270,7 +272,8 @@ export function parseUpdateTaxonomyMappingForm(
 ): UpdateTaxonomyMappingInput {
   return {
     id: requiredText(formData, "id", 255),
-    ...parseCreateTaxonomyMappingForm(formData),
+    weight: integer(formData, "weight", 1, 1_000_000),
+    reason: reason(formData),
   };
 }
 
