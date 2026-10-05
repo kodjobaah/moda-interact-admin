@@ -28,6 +28,16 @@ export const STORE_CATEGORY_AUTHORING_SCHEMA_VERSION = 2 as const;
 export const STORE_CATEGORY_AUTHORING_STORAGE_KEY =
   "moda.admin.store-category-authoring.v2";
 
+function createEmptyDefaultTemplate():
+  StoreCategoryAuthoringSession["defaultTemplate"] {
+  return {
+    key: "",
+    displayName: "",
+    description: "",
+    promptText: "",
+  };
+}
+
 export function createStoreCategoryAuthoringSession(
   sessionId: string,
   now: string,
@@ -45,12 +55,7 @@ export function createStoreCategoryAuthoringSession(
       description: "",
       displayOrder: 0,
     },
-    defaultTemplate: {
-      key: "",
-      displayName: "",
-      description: "",
-      promptText: "",
-    },
+    defaultTemplate: createEmptyDefaultTemplate(),
     shopifyMappings: [],
     dirty: {
       category: false,
@@ -62,6 +67,27 @@ export function createStoreCategoryAuthoringSession(
     auditReason: "",
     error: null,
     updatedAt: now,
+  };
+}
+
+const DEFAULT_TEMPLATE_KEY_SUFFIX = "_default";
+
+function suggestedDefaultTemplate(
+  session: StoreCategoryAuthoringSession,
+): Pick<
+  StoreCategoryAuthoringSession["defaultTemplate"],
+  "key" | "displayName"
+> {
+  const keyBaseLength = 128 - DEFAULT_TEMPLATE_KEY_SUFFIX.length;
+  const keyBase = session.category.slug
+    .trim()
+    .replace(/-+/g, "_")
+    .slice(0, keyBaseLength)
+    .replace(/_+$/g, "");
+
+  return {
+    key: keyBase ? `${keyBase}${DEFAULT_TEMPLATE_KEY_SUFFIX}` : "",
+    displayName: `${session.category.displayName.trim()} default`.slice(0, 255),
   };
 }
 
@@ -95,6 +121,20 @@ export function storeCategoryAuthoringReducer(
     case "category.changed": {
       const next = changed(session, "category", action.now);
       return { ...next, category: { ...session.category, ...action.patch } };
+    }
+    case "category.reference.changed": {
+      const next = changed(session, "category", action.now);
+      return {
+        ...next,
+        category: { ...session.category, ...action.patch },
+        defaultTemplate: createEmptyDefaultTemplate(),
+        shopifyMappings: [],
+        dirty: {
+          ...next.dirty,
+          defaultTemplate: false,
+          shopifyMappings: false,
+        },
+      };
     }
     case "template.changed": {
       const next = changed(session, "defaultTemplate", action.now);
@@ -141,6 +181,17 @@ export function storeCategoryAuthoringReducer(
           status: "READY",
           reviewedRevision: session.validationRevision,
           error: null,
+          updatedAt: action.now,
+        };
+      }
+      if (action.step === "template" && !session.dirty.defaultTemplate) {
+        return {
+          ...session,
+          step: action.step,
+          defaultTemplate: {
+            ...session.defaultTemplate,
+            ...suggestedDefaultTemplate(session),
+          },
           updatedAt: action.now,
         };
       }

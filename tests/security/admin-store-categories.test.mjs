@@ -130,3 +130,59 @@ test("Store Category authoring persists human-readable reference taxonomy metada
   assert.match(service, /taxonomyCategoryName: mapping\.taxonomy\.name/);
   assert.match(service, /taxonomyCategoryFullName: mapping\.taxonomy\.fullName/);
 });
+
+test("Store Category reference selection refreshes identity and blocks assigned taxonomy roots", async () => {
+  const catalog = await source("src/components/admin/store-categories/store-category-catalog.tsx");
+  const creator = await source("src/components/admin/store-categories/store-category-creation-workspace.tsx");
+  const workspace = await source("src/components/admin/store-categories/store-category-authoring-workspace.tsx");
+  const navigation = await source("src/components/admin/store-categories/store-category-authoring-step-navigation.tsx");
+  const categoryStep = await source("src/components/admin/store-categories/store-category-category-step.tsx");
+  const picker = await source("src/components/admin/store-categories/shopify-taxonomy-picker.tsx");
+  const action = await source("src/app/actions/store-categories.ts");
+
+  assert.match(catalog, /referenceTaxonomyCategoryId/);
+  assert.match(catalog, /assignedReferenceTaxonomy=\{assignedReferenceTaxonomy\}/);
+  assert.match(creator, /assignedReferenceTaxonomy=\{assignedReferenceTaxonomy\}/);
+  assert.match(workspace, /selectedReferenceAssignment/);
+  assert.match(workspace, /categoryReferenceAvailable/);
+  assert.match(navigation, /categoryReferenceAvailable \|\| entry\.step === "category"/);
+  assert.match(categoryStep, /slug: suggestedSlug\(referenceTaxonomy\.name\)/);
+  assert.match(categoryStep, /displayName: referenceTaxonomy\.name/);
+  assert.doesNotMatch(categoryStep, /session\.category\.displayName\.trim\(\)/);
+  assert.match(categoryStep, /Changing the reference category will clear the default template and all category mappings/);
+  assert.match(categoryStep, /type: "category\.reference\.changed"/);
+  assert.match(categoryStep, /session\.dirty\.defaultTemplate/);
+  assert.match(categoryStep, /session\.shopifyMappings\.length > 0/);
+  assert.match(categoryStep, /Already assigned to Store Category/);
+  assert.match(picker, /unavailableSelections/);
+  assert.match(picker, /selectionCommitRef/);
+  assert.match(picker, /disabled=\{selectionDisabled\}/);
+  assert.match(picker, /actionLabel \?\? "Assigned"/);
+  assert.match(action, /referenceTaxonomyCategoryId/);
+  assert.match(action, /already used by another Store Category/);
+
+  const session = await source("src/components/admin/store-categories/store-category-authoring-session.ts");
+  assert.match(session, /case "category\.reference\.changed"/);
+  assert.match(session, /defaultTemplate: createEmptyDefaultTemplate\(\)/);
+  assert.match(session, /shopifyMappings: \[\]/);
+  assert.match(session, /defaultTemplate: false/);
+  assert.match(session, /shopifyMappings: false/);
+});
+
+
+test("Store Category mapping authoring uses one picker and a compact added-mappings list", async () => {
+  const mappingsStep = await source("src/components/admin/store-categories/store-category-mappings-step.tsx");
+  const picker = await source("src/components/admin/store-categories/shopify-taxonomy-picker.tsx");
+
+  assert.equal((mappingsStep.match(/<ShopifyTaxonomyPicker/g) ?? []).length, 1);
+  assert.match(mappingsStep, /Add a mapping/);
+  assert.match(mappingsStep, /Added mappings \(\{session\.shopifyMappings\.length\}\)/);
+  assert.match(mappingsStep, /showSelectionSummary=\{false\}/);
+  assert.match(mappingsStep, /selectionActionLabel="Add"/);
+  assert.match(mappingsStep, /Already added to this Store Category/);
+  assert.match(mappingsStep, /actionLabel: "Added"/);
+  assert.match(mappingsStep, /mapping\.taxonomy\?\.categoryId === taxonomy\.categoryId/);
+  assert.match(picker, /showSelectionSummary/);
+  assert.match(picker, /selectionActionLabel/);
+  assert.match(picker, /selectionPendingLabel/);
+});

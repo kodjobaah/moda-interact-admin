@@ -7,6 +7,7 @@ import {
   type StoreCategoryAuthoringSession,
 } from "./store-category-authoring-session";
 import { storeCategoryAuthoringNow } from "./store-category-authoring-runtime";
+import type { AssignedReferenceTaxonomyCategory } from "./store-category-authoring-types";
 import { ShopifyTaxonomyPicker } from "./shopify-taxonomy-picker";
 import {
   STORE_CATEGORY_AUTHORING_INPUT_CLASS,
@@ -26,11 +27,55 @@ function suggestedSlug(name: string): string {
 export function StoreCategoryCategoryStep({
   session,
   dispatch,
+  assignedReferenceTaxonomy,
 }: {
   session: StoreCategoryAuthoringSession;
   dispatch: Dispatch<StoreCategoryAuthoringAction>;
+  assignedReferenceTaxonomy: AssignedReferenceTaxonomyCategory[];
 }) {
   const validation = validateStoreCategoryAuthoringSession(session).category;
+  const selectedReferenceAssignment = assignedReferenceTaxonomy.find(
+    (assignment) =>
+      assignment.categoryId === session.category.referenceTaxonomy?.categoryId,
+  );
+  const unavailableSelections = assignedReferenceTaxonomy.map((assignment) => ({
+    categoryId: assignment.categoryId,
+    reason: `Already assigned to Store Category “${assignment.storeCategoryDisplayName}”.`,
+  }));
+  const hasAuthoredDependentState =
+    session.dirty.defaultTemplate || session.shopifyMappings.length > 0;
+
+  function changeReferenceTaxonomy(
+    referenceTaxonomy:
+      StoreCategoryAuthoringSession["category"]["referenceTaxonomy"],
+  ) {
+    const currentCategoryId =
+      session.category.referenceTaxonomy?.categoryId ?? null;
+    const nextCategoryId = referenceTaxonomy?.categoryId ?? null;
+    if (currentCategoryId === nextCategoryId) return;
+
+    if (
+      currentCategoryId &&
+      hasAuthoredDependentState &&
+      !window.confirm(
+        "Changing the reference category will clear the default template and all category mappings because they may no longer apply to the new category. Continue?",
+      )
+    ) {
+      return;
+    }
+
+    dispatch({
+      type: "category.reference.changed",
+      patch: referenceTaxonomy
+        ? {
+            referenceTaxonomy,
+            slug: suggestedSlug(referenceTaxonomy.name),
+            displayName: referenceTaxonomy.name,
+          }
+        : { referenceTaxonomy: null },
+      now: storeCategoryAuthoringNow(),
+    });
+  }
 
   return (
     <section aria-labelledby="author-category-title">
@@ -46,7 +91,9 @@ export function StoreCategoryCategoryStep({
             Select the top-level reference taxonomy category, then define Moda's stable category identity and merchant-facing metadata.
           </p>
         </div>
-        <StoreCategoryAuthoringSectionStatus valid={validation.valid} />
+        <StoreCategoryAuthoringSectionStatus
+          valid={validation.valid && !selectedReferenceAssignment}
+        />
       </div>
 
       <div className="mt-5">
@@ -55,30 +102,19 @@ export function StoreCategoryCategoryStep({
           value={session.category.referenceTaxonomy?.categoryId ?? ""}
           scope="top-level"
           allowRawId={false}
-          onSelectionChange={(referenceTaxonomy) => {
-            if (!referenceTaxonomy) {
-              dispatch({
-                type: "category.changed",
-                patch: { referenceTaxonomy: null },
-                now: storeCategoryAuthoringNow(),
-              });
-              return;
-            }
-            dispatch({
-              type: "category.changed",
-              patch: {
-                referenceTaxonomy,
-                ...(session.category.displayName.trim()
-                  ? {}
-                  : { displayName: referenceTaxonomy.name }),
-                ...(session.category.slug.trim()
-                  ? {}
-                  : { slug: suggestedSlug(referenceTaxonomy.name) }),
-              },
-              now: storeCategoryAuthoringNow(),
-            });
-          }}
+          unavailableSelections={unavailableSelections}
+          onSelectionChange={changeReferenceTaxonomy}
         />
+        {selectedReferenceAssignment ? (
+          <p
+            className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800"
+            role="status"
+          >
+            This reference category is already assigned to Store Category
+            “{selectedReferenceAssignment.storeCategoryDisplayName}”. Choose another
+            reference category before continuing.
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

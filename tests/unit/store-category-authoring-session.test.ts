@@ -95,6 +95,172 @@ test("authoring session blocks progression until required category and default-t
   assert.equal(session.step, "template");
 });
 
+test("entering the template step derives editable defaults from the selected category identity", () => {
+  let session = createStoreCategoryAuthoringSession("session-1", T0);
+  session = storeCategoryAuthoringReducer(session, {
+    type: "category.changed",
+    patch: {
+      referenceTaxonomy: {
+        ...TOP_LEVEL,
+        categoryId: "gid://shopify/TaxonomyCategory/ap",
+        name: "Animals & Pet Supplies",
+        fullName: "Animals & Pet Supplies",
+      },
+      slug: "animals-pet-supplies",
+      displayName: "Animals & Pet Supplies",
+    },
+    now: T0,
+  })!;
+
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "template",
+    now: T0,
+  })!;
+
+  assert.equal(session.defaultTemplate.key, "animals_pet_supplies_default");
+  assert.equal(
+    session.defaultTemplate.displayName,
+    "Animals & Pet Supplies default",
+  );
+  assert.equal(session.dirty.defaultTemplate, false);
+
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "category",
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "category.changed",
+    patch: {
+      slug: "pet-care",
+      displayName: "Pet Care",
+    },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "template",
+    now: T0,
+  })!;
+
+  assert.equal(session.defaultTemplate.key, "pet_care_default");
+  assert.equal(session.defaultTemplate.displayName, "Pet Care default");
+
+  session = storeCategoryAuthoringReducer(session, {
+    type: "template.changed",
+    patch: {
+      key: "pet_support_default",
+      displayName: "Pet support default",
+    },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "category",
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "category.changed",
+    patch: {
+      slug: "animal-care",
+      displayName: "Animal Care",
+    },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "template",
+    now: T0,
+  })!;
+
+  assert.equal(session.defaultTemplate.key, "pet_support_default");
+  assert.equal(session.defaultTemplate.displayName, "Pet support default");
+  assert.equal(session.dirty.defaultTemplate, true);
+});
+
+test("changing the reference category resets the authored template and mappings for the previous category", () => {
+  let session = createStoreCategoryAuthoringSession("session-1", T0);
+  session = storeCategoryAuthoringReducer(session, {
+    type: "category.reference.changed",
+    patch: {
+      referenceTaxonomy: TOP_LEVEL,
+      slug: "apparel-accessories",
+      displayName: "Apparel & Accessories",
+    },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "template",
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "template.changed",
+    patch: {
+      description: "Apparel prompt",
+      promptText: "Help customers with apparel questions.",
+    },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "mapping.added",
+    mapping: { clientId: "m1", taxonomy: SUBCATEGORY, weight: 2 },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "category",
+    now: T0,
+  })!;
+
+  const previousRevision = session.validationRevision;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "category.reference.changed",
+    patch: {
+      referenceTaxonomy: {
+        ...TOP_LEVEL,
+        categoryId: "gid://shopify/TaxonomyCategory/ap",
+        name: "Animals & Pet Supplies",
+        fullName: "Animals & Pet Supplies",
+      },
+      slug: "animals-pet-supplies",
+      displayName: "Animals & Pet Supplies",
+    },
+    now: "2026-10-04T18:03:00.000Z",
+  })!;
+
+  assert.equal(
+    session.category.referenceTaxonomy?.categoryId,
+    "gid://shopify/TaxonomyCategory/ap",
+  );
+  assert.equal(session.category.slug, "animals-pet-supplies");
+  assert.equal(session.category.displayName, "Animals & Pet Supplies");
+  assert.deepEqual(session.defaultTemplate, {
+    key: "",
+    displayName: "",
+    description: "",
+    promptText: "",
+  });
+  assert.deepEqual(session.shopifyMappings, []);
+  assert.equal(session.dirty.category, true);
+  assert.equal(session.dirty.defaultTemplate, false);
+  assert.equal(session.dirty.shopifyMappings, false);
+  assert.equal(session.validationRevision, previousRevision + 1);
+  assert.equal(session.status, "DRAFT");
+
+  session = storeCategoryAuthoringReducer(session, {
+    type: "step.changed",
+    step: "template",
+    now: "2026-10-04T18:04:00.000Z",
+  })!;
+  assert.equal(session.defaultTemplate.key, "animals_pet_supplies_default");
+  assert.equal(
+    session.defaultTemplate.displayName,
+    "Animals & Pet Supplies default",
+  );
+});
+
 test("review readiness becomes stale whenever reviewed category configuration changes", () => {
   let session = completeSession();
   assert.equal(session.status, "READY");

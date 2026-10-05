@@ -19,6 +19,11 @@ export type StoreCategoryAuthoringMapping = {
   weight: number;
 };
 
+export type AssignedReferenceTaxonomyCategory = {
+  categoryId: string;
+  storeCategoryDisplayName: string;
+};
+
 export type StoreCategoryAuthoringSession = {
   schemaVersion: 2;
   sessionId: string;
@@ -57,6 +62,11 @@ export type StoreCategoryAuthoringAction =
   | { type: "session.discarded" }
   | {
       type: "category.changed";
+      patch: Partial<StoreCategoryAuthoringSession["category"]>;
+      now: string;
+    }
+  | {
+      type: "category.reference.changed";
       patch: Partial<StoreCategoryAuthoringSession["category"]>;
       now: string;
     }
