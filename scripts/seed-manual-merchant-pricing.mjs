@@ -29,8 +29,8 @@ const FEATURE_DEFINITIONS = [
     key: "ai_conversations",
     displayName: "AI Conversations",
     description: "AI-assisted merchant and customer conversations.",
-    activationMode: "MERCHANT_OPT_IN",
-    systemRequired: false,
+    activationMode: "ALWAYS_ENABLED",
+    systemRequired: true,
     active: true,
   },
   {
