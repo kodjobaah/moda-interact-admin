@@ -1,4 +1,8 @@
 import {
+  StoreCategoryPromptConditionKeySchema,
+  validateStoreCategoryPromptTemplate,
+} from "@modainteract/moda-interact-shared/commerce";
+import {
   PROMPT_TEMPLATE_KEY_PATTERN,
   STORE_CATEGORY_SLUG_PATTERN,
 } from "../../../lib/admin/store-category-validation.ts";
@@ -39,6 +43,49 @@ export function validateStoreCategoryAuthoringSession(
     categoryIssues.push("Display order must be between 0 and 1,000,000.");
   }
 
+  const mappingIssues: string[] = [];
+  const seenTaxonomyIds = new Set<string>();
+  const seenConditionKeys = new Set<string>();
+  for (const mapping of session.shopifyMappings) {
+    if (!isStoreCategoryTaxonomyReference(mapping.taxonomy)) {
+      mappingIssues.push("Every category mapping needs a complete taxonomy selection.");
+      continue;
+    }
+    const taxonomyId = mapping.taxonomy.categoryId.trim();
+    if (seenTaxonomyIds.has(taxonomyId)) {
+      mappingIssues.push(
+        `Reference taxonomy category ${mapping.taxonomy.fullName} is mapped more than once.`,
+      );
+    }
+    seenTaxonomyIds.add(taxonomyId);
+
+    const mappingDisplayName = mapping.displayName.trim();
+    if (mappingDisplayName.length < 1 || mappingDisplayName.length > 255) {
+      mappingIssues.push(
+        `Mapping ${mapping.taxonomy.fullName} needs a merchant display name of at most 255 characters.`,
+      );
+    }
+    const conditionKey = mapping.conditionKey.trim();
+    if (!StoreCategoryPromptConditionKeySchema.safeParse(conditionKey).success) {
+      mappingIssues.push(
+        `Mapping ${mapping.taxonomy.fullName} needs a valid condition key such as shoes or formal_shoes.`,
+      );
+    } else if (seenConditionKeys.has(conditionKey)) {
+      mappingIssues.push(`Mapping condition key ${conditionKey} is used more than once.`);
+    }
+    seenConditionKeys.add(conditionKey);
+
+    if (
+      !Number.isSafeInteger(mapping.weight) ||
+      mapping.weight < 1 ||
+      mapping.weight > 1_000_000
+    ) {
+      mappingIssues.push(
+        "Every category mapping weight must be between 1 and 1,000,000.",
+      );
+    }
+  }
+
   const templateIssues: string[] = [];
   const templateKey = session.defaultTemplate.key.trim();
   const templateDisplayName = session.defaultTemplate.displayName.trim();
@@ -60,30 +107,15 @@ export function validateStoreCategoryAuthoringSession(
     templateIssues.push(
       "Canonical English prompt is required and must be at most 100,000 characters.",
     );
-  }
-
-  const mappingIssues: string[] = [];
-  const seenTaxonomyIds = new Set<string>();
-  for (const mapping of session.shopifyMappings) {
-    if (!isStoreCategoryTaxonomyReference(mapping.taxonomy)) {
-      mappingIssues.push("Every category mapping needs a complete taxonomy selection.");
-      continue;
-    }
-    const taxonomyId = mapping.taxonomy.categoryId.trim();
-    if (seenTaxonomyIds.has(taxonomyId)) {
-      mappingIssues.push(
-        `Reference taxonomy category ${mapping.taxonomy.fullName} is mapped more than once.`,
-      );
-    }
-    seenTaxonomyIds.add(taxonomyId);
-    if (
-      !Number.isSafeInteger(mapping.weight) ||
-      mapping.weight < 1 ||
-      mapping.weight > 1_000_000
-    ) {
-      mappingIssues.push(
-        "Every category mapping weight must be between 1 and 1,000,000.",
-      );
+  } else if (mappingIssues.length === 0) {
+    const promptValidation = validateStoreCategoryPromptTemplate({
+      source: session.defaultTemplate.promptText,
+      availableConditionKeys: session.shopifyMappings.map((mapping) =>
+        mapping.conditionKey.trim(),
+      ),
+    });
+    for (const issue of promptValidation.issues) {
+      templateIssues.push(issue.message);
     }
   }
 
@@ -115,14 +147,14 @@ export function canEnterStoreCategoryAuthoringStep(
 ): boolean {
   const validation = validateStoreCategoryAuthoringSession(session);
   if (step === "category") return true;
-  if (step === "template") return validation.category.valid;
-  if (step === "mappings") {
-    return validation.category.valid && validation.defaultTemplate.valid;
+  if (step === "mappings") return validation.category.valid;
+  if (step === "template") {
+    return validation.category.valid && validation.shopifyMappings.valid;
   }
   return (
     validation.category.valid &&
-    validation.defaultTemplate.valid &&
-    validation.shopifyMappings.valid
+    validation.shopifyMappings.valid &&
+    validation.defaultTemplate.valid
   );
 }
 

@@ -65,7 +65,11 @@ function transactionFor(options: {
     id: "mapping-1",
     categoryId: "category-1",
     shopifyTaxonomyCategoryId: "gid://shopify/TaxonomyCategory/aa-1",
+    conditionKey: "clothing",
+    displayName: "Clothing",
     weight: 2,
+    editVersion: 2,
+    category: { enabled: false },
     ...options.taxonomyMapping,
   };
   const updates: Array<{ model: string; where: Record<string, unknown>; data: Record<string, unknown> }> = [];
@@ -116,7 +120,14 @@ function transactionFor(options: {
       },
       findUnique: async () => {
         calls.push({ model: "template", method: "findUnique" });
-        return { ...template };
+        return {
+          ...template,
+          category: {
+            id: category.id,
+            enabled: category.enabled,
+            taxonomyMappings: [{ conditionKey: "clothing" }],
+          },
+        };
       },
       updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
         calls.push({ model: "template", method: "updateMany", args: { where, data } });
@@ -293,10 +304,8 @@ test("stale category CAS writes no audit event", async () => {
   assert.equal(fake.audits.length, 0);
 });
 
-test("category enable requires an enabled non-empty default in the same category", async () => {
-  const fake = transactionFor({
-    category: { defaultTemplate: { ...templateBase, enabled: false } },
-  });
+test("disabled categories cannot bypass Translate & Enable", async () => {
+  const fake = transactionFor();
   await assert.rejects(
     mutateStoreCategoryCatalogue(
       fake.transaction,
@@ -314,28 +323,10 @@ test("category enable requires an enabled non-empty default in the same category
       },
       "admin-1",
     ),
-    /valid enabled default template/,
+    /Use Translate & Enable/,
   );
   assert.equal(fake.updates.length, 0);
-
-  const valid = transactionFor();
-  await mutateStoreCategoryCatalogue(
-    valid.transaction,
-    {
-      kind: "update-category",
-      input: {
-        id: "category-1",
-        displayName: "Home Goods",
-        description: "",
-        displayOrder: 1,
-        enabled: true,
-        expectedEditVersion: 4,
-        reason: "Enable category",
-      },
-    },
-    "admin-1",
-  );
-  assert.equal(valid.audits[0]?.action, "ENABLE_PROMPT_TEMPLATE_CATEGORY");
+  assert.equal(fake.audits.length, 0);
 });
 
 test("disabling a category audits the change without touching shop profiles", async () => {
@@ -504,6 +495,8 @@ test("duplicate taxonomy IDs remain rejected by the database unique constraint",
         input: {
           categoryId: "category-1",
           taxonomy: clothingTaxonomy,
+          conditionKey: "clothing",
+          displayName: "Clothing",
           weight: 1,
           reason: "Duplicate mapping",
         },
@@ -524,6 +517,8 @@ test("taxonomy mapping create, weight update, and remove use category audit meta
       input: {
         categoryId: "category-1",
         taxonomy: clothingTaxonomy,
+        conditionKey: "clothing",
+        displayName: "Clothing",
         weight: 4,
         reason: "Add mapping",
       },
@@ -553,13 +548,21 @@ test("taxonomy mapping create, weight update, and remove use category audit meta
       kind: "update-taxonomy-mapping",
       input: {
         id: "mapping-1",
+        conditionKey: "clothing",
+        displayName: "Clothing",
         weight: 9,
+        expectedEditVersion: 2,
         reason: "Increase weighting",
       },
     },
     "admin-1",
   );
-  assert.deepEqual(update.updates[0]?.data, { weight: 9 });
+  assert.deepEqual(update.updates[0]?.data, {
+    conditionKey: "clothing",
+    displayName: "Clothing",
+    weight: 9,
+    editVersion: { increment: 1 },
+  });
   assert.equal(update.audits[0]?.promptTemplateCategoryId, "category-1");
   assert.deepEqual(update.audits[0]?.metadata, {
     changeKind: "TAXONOMY_MAPPING",
@@ -572,7 +575,7 @@ test("taxonomy mapping create, weight update, and remove use category audit meta
     remove.transaction,
     {
       kind: "remove-taxonomy-mapping",
-      input: { id: "mapping-1", reason: "Remove mapping" },
+      input: { id: "mapping-1", expectedEditVersion: 2, reason: "Remove mapping" },
     },
     "admin-1",
   );
@@ -604,6 +607,8 @@ test("atomic category bundle creates disabled category, enabled default template
       shopifyMappings: [
         {
           taxonomy: clothingTaxonomy,
+          conditionKey: "clothing",
+          displayName: "Clothing",
           weight: 100,
         },
       ],

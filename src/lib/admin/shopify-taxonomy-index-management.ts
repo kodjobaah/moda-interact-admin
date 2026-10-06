@@ -218,7 +218,7 @@ export async function getReferenceTaxonomyIndexStatus(): Promise<ReferenceTaxono
 
     return {
       environment,
-      state: indexMatchesEmbedding(index, embedding)
+      state: indexMatchesEmbedding(index, embeddingStatus(configuration))
         ? "READY"
         : "REQUIRES_SYNC",
       redisIndexPresent: true,

@@ -7,6 +7,8 @@ import { ShopifyTaxonomyPicker } from "./shopify-taxonomy-picker";
 export type StoreCategoryMappingWorkspaceItem = {
   id: string;
   taxonomy: StoreCategoryTaxonomyReference | null;
+  conditionKey?: string | null;
+  displayName?: string | null;
   weight: number;
   statusLabel?: string;
 };
@@ -146,6 +148,16 @@ export function StoreCategoryMappingWorkspace({
                           </span>
                         ) : null}
                       </div>
+                      {mapping.displayName ? (
+                        <p className="mt-1 text-sm text-gray-700">
+                          Merchant label: <span className="font-medium">{mapping.displayName}</span>
+                        </p>
+                      ) : null}
+                      {mapping.conditionKey ? (
+                        <p className="mt-1 font-mono text-xs text-gray-500">
+                          mappings.{mapping.conditionKey}
+                        </p>
+                      ) : null}
                       <p className="mt-1 break-all font-mono text-xs text-gray-500">
                         {mapping.taxonomy.categoryId}
                       </p>

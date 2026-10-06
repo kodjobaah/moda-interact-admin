@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { StoreCategoryCatalogue } from "@/lib/admin/store-categories";
+import type { TranslationConfigurationAdminData } from "@/lib/admin/translation-configuration";
 import type { ReferenceTaxonomyIndexStatus } from "@/lib/admin/shopify-taxonomy-index-management";
 import { StoreCategoryCreationWorkspace } from "./store-category-creation-workspace";
 import { StoreCategoryEditor } from "./store-category-editor";
@@ -13,14 +14,18 @@ export function StoreCategoryCatalog({
   selectedTab = "details",
   selectedTemplateId,
   taxonomyIndexStatus,
+  translationConfiguration,
   canManageTaxonomy,
+  canManageTranslations,
 }: {
   catalogue: StoreCategoryCatalogue;
   selectedCategoryId?: string;
   selectedTab?: StoreCategoryTab;
   selectedTemplateId?: string;
   taxonomyIndexStatus: ReferenceTaxonomyIndexStatus;
+  translationConfiguration: TranslationConfigurationAdminData;
   canManageTaxonomy: boolean;
+  canManageTranslations: boolean;
 }) {
   const selectedCategory =
     catalogue.categories.find((category) => category.id === selectedCategoryId) ??
@@ -103,6 +108,8 @@ export function StoreCategoryCatalog({
               category={selectedCategory}
               activeTab={selectedTab}
               selectedTemplateId={selectedTemplateId}
+              translationConfiguration={translationConfiguration}
+              canManageTranslations={canManageTranslations}
             />
           ) : null}
         </div>

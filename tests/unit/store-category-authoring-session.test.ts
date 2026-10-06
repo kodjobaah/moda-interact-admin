@@ -205,7 +205,7 @@ test("changing the reference category resets the authored template and mappings 
   })!;
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.added",
-    mapping: { clientId: "m1", taxonomy: SUBCATEGORY, weight: 2 },
+    mapping: { clientId: "m1", taxonomy: SUBCATEGORY, conditionKey: "clothing", displayName: "Clothing", weight: 2 },
     now: T0,
   })!;
   session = storeCategoryAuthoringReducer(session, {
@@ -292,7 +292,7 @@ test("category mappings are optional but every supplied mapping must be complete
 
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.added",
-    mapping: { clientId: "m1", taxonomy: null, weight: 1 },
+    mapping: { clientId: "m1", taxonomy: null, conditionKey: "", displayName: "", weight: 1 },
     now: T0,
   })!;
   assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, false);
@@ -300,7 +300,7 @@ test("category mappings are optional but every supplied mapping must be complete
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.changed",
     clientId: "m1",
-    patch: { taxonomy: SUBCATEGORY },
+    patch: { taxonomy: SUBCATEGORY, conditionKey: "clothing", displayName: "Clothing" },
     now: T0,
   })!;
   session = storeCategoryAuthoringReducer(session, {
@@ -308,11 +308,56 @@ test("category mappings are optional but every supplied mapping must be complete
     mapping: {
       clientId: "m2",
       taxonomy: SUBCATEGORY,
+      conditionKey: "clothing_2",
+      displayName: "Clothing 2",
       weight: 2,
     },
     now: T0,
   })!;
   assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, false);
+});
+
+test("mapping conditions are validated against the conditional prompt contract", () => {
+  let session = createStoreCategoryAuthoringSession("session-1", T0);
+  session = storeCategoryAuthoringReducer(session, {
+    type: "category.changed",
+    patch: {
+      referenceTaxonomy: TOP_LEVEL,
+      slug: "fashion-apparel",
+      displayName: "Fashion & Apparel",
+    },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "mapping.added",
+    mapping: {
+      clientId: "m1",
+      taxonomy: SUBCATEGORY,
+      conditionKey: "clothing",
+      displayName: "Clothing",
+      weight: 1,
+    },
+    now: T0,
+  })!;
+  session = storeCategoryAuthoringReducer(session, {
+    type: "template.changed",
+    patch: {
+      key: "fashion_apparel_default",
+      displayName: "Fashion default",
+      promptText: "Base\n{% if mappings.clothing %}Clothing help{% endif %}",
+    },
+    now: T0,
+  })!;
+  assert.equal(validateStoreCategoryAuthoringSession(session).defaultTemplate.valid, true);
+
+  session = storeCategoryAuthoringReducer(session, {
+    type: "template.changed",
+    patch: {
+      promptText: "Base\n{% if mappings.shoes %}Footwear help{% endif %}",
+    },
+    now: T0,
+  })!;
+  assert.equal(validateStoreCategoryAuthoringSession(session).defaultTemplate.valid, false);
 });
 
 test("browser session restoration rejects incompatible state and derives readiness from the reviewed revision", () => {

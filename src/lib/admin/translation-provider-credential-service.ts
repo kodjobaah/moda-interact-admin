@@ -184,11 +184,13 @@ export async function replaceTranslationProviderCredential(
 ): Promise<TranslationProviderCredentialStatus> {
   requireSuperAdmin(principal);
   const validated = validateTranslationProviderCredentialMutation(input);
-  if (!validated.secret || validated.expectedEditVersion === undefined) {
+  const secret = validated.secret;
+  const expectedEditVersion = validated.expectedEditVersion;
+  if (!secret || expectedEditVersion === undefined) {
     throw new Error("Translation provider credential is invalid.");
   }
   const environment = resolveCommerceEnvironment() as CommerceEnvironment;
-  const sealed = sealCredential({ environment, secret: validated.secret });
+  const sealed = sealCredential({ environment, secret });
   const { prisma } = await import("@/lib/prisma");
 
   try {
@@ -199,7 +201,7 @@ export async function replaceTranslationProviderCredential(
           where: {
             environment,
             provider: TRANSLATION_PROVIDER,
-            editVersion: validated.expectedEditVersion,
+            editVersion: expectedEditVersion,
           },
           data: {
             ciphertext: Buffer.from(sealed.ciphertext),
@@ -236,8 +238,8 @@ export async function replaceTranslationProviderCredential(
             reason: validated.reason,
             metadata: {
               provider: TRANSLATION_PROVIDER,
-              previousEditVersion: validated.expectedEditVersion,
-              editVersion: validated.expectedEditVersion + 1,
+              previousEditVersion: expectedEditVersion,
+              editVersion: expectedEditVersion + 1,
             },
           },
         });

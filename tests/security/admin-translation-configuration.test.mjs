@@ -99,11 +99,11 @@ test("credential status never returns encrypted envelope fields and only OpenAI 
   assert.match(credential, />OpenAI</);
 });
 
-test("translation credential uses Shared 1.2.0 AAD and the existing Commerce keyring", () => {
+test("translation credential uses Shared 1.3.0 AAD and the existing Commerce keyring", () => {
   const dependency = JSON.parse(packageJson).dependencies[
     "@modainteract/moda-interact-shared"
   ];
-  assert.equal(dependency, "1.2.0");
+  assert.equal(dependency, "1.3.0");
   assert.match(cryptoSource, /createCommerceTranslationProviderCredentialAad/);
   assert.match(cryptoSource, /provider: input\.provider/);
   assert.match(service, /loadActiveCredentialKeyring\(\)/);

@@ -248,3 +248,82 @@ export async function createStoreCategoryBundleAction(
     return { ok: false, message };
   }
 }
+
+export type RequestStoreCategoryTranslationActionResult =
+  | { ok: true; runId: string; itemCount: number; localeCount: number }
+  | { ok: false; message: string; refreshRequired: boolean };
+
+function translationRequestPayload(input: unknown): Record<string, unknown> {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    throw new Error("Translation enablement input is invalid.");
+  }
+  return input as Record<string, unknown>;
+}
+
+function translationRequestClientMessage(error: unknown): {
+  message: string;
+  refreshRequired: boolean;
+} {
+  const message = error instanceof Error ? error.message : "";
+  const refreshRequired =
+    message === "Store Category changed; refresh and try again.";
+  const allowedPrefixes = [
+    "SUPER_ADMIN access is required.",
+    "Store Category was not found.",
+    "Store Category changed; refresh and try again.",
+    "Disable this Store Category before requesting translation.",
+    "A translation/enablement run is already active for this Store Category.",
+    "Choose a valid enabled default prompt template before translation.",
+    "Configure a merchant display name and condition key for every mapping before translation.",
+    "The selected translation model is unavailable or its provider credential is not configured.",
+    "The translation/enablement request timed out while writing to PostgreSQL. Retry the request.",
+  ];
+  if (allowedPrefixes.includes(message) || message.startsWith("Unknown mapping condition")) {
+    return { message, refreshRequired };
+  }
+  if (
+    message.includes("conditional") ||
+    message.includes("mapping condition") ||
+    message.includes("Prompt template")
+  ) {
+    return { message, refreshRequired };
+  }
+  return {
+    message: "The translation/enablement request could not be created. Check the admin server logs and retry.",
+    refreshRequired,
+  };
+}
+
+export async function requestStoreCategoryTranslationAction(
+  payload: unknown,
+): Promise<RequestStoreCategoryTranslationActionResult> {
+  try {
+    const principal = await requirePlatformAdminMutation();
+    if (principal.role !== "SUPER_ADMIN") {
+      throw new Error("SUPER_ADMIN access is required.");
+    }
+    const value = translationRequestPayload(payload);
+    const { requestStoreCategoryTranslation } = await import(
+      "@/lib/admin/store-category-translation-enablement"
+    );
+    const result = await requestStoreCategoryTranslation(
+      {
+        categoryId: value.categoryId,
+        expectedCategoryEditVersion: value.expectedCategoryEditVersion,
+        translationModelConfigurationId: value.translationModelConfigurationId,
+        operationId: value.operationId,
+        reason: value.reason,
+      },
+      principal,
+    );
+    revalidatePath("/system-controls/store-categories");
+    return {
+      ok: true,
+      runId: result.runId,
+      itemCount: result.itemCount,
+      localeCount: result.localeCount,
+    };
+  } catch (error) {
+    return { ok: false, ...translationRequestClientMessage(error) };
+  }
+}

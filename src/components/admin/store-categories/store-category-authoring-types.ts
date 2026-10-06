@@ -2,8 +2,8 @@ import type { StoreCategoryTaxonomyReference } from "../../../lib/admin/store-ca
 
 export type StoreCategoryAuthoringStep =
   | "category"
-  | "template"
   | "mappings"
+  | "template"
   | "review";
 
 export type StoreCategoryAuthoringStatus =
@@ -16,6 +16,8 @@ export type StoreCategoryAuthoringStatus =
 export type StoreCategoryAuthoringMapping = {
   clientId: string;
   taxonomy: StoreCategoryTaxonomyReference | null;
+  conditionKey: string;
+  displayName: string;
   weight: number;
 };
 
@@ -25,7 +27,7 @@ export type AssignedReferenceTaxonomyCategory = {
 };
 
 export type StoreCategoryAuthoringSession = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   sessionId: string;
   mode: "CREATE";
   step: StoreCategoryAuthoringStep;

@@ -7,6 +7,7 @@ import {
   parseUpdatePromptTemplateForm,
   parseUpdateStoreCategoryForm,
   parseUpdateTaxonomyMappingForm,
+  parseRemoveTaxonomyMappingForm,
 } from "../../src/lib/admin/store-category-validation.ts";
 
 function form(values: Record<string, string>): FormData {
@@ -142,6 +143,8 @@ test("taxonomy mapping weight must be a positive bounded integer", () => {
   const values = {
     categoryId: "category-1",
     ...taxonomyFields,
+    conditionKey: "clothing",
+    displayName: "Clothing",
     weight: "1",
     reason: "Add mapping",
   };
@@ -155,9 +158,33 @@ test("taxonomy mapping weight must be a positive bounded integer", () => {
 
   assert.deepEqual(
     parseUpdateTaxonomyMappingForm(
-      form({ id: "mapping-1", weight: "7", reason: "Adjust weighting" }),
+      form({
+        id: "mapping-1",
+        conditionKey: "clothing",
+        displayName: "Clothing",
+        weight: "7",
+        expectedEditVersion: "3",
+        reason: "Adjust mapping",
+      }),
     ),
-    { id: "mapping-1", weight: 7, reason: "Adjust weighting" },
+    {
+      id: "mapping-1",
+      conditionKey: "clothing",
+      displayName: "Clothing",
+      weight: 7,
+      expectedEditVersion: 3,
+      reason: "Adjust mapping",
+    },
+  );
+  assert.deepEqual(
+    parseRemoveTaxonomyMappingForm(
+      form({ id: "mapping-1", expectedEditVersion: "3", reason: "Remove" }),
+    ),
+    { id: "mapping-1", expectedEditVersion: 3, reason: "Remove" },
+  );
+  assert.throws(
+    () => parseCreateTaxonomyMappingForm(form({ ...values, conditionKey: "Bad-Key" })),
+    /conditionKey/,
   );
 });
 test("atomic category bundle validates category, required default template, mappings, and audit reason", async () => {
@@ -181,6 +208,8 @@ test("atomic category bundle validates category, required default template, mapp
     shopifyMappings: [
       {
         taxonomy: clothingTaxonomy,
+        conditionKey: "clothing",
+        displayName: "Clothing",
         weight: 100,
       },
     ],
@@ -204,6 +233,8 @@ test("atomic category bundle validates category, required default template, mapp
     shopifyMappings: [
       {
         taxonomy: clothingTaxonomy,
+        conditionKey: "clothing",
+        displayName: "Clothing",
         weight: 100,
       },
     ],

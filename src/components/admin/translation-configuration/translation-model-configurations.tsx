@@ -21,8 +21,7 @@ export function TranslationModelConfigurations({
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-gray-600">
           Define the OpenAI models that later Store Category enablement can
-          choose from. Profiles are configuration only; ADMIN-001 does not run
-          translations.
+          choose from. Profiles are configuration only
         </p>
       </div>
 

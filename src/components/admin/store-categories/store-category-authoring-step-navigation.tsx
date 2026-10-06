@@ -21,19 +21,19 @@ export const STORE_CATEGORY_AUTHORING_STEPS: Array<{
     description: "Identity and display metadata",
   },
   {
-    step: "template",
-    label: "Default template",
-    description: "Required canonical-English prompt",
-  },
-  {
     step: "mappings",
     label: "Category mappings",
-    description: "Optional taxonomy suggestions",
+    description: "Merchant choices and prompt conditions",
+  },
+  {
+    step: "template",
+    label: "Conditional prompt",
+    description: "Canonical-English conditional instructions",
   },
   {
     step: "review",
     label: "Review",
-    description: "Validate and create atomically",
+    description: "Validate and save the disabled draft",
   },
 ];
 

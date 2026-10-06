@@ -40,7 +40,7 @@ export function PromptTemplateWorkspace({
         />
         <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-5">
           <PromptTemplateEditor
-            categoryId={category.id}
+            category={category}
             template={effectiveTemplate}
             heading={creating ? "Create prompt template" : undefined}
           />

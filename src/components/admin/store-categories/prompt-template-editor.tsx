@@ -1,21 +1,67 @@
+"use client";
+
+import { useState } from "react";
 import { mutateStoreCategoryCatalogueAction } from "@/app/actions/store-categories";
 import type { StoreCategoryCatalogue } from "@/lib/admin/store-categories";
+import { StoreCategoryPromptConditionEditor } from "./store-category-prompt-condition-editor";
 
-type Template = StoreCategoryCatalogue["categories"][number]["templates"][number];
+type Category = StoreCategoryCatalogue["categories"][number];
+type Template = Category["templates"][number];
 
 const inputClass =
-  "mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)]";
+  "mt-1 w-full rounded-md border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[var(--brand-500)] focus:ring-2 focus:ring-[var(--brand-200)] disabled:bg-gray-100 disabled:text-gray-500";
 
 export function PromptTemplateEditor({
-  categoryId,
+  category,
   template,
   heading,
 }: {
-  categoryId: string;
+  category: Category;
   template?: Template;
   heading?: string;
 }) {
   const creating = !template;
+  const [promptText, setPromptText] = useState(template?.promptText ?? "");
+  const conditions = category.taxonomyMappings.flatMap((mapping) =>
+    mapping.conditionKey && mapping.displayName
+      ? [
+          {
+            id: mapping.id,
+            conditionKey: mapping.conditionKey,
+            displayName: mapping.displayName,
+          },
+        ]
+      : [],
+  );
+
+  if (category.enabled) {
+    return (
+      <section>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h4 className="text-sm font-semibold text-gray-900">
+            {heading ?? (creating ? "Create prompt template" : template.displayName)}
+          </h4>
+          {!creating ? (
+            <span className="font-mono text-xs text-gray-500">
+              {template.key} · {template.enabled ? "Enabled" : "Disabled"} · v
+              {template.editVersion}
+            </span>
+          ) : null}
+        </div>
+        <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
+          This Store Category is enabled. Disable it before creating or changing prompt
+          templates because those changes invalidate the reviewed translation/enablement
+          configuration.
+        </p>
+        {template ? (
+          <pre className="mt-4 max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-800">
+            {template.promptText}
+          </pre>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
@@ -24,7 +70,8 @@ export function PromptTemplateEditor({
         </h4>
         {!creating ? (
           <span className="font-mono text-xs text-gray-500">
-            {template.key} · {template.enabled ? "Enabled" : "Disabled"} · v{template.editVersion}
+            {template.key} · {template.enabled ? "Enabled" : "Disabled"} · v
+            {template.editVersion}
           </span>
         ) : null}
       </div>
@@ -36,7 +83,7 @@ export function PromptTemplateEditor({
         />
         {creating ? (
           <>
-            <input type="hidden" name="categoryId" value={categoryId} />
+            <input type="hidden" name="categoryId" value={category.id} />
             <label className="text-sm font-medium text-gray-700">
               Template key
               <input
@@ -92,17 +139,19 @@ export function PromptTemplateEditor({
             rows={2}
           />
         </label>
-        <label className="text-sm font-medium text-gray-700 sm:col-span-2">
-          Canonical English prompt
-          <textarea
-            className={`${inputClass} min-h-72 font-mono leading-6`}
-            name="promptText"
-            defaultValue={template?.promptText ?? ""}
-            maxLength={100_000}
+        <div className="sm:col-span-2">
+          <p className="mb-2 text-sm font-medium text-gray-700">
+            Canonical English conditional prompt
+          </p>
+          <StoreCategoryPromptConditionEditor
+            promptText={promptText}
+            onChange={setPromptText}
+            conditions={conditions}
+            textareaClassName={`${inputClass} min-h-72 font-mono leading-6`}
+            textareaName="promptText"
             rows={16}
-            required
           />
-        </label>
+        </div>
         <label className="text-sm font-medium text-gray-700">
           Audit reason
           <input className={inputClass} name="reason" maxLength={1000} required />

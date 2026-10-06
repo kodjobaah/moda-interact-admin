@@ -35,25 +35,20 @@ test("category updates cannot carry slug and the database identity guard is not 
   assert.doesNotMatch(updateBlock, /\$executeRaw|\$queryRaw/);
 });
 
-test("Admin catalogue introduces no translation persistence or queue surface", async () => {
-  const files = [
-    "src/app/actions/store-categories.ts",
-    "src/lib/admin/store-categories.ts",
-    "src/lib/admin/store-category-validation.ts",
-    "src/components/admin/store-categories/store-category-catalog.tsx",
-    "src/components/admin/store-categories/store-category-editor.tsx",
-    "src/components/admin/store-categories/prompt-template-editor.tsx",
-    "src/components/admin/store-categories/prompt-template-list.tsx",
-    "src/components/admin/store-categories/prompt-template-workspace.tsx",
-    "src/components/admin/store-categories/store-category-maintenance-tabs.tsx",
-    "src/components/admin/store-categories/store-category-mapping-workspace.tsx",
-    "src/components/admin/store-categories/store-category-workspace-header.tsx",
-    "src/components/admin/store-categories/taxonomy-mapping-editor.tsx",
-    "src/lib/admin/store-category-taxonomy-reference.ts",
-  ];
-  const contents = (await Promise.all(files.map(source))).join("\n");
-  assert.doesNotMatch(contents, /CommercePromptTemplateTranslation|TranslationJob|Queue\.add|queue\.add/i);
-  assert.match(contents, /Merchant presentation falls back to this category display name and description when Shopify locale keys are unavailable/);
+test("Admin stages Store Category translation work without publishing to BullMQ", async () => {
+  const action = await source("src/app/actions/store-categories.ts");
+  const service = await source("src/lib/admin/store-category-translation-enablement.ts");
+  const editor = await source("src/components/admin/store-categories/store-category-translation-enablement.tsx");
+  const contents = [action, service, editor].join("\n");
+  assert.match(service, /commerceStoreCategoryTranslationRun\.create/);
+  assert.match(service, /commerceStoreCategoryTranslationItem\.createMany/);
+  assert.match(service, /MODA_SUPPORTED_LANGUAGE_TAGS/);
+  assert.match(service, /@modainteract\/moda-interact-shared\/internationalization/);
+  assert.doesNotMatch(service, /MERCHANT_PRICING_LOCALES/);
+  assert.match(service, /REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION/);
+  assert.match(service, /status: CommerceStoreCategoryTranslationRunStatus\.PENDING/);
+  assert.match(editor, /ADMIN-002 intentionally stops here/);
+  assert.doesNotMatch(contents, /Queue\.add|queue\.add|BullMQ|new Queue\(/);
 });
 
 test("Store Categories uses an atomic authoring session for creation and scoped tabs for maintenance", async () => {
@@ -76,23 +71,23 @@ test("Store Categories uses an atomic authoring session for creation and scoped 
   assert.match(creator, /StoreCategoryAuthoringWorkspace/);
   assert.match(creator, /window\.sessionStorage/);
   assert.doesNotMatch(creator, /function CategoryStep|function TemplateStep|function MappingsStep|function ReviewStep/);
-  assert.match(workspace, /Nothing is written to PostgreSQL until the final Review step succeeds/);
+  assert.match(workspace, /Nothing is written to PostgreSQL until the final Review step saves this disabled draft/);
   assert.match(workspace, /StoreCategoryCategoryStep/);
   assert.match(workspace, /StoreCategoryTemplateStep/);
   assert.match(workspace, /StoreCategoryMappingsStep/);
   assert.match(workspace, /StoreCategoryReviewStep/);
+  assert.match(workspace, /Save Store Category Draft/);
   assert.match(categoryStep, /Category identity/);
-  assert.match(templateStep, /Default prompt template/);
+  assert.match(templateStep, /Conditional prompt template/);
   assert.match(mappingsStep, /Category mappings/);
   assert.match(reviewStep, /Review Store Category/);
   assert.match(session, /validationRevision/);
   assert.match(session, /reviewedRevision/);
   assert.match(session, /status: "DRAFT"/);
   assert.match(session, /status: "READY"/);
-  assert.match(session, /Readiness is derived from the reviewed configuration/);
   assert.match(workspace, /createInFlightRef/);
   assert.match(reviewStep, /Audit reason supplied/);
-  assert.match(reviewStep, /Ready to create/);
+  assert.match(reviewStep, /Ready to save/);
   assert.match(maintenanceTabs, /aria-label="Store category sections"/);
   assert.match(maintenanceTabs, /Category details/);
   assert.match(maintenanceTabs, /Prompt templates \(\$\{templateCount\}\)/);
@@ -194,12 +189,41 @@ test("Store Category creation and maintenance reuse one compact mapping workspac
   assert.match(mappingsStep, /mapping\.taxonomy\?\.categoryId === taxonomy\.categoryId/);
   assert.match(mappingEditor, /Audit reason for additions/);
   assert.match(mappingEditor, /value="update-taxonomy-mapping"/);
+  assert.match(mappingEditor, /Merchant display name/);
+  assert.match(mappingEditor, /Condition key/);
+  assert.match(mappingEditor, /expectedEditVersion/);
   assert.doesNotMatch(mappingEditor, /<select/);
   assert.match(mappingWorkspace, /To change a taxonomy category/);
   assert.match(picker, /showSelectionSummary/);
   assert.match(picker, /selectionActionLabel/);
   assert.match(picker, /selectionPendingLabel/);
   assert.match(picker, /selectionDisabled/);
+});
+
+test("direct category enablement is removed and translation enablement uses configured models", async () => {
+  const page = await source("src/app/(protected)/system-controls/store-categories/page.tsx");
+  const editor = await source("src/components/admin/store-categories/store-category-editor.tsx");
+  const enablement = await source("src/components/admin/store-categories/store-category-translation-enablement.tsx");
+  const service = await source("src/lib/admin/store-categories.ts");
+  const promptEditor = await source("src/components/admin/store-categories/store-category-prompt-condition-editor.tsx");
+
+  assert.match(page, /getTranslationConfigurationAdminData/);
+  assert.match(editor, /StoreCategoryTranslationEnablement/);
+  assert.doesNotMatch(editor, /<option value="true">Enabled<\/option>/);
+  assert.match(service, /Use Translate & Enable to enable a disabled Store Category/);
+  assert.match(enablement, /Translate & Enable/);
+  assert.match(enablement, /translationConfiguration\.models\.filter/);
+  assert.match(enablement, /requestStoreCategoryTranslationAction/);
+
+  const translationService = await source("src/lib/admin/store-category-translation-enablement.ts");
+  assert.match(translationService, /ensureDevelopmentPlatformAdmin\(prisma, principal\)/);
+  assert.match(translationService, /maxWait:\s*TRANSLATION_REQUEST_TRANSACTION_MAX_WAIT_MS/);
+  assert.match(translationService, /timeout:\s*TRANSLATION_REQUEST_TRANSACTION_TIMEOUT_MS/);
+  assert.match(translationService, /TRANSLATION_REQUEST_TRANSACTION_TIMEOUT_MS = 20_000/);
+  assert.match(translationService, /databaseCode\(cause\) === "P2028"/);
+
+  assert.match(promptEditor, /createStoreCategoryPromptConditionBlock/);
+  assert.match(promptEditor, /validateStoreCategoryPromptTemplate/);
 });
 
 test("Store Category bundle creation clears committed drafts and surfaces structured server failures", async () => {

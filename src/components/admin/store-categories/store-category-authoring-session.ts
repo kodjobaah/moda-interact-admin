@@ -24,9 +24,9 @@ export type {
   StoreCategoryAuthoringValidation,
 } from "./store-category-authoring-types.ts";
 
-export const STORE_CATEGORY_AUTHORING_SCHEMA_VERSION = 2 as const;
+export const STORE_CATEGORY_AUTHORING_SCHEMA_VERSION = 3 as const;
 export const STORE_CATEGORY_AUTHORING_STORAGE_KEY =
-  "moda.admin.store-category-authoring.v2";
+  "moda.admin.store-category-authoring.v3";
 
 function createEmptyDefaultTemplate():
   StoreCategoryAuthoringSession["defaultTemplate"] {
@@ -252,10 +252,6 @@ export function restoreStoreCategoryAuthoringSession(
     const session = candidate as StoreCategoryAuthoringSession;
     if (session.status === "COMPLETE") return null;
 
-    // Readiness is derived from the reviewed configuration, not trusted from
-    // persisted browser state. This keeps older/in-flight browser drafts from
-    // leaving the Review screen visually current while the Create button is
-    // silently disabled because a stale status value survived a refresh.
     return {
       ...session,
       status: isStoreCategoryReviewCurrent(session) ? "READY" : "DRAFT",
@@ -278,7 +274,12 @@ export function createStoreCategoryBundlePayload(
     if (!isStoreCategoryTaxonomyReference(mapping.taxonomy)) {
       throw new Error("Store category mapping taxonomy is incomplete.");
     }
-    return { taxonomy: mapping.taxonomy, weight: mapping.weight };
+    return {
+      taxonomy: mapping.taxonomy,
+      conditionKey: mapping.conditionKey.trim(),
+      displayName: mapping.displayName.trim(),
+      weight: mapping.weight,
+    };
   });
 
   return {

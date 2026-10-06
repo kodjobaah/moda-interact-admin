@@ -7,6 +7,7 @@ import {
   type StoreCategoryAuthoringSession,
 } from "./store-category-authoring-session";
 import { storeCategoryAuthoringNow } from "./store-category-authoring-runtime";
+import { StoreCategoryPromptConditionEditor } from "./store-category-prompt-condition-editor";
 import {
   STORE_CATEGORY_AUTHORING_INPUT_CLASS,
   StoreCategoryAuthoringErrorList,
@@ -22,6 +23,13 @@ export function StoreCategoryTemplateStep({
 }) {
   const validation =
     validateStoreCategoryAuthoringSession(session).defaultTemplate;
+  const conditions = session.shopifyMappings
+    .filter((mapping) => mapping.conditionKey.trim() && mapping.displayName.trim())
+    .map((mapping) => ({
+      id: mapping.clientId,
+      conditionKey: mapping.conditionKey.trim(),
+      displayName: mapping.displayName.trim(),
+    }));
 
   return (
     <section aria-labelledby="author-template-title">
@@ -31,10 +39,12 @@ export function StoreCategoryTemplateStep({
             id="author-template-title"
             className="text-lg font-semibold text-gray-950"
           >
-            Default prompt template
+            Conditional prompt template
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Every new Store Category starts with one enabled, non-empty default template.
+            Author the canonical-English prompt after the mappings are known. Mapping
+            conditions decide which specialized instructions are included when a merchant
+            later selects this Store Category.
           </p>
         </div>
         <StoreCategoryAuthoringSectionStatus valid={validation.valid} />
@@ -91,24 +101,21 @@ export function StoreCategoryTemplateStep({
             }
           />
         </label>
+      </div>
 
-        <label className="text-sm font-medium text-gray-700 sm:col-span-2">
-          Canonical English prompt
-          <textarea
-            className={`${STORE_CATEGORY_AUTHORING_INPUT_CLASS} min-h-80 font-mono leading-6`}
-            value={session.defaultTemplate.promptText}
-            maxLength={100_000}
-            rows={18}
-            onChange={(event) =>
-              dispatch({
-                type: "template.changed",
-                patch: { promptText: event.target.value },
-                now: storeCategoryAuthoringNow(),
-              })
-            }
-            placeholder="Describe how CommerceAgent should support customers in this store category…"
-          />
-        </label>
+      <div className="mt-5">
+        <StoreCategoryPromptConditionEditor
+          promptText={session.defaultTemplate.promptText}
+          conditions={conditions}
+          textareaClassName={`${STORE_CATEGORY_AUTHORING_INPUT_CLASS} min-h-80 font-mono leading-6`}
+          onChange={(promptText) =>
+            dispatch({
+              type: "template.changed",
+              patch: { promptText },
+              now: storeCategoryAuthoringNow(),
+            })
+          }
+        />
       </div>
 
       <StoreCategoryAuthoringErrorList issues={validation.issues} />

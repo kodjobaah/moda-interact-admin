@@ -39,7 +39,7 @@ export function StoreCategoryReviewStep({
             Review Store Category
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            This complete configuration will be created in one serializable PostgreSQL transaction.
+            This complete configuration will be saved as a disabled Store Category draft in one serializable PostgreSQL transaction.
           </p>
         </div>
         <span
@@ -72,7 +72,7 @@ export function StoreCategoryReviewStep({
             </p>
           ) : null}
           <p className="mt-2 text-sm text-gray-600">
-            Created disabled · display order {session.category.displayOrder}
+            Saved disabled · display order {session.category.displayOrder}
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export function StoreCategoryReviewStep({
             {session.defaultTemplate.key}
           </p>
           <p className="mt-3 text-sm text-gray-600">
-            Enabled · {session.defaultTemplate.promptText.trim().length.toLocaleString()} prompt characters
+            Enabled template · {session.defaultTemplate.promptText.trim().length.toLocaleString()} prompt characters
           </p>
         </div>
 
@@ -101,7 +101,7 @@ export function StoreCategoryReviewStep({
           <p className="mt-3 text-sm text-gray-600">
             {session.shopifyMappings.length === 0
               ? "Optional mappings can be added later."
-              : "Mappings will be created with this category."}
+              : "Mappings will be created with merchant labels and stable prompt condition keys."}
           </p>
           {session.shopifyMappings.length > 0 ? (
             <ul className="mt-3 space-y-2">
@@ -115,6 +115,12 @@ export function StoreCategoryReviewStep({
                       {mapping.taxonomy.categoryId}
                     </span>
                   ) : null}
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Merchant label: {mapping.displayName || "Missing"}
+                  </span>
+                  <span className="mt-1 block font-mono text-xs text-gray-500">
+                    mappings.{mapping.conditionKey || "missing_condition"}
+                  </span>
                   <span className="mt-1 block text-xs text-gray-500">
                     Weight {mapping.weight.toLocaleString()}
                   </span>
@@ -167,9 +173,9 @@ export function StoreCategoryReviewStep({
           : "text-amber-700"
       }`} role="status">
         {configurationValid && reviewCurrent && validation.auditReason.valid
-          ? "Ready to create. The complete configuration will be committed atomically."
+          ? "Ready to save. The disabled configuration will be committed atomically."
           : !validation.auditReason.valid
-            ? "Add an audit reason before creating this Store Category."
+            ? "Add an audit reason before saving this Store Category."
             : !reviewCurrent
               ? "The configuration changed after review. Re-enter Review to confirm the latest version."
               : "Resolve the validation issues above before creating this Store Category."}

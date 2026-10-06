@@ -1,3 +1,4 @@
+import { StoreCategoryPromptConditionKeySchema } from "@modainteract/moda-interact-shared/commerce";
 import {
   STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE,
   type StoreCategoryTaxonomyReference,
@@ -23,6 +24,8 @@ export type CreateStoreCategoryBundleInput = {
   };
   shopifyMappings: Array<{
     taxonomy: StoreCategoryTaxonomyReference;
+    conditionKey: string;
+    displayName: string;
     weight: number;
   }>;
   reason: string;
@@ -77,18 +80,24 @@ export type SelectDefaultTemplateInput = {
 export type CreateTaxonomyMappingInput = {
   categoryId: string;
   taxonomy: StoreCategoryTaxonomyReference;
+  conditionKey: string;
+  displayName: string;
   weight: number;
   reason: string;
 };
 
 export type UpdateTaxonomyMappingInput = {
   id: string;
+  conditionKey: string;
+  displayName: string;
   weight: number;
+  expectedEditVersion: number;
   reason: string;
 };
 
 export type RemoveTaxonomyMappingInput = {
   id: string;
+  expectedEditVersion: number;
   reason: string;
 };
 
@@ -140,6 +149,15 @@ function enabled(formData: FormData): boolean {
     throw new Error("enabled must be true or false.");
   }
   return raw === "true";
+}
+
+
+function conditionKeyValue(value: string): string {
+  const parsed = StoreCategoryPromptConditionKeySchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("conditionKey has an invalid format.");
+  }
+  return parsed.data;
 }
 
 function reason(formData: FormData): string {
@@ -262,6 +280,8 @@ export function parseCreateTaxonomyMappingForm(
   return {
     categoryId: requiredText(formData, "categoryId", 255),
     taxonomy: taxonomyReferenceFromForm(formData),
+    conditionKey: conditionKeyValue(requiredText(formData, "conditionKey", 128)),
+    displayName: requiredText(formData, "displayName", 255),
     weight: integer(formData, "weight", 1, 1_000_000),
     reason: reason(formData),
   };
@@ -272,7 +292,15 @@ export function parseUpdateTaxonomyMappingForm(
 ): UpdateTaxonomyMappingInput {
   return {
     id: requiredText(formData, "id", 255),
+    conditionKey: conditionKeyValue(requiredText(formData, "conditionKey", 128)),
+    displayName: requiredText(formData, "displayName", 255),
     weight: integer(formData, "weight", 1, 1_000_000),
+    expectedEditVersion: integer(
+      formData,
+      "expectedEditVersion",
+      1,
+      Number.MAX_SAFE_INTEGER,
+    ),
     reason: reason(formData),
   };
 }
@@ -282,6 +310,12 @@ export function parseRemoveTaxonomyMappingForm(
 ): RemoveTaxonomyMappingInput {
   return {
     id: requiredText(formData, "id", 255),
+    expectedEditVersion: integer(
+      formData,
+      "expectedEditVersion",
+      1,
+      Number.MAX_SAFE_INTEGER,
+    ),
     reason: reason(formData),
   };
 }
@@ -371,6 +405,7 @@ export function parseCreateStoreCategoryBundleInput(
     throw new Error("shopifyMappings must contain at most 100 mappings.");
   }
   const seen = new Set<string>();
+  const seenConditionKeys = new Set<string>();
   const shopifyMappings = mappings.map((mapping, index) => {
     const value = objectValue(mapping, `shopifyMappings[${index}]`);
     const taxonomy = objectTaxonomyReference(
@@ -381,8 +416,15 @@ export function parseCreateStoreCategoryBundleInput(
       throw new Error("Each reference taxonomy category may be mapped only once.");
     }
     seen.add(taxonomy.categoryId);
+    const conditionKey = conditionKeyValue(objectText(value, "conditionKey", 128));
+    if (seenConditionKeys.has(conditionKey)) {
+      throw new Error("Each mapping condition key may be used only once.");
+    }
+    seenConditionKeys.add(conditionKey);
     return {
       taxonomy,
+      conditionKey,
+      displayName: objectText(value, "displayName", 255),
       weight: objectInteger(value, "weight", 1, 1_000_000),
     };
   });

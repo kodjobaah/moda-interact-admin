@@ -15,6 +15,7 @@ import {
   StoreCategoryMappingWorkspace,
   type StoreCategoryMappingWorkspaceItem,
 } from "./store-category-mapping-workspace";
+import { suggestStoreCategoryMappingConditionKey } from "./store-category-mapping-condition";
 import {
   STORE_CATEGORY_AUTHORING_INPUT_CLASS,
   StoreCategoryAuthoringErrorList,
@@ -41,6 +42,10 @@ export function StoreCategoryMappingsStep({
       return;
     }
 
+    const conditionKey = suggestStoreCategoryMappingConditionKey(
+      taxonomy.name,
+      session.shopifyMappings.map((mapping) => mapping.conditionKey),
+    );
     const incompleteMapping = session.shopifyMappings.find(
       (mapping) => mapping.taxonomy === null,
     );
@@ -48,7 +53,11 @@ export function StoreCategoryMappingsStep({
       dispatch({
         type: "mapping.changed",
         clientId: incompleteMapping.clientId,
-        patch: { taxonomy },
+        patch: {
+          taxonomy,
+          conditionKey,
+          displayName: taxonomy.name,
+        },
         now: storeCategoryAuthoringNow(),
       });
       return;
@@ -59,6 +68,8 @@ export function StoreCategoryMappingsStep({
       mapping: {
         clientId: createStoreCategoryAuthoringClientId(),
         taxonomy,
+        conditionKey,
+        displayName: taxonomy.name,
         weight: 1,
       },
       now: storeCategoryAuthoringNow(),
@@ -69,6 +80,8 @@ export function StoreCategoryMappingsStep({
     (mapping) => ({
       id: mapping.clientId,
       taxonomy: mapping.taxonomy,
+      conditionKey: mapping.conditionKey,
+      displayName: mapping.displayName,
       weight: mapping.weight,
     }),
   );
@@ -84,8 +97,8 @@ export function StoreCategoryMappingsStep({
             Category mappings
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Optional. Add reference-taxonomy subcategories that should suggest this
-            Store Category. You can continue without any mappings.
+            Add merchant-selectable mappings before authoring the prompt. Each mapping
+            gets a stable condition key that the conditional prompt can reference.
           </p>
         </div>
         <StoreCategoryAuthoringSectionStatus valid={validation.valid} />
@@ -98,7 +111,43 @@ export function StoreCategoryMappingsStep({
           mappings={mappings}
           onAdd={addMapping}
           renderMappingControls={(mapping) => (
-            <div className="grid gap-3 sm:grid-cols-[8rem_auto] sm:items-end sm:justify-end">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(11rem,1fr)_minmax(11rem,1fr)_7rem_auto] xl:items-end">
+              <label className="text-sm font-medium text-gray-700">
+                Merchant display name
+                <input
+                  className={STORE_CATEGORY_AUTHORING_INPUT_CLASS}
+                  value={mapping.displayName ?? ""}
+                  maxLength={255}
+                  onChange={(event) =>
+                    dispatch({
+                      type: "mapping.changed",
+                      clientId: mapping.id,
+                      patch: { displayName: event.target.value },
+                      now: storeCategoryAuthoringNow(),
+                    })
+                  }
+                />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Condition key
+                <input
+                  className={`${STORE_CATEGORY_AUTHORING_INPUT_CLASS} font-mono`}
+                  value={mapping.conditionKey ?? ""}
+                  maxLength={128}
+                  pattern="[a-z][a-z0-9_]{0,127}"
+                  onChange={(event) =>
+                    dispatch({
+                      type: "mapping.changed",
+                      clientId: mapping.id,
+                      patch: { conditionKey: event.target.value },
+                      now: storeCategoryAuthoringNow(),
+                    })
+                  }
+                />
+                <span className="mt-1 block text-xs font-normal text-gray-500">
+                  Used as mappings.{mapping.conditionKey || "condition_key"}
+                </span>
+              </label>
               <label className="text-sm font-medium text-gray-700">
                 Weight
                 <input

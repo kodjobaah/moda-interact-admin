@@ -119,7 +119,7 @@ export function StoreCategoryAuthoringWorkspace({
             ) : null}
           </div>
           <p className="mt-1 text-sm text-gray-600">
-            Nothing is written to PostgreSQL until the final Review step succeeds.
+            Nothing is written to PostgreSQL until the final Review step saves this disabled draft.
           </p>
           <p className="mt-1 font-mono text-xs text-gray-400">
             Session {session.sessionId}
@@ -171,11 +171,11 @@ export function StoreCategoryAuthoringWorkspace({
             assignedReferenceTaxonomy={assignedReferenceTaxonomy}
           />
         ) : null}
-        {session.step === "template" ? (
-          <StoreCategoryTemplateStep session={session} dispatch={dispatch} />
-        ) : null}
         {session.step === "mappings" ? (
           <StoreCategoryMappingsStep session={session} dispatch={dispatch} />
+        ) : null}
+        {session.step === "template" ? (
+          <StoreCategoryTemplateStep session={session} dispatch={dispatch} />
         ) : null}
         {session.step === "review" ? (
           <StoreCategoryReviewStep
@@ -242,8 +242,8 @@ export function StoreCategoryAuthoringWorkspace({
               onClick={() => void createCategory()}
             >
               {session.status === "SAVING"
-                ? "Creating Store Category…"
-                : "Create Store Category"}
+                ? "Saving Store Category…"
+                : "Save Store Category Draft"}
             </button>
           )}
         </div>
