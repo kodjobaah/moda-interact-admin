@@ -209,6 +209,7 @@ function conversationFixtures(shopId, recoveries) {
   return recoveries.map((recovery, index) => ({
     id: idFor(shopId, `conversation-${String(index + 1).padStart(2, "0")}`),
     shopId,
+    type: "RECOVERY",
     customerId: recovery.customerId,
     checkoutRecoveryId: recovery.id,
     outcome: conversationOutcome(recovery.status),
