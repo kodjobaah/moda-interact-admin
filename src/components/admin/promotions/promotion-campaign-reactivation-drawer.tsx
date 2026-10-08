@@ -28,7 +28,7 @@ export function PromotionCampaignReactivationDrawer({
       <PromotionCampaignReactivationForm
         campaign={campaign}
         returnTo={closeHref}
-        requiresNewExpiry={campaign.expiresAt.getTime() <= Date.now()}
+        requiresNewExpiry={campaign.requiresNewExpiry}
       />
     </AdminDetailDrawer>
   );

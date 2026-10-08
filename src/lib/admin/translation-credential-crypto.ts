@@ -4,7 +4,6 @@ import {
   type CommerceEnvironment,
 } from "@modainteract/moda-interact-shared/commerce/model";
 import {
-  CREDENTIAL_ENCRYPTION_UNAVAILABLE,
   type CredentialKeyring,
 } from "./openrouter-credential-keyring.ts";
 import { validateTranslationCredentialSecret } from "./translation-configuration-validation.ts";

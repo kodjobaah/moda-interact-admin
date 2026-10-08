@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -60,7 +60,7 @@ export function PromotionCampaignReactivationForm({
   requiresNewExpiry: boolean;
 }) {
   const router = useRouter();
-  const [minimumExpiry, setMinimumExpiry] = useState("");
+  const expiryInputRef = useRef<HTMLInputElement>(null);
   const [actionState, formAction] = useActionState<
     PromotionCampaignReactivationActionState,
     FormData
@@ -71,7 +71,9 @@ export function PromotionCampaignReactivationForm({
       : (campaign.targetPlanName ?? campaign.targetShopDomain ?? "Unavailable");
 
   useEffect(() => {
-    setMinimumExpiry(toLocalDateTimeInput(new Date(Date.now() + 60_000)));
+    const input = expiryInputRef.current;
+    if (!input) return;
+    input.min = toLocalDateTimeInput(new Date(Date.now() + 60_000));
   }, []);
 
   useEffect(() => {
@@ -142,10 +144,10 @@ export function PromotionCampaignReactivationForm({
       <label className="block text-sm font-medium text-gray-700">
         {requiresNewExpiry ? "New expiry" : "New expiry (optional)"}
         <input
+          ref={expiryInputRef}
           className={`${inputClass} mt-1`}
           name="expiresAt"
           type="datetime-local"
-          min={minimumExpiry || undefined}
           required={requiresNewExpiry}
         />
         <span className="mt-1 block text-xs font-normal text-gray-500">

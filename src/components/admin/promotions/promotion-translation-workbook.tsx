@@ -84,10 +84,12 @@ export function PromotionTranslationWorkbook({
   useEffect(() => {
     if (!uploadedBytes) return;
     let cancelled = false;
-    void parsePromotionTranslationWorkbook(
-      uploadedBytes,
-      expectedFromTemplate(template),
-    ).then((parsed) => {
+    void parsePromotionTranslationWorkbook(uploadedBytes, {
+      campaignId: template._meta.campaignId,
+      campaignInternalName: template._meta.campaignInternalName,
+      sourceMerchantTitle: template._meta.sourceMerchantTitle,
+      sourceMerchantDescription: template._meta.sourceMerchantDescription,
+    }).then((parsed) => {
       if (cancelled) return;
       setIssues(parsed.workbookIssues);
       setResult(parsed.translationResult);

@@ -38,6 +38,7 @@ export type PromotionCampaignSummary = {
 };
 
 export type PromotionCampaignRow = PromotionCampaignSummary & {
+  requiresNewExpiry: boolean;
   englishMerchantTitle: string;
   englishMerchantDescription: string | null;
   translations: Array<{
@@ -193,6 +194,7 @@ export async function getPromotionCampaignById(
   return {
     ...summary,
     translationCount,
+    requiresNewExpiry: campaign.expiresAt <= now,
     englishMerchantTitle: english?.merchantTitle ?? "",
     englishMerchantDescription: english?.merchantDescription ?? null,
     translations: campaign.translations,

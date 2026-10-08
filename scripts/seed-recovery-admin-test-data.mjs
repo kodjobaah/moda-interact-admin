@@ -7,7 +7,6 @@ const prisma = new PrismaClient();
 
 const DEFAULT_SHOP_DOMAIN = "kwadwo-e4bf4mc4.myshopify.com";
 const CONFIRM_FLAG = "--confirm-test-data";
-const CLEANUP_FLAG = "--cleanup";
 
 const CUSTOMER_PREFIX = "admin-recovery-seed-customer-";
 const CHECKOUT_PREFIX = "admin-recovery-seed-checkout-";

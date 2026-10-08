@@ -177,9 +177,7 @@ export function BillingEventDrawer({
   const closeHref = returnPath
     ? withParamUpdates(returnPath, params, { eventId: null })
     : withParamUpdates("/billing", params, { eventId: null });
-  const retryAlreadyDue =
-    event.shopifyReportState === "RETRYABLE" &&
-    (event.nextReportAt === null || event.nextReportAt.getTime() <= Date.now());
+  const retryAlreadyDue = event.retryAlreadyDue;
   const manualRetryAvailable =
     canRetry &&
     (event.shopifyReportState === "NEEDS_ATTENTION" ||

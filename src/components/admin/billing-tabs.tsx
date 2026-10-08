@@ -8,7 +8,8 @@ type BillingView =
   | "packs"
   | "refunds"
   | "events"
-  | "unmapped";
+  | "unmapped"
+  | "sync-errors";
 
 const tabs: Array<{ value: BillingView; label: string }> = [
   { value: "overview", label: "billing.tab.overview" },
@@ -17,6 +18,7 @@ const tabs: Array<{ value: BillingView; label: string }> = [
   { value: "refunds", label: "billing.tab.refundRequests" },
   { value: "events", label: "billing.tab.appEvents" },
   { value: "unmapped", label: "billing.tab.unmapped" },
+  { value: "sync-errors", label: "billing.syncErrors" },
 ];
 
 const relevantParams: Record<BillingView, string[]> = {
@@ -26,6 +28,7 @@ const relevantParams: Record<BillingView, string[]> = {
   refunds: ["refundPage", "refundStatus", "refundId"],
   events: ["eventPage", "state", "shopId", "from", "to", "eventId"],
   unmapped: ["unmappedPage", "subscriptionId", "mappingResolved"],
+  "sync-errors": ["syncErrorPage", "syncReconcileRequested"],
 };
 
 export function BillingTabs({

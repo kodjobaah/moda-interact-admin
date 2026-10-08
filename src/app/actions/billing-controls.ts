@@ -34,59 +34,94 @@ function requireSuperAdmin(
   }
 }
 
+export type PlatformBillingPolicyActionResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+const platformBillingPolicyPublicErrors = new Set([
+  "SUPER_ADMIN access is required for this control.",
+  "A provisioned SUPER_ADMIN is required for billing controls.",
+  "Default outbound hard limit must be at least 2.",
+  "Default outbound soft limit must not exceed the hard limit.",
+  "Default outbound hard limit must not exceed the absolute hard limit.",
+  "Terminal message reserved slots must be lower than the default outbound hard limit.",
+  "Warning threshold must be between 0 and 100 percent.",
+  "Lifetime Free recovery grant must be non-negative.",
+  "Minimum upgrade premium must be between 0 and 10000 bps.",
+  "Reason must be 1000 characters or fewer.",
+]);
+
+function platformBillingPolicyClientMessage(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : "";
+  if (platformBillingPolicyPublicErrors.has(message)) return message;
+  if (
+    /^(Absolute outbound hard limit|Default outbound soft limit|Default outbound hard limit|Terminal message reserved slots|Warning threshold|Lifetime Free recovery grant|Minimum upgrade premium|A reason) (is required|is invalid|must be)/.test(
+      message,
+    )
+  ) {
+    return message;
+  }
+  return "Platform billing policy could not be saved or refreshed. Refresh the page to verify the current policy before retrying.";
+}
+
 export async function mutatePlatformBillingPolicyAction(
   formData: FormData,
-): Promise<void> {
-  const principal = await requirePlatformAdminMutation();
-  requireSuperAdmin(principal);
-  const values = parsePlatformBillingPolicyForm(formData);
-  const adminId = await auditAdminId(principal);
+): Promise<PlatformBillingPolicyActionResult> {
+  try {
+    const principal = await requirePlatformAdminMutation();
+    requireSuperAdmin(principal);
+    const values = parsePlatformBillingPolicyForm(formData);
+    const adminId = await auditAdminId(principal);
 
-  await prisma.$transaction(async (transaction) => {
-    const before = await transaction.platformBillingPolicy.findUnique({
-      where: { id: "default" },
+    await prisma.$transaction(async (transaction) => {
+      const before = await transaction.platformBillingPolicy.findUnique({
+        where: { id: "default" },
+      });
+      const after = await transaction.platformBillingPolicy.upsert({
+        where: { id: "default" },
+        create: {
+          id: "default",
+          globalPauseNewRecoveries: values.globalPauseNewRecoveries,
+          globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
+          absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
+          defaultWarningPercent: values.defaultWarningPercent,
+          lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
+          defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
+          defaultOutboundHardLimit: values.defaultOutboundHardLimit,
+          terminalMessageReservedSlots: values.terminalMessageReservedSlots,
+          minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
+        },
+        update: {
+          globalPauseNewRecoveries: values.globalPauseNewRecoveries,
+          globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
+          absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
+          defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
+          defaultOutboundHardLimit: values.defaultOutboundHardLimit,
+          terminalMessageReservedSlots: values.terminalMessageReservedSlots,
+          defaultWarningPercent: values.defaultWarningPercent,
+          lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
+          version: { increment: 1 },
+          minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
+        },
+      });
+      await transaction.billingAuditEvent.create({
+        data: {
+          action: BillingAuditAction.PLATFORM_POLICY_CHANGED,
+          platformAdminId: adminId,
+          reason: values.reason,
+          relatedEntityType: "PlatformBillingPolicy",
+          relatedEntityId: after.id,
+          beforeValue: before as unknown as Prisma.InputJsonValue,
+          afterValue: after as unknown as Prisma.InputJsonValue,
+        },
+      });
     });
-    const after = await transaction.platformBillingPolicy.upsert({
-      where: { id: "default" },
-      create: {
-        id: "default",
-        globalPauseNewRecoveries: values.globalPauseNewRecoveries,
-        globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
-        absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
-        defaultWarningPercent: values.defaultWarningPercent,
-        lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
-        defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
-        defaultOutboundHardLimit: values.defaultOutboundHardLimit,
-        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
-        minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
-      },
-      update: {
-        globalPauseNewRecoveries: values.globalPauseNewRecoveries,
-        globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
-        absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
-        defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
-        defaultOutboundHardLimit: values.defaultOutboundHardLimit,
-        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
-        defaultWarningPercent: values.defaultWarningPercent,
-        lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
-        version: { increment: 1 },
-        minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
-      },
-    });
-    await transaction.billingAuditEvent.create({
-      data: {
-        action: BillingAuditAction.PLATFORM_POLICY_CHANGED,
-        platformAdminId: adminId,
-        reason: values.reason,
-        relatedEntityType: "PlatformBillingPolicy",
-        relatedEntityId: after.id,
-        beforeValue: before as unknown as Prisma.InputJsonValue,
-        afterValue: after as unknown as Prisma.InputJsonValue,
-      },
-    });
-  });
-  revalidatePath("/billing");
-  revalidatePath("/system-controls/platform-policy");
+    revalidatePath("/billing");
+    revalidatePath("/system-controls/platform-policy");
+    return { ok: true };
+  } catch (cause) {
+    return { ok: false, message: platformBillingPolicyClientMessage(cause) };
+  }
 }
 
 export async function mutateShopBillingOverrideAction(

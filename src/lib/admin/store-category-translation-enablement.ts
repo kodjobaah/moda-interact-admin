@@ -23,7 +23,6 @@ import { resolveCommerceEnvironment } from "./openrouter-credential-environment.
 import { TRANSLATION_PROVIDER } from "./translation-configuration-validation.ts";
 import {
   validateRequestStoreCategoryTranslationInput,
-  type RequestStoreCategoryTranslationInput,
 } from "./store-category-translation-enablement-validation.ts";
 
 const logger = createLogger({

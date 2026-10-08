@@ -55,16 +55,21 @@ export function PromptCodeEditor({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const valueRef = useRef(value);
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
   useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  useEffect(() => {
     if (!hostRef.current) return undefined;
 
     const view = new EditorView({
-      doc: value,
+      doc: valueRef.current,
       parent: hostRef.current,
       extensions: [
         basicSetup,

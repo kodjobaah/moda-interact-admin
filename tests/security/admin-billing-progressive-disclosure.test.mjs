@@ -12,7 +12,7 @@ test("global billing exposes URL-backed views with overview fallback", async () 
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-tabs.tsx"),
   ]);
-  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*"unmapped",\s*\]/);
+  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*"unmapped",\s*"sync-errors",\s*\]/);
   assert.match(page, /rawRequestedView = firstParam\(rawParams\.view\)/);
   assert.match(page, /rawRequestedView === "controls"/);
   assert.match(page, /: "overview"/);
@@ -30,6 +30,7 @@ test("billing route loads only the selected view and selected detail", async () 
   );
   assert.match(page, /view === "packs"\s*\n\s*\? await getRecoveryCreditPurchases/);
   assert.match(page, /view === "events"\s*\n\s*\? await getBillingLedger/);
+  assert.match(page, /view === "sync-errors"\s*\n\s*\? await getBillingSyncErrors/);
   assert.doesNotMatch(page, /view === "controls" \? await getPlatformBillingPolicy\(\)/);
   assert.match(page, /getMerchantPricingPlanById/);
   assert.match(page, /getRecoveryCreditPurchaseDetail/);
@@ -127,16 +128,18 @@ test("global billing visible labels use the translation catalogue", async () => 
 });
 
 test("platform policy is isolated from Billing Plans and existing mutation security stays intact", async () => {
-  const [billingPage, policyPage, controls, security] = await Promise.all([
+  const [billingPage, policyPage, controls, platformPolicyForm, security] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
     read("src/app/(protected)/system-controls/platform-policy/page.tsx"),
     read("src/components/admin/billing-controls.tsx"),
+    read("src/components/admin/platform-policy-form.tsx"),
     read("tests/security/admin-merchant-pricing-plan.test.mjs"),
   ]);
   assert.doesNotMatch(billingPage, /PlatformPolicyControls|view === "controls" && policy/);
   assert.match(billingPage, /redirect\("\/system-controls\/platform-policy"\)/);
   assert.match(policyPage, /<PlatformPolicyControls policy=\{policy\}/);
   assert.match(policyPage, /<AdminShell active="platform-policy">/);
-  assert.match(controls, /mutatePlatformBillingPolicyAction/);
+  assert.match(controls, /PlatformPolicyForm/);
+  assert.match(platformPolicyForm, /mutatePlatformBillingPolicyAction/);
   assert.match(security, /mutateMerchantPricingPlanAction|requirePlatformAdmin/);
 });

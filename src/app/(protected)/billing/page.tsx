@@ -55,6 +55,8 @@ import {
   getUnmappedSubscriptionDetail,
   getUnmappedSubscriptions,
 } from "@/lib/admin/unmapped-subscriptions";
+import { getBillingSyncErrors } from "@/lib/admin/billing-sync-errors";
+import { BillingSyncErrors } from "@/components/admin/billing-sync-errors";
 import {
   RecoveryCreditRefundDrawer,
   RecoveryCreditRefundQueue,
@@ -85,6 +87,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
     "refunds",
     "events",
     "unmapped",
+    "sync-errors",
   ];
   const rawView = rawRequestedView as BillingView | undefined;
   const view = allowedViews.includes(rawView ?? "overview")
@@ -197,6 +200,13 @@ export default async function BillingPage({ searchParams }: PageProps) {
           firstParam(rawParams.subscriptionId) as string,
         )
       : null;
+  const syncErrors =
+    view === "sync-errors"
+      ? await getBillingSyncErrors({
+          page: positiveInt(rawParams.syncErrorPage),
+          pageSize: 20,
+        })
+      : null;
 
   return (
     <AdminShell active="billing">
@@ -264,6 +274,14 @@ export default async function BillingPage({ searchParams }: PageProps) {
             subscriptions={unmapped}
             params={params}
           />
+        ) : null}
+        {view === "sync-errors" && firstParam(rawParams.syncReconcileRequested) ? (
+          <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            Billing reconciliation was requested. The billing worker will reconstruct the scheduled subscription reconciliation on its next billing cycle.
+          </div>
+        ) : null}
+        {view === "sync-errors" && syncErrors ? (
+          <BillingSyncErrors subscriptions={syncErrors} params={params} />
         ) : null}
         {view === "plans" &&
         planSection === "pricing" &&

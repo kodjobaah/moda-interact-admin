@@ -165,47 +165,77 @@ function TaxonomyPath({ fullName }: { fullName: string }) {
 function useResolvedCategory(
   taxonomyCategoryId: string,
   scope: "all" | "top-level" | "subcategories" = "all",
+  onNotFound?: (taxonomyCategoryId: string) => void,
 ) {
-  const [category, setCategory] = useState<ShopifyTaxonomyCategory | null>(null);
-  const [version, setVersion] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
-  const [notFound, setNotFound] = useState(false);
+  const requestedId = taxonomyCategoryId.trim();
+  const onNotFoundRef = useRef(onNotFound);
+  const [resolution, setResolution] = useState<{
+    requestedId: string;
+    category: ShopifyTaxonomyCategory | null;
+    version: string | null;
+    unavailable: boolean;
+    notFound: boolean;
+  }>({
+    requestedId: "",
+    category: null,
+    version: null,
+    unavailable: false,
+    notFound: false,
+  });
 
   useEffect(() => {
-    if (!taxonomyCategoryId.trim()) {
-      setCategory(null);
-      setUnavailable(false);
-      setNotFound(false);
-      return undefined;
-    }
+    onNotFoundRef.current = onNotFound;
+  }, [onNotFound]);
+
+  useEffect(() => {
+    if (!requestedId) return undefined;
 
     const controller = new AbortController();
-    const params = new URLSearchParams({ id: taxonomyCategoryId });
+    const params = new URLSearchParams({ id: requestedId });
     if (scope !== "all") params.set("scope", scope);
     void fetchTaxonomy(params, controller.signal)
       .then((response) => {
         if (response.mode !== "resolve") return;
-        setCategory(response.category);
-        setVersion(response.version);
-        setUnavailable(false);
-        setNotFound(false);
+        setResolution({
+          requestedId,
+          category: response.category,
+          version: response.version,
+          unavailable: false,
+          notFound: false,
+        });
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setCategory(null);
-        if (error instanceof TaxonomyFetchError && error.code === "not_found") {
-          setUnavailable(false);
-          setNotFound(true);
-          return;
-        }
-        setUnavailable(true);
-        setNotFound(false);
+        const notFound =
+          error instanceof TaxonomyFetchError && error.code === "not_found";
+        setResolution({
+          requestedId,
+          category: null,
+          version: null,
+          unavailable: !notFound,
+          notFound,
+        });
+        if (notFound) onNotFoundRef.current?.(requestedId);
       });
 
     return () => controller.abort();
-  }, [scope, taxonomyCategoryId]);
+  }, [requestedId, scope]);
 
-  return { category, version, unavailable, notFound };
+  if (!requestedId || resolution.requestedId !== requestedId) {
+    return {
+      category: null,
+      version: null,
+      unavailable: false,
+      notFound: false,
+    };
+  }
+
+  return {
+    category: resolution.category,
+    version: resolution.version,
+    unavailable: resolution.unavailable,
+    notFound: resolution.notFound,
+  };
 }
 
 export function ShopifyTaxonomyCategoryLabel({
@@ -269,12 +299,17 @@ export function ShopifyTaxonomyPicker({
   const [committedSelection, setCommittedSelection] =
     useState<StoreCategoryTaxonomyReference | null>(fallbackSelection);
   const selectedId = controlled ? value ?? "" : internalValue;
+
+  function clearUnresolvableSelection(notFoundId: string) {
+    if (allowRawId || notFoundId !== selectedId) return;
+    commit("");
+  }
+
   const {
     category: selectedCategory,
     version,
     unavailable: selectedUnavailable,
-    notFound: selectedNotFound,
-  } = useResolvedCategory(selectedId, scope);
+  } = useResolvedCategory(selectedId, scope, clearUnresolvableSelection);
   const [query, setQuery] = useState("");
   const [browseParentId, setBrowseParentId] = useState<string | null>(null);
   const [results, setResults] = useState<ShopifyTaxonomyCategory[]>([]);
@@ -345,21 +380,6 @@ export function ShopifyTaxonomyPicker({
     },
     [],
   );
-
-  useEffect(() => {
-    if (allowRawId || !selectedId || !selectedNotFound) return;
-    if (!controlled) setInternalValue("");
-    setCommittedSelection(null);
-    onChange?.("");
-    onSelectionChange?.(null);
-  }, [
-    allowRawId,
-    controlled,
-    onChange,
-    onSelectionChange,
-    selectedId,
-    selectedNotFound,
-  ]);
 
   useEffect(() => {
     const generation = ++searchGenerationRef.current;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { mutateStoreCategoryCatalogueAction } from "@/app/actions/store-categories";
 import type { StoreCategoryCatalogue } from "@/lib/admin/store-categories";
@@ -79,18 +79,7 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
     string | null
   >(null);
   const [addError, setAddError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (
-      recentlyAddedCategoryId &&
-      category.taxonomyMappings.some(
-        (mapping) =>
-          mapping.shopifyTaxonomyCategoryId === recentlyAddedCategoryId,
-      )
-    ) {
-      setRecentlyAddedCategoryId(null);
-    }
-  }, [category.taxonomyMappings, recentlyAddedCategoryId]);
+  const [refreshPending, startRefreshTransition] = useTransition();
 
   const mappings: StoreCategoryMappingWorkspaceItem[] =
     category.taxonomyMappings.map((mapping) => ({
@@ -137,7 +126,7 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
     try {
       await mutateStoreCategoryCatalogueAction(formData);
       setRecentlyAddedCategoryId(taxonomy.categoryId);
-      router.refresh();
+      startRefreshTransition(() => router.refresh());
     } catch (error) {
       setAddError(actionErrorMessage(error));
     } finally {
@@ -155,7 +144,7 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
           },
         ]
       : []),
-    ...(recentlyAddedCategoryId
+    ...(refreshPending && recentlyAddedCategoryId
       ? [
           {
             categoryId: recentlyAddedCategoryId,

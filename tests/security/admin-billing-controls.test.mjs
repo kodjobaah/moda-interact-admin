@@ -28,7 +28,7 @@ test("accepts strict non-negative lifetime Free defaults", () => {
     import { parsePlatformBillingPolicyForm } from ${JSON.stringify(validationUrl)};
     const attempt = (value) => {
       const form = new FormData();
-      for (const [key, entry] of Object.entries({ absoluteOutboundHardLimit: '20', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: value, reason: 'policy change' })) form.set(key, entry);
+      for (const [key, entry] of Object.entries({ absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: value, minimumUpgradePremiumBps: '2000', reason: 'policy change' })) form.set(key, entry);
       try { return parsePlatformBillingPolicyForm(form).lifetimeFreeRecoveryAllowance; } catch { return null; }
     };
     console.log(JSON.stringify({
@@ -53,18 +53,20 @@ test("enforces existing platform policy bounds and a required reason", () => {
     import { parsePlatformBillingPolicyForm } from ${JSON.stringify(validationUrl)};
     const attempt = (values) => {
       const form = new FormData();
-      for (const [key, value] of Object.entries({ absoluteOutboundHardLimit: '20', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: '5', reason: 'policy change', ...values })) form.set(key, value);
+      for (const [key, value] of Object.entries({ absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: '5', minimumUpgradePremiumBps: '2000', reason: 'policy change', ...values })) form.set(key, value);
       try { parsePlatformBillingPolicyForm(form); return false; } catch { return true; }
     };
     console.log(JSON.stringify({
       warningAbove100Rejected: attempt({ defaultWarningPercent: '101' }),
       zeroHardLimitRejected: attempt({ absoluteOutboundHardLimit: '0' }),
+      terminalReserveAtHardLimitRejected: attempt({ defaultOutboundHardLimit: '2', terminalMessageReservedSlots: '2' }),
       missingReasonRejected: attempt({ reason: '' }),
     }));
   `);
   assert.deepEqual(result, {
     warningAbove100Rejected: true,
     zeroHardLimitRejected: true,
+    terminalReserveAtHardLimitRejected: true,
     missingReasonRejected: true,
   });
 });
@@ -135,7 +137,7 @@ test("keeps policy changes protected, audited, and internal-only", () => {
   );
   assert.equal(
     catalogue["billingControls.lifetimeFreeRecoveryAllowanceHelp"],
-    "This value is snapshotted only when a merchant receives its first verified subscription activation. Changing it does not reset or increase existing merchants' lifetime grants.",
+    "This value is snapshotted only when a merchant receives its first verified subscription activation. Changing it affects future first activations only; it does not reset or increase existing merchants' lifetime grants.",
   );
   const pageSource = readFileSync(
     resolve(root, "src/app/(protected)/system-controls/platform-policy/page.tsx"),
@@ -144,6 +146,44 @@ test("keeps policy changes protected, audited, and internal-only", () => {
   assert.match(pageSource, /requirePlatformAdminPage/);
   assert.match(pageSource, /PlatformPolicyControls/);
   assert.match(pageSource, /<AdminShell active="platform-policy">/);
+});
+
+test("platform policy explains the controls and reports mutations inline with duplicate-submit protection", () => {
+  const componentSource = readFileSync(
+    resolve(root, "src/components/admin/billing-controls.tsx"),
+    "utf8",
+  );
+  const formSource = readFileSync(
+    resolve(root, "src/components/admin/platform-policy-form.tsx"),
+    "utf8",
+  );
+  const catalogue = JSON.parse(
+    readFileSync(resolve(root, "src/i18n/locales/en.json"), "utf8"),
+  );
+
+  for (const key of [
+    "billingControls.platformRequiredDescription",
+    "billingControls.absoluteHardLimitHelp",
+    "billingControls.defaultSoftLimitHelp",
+    "billingControls.defaultHardLimitHelp",
+    "billingControls.terminalReservedSlotsHelp",
+    "billingControls.minimumUpgradePremiumHelp",
+    "billingControls.warningPercentHelp",
+    "billingControls.pauseNewRecoveriesHelp",
+    "billingControls.pauseAutomatedWhatsappHelp",
+    "billingControls.reasonHelp",
+  ]) {
+    assert.equal(typeof catalogue[key], "string");
+    assert.ok(catalogue[key].length > 20);
+  }
+
+  assert.match(componentSource, /billingControls\.platformLimitRulesDescription/);
+  assert.match(formSource, /role=\{result\.ok \? "status" : "alert"\}/);
+  assert.match(formSource, /submittingRef\.current/);
+  assert.match(formSource, /disabled=\{pending\}/);
+  assert.match(formSource, /mutatePlatformBillingPolicyAction/);
+  assert.match(actionSource, /Promise<PlatformBillingPolicyActionResult>/);
+  assert.match(actionSource, /return \{ ok: false, message: platformBillingPolicyClientMessage\(cause\) \}/);
 });
 
 test("server validation enforces the platform ceiling and soft-below-hard rule", () => {

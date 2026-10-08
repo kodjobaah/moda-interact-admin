@@ -12,7 +12,6 @@ import { prisma } from "@/lib/prisma";
 
 const MAX_REFERENCE_LENGTH = 512;
 const CURRENCY = /^[A-Z]{3}$/;
-const SUPPORTED_CURRENCIES = new Set(Intl.supportedValuesOf("currency"));
 type Transaction = Prisma.TransactionClient;
 
 function bounded(value: string, max: number, name: string): string {

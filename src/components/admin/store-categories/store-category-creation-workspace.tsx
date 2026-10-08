@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useSyncExternalStore } from "react";
 import {
   STORE_CATEGORY_AUTHORING_STORAGE_KEY,
   restoreStoreCategoryAuthoringSession,
@@ -13,28 +13,33 @@ import {
   storeCategoryAuthoringNow,
 } from "./store-category-authoring-runtime";
 
-export function StoreCategoryCreationWorkspace({
+const hydrationSubscribe = () => () => {};
+
+function StoreCategoryCreationLoading() {
+  return (
+    <div className="mb-8 rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-500 shadow-sm">
+      Loading category authoring workspace…
+    </div>
+  );
+}
+
+function HydratedStoreCategoryCreationWorkspace({
   taxonomyReady,
   assignedReferenceTaxonomy,
 }: {
   taxonomyReady: boolean;
   assignedReferenceTaxonomy: AssignedReferenceTaxonomyCategory[];
 }) {
-  const [session, dispatch] = useReducer(storeCategoryAuthoringReducer, null);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    dispatch({
-      type: "session.restored",
-      session: restoreStoreCategoryAuthoringSession(
+  const [session, dispatch] = useReducer(
+    storeCategoryAuthoringReducer,
+    null,
+    () =>
+      restoreStoreCategoryAuthoringSession(
         window.sessionStorage.getItem(STORE_CATEGORY_AUTHORING_STORAGE_KEY),
       ),
-    });
-    setHydrated(true);
-  }, []);
+  );
 
   useEffect(() => {
-    if (!hydrated) return;
     if (!session) {
       window.sessionStorage.removeItem(STORE_CATEGORY_AUTHORING_STORAGE_KEY);
       return;
@@ -43,15 +48,7 @@ export function StoreCategoryCreationWorkspace({
       STORE_CATEGORY_AUTHORING_STORAGE_KEY,
       JSON.stringify(session),
     );
-  }, [hydrated, session]);
-
-  if (!hydrated) {
-    return (
-      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-500 shadow-sm">
-        Loading category authoring workspace…
-      </div>
-    );
-  }
+  }, [session]);
 
   if (!session) {
     return (
@@ -91,6 +88,29 @@ export function StoreCategoryCreationWorkspace({
     <StoreCategoryAuthoringWorkspace
       session={session}
       dispatch={dispatch}
+      taxonomyReady={taxonomyReady}
+      assignedReferenceTaxonomy={assignedReferenceTaxonomy}
+    />
+  );
+}
+
+export function StoreCategoryCreationWorkspace({
+  taxonomyReady,
+  assignedReferenceTaxonomy,
+}: {
+  taxonomyReady: boolean;
+  assignedReferenceTaxonomy: AssignedReferenceTaxonomyCategory[];
+}) {
+  const hydrated = useSyncExternalStore(
+    hydrationSubscribe,
+    () => true,
+    () => false,
+  );
+
+  if (!hydrated) return <StoreCategoryCreationLoading />;
+
+  return (
+    <HydratedStoreCategoryCreationWorkspace
       taxonomyReady={taxonomyReady}
       assignedReferenceTaxonomy={assignedReferenceTaxonomy}
     />

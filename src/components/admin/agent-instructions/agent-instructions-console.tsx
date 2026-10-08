@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutateAgentInstructionsAction } from "@/app/actions/agent-instructions";
 import type { AgentInstructionsScopeConflict, getAgentInstructionsData } from "@/lib/admin/agent-instructions";
@@ -56,13 +56,6 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
   const [promptText, setPromptText] = useState(draft?.promptText ?? "");
   const [savedText, setSavedText] = useState(draft?.promptText ?? "");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const nextSavedText = draft?.promptText ?? "";
-    setPromptText(nextSavedText);
-    setSavedText(nextSavedText);
-    setSaving(false);
-  }, [draft?.id, draft?.editVersion, draft?.promptText]);
 
   const hasPrompt = promptText.trim().length > 0;
   const hasUnsavedChanges = promptText !== savedText;
@@ -247,19 +240,15 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
   );
 }
 
-export function AgentInstructionsConsole({
+function AgentInstructionsConsoleContent({
   data,
-  initialTab = "platform",
+  initialTab,
 }: {
   data: Data;
-  initialTab?: AgentInstructionsTab;
+  initialTab: AgentInstructionsTab;
 }) {
   const selected = data.selectedShop;
   const [activeTab, setActiveTab] = useState<AgentInstructionsTab>(initialTab);
-
-  useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -302,7 +291,7 @@ export function AgentInstructionsConsole({
                   </span>
                 </div>
                 <PromptEditor
-                  key={data.platform.draft?.id ?? "none"}
+                  key={`${data.platform.draft?.id ?? "none"}:${data.platform.draft?.editVersion ?? 0}`}
                   data={data.platform}
                   configurationVersion={data.platform.configuration?.promptEditVersion ?? 1}
                 />
@@ -383,7 +372,7 @@ export function AgentInstructionsConsole({
                       </span>
                     </div>
                     <PromptEditor
-                      key={`${selected.id}:${data.shopData.draft?.id ?? "none"}`}
+                      key={`${selected.id}:${data.shopData.draft?.id ?? "none"}:${data.shopData.draft?.editVersion ?? 0}`}
                       data={data.shopData}
                       configurationVersion={data.shopData.configuration?.promptEditVersion ?? 1}
                     />
@@ -399,5 +388,21 @@ export function AgentInstructionsConsole({
         )}
       </div>
     </div>
+  );
+}
+
+export function AgentInstructionsConsole({
+  data,
+  initialTab = "platform",
+}: {
+  data: Data;
+  initialTab?: AgentInstructionsTab;
+}) {
+  return (
+    <AgentInstructionsConsoleContent
+      key={initialTab}
+      data={data}
+      initialTab={initialTab}
+    />
   );
 }

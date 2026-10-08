@@ -77,6 +77,8 @@ export function BillingOverviewCards({
       <Metric
         label={adminI18n.t("billing.syncErrors")}
         value={adminI18n.formatNumber(overview.planDistribution.syncError)}
+        href="/billing?view=sync-errors"
+        actionLabel="Review and reconcile"
       />
     </section>
   );

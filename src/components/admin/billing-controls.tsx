@@ -1,7 +1,5 @@
-import {
-  mutatePlatformBillingPolicyAction,
-  mutateShopBillingOverrideAction,
-} from "@/app/actions/billing-controls";
+import { mutateShopBillingOverrideAction } from "@/app/actions/billing-controls";
+import { PlatformPolicyForm } from "@/components/admin/platform-policy-form";
 import type { TenantBillingControls } from "@/lib/admin/types";
 import { adminI18n } from "@/i18n";
 
@@ -64,19 +62,38 @@ export function PlatformPolicyControls({
           {adminI18n.t("billingControls.platformDescription")}
         </p>
       </div>
+
+      <div className="mb-5 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        <h2 className="font-semibold">
+          {adminI18n.t("billingControls.platformRequiredTitle")}
+        </h2>
+        <p className="mt-1 max-w-4xl leading-6">
+          {adminI18n.t("billingControls.platformRequiredDescription")}
+        </p>
+      </div>
+
       {!policy ? (
         <p
           role="status"
           className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
-          Platform policy is not configured yet. Enter the values below to create it.
+          {adminI18n.t("billingControls.platformNotConfigured")}
         </p>
       ) : null}
-      <form action={mutatePlatformBillingPolicyAction} className="space-y-4">
+
+      <PlatformPolicyForm>
+        <p className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-700">
+          <span className="font-semibold">
+            {adminI18n.t("billingControls.platformLimitRulesTitle")}
+          </span>{" "}
+          {adminI18n.t("billingControls.platformLimitRulesDescription")}
+        </p>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
             {adminI18n.t("billingControls.absoluteHardLimit")}
             <input
+              aria-describedby="absoluteOutboundHardLimit-help"
               className={inputClass}
               type="number"
               min="1"
@@ -84,26 +101,79 @@ export function PlatformPolicyControls({
               defaultValue={policy?.absoluteOutboundHardLimit ?? ""}
               required
             />
+            <span
+              id="absoluteOutboundHardLimit-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.absoluteHardLimitHelp")}
+            </span>
           </label>
+
           <label className="text-sm font-medium text-gray-700">
-            Default outbound soft limit
-            <input className={inputClass} type="number" min="1" name="defaultOutboundSoftLimit" defaultValue={policy?.defaultOutboundSoftLimit ?? ""} required />
+            {adminI18n.t("billingControls.defaultSoftLimit")}
+            <input
+              aria-describedby="defaultOutboundSoftLimit-help"
+              className={inputClass}
+              type="number"
+              min="1"
+              name="defaultOutboundSoftLimit"
+              defaultValue={policy?.defaultOutboundSoftLimit ?? ""}
+              required
+            />
+            <span
+              id="defaultOutboundSoftLimit-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.defaultSoftLimitHelp")}
+            </span>
           </label>
+
           <label className="text-sm font-medium text-gray-700">
-            Default outbound hard limit
-            <input className={inputClass} type="number" min="2" name="defaultOutboundHardLimit" defaultValue={policy?.defaultOutboundHardLimit ?? ""} required />
+            {adminI18n.t("billingControls.defaultHardLimit")}
+            <input
+              aria-describedby="defaultOutboundHardLimit-help"
+              className={inputClass}
+              type="number"
+              min="2"
+              name="defaultOutboundHardLimit"
+              defaultValue={policy?.defaultOutboundHardLimit ?? ""}
+              required
+            />
+            <span
+              id="defaultOutboundHardLimit-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.defaultHardLimitHelp")}
+            </span>
           </label>
+
           <label className="text-sm font-medium text-gray-700">
-            Terminal message reserved slots
-            <input className={inputClass} type="number" min="1" name="terminalMessageReservedSlots" defaultValue={policy?.terminalMessageReservedSlots ?? ""} required />
+            {adminI18n.t("billingControls.terminalReservedSlots")}
+            <input
+              aria-describedby="terminalMessageReservedSlots-help"
+              className={inputClass}
+              type="number"
+              min="1"
+              name="terminalMessageReservedSlots"
+              defaultValue={policy?.terminalMessageReservedSlots ?? ""}
+              required
+            />
+            <span
+              id="terminalMessageReservedSlots-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.terminalReservedSlotsHelp")}
+            </span>
           </label>
+
           <label className="text-sm font-medium text-gray-700">
-            Minimum stay+top-up premium above next-plan upgrade
+            {adminI18n.t("billingControls.minimumUpgradePremium")}
             <span className="mt-1 block text-xs font-normal text-gray-500">
               {((policy?.minimumUpgradePremiumBps ?? 2000) / 100).toFixed(2)}% (
               {policy?.minimumUpgradePremiumBps ?? 2000} bps)
             </span>
             <input
+              aria-describedby="minimumUpgradePremiumBps-help"
               className={inputClass}
               type="number"
               min="0"
@@ -113,10 +183,18 @@ export function PlatformPolicyControls({
               defaultValue={policy?.minimumUpgradePremiumBps ?? 2000}
               required
             />
+            <span
+              id="minimumUpgradePremiumBps-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.minimumUpgradePremiumHelp")}
+            </span>
           </label>
+
           <label className="text-sm font-medium text-gray-700">
             {adminI18n.t("billingControls.warningPercent")}
             <input
+              aria-describedby="defaultWarningPercent-help"
               className={inputClass}
               type="number"
               min="0"
@@ -125,10 +203,18 @@ export function PlatformPolicyControls({
               defaultValue={policy?.defaultWarningPercent ?? 80}
               required
             />
+            <span
+              id="defaultWarningPercent-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.warningPercentHelp")}
+            </span>
           </label>
+
           <label className="text-sm font-medium text-gray-700">
             {adminI18n.t("billingControls.lifetimeFreeRecoveryAllowance")}
             <input
+              aria-describedby="lifetimeFreeRecoveryAllowance-help"
               className={inputClass}
               type="number"
               min="0"
@@ -137,40 +223,63 @@ export function PlatformPolicyControls({
               defaultValue={policy?.lifetimeFreeRecoveryAllowance ?? ""}
               required
             />
+            <span
+              id="lifetimeFreeRecoveryAllowance-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.lifetimeFreeRecoveryAllowanceHelp")}
+            </span>
           </label>
         </div>
-        <p className="text-sm text-gray-600">
-          {adminI18n.t("billingControls.lifetimeFreeRecoveryAllowanceHelp")}
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              name="globalPauseNewRecoveries"
-              defaultChecked={policy?.globalPauseNewRecoveries ?? false}
-            />
-            {adminI18n.t("billingControls.pauseNewRecoveries")}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="rounded-md border border-gray-200 p-3 text-sm text-gray-700">
+            <span className="flex items-center gap-2 font-medium">
+              <input
+                type="checkbox"
+                name="globalPauseNewRecoveries"
+                defaultChecked={policy?.globalPauseNewRecoveries ?? false}
+              />
+              {adminI18n.t("billingControls.pauseNewRecoveries")}
+            </span>
+            <span className="mt-2 block text-xs font-normal leading-5 text-gray-500">
+              {adminI18n.t("billingControls.pauseNewRecoveriesHelp")}
+            </span>
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              name="globalPauseAutomatedWhatsapp"
-              defaultChecked={policy?.globalPauseAutomatedWhatsapp ?? false}
-            />
-            {adminI18n.t("billingControls.pauseAutomatedWhatsapp")}
+
+          <label className="rounded-md border border-gray-200 p-3 text-sm text-gray-700">
+            <span className="flex items-center gap-2 font-medium">
+              <input
+                type="checkbox"
+                name="globalPauseAutomatedWhatsapp"
+                defaultChecked={policy?.globalPauseAutomatedWhatsapp ?? false}
+              />
+              {adminI18n.t("billingControls.pauseAutomatedWhatsapp")}
+            </span>
+            <span className="mt-2 block text-xs font-normal leading-5 text-gray-500">
+              {adminI18n.t("billingControls.pauseAutomatedWhatsappHelp")}
+            </span>
           </label>
         </div>
-        <label className="text-sm font-medium text-gray-700">
+
+        <label className="block text-sm font-medium text-gray-700">
           {adminI18n.t("billingControls.reason")}
-          <textarea className={inputClass} name="reason" rows={2} required />
+          <textarea
+            aria-describedby="platform-policy-reason-help"
+            className={inputClass}
+            name="reason"
+            rows={2}
+            maxLength={1000}
+            required
+          />
+          <span
+            id="platform-policy-reason-help"
+            className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+          >
+            {adminI18n.t("billingControls.reasonHelp")}
+          </span>
         </label>
-        <button
-          className="rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
-          type="submit"
-        >
-          {adminI18n.t("billingControls.savePlatform")}
-        </button>
-      </form>
+      </PlatformPolicyForm>
     </section>
   );
 }

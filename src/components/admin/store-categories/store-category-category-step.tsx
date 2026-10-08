@@ -88,7 +88,7 @@ export function StoreCategoryCategoryStep({
             Category identity
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Select the top-level reference taxonomy category, then define Moda's stable category identity and merchant-facing metadata.
+            Select the top-level reference taxonomy category, then define Moda&apos;s stable category identity and merchant-facing metadata.
           </p>
         </div>
         <StoreCategoryAuthoringSectionStatus

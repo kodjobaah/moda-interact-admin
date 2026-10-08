@@ -44,6 +44,15 @@ export function StoreCategoryAuthoringWorkspace({
   const currentStepIndex = STORE_CATEGORY_AUTHORING_STEPS.findIndex(
     (entry) => entry.step === session.step,
   );
+  const previousStep =
+    currentStepIndex > 0
+      ? STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex - 1]?.step ?? null
+      : null;
+  const nextStep =
+    currentStepIndex >= 0 &&
+    currentStepIndex < STORE_CATEGORY_AUTHORING_STEPS.length - 1
+      ? STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex + 1]?.step ?? null
+      : null;
   const reviewStale =
     session.reviewedRevision !== null &&
     session.reviewedRevision !== session.validationRevision;
@@ -199,12 +208,10 @@ export function StoreCategoryAuthoringWorkspace({
           <button
             type="button"
             className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={currentStepIndex === 0 || session.status === "SAVING"}
-            onClick={() =>
-              changeStep(
-                STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex - 1]!.step,
-              )
-            }
+            disabled={!previousStep || session.status === "SAVING"}
+            onClick={() => {
+              if (previousStep) changeStep(previousStep);
+            }}
           >
             Back
           </button>
@@ -216,16 +223,12 @@ export function StoreCategoryAuthoringWorkspace({
               disabled={
                 session.status === "SAVING" ||
                 !categoryReferenceAvailable ||
-                !canEnterStoreCategoryAuthoringStep(
-                  session,
-                  STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex + 1]!.step,
-                )
+                !nextStep ||
+                !canEnterStoreCategoryAuthoringStep(session, nextStep)
               }
-              onClick={() =>
-                changeStep(
-                  STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex + 1]!.step,
-                )
-              }
+              onClick={() => {
+                if (nextStep) changeStep(nextStep);
+              }}
             >
               Continue
             </button>

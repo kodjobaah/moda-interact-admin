@@ -83,6 +83,40 @@ function recoveryCreditPurchaseProjection(
   };
 }
 
+const billingLedgerSelect = {
+  id: true,
+  shopId: true,
+  metric: true,
+  quantity: true,
+  occurredAt: true,
+  shopifyReportState: true,
+  reportAttemptCount: true,
+  nextReportAt: true,
+  lastReportAttemptAt: true,
+  reportedAt: true,
+  providerErrorCode: true,
+  providerResponseSummary: true,
+  shopifyEventHandle: true,
+  shop: { select: { domain: true } },
+} satisfies Prisma.UsageEventSelect;
+
+type BillingLedgerRow = Prisma.UsageEventGetPayload<{
+  select: typeof billingLedgerSelect;
+}>;
+
+function billingLedgerProjection(
+  row: BillingLedgerRow,
+  now: Date,
+): BillingLedgerItem {
+  return {
+    ...row,
+    quantity: decimalValue(row.quantity),
+    retryAlreadyDue:
+      row.shopifyReportState === ShopifyReportState.RETRYABLE &&
+      (row.nextReportAt === null || row.nextReportAt.getTime() <= now.getTime()),
+  };
+}
+
 function boundedPage(
   value: number,
   pageSize: number,
@@ -161,14 +195,17 @@ export async function getBillingOverview(): Promise<BillingOverview> {
   };
 }
 
-export async function getBillingLedger(input: {
-  page: number;
-  pageSize: number;
-  shopId?: string;
-  state?: ShopifyReportState;
-  from?: string;
-  to?: string;
-}): Promise<PageResult<BillingLedgerItem>> {
+export async function getBillingLedger(
+  input: {
+    page: number;
+    pageSize: number;
+    shopId?: string;
+    state?: ShopifyReportState;
+    from?: string;
+    to?: string;
+  },
+  now = new Date(),
+): Promise<PageResult<BillingLedgerItem>> {
   await requirePlatformAdminRead();
   const { page: requestedPage, pageSize } = boundedPage(
     input.page,
@@ -192,25 +229,10 @@ export async function getBillingLedger(input: {
     orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * pageSize,
     take: pageSize,
-    select: {
-      id: true,
-      shopId: true,
-      metric: true,
-      quantity: true,
-      occurredAt: true,
-      shopifyReportState: true,
-      reportAttemptCount: true,
-      nextReportAt: true,
-      lastReportAttemptAt: true,
-      reportedAt: true,
-      providerErrorCode: true,
-      providerResponseSummary: true,
-      shopifyEventHandle: true,
-      shop: { select: { domain: true } },
-    },
+    select: billingLedgerSelect,
   });
   return pageResult(
-    rows.map((row) => ({ ...row, quantity: decimalValue(row.quantity) })),
+    rows.map((row) => billingLedgerProjection(row, now)),
     page,
     pageSize,
     totalItems,
@@ -268,28 +290,14 @@ export async function getRecoveryCreditPurchaseDetail(
 export async function getBillingLedgerItem(
   id: string,
   shopId?: string,
+  now = new Date(),
 ): Promise<BillingLedgerItem | null> {
   await requirePlatformAdminRead();
   const row = await prisma.usageEvent.findFirst({
     where: { id, ...(shopId ? { shopId } : {}) },
-    select: {
-      id: true,
-      shopId: true,
-      metric: true,
-      quantity: true,
-      occurredAt: true,
-      shopifyReportState: true,
-      reportAttemptCount: true,
-      nextReportAt: true,
-      lastReportAttemptAt: true,
-      reportedAt: true,
-      providerErrorCode: true,
-      providerResponseSummary: true,
-      shopifyEventHandle: true,
-      shop: { select: { domain: true } },
-    },
+    select: billingLedgerSelect,
   });
-  return row ? { ...row, quantity: decimalValue(row.quantity) } : null;
+  return row ? billingLedgerProjection(row, now) : null;
 }
 
 export async function getTenantBilling(
@@ -382,11 +390,14 @@ export async function getTenantBilling(
       }),
       prisma.platformBillingPolicy.findUnique({ where: { id: "default" } }),
       includeLedger
-        ? getBillingLedger({
-            shopId,
-            page: ledgerPage,
-            pageSize: ledgerPageSize,
-          })
+        ? getBillingLedger(
+            {
+              shopId,
+              page: ledgerPage,
+              pageSize: ledgerPageSize,
+            },
+            now,
+          )
         : Promise.resolve(pageResult([], 1, ledgerPageSize, 0)),
     ]);
 

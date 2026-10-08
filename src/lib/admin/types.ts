@@ -37,6 +37,7 @@ export type BillingLedgerItem = {
   shopifyReportState: string;
   reportAttemptCount: number;
   nextReportAt: Date | null;
+  retryAlreadyDue: boolean;
   lastReportAttemptAt: Date | null;
   reportedAt: Date | null;
   providerErrorCode: string | null;
