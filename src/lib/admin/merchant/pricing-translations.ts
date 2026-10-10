@@ -223,6 +223,30 @@ export function parseCompletedMerchantPricingTranslationPackage(
           "sourceLocale must be en.",
         ),
       );
+
+    if (
+      typeof meta.planHandle !== "string" ||
+      normalized(meta.planHandle) !== normalized(expected.planHandle)
+    )
+      issues.push(
+        makeIssue(
+          "PLAN_HANDLE_MISMATCH",
+          "$._meta.planHandle",
+          "Plan handle does not match the current draft.",
+        ),
+      );
+
+    if (
+      typeof meta.planName !== "string" ||
+      normalized(meta.planName) !== normalized(expected.planName)
+    )
+      issues.push(
+        makeIssue(
+          "PLAN_NAME_MISMATCH",
+          "$._meta.planName",
+          "Plan name does not match the current draft.",
+        ),
+      );
   }
   const translations = parsed.translations;
   const expectedKeys = new Set(
