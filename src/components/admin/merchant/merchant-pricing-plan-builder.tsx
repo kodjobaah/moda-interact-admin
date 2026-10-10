@@ -100,6 +100,7 @@ export function MerchantPricingPlanBuilder({
     unboundedZeroCostEventLabel,
     translationsRetained,
     automaticTranslation,
+    activationLocked,
     canSubmit,
     canNavigateTo,
     formFields,
@@ -185,6 +186,7 @@ export function MerchantPricingPlanBuilder({
             unavailableCommerceModelId,
             supportedFeatureControls,
             merchantKnowledgeConfigurationValid,
+            activationLocked,
             sourceTypeKey,
           }}
         />
@@ -273,6 +275,7 @@ export function MerchantPricingPlanBuilder({
         retryAutomaticTranslation={retryAutomaticTranslation}
         translationsRetained={translationsRetained}
         automaticTranslation={automaticTranslation}
+        translationRunAvailable={controller.selectors.translationRunAvailable}
         placementLabel={placementLabel}
         economicsPassed={economicsPassed}
         economicsOverrideReady={economicsOverrideReady}

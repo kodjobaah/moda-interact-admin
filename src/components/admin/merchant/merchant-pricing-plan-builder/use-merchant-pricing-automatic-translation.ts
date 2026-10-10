@@ -34,6 +34,7 @@ export function useMerchantPricingAutomaticTranslation(input: {
   active: boolean;
   translationsRetained: boolean;
   merchantPricingPlanId: string | null;
+  initialRunId: string | null;
   shopifyPlanHandle: string;
   englishDescription: string;
   highlights: MerchantPricingBuilderHighlight[];
@@ -59,6 +60,7 @@ export function useMerchantPricingAutomaticTranslation(input: {
     configurationRequired: false,
   });
   const requestedSourceKeyRef = useRef<string | null>(null);
+  const initialRunLoadKeyRef = useRef<string | null>(null);
   const requestInFlightRef = useRef(false);
   const pollInFlightRef = useRef(false);
 
@@ -114,7 +116,8 @@ export function useMerchantPricingAutomaticTranslation(input: {
           current === sourceKey ? null : current,
         );
       }
-    }, [
+    },
+    [
       input.active,
       input.translationsRetained,
       input.merchantPricingPlanId,
@@ -127,6 +130,64 @@ export function useMerchantPricingAutomaticTranslation(input: {
 
   const currentRun =
     !input.translationsRetained && runSourceKey === sourceKey ? run : null;
+
+  useEffect(() => {
+    if (
+      !input.active ||
+      input.translationsRetained ||
+      currentRun !== null ||
+      !input.initialRunId ||
+      requestInFlightRef.current
+    ) {
+      return;
+    }
+
+    const loadKey = `${sourceKey}:${input.initialRunId}`;
+    if (initialRunLoadKeyRef.current === loadKey) return;
+    initialRunLoadKeyRef.current = loadKey;
+    requestedSourceKeyRef.current = sourceKey;
+
+    let cancelled = false;
+    void getMerchantPricingTranslationStatusAction(input.initialRunId)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          setMessage({
+            sourceKey,
+            error: result.message,
+            configurationRequired: false,
+          });
+          return;
+        }
+        setMessage({
+          sourceKey,
+          error: null,
+          configurationRequired: false,
+        });
+        setRun(result.run as MerchantPricingAutomaticTranslationRunView);
+        setRunSourceKey(sourceKey);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMessage({
+            sourceKey,
+            error:
+              "Automatic Merchant Pricing translation status could not be loaded.",
+            configurationRequired: false,
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentRun,
+    input.active,
+    input.initialRunId,
+    input.translationsRetained,
+    sourceKey,
+  ]);
 
   useEffect(() => {
     if (
@@ -199,6 +260,7 @@ export function useMerchantPricingAutomaticTranslation(input: {
 
   const retry = useCallback(() => {
     requestedSourceKeyRef.current = null;
+    initialRunLoadKeyRef.current = null;
     void requestRun(true);
   }, [requestRun]);
 

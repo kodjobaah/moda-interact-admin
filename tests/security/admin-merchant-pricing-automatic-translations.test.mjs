@@ -96,15 +96,17 @@ test("ready package reconstruction revalidates run status, handle, source hash, 
   assert.match(serviceSource, /parseCompletedMerchantPricingTranslationPackage/);
 });
 
-test("ADMIN-003 final mutation consumes only durable ready translation work", () => {
+test("ADMIN-003 save persists an inactive English-only draft linked to durable translation work", () => {
   assert.match(finalMutationSource, /formData\.get\("translationRunId"\)/);
   assert.doesNotMatch(finalMutationSource, /formData\.get\("translationJson"\)/);
-  assert.match(finalMutationSource, /reconstructReadyMerchantPricingTranslationPackage/);
-  assert.match(finalMutationSource, /markMerchantPricingTranslationRunApplied/);
+  assert.match(finalMutationSource, /validateMerchantPricingTranslationRunForDraft/);
+  assert.match(finalMutationSource, /publicationStatus:\s*translationRun!\.publicationStatus/);
+  assert.match(finalMutationSource, /currentTranslationRunId:\s*translationRun!\.runId/);
+  assert.match(finalMutationSource, /isActive:\s*false/);
+  assert.match(finalMutationSource, /locale:\s*"en"/);
+  assert.doesNotMatch(finalMutationSource, /markMerchantPricingTranslationRunApplied/);
   assert.match(finalMutationSource, /isolationLevel:\s*"Serializable"/);
-  assert.match(serviceSource, /status:\s*MerchantPricingTranslationRunStatus\.READY_TO_APPLY/);
-  assert.match(serviceSource, /status:\s*MerchantPricingTranslationRunStatus\.APPLIED/);
-  assert.match(serviceSource, /appliedMerchantPricingPlanId/);
+  assert.match(serviceSource, /DRAFT_PERSISTABLE_RUN_STATUSES/);
 });
 
 test("new Merchant Pricing translation semantic logs use the Shared logger", () => {
@@ -136,6 +138,8 @@ test("ADMIN-003 builder automatically requests and polls without exposing workbo
   assert.match(hook, /window\.setInterval/);
   assert.match(hook, /window\.clearInterval/);
   assert.match(hook, /merchantPricingAutomaticTranslationTerminal/);
+  assert.match(hook, /input\.initialRunId/);
+  assert.match(hook, /getMerchantPricingTranslationStatusAction\(input\.initialRunId\)/);
   assert.match(hook, /runSourceKey === sourceKey/);
   assert.match(hook, /message\.sourceKey === sourceKey/);
   assert.doesNotMatch(hook, /router\.refresh/);
@@ -148,9 +152,16 @@ test("ADMIN-003 preserves translations on reorder-only edits without provider wo
   assert.match(finalMutationSource, /!contentChanged/);
 });
 
-test("translation application semantic logs use Shared logging and contain no translation text", () => {
+test("translation draft-save semantic logs use Shared logging and contain no translation text", () => {
   assert.match(finalMutationSource, /@modainteract\/moda-interact-shared\/logging/);
-  assert.match(finalMutationSource, /admin\.merchant_pricing\.translation_applied/);
-  assert.match(finalMutationSource, /admin\.merchant_pricing\.translation_apply_failed/);
+  assert.match(finalMutationSource, /admin\.merchant_pricing\.translation_draft_saved/);
+  assert.match(finalMutationSource, /admin\.merchant_pricing\.translation_draft_save_failed/);
   assert.doesNotMatch(finalMutationSource, /translatedText:\s*|sourceText:\s*/);
+});
+
+test("persisted translation drafts reload their current run and retries can relink unchanged draft content", () => {
+  assert.match(serviceSource, /relinkPersistedDraftRunIfUnchanged/);
+  assert.match(serviceSource, /currentTranslationRunId:\s*input\.runId/);
+  assert.match(serviceSource, /MerchantPricingPlanPublicationStatus\.TRANSLATION_FAILED/);
+  assert.match(serviceSource, /MerchantPricingPlanPublicationStatus\.TRANSLATING/);
 });

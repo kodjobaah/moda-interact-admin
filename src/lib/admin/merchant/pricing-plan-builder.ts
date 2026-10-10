@@ -373,7 +373,7 @@ export function merchantPricingBuilderRequiredFieldsValid({
   );
 }
 
-export function merchantPricingBuilderTranslationsRetained(
+export function merchantPricingBuilderEnglishContentUnchanged(
   plan: MerchantPricingPlanWithChildren | undefined,
   description: string,
   highlights: MerchantPricingBuilderHighlight[],
@@ -409,6 +409,17 @@ export function merchantPricingBuilderTranslationsRetained(
         highlight.description.trim()
     );
   });
+}
+
+export function merchantPricingBuilderTranslationsRetained(
+  plan: MerchantPricingPlanWithChildren | undefined,
+  description: string,
+  highlights: MerchantPricingBuilderHighlight[],
+): boolean {
+  return Boolean(
+    plan?.publicationStatus === "READY" &&
+      merchantPricingBuilderEnglishContentUnchanged(plan, description, highlights),
+  );
 }
 
 export function moveBuilderEvent(

@@ -11,6 +11,47 @@ import type { PageResult } from "@/lib/admin/types";
 import { MerchantPricingPlanDeleteButton } from "./merchant-pricing-plan-delete-button";
 import { adminI18n } from "@/i18n";
 
+function translationDraftFailed(plan: MerchantPricingPlanWithChildren): boolean {
+  return (
+    plan.publicationStatus === "TRANSLATION_FAILED" ||
+    plan.currentTranslationRun?.status === "FAILED"
+  );
+}
+
+function publicationBadge(plan: MerchantPricingPlanWithChildren): {
+  label: string;
+  className: string;
+} {
+  if (translationDraftFailed(plan)) {
+    return {
+      label: "Draft · Needs attention",
+      className: "bg-red-100 text-red-800",
+    };
+  }
+  if (plan.publicationStatus === "TRANSLATING") {
+    return {
+      label: "Draft · Translating",
+      className: "bg-amber-100 text-amber-900",
+    };
+  }
+  return plan.isActive
+    ? { label: "Active", className: "bg-green-100 text-green-800" }
+    : { label: "Inactive", className: "bg-gray-100 text-gray-600" };
+}
+
+function publicationMessage(plan: MerchantPricingPlanWithChildren): string {
+  if (translationDraftFailed(plan)) {
+    const code = plan.currentTranslationRun?.failureCode;
+    return `Draft — automatic translation failed${code ? ` (${code})` : ""}. Open the draft to retry.`;
+  }
+  if (plan.publicationStatus === "TRANSLATING") {
+    return plan.currentTranslationRun?.status === "READY_TO_APPLY"
+      ? "Draft — translations are complete and waiting for automatic finalisation."
+      : "Draft — waiting for automatic translations to complete.";
+  }
+  return plan.isActive ? "Ready — active." : "Ready — inactive.";
+}
+
 export function MerchantPricingPlanCatalog({
   plans,
   params,
@@ -105,8 +146,11 @@ export function MerchantPricingPlanCatalog({
         <div className="max-h-[calc(100vh-20rem)] min-h-64 overflow-y-auto p-4">
           {plans.items.length ? (
             <div className="grid gap-4 lg:grid-cols-2">
-              {plans.items.map((plan) => (
-                <article
+              {plans.items.map((plan) => {
+                const badge = publicationBadge(plan);
+                const draft = plan.publicationStatus !== "READY";
+                return (
+                  <article
                   key={plan.id}
                   className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
                 >
@@ -120,9 +164,9 @@ export function MerchantPricingPlanCatalog({
                       </p>
                     </div>
                     <span
-                      className={`rounded-full px-2 py-1 text-xs font-semibold ${plan.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+                      className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.className}`}
                     >
-                      {plan.isActive ? "Active" : "Inactive"}
+                      {badge.label}
                     </span>
                   </div>
                   <dl className="mt-5 grid gap-3 border-t border-gray-100 pt-4 text-sm sm:grid-cols-2">
@@ -163,7 +207,23 @@ export function MerchantPricingPlanCatalog({
                       <dd>{plan.translations.length}/20</dd>
                     </div>
                     <div className="sm:col-span-2">
-                      <dt className="text-xs text-gray-500">Operational status</dt>
+                      <dt className="text-xs text-gray-500">
+                        Publication status
+                      </dt>
+                      <dd
+                        className={
+                          translationDraftFailed(plan)
+                            ? "text-red-700"
+                            : undefined
+                        }
+                      >
+                        {publicationMessage(plan)}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs text-gray-500">
+                        Operational status
+                      </dt>
                       <dd>
                         {plan.materializedAt
                           ? `Durable since ${adminI18n.formatDateTime(plan.materializedAt)}`
@@ -181,38 +241,41 @@ export function MerchantPricingPlanCatalog({
                         pricingError: null,
                       })}
                     >
-                      Edit plan
+                      {draft ? "Edit draft" : "Edit plan"}
                     </Link>
-                    <form action={mutateMerchantPricingPlanAction}>
-                      <input type="hidden" name="intent" value="toggle" />
-                      <input type="hidden" name="id" value={plan.id} />
-                      <input
-                        type="hidden"
-                        name="reason"
-                        value={
-                          plan.isActive
-                            ? "Deactivated from MerchantPricing catalogue"
-                            : "Activated in MerchantPricing catalogue"
-                        }
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700"
-                      >
-                        {plan.isActive ? "Deactivate" : "Activate"}
-                      </button>
-                      {plan.planKind === "PAID_METERED" ? (
-                        <MerchantPricingPlanDeleteButton
-                          id={plan.id}
-                          displayName={plan.displayName}
-                          disabled={plan.isActive || Boolean(plan.materializedAt)}
-                          durable={Boolean(plan.materializedAt)}
+                    {plan.publicationStatus === "READY" ? (
+                      <form action={mutateMerchantPricingPlanAction}>
+                        <input type="hidden" name="intent" value="toggle" />
+                        <input type="hidden" name="id" value={plan.id} />
+                        <input
+                          type="hidden"
+                          name="reason"
+                          value={
+                            plan.isActive
+                              ? "Deactivated from MerchantPricing catalogue"
+                              : "Activated in MerchantPricing catalogue"
+                          }
                         />
-                      ) : null}
-                    </form>
+                        <button
+                          type="submit"
+                          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700"
+                        >
+                          {plan.isActive ? "Deactivate" : "Activate"}
+                        </button>
+                      </form>
+                    ) : null}
+                    {plan.planKind === "PAID_METERED" ? (
+                      <MerchantPricingPlanDeleteButton
+                        id={plan.id}
+                        displayName={plan.displayName}
+                        disabled={plan.isActive || Boolean(plan.materializedAt)}
+                        durable={Boolean(plan.materializedAt)}
+                      />
+                    ) : null}
                   </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-gray-300 p-8 text-sm text-gray-600">

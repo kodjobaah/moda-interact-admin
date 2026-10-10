@@ -33,8 +33,8 @@ test("MerchantPricing mutation requires SUPER_ADMIN and revalidates server paylo
   assert.match(action, /requirePlatformAdminMutation/);
   assert.match(action, /principal\.role !== "SUPER_ADMIN"/);
   assert.match(action, /parseMerchantPricingBuilderPayload/);
-  assert.match(action, /reconstructReadyMerchantPricingTranslationPackage/);
-  assert.match(action, /markMerchantPricingTranslationRunApplied/);
+  assert.match(action, /validateMerchantPricingTranslationRunForDraft/);
+  assert.match(action, /MerchantPricingPlanPublicationStatus\.READY/);
   assert.match(action, /prisma\.\$transaction/);
 });
 
@@ -226,6 +226,8 @@ test("Merchant Pricing Step 7 uses automatic durable translations instead of wor
   assert.match(status, /Moda Interact automatically translates the English merchant content/);
   assert.match(status, /20 \/ 20 languages ready/);
   assert.match(status, /Retry translations/);
+  assert.match(status, /save the plan now/);
+  assert.match(status, /Draft/);
   assert.match(status, /System Controls \/ Translations/);
   assert.doesNotMatch(
     `${builder}\n${translationStep}\n${status}`,
@@ -276,6 +278,10 @@ test("MerchantPricing catalogue pagination is database-backed and drawer context
   assert.match(catalogue, /plans\.items\.map/);
   assert.match(catalogue, /name="planPageSize"/);
   assert.match(catalogue, /pageParam="planPage"/);
+  assert.match(catalogue, /Draft · Translating/);
+  assert.match(catalogue, /Draft · Needs attention/);
+  assert.match(catalogue, /Open the draft to retry/);
+  assert.match(catalogue, /plan\.publicationStatus === "READY"/);
 });
 
 test("Commerce model pricing assignments remain Platform-admin-only and repairable", async () => {

@@ -23,6 +23,7 @@ type TranslationsReviewStepProps = Pick<
     Controller["selectors"],
     | "translationsRetained"
     | "automaticTranslation"
+    | "translationRunAvailable"
     | "placementLabel"
     | "economicsPassed"
     | "economicsOverrideReady"
@@ -52,6 +53,7 @@ export function TranslationsReviewStep({
   retryAutomaticTranslation,
   translationsRetained,
   automaticTranslation,
+  translationRunAvailable,
   placementLabel,
   economicsPassed,
   economicsOverrideReady,
@@ -123,9 +125,13 @@ export function TranslationsReviewStep({
           Translation state:{" "}
           {translationsRetained
             ? "20/20 retained"
-            : automaticTranslation.ready
-              ? `${automaticTranslation.run?.completeLocaleCount ?? 0}/${automaticTranslation.run?.localeCount ?? 20} ready`
-              : "Automatic translation in progress"}
+            : automaticTranslation.run?.status === "FAILED"
+              ? `Failed — ${automaticTranslation.run.failureCode ?? "TRANSLATION_FAILED"}`
+              : automaticTranslation.ready
+                ? `${automaticTranslation.run?.completeLocaleCount ?? 0}/${automaticTranslation.run?.localeCount ?? 20} ready`
+                : automaticTranslation.run
+                  ? `${automaticTranslation.run.completeLocaleCount}/${automaticTranslation.run.localeCount} translating`
+                  : "Creating durable translation request"}
         </p>
       </section>
 
@@ -140,7 +146,21 @@ export function TranslationsReviewStep({
         />
       </label>
 
-      <MerchantPricingPlanSubmitButton disabled={!canSubmit} isUpdate={isUpdate} />
+      {!translationsRetained ? (
+        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          {translationRunAvailable
+            ? isUpdate
+              ? "You can save this draft now. It will remain inactive until automatic translation and finalisation complete."
+              : "You can create this plan now. It will appear in the catalogue as a Draft and remain inactive until automatic translation and finalisation complete."
+            : "Save is waiting for a durable automatic translation request to be created."}
+        </p>
+      ) : null}
+
+      <MerchantPricingPlanSubmitButton
+        disabled={!canSubmit}
+        isUpdate={isUpdate}
+        draftMode={!translationsRetained}
+      />
     </>
   );
 }

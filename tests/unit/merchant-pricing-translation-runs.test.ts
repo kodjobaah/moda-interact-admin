@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   CommerceEnvironment,
+  MerchantPricingPlanPublicationStatus,
   MerchantPricingTranslationEntityKind,
   MerchantPricingTranslationField,
   MerchantPricingTranslationItemStatus,
@@ -17,6 +18,7 @@ import {
   markMerchantPricingTranslationRunApplied,
   reconstructReadyMerchantPricingTranslationPackage,
   requestMerchantPricingTranslationInTransaction,
+  validateMerchantPricingTranslationRunForDraft,
 } from "../../src/lib/admin/merchant/merchant-pricing-translation-runs.ts";
 
 process.env.DEPLOYMENT_ENVIRONMENT_NAME = "test";
@@ -288,5 +290,52 @@ test("already consumed translation run fails closed", async () => {
       merchantPricingPlanId: "plan-1",
     }),
     new RegExp(MERCHANT_PRICING_TRANSLATION_ERRORS.runAlreadyApplied),
+  );
+});
+
+test("draft run validation accepts in-progress and failed matching work but rejects stale work", async () => {
+  const source = translationSource();
+  const sourceHash = merchantPricingTranslationSourceHash(source);
+  const expected = {
+    planHandle: "starter",
+    planName: "Starter",
+    englishDescription: "English description",
+    highlights: [],
+  };
+  const dbFor = (status: MerchantPricingTranslationRunStatus) => ({
+    merchantPricingTranslationRun: {
+      findFirst: async () => ({
+        id: "run-draft",
+        shopifyPlanHandle: "starter",
+        sourceHash,
+        status,
+      }),
+    },
+  }) as never;
+
+  const processing = await validateMerchantPricingTranslationRunForDraft(
+    dbFor(MerchantPricingTranslationRunStatus.PROCESSING),
+    { runId: "run-draft", expected },
+  );
+  assert.equal(
+    processing.publicationStatus,
+    MerchantPricingPlanPublicationStatus.TRANSLATING,
+  );
+
+  const failed = await validateMerchantPricingTranslationRunForDraft(
+    dbFor(MerchantPricingTranslationRunStatus.FAILED),
+    { runId: "run-draft", expected },
+  );
+  assert.equal(
+    failed.publicationStatus,
+    MerchantPricingPlanPublicationStatus.TRANSLATION_FAILED,
+  );
+
+  await assert.rejects(
+    validateMerchantPricingTranslationRunForDraft(
+      dbFor(MerchantPricingTranslationRunStatus.STALE),
+      { runId: "run-draft", expected },
+    ),
+    new RegExp(MERCHANT_PRICING_TRANSLATION_ERRORS.runNotPersistable),
   );
 });

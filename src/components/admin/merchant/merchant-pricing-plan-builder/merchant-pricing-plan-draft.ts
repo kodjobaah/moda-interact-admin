@@ -173,7 +173,7 @@ export function createMerchantPricingPlanDraft({
     name: plan?.displayName ?? "",
     handle: plan?.shopifyPlanHandle ?? "",
     planKind: plan?.planKind ?? (hasFreePlan ? "PAID_METERED" : "FREE"),
-    isActive: plan?.isActive ?? true,
+    isActive: plan?.isActive ?? false,
     featured: plan?.featured ?? false,
     commerceModelId: plan?.commerceModelId ?? "",
     maxKnowledgeSources: initialKnowledgeConfiguration
@@ -366,7 +366,7 @@ export function canSubmitMerchantPricingPlan(input: {
   reason: string;
   economicsSatisfied: boolean;
   translationsRetained: boolean;
-  translationReady: boolean;
+  translationRunAvailable: boolean;
 }): boolean {
   const trimmedReason = input.reason.trim();
   return (
@@ -375,7 +375,7 @@ export function canSubmitMerchantPricingPlan(input: {
     Boolean(trimmedReason) &&
     trimmedReason.length <= 2000 &&
     input.economicsSatisfied &&
-    (input.translationsRetained || input.translationReady)
+    (input.translationsRetained || input.translationRunAvailable)
   );
 }
 

@@ -59,6 +59,8 @@ test("new draft defaults to FREE without a FREE plan and PAID_METERED when one e
 
   assert.equal(create(false).planKind, "FREE");
   assert.equal(create(true).planKind, "PAID_METERED");
+  assert.equal(create(false).isActive, false);
+  assert.equal(create(true).isActive, false);
 });
 
 test("FREE plan option is disabled only for a non-FREE edit when a FREE plan exists", () => {
@@ -160,7 +162,7 @@ test("submit selector requires each independent readiness condition", () => {
     reason: "approved",
     economicsSatisfied: true,
     translationsRetained: false,
-    translationReady: true,
+    translationRunAvailable: true,
   };
 
   assert.equal(canSubmitMerchantPricingPlan(ready), true);
@@ -168,7 +170,7 @@ test("submit selector requires each independent readiness condition", () => {
     "requiredFieldsValid",
     "merchantKnowledgeConfigurationValid",
     "economicsSatisfied",
-    "translationReady",
+    "translationRunAvailable",
   ] as const) {
     assert.equal(canSubmitMerchantPricingPlan({ ...ready, [key]: false }), false);
   }
@@ -176,7 +178,7 @@ test("submit selector requires each independent readiness condition", () => {
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2000) }), true);
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2001) }), false);
   assert.equal(
-    canSubmitMerchantPricingPlan({ ...ready, translationsRetained: true, translationReady: false }),
+    canSubmitMerchantPricingPlan({ ...ready, translationsRetained: true, translationRunAvailable: false }),
     true,
   );
 });

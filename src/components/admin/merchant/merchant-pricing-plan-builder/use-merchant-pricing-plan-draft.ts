@@ -26,6 +26,7 @@ import {
   hasUnboundedZeroCostFixedEvent,
   initialEvents,
   initialHighlights,
+  merchantPricingBuilderEnglishContentUnchanged,
   merchantPricingBuilderMerchantContentValid,
   merchantPricingBuilderRequiredFieldsValid,
   merchantPricingBuilderTranslationsRetained,
@@ -54,6 +55,7 @@ import { buildSupportedFeatureControls } from "@/lib/admin/merchant/pricing-plan
 import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
 import type { MerchantKnowledgeFeatureConfiguration } from "@modainteract/moda-interact-shared/merchant-knowledge";
 import { useMerchantPricingAutomaticTranslation } from "./use-merchant-pricing-automatic-translation";
+import { merchantPricingAutomaticTranslationCanPersistDraft } from "./merchant-pricing-automatic-translation-state";
 
 export type MerchantPricingPlanDraftControllerInput = {
   plan?: MerchantPricingPlanWithChildren;
@@ -250,6 +252,11 @@ export function useMerchantPricingPlanDraft({
     recoveryUsageEventHandle: draft.recoveryUsageEventHandle,
     planKind: draft.planKind,
   });
+  const englishContentUnchanged = merchantPricingBuilderEnglishContentUnchanged(
+    plan,
+    draft.description,
+    draft.highlights,
+  );
   const translationsRetained = merchantPricingBuilderTranslationsRetained(
     plan,
     draft.description,
@@ -259,17 +266,27 @@ export function useMerchantPricingPlanDraft({
     active: draft.step === 6,
     translationsRetained,
     merchantPricingPlanId: plan?.id ?? null,
+    initialRunId:
+      englishContentUnchanged && plan?.currentTranslationRunId
+        ? plan.currentTranslationRunId
+        : null,
     shopifyPlanHandle: draft.handle,
     englishDescription: draft.description,
     highlights: draft.highlights,
   });
+  const translationRunAvailable =
+    merchantPricingAutomaticTranslationCanPersistDraft(
+      automaticTranslation.run,
+    );
+  const activationLocked =
+    !plan || plan.publicationStatus !== "READY" || !translationsRetained;
   const canSubmit = canSubmitMerchantPricingPlan({
     requiredFieldsValid,
     merchantKnowledgeConfigurationValid,
     reason: draft.reason,
     economicsSatisfied,
     translationsRetained,
-    translationReady: automaticTranslation.ready,
+    translationRunAvailable,
   });
   const placementLabel = plan
     ? `Current position (${plan.cataloguePosition + 1})`
@@ -386,7 +403,7 @@ export function useMerchantPricingPlanDraft({
     isEditing: Boolean(plan),
     payload,
     translationRunId:
-      translationsRetained || !automaticTranslation.ready
+      translationsRetained || !translationRunAvailable
         ? ""
         : (automaticTranslation.run?.runId ?? ""),
     economicsOverrideReady,
@@ -424,6 +441,8 @@ export function useMerchantPricingPlanDraft({
       unboundedZeroCostEventLabel,
       translationsRetained,
       automaticTranslation,
+      translationRunAvailable,
+      activationLocked,
       serializedUsageEvents,
       economicsConfigurationKey,
       payload,

@@ -6,6 +6,7 @@ import type {
   MerchantPricingPlanHighlightTranslation,
   MerchantPricingUsageEvent,
   MerchantPricingUsageTier,
+  MerchantPricingTranslationRunStatus,
 } from "@prisma/client";
 import { CommercePricingPlanModelAssignmentSchema } from "@modainteract/moda-interact-shared/commerce/model";
 import { hasCurrentMerchantKnowledgeConfiguration } from "@/lib/admin/merchant-knowledge-plan-policy";
@@ -19,6 +20,11 @@ import type {
 
 export type MerchantPricingPlanWithChildren = MerchantPricingPlan & {
   features: Array<{ feature: Feature; configuration: unknown }>;
+  currentTranslationRun: {
+    id: string;
+    status: MerchantPricingTranslationRunStatus;
+    failureCode: string | null;
+  } | null;
   translations: MerchantPricingPlanTranslation[];
   highlights: Array<
     MerchantPricingPlanHighlight & {
@@ -64,7 +70,16 @@ function validateMerchantPricingPlanAssignment<
   return plan;
 }
 
+const merchantPricingCurrentTranslationRun = {
+  select: {
+    id: true,
+    status: true,
+    failureCode: true,
+  },
+} as const;
+
 const merchantPricingInclude = {
+  currentTranslationRun: merchantPricingCurrentTranslationRun,
   features: {
     include: { feature: true },
     orderBy: { featureId: "asc" as const },
@@ -213,7 +228,10 @@ export async function getMerchantPricingCatalogueContext(): Promise<
   const [plans, activeUsageEvents] = await Promise.all([
     prisma.merchantPricingPlan.findMany({
       orderBy: [{ cataloguePosition: "asc" }, { id: "asc" }],
-      include: { features: { include: { feature: true } } },
+      include: {
+        currentTranslationRun: merchantPricingCurrentTranslationRun,
+        features: { include: { feature: true } },
+      },
     }),
     prisma.merchantPricingPlan.findMany({
       where: { isActive: true },

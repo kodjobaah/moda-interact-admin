@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  merchantPricingAutomaticTranslationCanPersistDraft,
   merchantPricingAutomaticTranslationReady,
   merchantPricingAutomaticTranslationSourceKey,
   merchantPricingAutomaticTranslationTerminal,
@@ -39,7 +40,7 @@ test("automatic translation source identity is trim-normalized and highlight-ord
   );
 });
 
-test("only complete READY_TO_APPLY work enables final submission", () => {
+test("only complete READY_TO_APPLY work reports translation readiness", () => {
   const ready = {
     runId: "run-1",
     status: "READY_TO_APPLY" as const,
@@ -79,5 +80,29 @@ test("polling terminal states stop at ready, applied, failed, or stale", () => {
   assert.equal(merchantPricingAutomaticTranslationTerminal({ ...base, status: "PROCESSING" }), false);
   for (const status of ["READY_TO_APPLY", "APPLIED", "FAILED", "STALE"] as const) {
     assert.equal(merchantPricingAutomaticTranslationTerminal({ ...base, status }), true);
+  }
+});
+
+test("durable draft saving accepts active, ready-to-apply, and failed runs but not stale/applied runs", () => {
+  const base = {
+    runId: "run-1",
+    modelDisplayName: "Automatic",
+    completeLocaleCount: 1,
+    localeCount: 20,
+    pendingItemCount: 19,
+    failedItemCount: 0,
+    failureCode: null,
+  };
+  for (const status of ["PENDING", "PROCESSING", "READY_TO_APPLY", "FAILED"] as const) {
+    assert.equal(
+      merchantPricingAutomaticTranslationCanPersistDraft({ ...base, status }),
+      true,
+    );
+  }
+  for (const status of ["STALE", "APPLIED"] as const) {
+    assert.equal(
+      merchantPricingAutomaticTranslationCanPersistDraft({ ...base, status }),
+      false,
+    );
   }
 });

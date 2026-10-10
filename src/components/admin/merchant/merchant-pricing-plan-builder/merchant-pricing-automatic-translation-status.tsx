@@ -59,19 +59,19 @@ export function MerchantPricingAutomaticTranslationStatus({
 
       {!run && requestPending ? (
         <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-blue-800">
-          Creating the automatic translation request…
+          Creating the durable automatic translation request… Save becomes available as soon as the request exists.
         </p>
       ) : null}
 
       {run && (run.status === "PENDING" || run.status === "PROCESSING") ? (
         <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-blue-800">
-          Translation is in progress. You can leave this step and return later; the work is durable.
+          Translation is in progress. You can save the plan now. It will appear in Merchant Pricing as a Draft and remain inactive while translations finish.
         </p>
       ) : null}
 
       {run?.status === "READY_TO_APPLY" ? (
         <p className="mt-4 rounded-md bg-green-50 px-3 py-2 font-medium text-green-800">
-          {run.completeLocaleCount} / {run.localeCount} languages are ready. The translations will be applied atomically when you save the plan.
+          {run.completeLocaleCount} / {run.localeCount} languages are ready. Save any unsaved changes; the persisted draft will be finalized automatically and will remain inactive until an admin activates it.
         </p>
       ) : null}
 
@@ -81,7 +81,7 @@ export function MerchantPricingAutomaticTranslationStatus({
           <p className="mt-1">
             {run.status === "STALE"
               ? "The durable translation request no longer matches the current translation work. Retry using the current English content."
-              : `Failure code: ${run.failureCode ?? "TRANSLATION_FAILED"}`}
+              : `Failure code: ${run.failureCode ?? "TRANSLATION_FAILED"}. You can save the plan as a draft with this failure recorded, or retry now.`}
           </p>
           <button
             type="button"
@@ -96,7 +96,7 @@ export function MerchantPricingAutomaticTranslationStatus({
 
       {run?.status === "APPLIED" ? (
         <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-amber-900">
-          This translation run has already been applied. Reload the plan before attempting another save.
+          This translation run has already been applied. Reload the plan to see its current publication state.
         </p>
       ) : null}
 

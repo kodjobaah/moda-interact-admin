@@ -1,5 +1,6 @@
 import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import {
+  MerchantPricingPlanPublicationStatus,
   MerchantPricingTranslationEntityKind,
   MerchantPricingTranslationField,
   MerchantPricingTranslationItemStatus,
@@ -44,6 +45,12 @@ const ACTIVE_RUN_STATUSES = [
   MerchantPricingTranslationRunStatus.READY_TO_APPLY,
 ] as const;
 
+const DRAFT_PERSISTABLE_RUN_STATUSES:
+  readonly MerchantPricingTranslationRunStatus[] = [
+    ...ACTIVE_RUN_STATUSES,
+    MerchantPricingTranslationRunStatus.FAILED,
+  ];
+
 const TRANSACTION_OPTIONS = {
   isolationLevel: "Serializable" as const,
   maxWait: 10_000,
@@ -64,6 +71,8 @@ export const MERCHANT_PRICING_TRANSLATION_ERRORS = {
     "Merchant Pricing translation run does not match the current plan content.",
   runAlreadyApplied:
     "Merchant Pricing translation run was already applied or changed. Reload the plan and try again.",
+  runNotPersistable:
+    "Merchant Pricing translation run cannot be saved with the current draft. Retry translations.",
   packageInvalid:
     "Merchant Pricing translation results are incomplete or invalid.",
   requestTimedOut:
@@ -218,6 +227,84 @@ async function existingTranslationState(
   };
 }
 
+async function relinkPersistedDraftRunIfUnchanged(
+  transaction: TranslationDb,
+  input: {
+    merchantPricingPlanId: string | null;
+    sourceHash: string;
+    runId: string;
+    runStatus: MerchantPricingTranslationRunStatus;
+  },
+): Promise<void> {
+  if (!input.merchantPricingPlanId) return;
+
+  const plan = await transaction.merchantPricingPlan.findUnique({
+    where: { id: input.merchantPricingPlanId },
+    select: {
+      publicationStatus: true,
+      shopifyPlanHandle: true,
+      translations: {
+        select: { locale: true, merchantDescription: true },
+      },
+      highlights: {
+        select: {
+          contentKey: true,
+          translations: {
+            select: {
+              locale: true,
+              merchantTitle: true,
+              merchantDescription: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (
+    !plan ||
+    plan.publicationStatus === MerchantPricingPlanPublicationStatus.READY
+  ) {
+    return;
+  }
+
+  const englishPlan = exactEnglish(
+    plan.translations,
+    "Existing Merchant Pricing plan translations",
+  );
+  const persistedSource = canonicalMerchantPricingTranslationSource({
+    shopifyPlanHandle: plan.shopifyPlanHandle,
+    englishDescription: englishPlan.merchantDescription,
+    highlights: plan.highlights.map((highlight) => {
+      const english = exactEnglish(
+        highlight.translations,
+        `Existing Merchant Pricing highlight ${highlight.contentKey} translations`,
+      );
+      return {
+        contentKey: highlight.contentKey,
+        title: english.merchantTitle,
+        description: english.merchantDescription,
+      };
+    }),
+  });
+  if (
+    merchantPricingTranslationSourceHash(persistedSource) !== input.sourceHash
+  ) {
+    return;
+  }
+
+  await transaction.merchantPricingPlan.update({
+    where: { id: input.merchantPricingPlanId },
+    data: {
+      currentTranslationRunId: input.runId,
+      publicationStatus:
+        input.runStatus === MerchantPricingTranslationRunStatus.FAILED
+          ? MerchantPricingPlanPublicationStatus.TRANSLATION_FAILED
+          : MerchantPricingPlanPublicationStatus.TRANSLATING,
+      isActive: false,
+    },
+  });
+}
+
 function countsForItems(
   source: MerchantPricingTranslationSourceSnapshot,
   items: Array<{
@@ -319,6 +406,12 @@ export async function requestMerchantPricingTranslationInTransaction(
     select: runStatusSelect,
   });
   if (reusable) {
+    await relinkPersistedDraftRunIfUnchanged(transaction, {
+      merchantPricingPlanId: input.merchantPricingPlanId,
+      sourceHash: input.sourceHash,
+      runId: reusable.id,
+      runStatus: reusable.status,
+    });
     return {
       ...(await statusViewFromRun(reusable)),
       sourceHash: input.sourceHash,
@@ -387,10 +480,18 @@ export async function requestMerchantPricingTranslationInTransaction(
     })),
   });
 
-  const created = await transaction.merchantPricingTranslationRun.findUniqueOrThrow({
-    where: { id: run.id },
-    select: runStatusSelect,
+  await relinkPersistedDraftRunIfUnchanged(transaction, {
+    merchantPricingPlanId: input.merchantPricingPlanId,
+    sourceHash: input.sourceHash,
+    runId: run.id,
+    runStatus: MerchantPricingTranslationRunStatus.PENDING,
   });
+
+  const created =
+    await transaction.merchantPricingTranslationRun.findUniqueOrThrow({
+      where: { id: run.id },
+      select: runStatusSelect,
+    });
   return {
     ...(await statusViewFromRun(created)),
     sourceHash: input.sourceHash,
@@ -508,6 +609,62 @@ export async function getMerchantPricingTranslationRunStatus(
   });
   if (!run) throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.runNotFound);
   return statusViewFromRun(run);
+}
+
+type DraftRunDb = Pick<
+  Prisma.TransactionClient,
+  "merchantPricingTranslationRun"
+>;
+
+export async function validateMerchantPricingTranslationRunForDraft(
+  db: DraftRunDb,
+  input: {
+    runId: string;
+    expected: MerchantPricingTranslationExpected;
+  },
+): Promise<{
+  runId: string;
+  status: MerchantPricingTranslationRunStatus;
+  publicationStatus: MerchantPricingPlanPublicationStatus;
+}> {
+  const source = canonicalMerchantPricingTranslationSource({
+    shopifyPlanHandle: input.expected.planHandle,
+    englishDescription: input.expected.englishDescription,
+    highlights: input.expected.highlights ?? [],
+  });
+  const sourceHash = merchantPricingTranslationSourceHash(source);
+  const environment = resolveCommerceEnvironment() as CommerceEnvironment;
+  const run = await db.merchantPricingTranslationRun.findFirst({
+    where: { id: input.runId, environment },
+    select: {
+      id: true,
+      shopifyPlanHandle: true,
+      sourceHash: true,
+      status: true,
+    },
+  });
+  if (!run) throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.runNotFound);
+  if (
+    run.shopifyPlanHandle !== source.shopifyPlanHandle ||
+    run.sourceHash !== sourceHash
+  ) {
+    throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.runSourceMismatch);
+  }
+  if (!DRAFT_PERSISTABLE_RUN_STATUSES.includes(run.status)) {
+    throw new Error(
+      run.status === MerchantPricingTranslationRunStatus.APPLIED
+        ? MERCHANT_PRICING_TRANSLATION_ERRORS.runAlreadyApplied
+        : MERCHANT_PRICING_TRANSLATION_ERRORS.runNotPersistable,
+    );
+  }
+  return {
+    runId: run.id,
+    status: run.status,
+    publicationStatus:
+      run.status === MerchantPricingTranslationRunStatus.FAILED
+        ? MerchantPricingPlanPublicationStatus.TRANSLATION_FAILED
+        : MerchantPricingPlanPublicationStatus.TRANSLATING,
+  };
 }
 
 type ReadyPackageDb = Pick<Prisma.TransactionClient, "merchantPricingTranslationRun">;

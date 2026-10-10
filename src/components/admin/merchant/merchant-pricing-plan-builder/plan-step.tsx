@@ -44,6 +44,7 @@ type PlanStepProps = {
     | "unavailableCommerceModelId"
     | "supportedFeatureControls"
     | "merchantKnowledgeConfigurationValid"
+    | "activationLocked"
     | "sourceTypeKey"
   >;
 };
@@ -140,13 +141,22 @@ export function PlanStep({
             onChange={(event) => actions.setCredits(Number(event.target.value))}
           />
         </label>
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-          <input
-            type="checkbox"
-            checked={draft.isActive}
-            onChange={(event) => actions.setIsActive(event.target.checked)}
-          />{" "}
-          Active
+        <label className="text-sm font-medium text-gray-700">
+          <span className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selectors.activationLocked ? false : draft.isActive}
+              disabled={selectors.activationLocked}
+              onChange={(event) => actions.setIsActive(event.target.checked)}
+            />{" "}
+            Active
+          </span>
+          {selectors.activationLocked ? (
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              Plans awaiting automatic translations are saved inactive. Activate
+              the plan from the catalogue after all translations are ready.
+            </span>
+          ) : null}
         </label>
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
           <input

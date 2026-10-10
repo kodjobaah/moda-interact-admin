@@ -48,6 +48,18 @@ export function merchantPricingAutomaticTranslationReady(
   );
 }
 
+
+export function merchantPricingAutomaticTranslationCanPersistDraft(
+  run: MerchantPricingAutomaticTranslationRunView | null,
+): boolean {
+  return Boolean(
+    run &&
+      ["PENDING", "PROCESSING", "READY_TO_APPLY", "FAILED"].includes(
+        run.status,
+      ),
+  );
+}
+
 export function merchantPricingAutomaticTranslationTerminal(
   run: MerchantPricingAutomaticTranslationRunView | null,
 ): boolean {
