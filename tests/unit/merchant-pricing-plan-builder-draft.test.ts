@@ -15,7 +15,6 @@ import {
   retainInitialMerchantKnowledgeConfiguration,
   selectUnavailableCommerceModelId,
   sourceTypeKey,
-  validMerchantPricingTranslationJson,
   type MerchantPricingPlanDraft,
 } from "../../src/components/admin/merchant/merchant-pricing-plan-builder/merchant-pricing-plan-draft.ts";
 
@@ -44,8 +43,6 @@ function draft(overrides: Partial<MerchantPricingPlanDraft> = {}): MerchantPrici
     economicsOverrideReason: "",
     events: [],
     highlights: [],
-    translationJson: "",
-    translationResult: null,
     ...overrides,
   };
 }
@@ -163,7 +160,7 @@ test("submit selector requires each independent readiness condition", () => {
     reason: "approved",
     economicsSatisfied: true,
     translationsRetained: false,
-    translationValid: true,
+    translationReady: true,
   };
 
   assert.equal(canSubmitMerchantPricingPlan(ready), true);
@@ -171,7 +168,7 @@ test("submit selector requires each independent readiness condition", () => {
     "requiredFieldsValid",
     "merchantKnowledgeConfigurationValid",
     "economicsSatisfied",
-    "translationValid",
+    "translationReady",
   ] as const) {
     assert.equal(canSubmitMerchantPricingPlan({ ...ready, [key]: false }), false);
   }
@@ -179,7 +176,7 @@ test("submit selector requires each independent readiness condition", () => {
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2000) }), true);
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2001) }), false);
   assert.equal(
-    canSubmitMerchantPricingPlan({ ...ready, translationsRetained: true, translationValid: false }),
+    canSubmitMerchantPricingPlan({ ...ready, translationsRetained: true, translationReady: false }),
     true,
   );
 });
@@ -296,7 +293,6 @@ test("economics invalidation key contains exactly the current configuration fiel
     { type: "set-economics-override-reason", value: "New override reason" },
     { type: "set-source-type", key: "faq\u001ftext", selected: true },
     { type: "set-supported-feature", key: "feature", selected: true },
-    { type: "set-translation", rawJson: "{}", result: null },
     {
       type: "add-highlight",
       highlight: { contentKey: "new-highlight", title: "New", description: "New" },
@@ -428,14 +424,14 @@ test("hidden fields preserve the existing action and override serialization cont
     buildMerchantPricingPlanDraftFormFields({
       isEditing: true,
       payload: { plan: "value" },
-      translationJson: "{}",
+      translationRunId: "run-ready",
       economicsOverrideReady: true,
       economicsOverrideReason: " approved ",
     }),
     {
       intent: "update",
       payload: '{"plan":"value"}',
-      translationJson: "{}",
+      translationRunId: "run-ready",
       economicsOverrideRequested: "true",
       economicsOverrideReason: "approved",
     },
@@ -444,58 +440,16 @@ test("hidden fields preserve the existing action and override serialization cont
     buildMerchantPricingPlanDraftFormFields({
       isEditing: false,
       payload: null,
-      translationJson: "{}",
+      translationRunId: "",
       economicsOverrideReady: false,
       economicsOverrideReason: "ignored",
     }),
     {
       intent: "create",
       payload: "null",
-      translationJson: "{}",
+      translationRunId: "",
       economicsOverrideRequested: "false",
       economicsOverrideReason: "",
     },
-  );
-});
-
-test("translation JSON preserves the existing precedence and raw non-empty value", () => {
-  const currentTemplate = { current: true };
-  const retainedTemplate = { retained: true };
-
-  assert.equal(
-    validMerchantPricingTranslationJson({
-      translationJson: "uploaded",
-      translationValid: true,
-      retainedTemplate,
-      currentTemplate,
-    }),
-    "uploaded",
-  );
-  assert.equal(
-    validMerchantPricingTranslationJson({
-      translationJson: "uploaded",
-      translationValid: false,
-      retainedTemplate,
-      currentTemplate,
-    }),
-    JSON.stringify(retainedTemplate),
-  );
-  assert.equal(
-    validMerchantPricingTranslationJson({
-      translationJson: "  raw invalid  ",
-      translationValid: false,
-      retainedTemplate: null,
-      currentTemplate,
-    }),
-    "  raw invalid  ",
-  );
-  assert.equal(
-    validMerchantPricingTranslationJson({
-      translationJson: "",
-      translationValid: false,
-      retainedTemplate: null,
-      currentTemplate,
-    }),
-    JSON.stringify(currentTemplate),
   );
 });

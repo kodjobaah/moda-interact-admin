@@ -62,6 +62,8 @@ export const MERCHANT_PRICING_TRANSLATION_ERRORS = {
   runNotReady: "Merchant Pricing translations are not ready to apply.",
   runSourceMismatch:
     "Merchant Pricing translation run does not match the current plan content.",
+  runAlreadyApplied:
+    "Merchant Pricing translation run was already applied or changed. Reload the plan and try again.",
   packageInvalid:
     "Merchant Pricing translation results are incomplete or invalid.",
   requestTimedOut:
@@ -677,4 +679,33 @@ export async function reconstructReadyMerchantPricingTranslationPackage(
     throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.packageInvalid);
   }
   return parsed.package;
+}
+
+export async function markMerchantPricingTranslationRunApplied(
+  transaction: Pick<Prisma.TransactionClient, "merchantPricingTranslationRun">,
+  input: {
+    runId: string;
+    merchantPricingPlanId: string;
+    now?: Date;
+  },
+): Promise<void> {
+  const environment = resolveCommerceEnvironment() as CommerceEnvironment;
+  const appliedAt = input.now ?? new Date();
+  const updated = await transaction.merchantPricingTranslationRun.updateMany({
+    where: {
+      id: input.runId,
+      environment,
+      status: MerchantPricingTranslationRunStatus.READY_TO_APPLY,
+    },
+    data: {
+      status: MerchantPricingTranslationRunStatus.APPLIED,
+      appliedAt,
+      completedAt: appliedAt,
+      appliedMerchantPricingPlanId: input.merchantPricingPlanId,
+      failureCode: null,
+    },
+  });
+  if (updated.count !== 1) {
+    throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.runAlreadyApplied);
+  }
 }

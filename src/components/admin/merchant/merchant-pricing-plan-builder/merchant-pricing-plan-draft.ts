@@ -4,7 +4,6 @@ import type {
 } from "../../../../lib/admin/merchant/pricing-builder-payload.ts";
 import type { MerchantPricingPlanWithChildren } from "../../../../lib/admin/merchant/pricing-plan.ts";
 import type { BuilderEvent } from "../../../../lib/admin/merchant/pricing-plan-builder.ts";
-import type { MerchantPricingTranslationParseResult } from "../../../../lib/admin/merchant/pricing-translations.ts";
 import type { MerchantKnowledgeFeatureConfiguration } from "@modainteract/moda-interact-shared/merchant-knowledge";
 
 export const MERCHANT_KNOWLEDGE_FEATURE_KEY = "merchant_knowledge";
@@ -33,8 +32,6 @@ export type MerchantPricingPlanDraft = {
   economicsOverrideReason: string;
   events: BuilderEvent[];
   highlights: MerchantPricingBuilderHighlight[];
-  translationJson: string;
-  translationResult: MerchantPricingTranslationParseResult | null;
 };
 
 export type CreateMerchantPricingPlanDraftInput = {
@@ -78,8 +75,7 @@ export type MerchantPricingPlanDraftAction =
   | { type: "add-highlight"; highlight: MerchantPricingBuilderHighlight }
   | { type: "remove-highlight"; index: number }
   | { type: "move-highlight"; index: number; direction: -1 | 1 }
-  | { type: "update-highlight"; index: number; update: Partial<Omit<MerchantPricingBuilderHighlight, "contentKey">> }
-  | { type: "set-translation"; rawJson: string; result: MerchantPricingTranslationParseResult | null };
+  | { type: "update-highlight"; index: number; update: Partial<Omit<MerchantPricingBuilderHighlight, "contentKey">> };
 
 export function sourceTypeKey(purposeKey: string, dataFormatKey: string): string {
   return `${purposeKey}\u001f${dataFormatKey}`;
@@ -142,20 +138,20 @@ export function isEconomicsOverrideReady(input: {
 export function buildMerchantPricingPlanDraftFormFields(input: {
   isEditing: boolean;
   payload: unknown;
-  translationJson: string;
+  translationRunId: string;
   economicsOverrideReady: boolean;
   economicsOverrideReason: string;
 }): {
   intent: "create" | "update";
   payload: string;
-  translationJson: string;
+  translationRunId: string;
   economicsOverrideRequested: "true" | "false";
   economicsOverrideReason: string;
 } {
   return {
     intent: input.isEditing ? "update" : "create",
     payload: JSON.stringify(input.payload),
-    translationJson: input.translationJson,
+    translationRunId: input.translationRunId,
     economicsOverrideRequested: input.economicsOverrideReady ? "true" : "false",
     economicsOverrideReason: input.economicsOverrideReady
       ? input.economicsOverrideReason.trim()
@@ -207,8 +203,6 @@ export function createMerchantPricingPlanDraft({
     economicsOverrideReason: "",
     events: initialEvents,
     highlights: initialHighlights,
-    translationJson: "",
-    translationResult: null,
   };
 }
 
@@ -347,8 +341,6 @@ export function merchantPricingPlanDraftReducer(
           index === action.index ? { ...highlight, ...action.update } : highlight,
         ),
       };
-    case "set-translation":
-      return { ...state, translationJson: action.rawJson, translationResult: action.result };
   }
 }
 
@@ -374,7 +366,7 @@ export function canSubmitMerchantPricingPlan(input: {
   reason: string;
   economicsSatisfied: boolean;
   translationsRetained: boolean;
-  translationValid: boolean;
+  translationReady: boolean;
 }): boolean {
   const trimmedReason = input.reason.trim();
   return (
@@ -383,7 +375,7 @@ export function canSubmitMerchantPricingPlan(input: {
     Boolean(trimmedReason) &&
     trimmedReason.length <= 2000 &&
     input.economicsSatisfied &&
-    (input.translationsRetained || input.translationValid)
+    (input.translationsRetained || input.translationReady)
   );
 }
 
@@ -405,17 +397,6 @@ export function buildEconomicsConfigurationKey(input: {
     minimumUpgradePremiumBps: input.minimumUpgradePremiumBps,
     usageEvents: input.serializedUsageEvents,
   });
-}
-
-export function validMerchantPricingTranslationJson(input: {
-  translationJson: string;
-  translationValid: boolean;
-  retainedTemplate: unknown | null;
-  currentTemplate: unknown;
-}): string {
-  if (input.translationValid) return input.translationJson;
-  if (input.retainedTemplate !== null) return JSON.stringify(input.retainedTemplate);
-  return input.translationJson || JSON.stringify(input.currentTemplate);
 }
 
 export function buildMerchantPricingPlanDraftPayload(input: {

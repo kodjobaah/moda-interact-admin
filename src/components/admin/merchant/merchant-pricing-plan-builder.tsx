@@ -60,7 +60,6 @@ export function MerchantPricingPlanBuilder({
     economicsOverrideReason,
     events,
     highlights,
-    translationResult,
   } = controller.draft;
   const {
     setStep,
@@ -82,7 +81,7 @@ export function MerchantPricingPlanBuilder({
     setReason,
     setEconomicsOverrideEnabled,
     setEconomicsOverrideReason,
-    onWorkbookChange,
+    retryAutomaticTranslation,
   } = controller.actions;
   const {
     freePlanAlreadyExists,
@@ -100,8 +99,7 @@ export function MerchantPricingPlanBuilder({
     passedEconomics,
     unboundedZeroCostEventLabel,
     translationsRetained,
-    retainedTemplate,
-    currentTemplate,
+    automaticTranslation,
     canSubmit,
     canNavigateTo,
     formFields,
@@ -116,8 +114,8 @@ export function MerchantPricingPlanBuilder({
       <input type="hidden" name="payload" value={formFields.payload} />
       <input
         type="hidden"
-        name="translationJson"
-        value={formFields.translationJson}
+        name="translationRunId"
+        value={formFields.translationRunId}
       />
       <input
         type="hidden"
@@ -271,12 +269,10 @@ export function MerchantPricingPlanBuilder({
         events={events}
         economicsOverrideReason={economicsOverrideReason}
         reason={reason}
-        translationResult={translationResult}
-        onWorkbookChange={onWorkbookChange}
         setReason={setReason}
-        retainedTemplate={retainedTemplate}
-        currentTemplate={currentTemplate}
+        retryAutomaticTranslation={retryAutomaticTranslation}
         translationsRetained={translationsRetained}
+        automaticTranslation={automaticTranslation}
         placementLabel={placementLabel}
         economicsPassed={economicsPassed}
         economicsOverrideReady={economicsOverrideReady}

@@ -33,7 +33,8 @@ test("MerchantPricing mutation requires SUPER_ADMIN and revalidates server paylo
   assert.match(action, /requirePlatformAdminMutation/);
   assert.match(action, /principal\.role !== "SUPER_ADMIN"/);
   assert.match(action, /parseMerchantPricingBuilderPayload/);
-  assert.match(action, /parseCompletedMerchantPricingTranslationPackage/);
+  assert.match(action, /reconstructReadyMerchantPricingTranslationPackage/);
+  assert.match(action, /markMerchantPricingTranslationRunApplied/);
   assert.match(action, /prisma\.\$transaction/);
 });
 
@@ -62,7 +63,6 @@ test("ARCH-014 implementation modules do not use operational plan or economics s
     "src/lib/admin/merchant/pricing-economics.ts",
     "src/lib/admin/merchant/pricing-translations.ts",
     "src/components/admin/merchant/merchant-pricing-plan-catalog.tsx",
-    "src/components/admin/merchant/merchant-pricing-translation-workbook.tsx",
   ];
   const [action, ...nonActionSources] = await Promise.all(paths.map(source));
   const nonActionModules = [
@@ -213,40 +213,26 @@ test("usage-event builder exposes currency-aware labels and blocks unbounded fre
   assert.match(builder, /Usage events \(\{events\.length}\/5\)/);
 });
 
-test("translation workbook keeps schema-v2 guidance and upload failures non-destructive", async () => {
-  const workbook = await source(
-    "src/components/admin/merchant/merchant-pricing-translation-workbook.tsx",
+test("Merchant Pricing Step 7 uses automatic durable translations instead of workbook upload", async () => {
+  const builder = await builderSource();
+  const translationStep = await source(
+    "src/components/admin/merchant/merchant-pricing-plan-builder/translations-review-step.tsx",
   );
-  const dropzone = await source(
-    "src/components/admin/translation-workbook-dropzone.tsx",
+  const status = await source(
+    "src/components/admin/merchant/merchant-pricing-plan-builder/merchant-pricing-automatic-translation-status.tsx",
   );
-  assert.match(workbook, /Download pre-populated translation spreadsheet/);
-  assert.match(workbook, /processSelectedTranslationWorkbook/);
-  assert.match(workbook, /TranslationWorkbookDropzone/);
-  assert.match(dropzone, /Drop your completed \.xlsx spreadsheet here/);
-  assert.match(dropzone, /Choose spreadsheet/);
-  assert.match(dropzone, /type="file"/);
-  assert.match(
-    dropzone,
-    /\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/,
-  );
-  assert.match(dropzone, /Upload one spreadsheet at a time\./);
-  assert.match(workbook, /The translation spreadsheet is larger than 2 MiB\./);
-  assert.match(workbook, /Choose an Excel workbook ending in \.xlsx\./);
-  assert.match(workbook, /The translation spreadsheet could not be read\./);
-  assert.match(workbook, /selectedFileName/);
-  assert.match(workbook, /workbookIssues/);
-  assert.match(
-    workbook,
-    /onChange\(parsed\.canonicalRawJson, parsed\.translationResult\)/,
-  );
-  assert.match(workbook, /Show technical details/);
+  assert.match(builder, /name="translationRunId"/);
+  assert.match(translationStep, /MerchantPricingAutomaticTranslationStatus/);
+  assert.match(status, /Moda Interact automatically translates the English merchant content/);
+  assert.match(status, /20 \/ 20 languages ready/);
+  assert.match(status, /Retry translations/);
+  assert.match(status, /System Controls \/ Translations/);
   assert.doesNotMatch(
-    workbook,
-    /Paste completed translation JSON|Choose JSON file|\.json/,
+    `${builder}\n${translationStep}\n${status}`,
+    /Download pre-populated translation spreadsheet|Drop your completed \.xlsx spreadsheet here|Choose spreadsheet|translationJson/,
   );
   await assert.rejects(
-    source("src/components/admin/merchant-pricing-translation-import.tsx"),
+    source("src/components/admin/merchant/merchant-pricing-translation-workbook.tsx"),
   );
 });
 

@@ -8,9 +8,11 @@ import {
   Prisma,
 } from "@prisma/client";
 import { CommercePricingPlanModelAssignmentSchema } from "@modainteract/moda-interact-shared/commerce/model";
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
+import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
 import {
   DEVELOPMENT_PLATFORM_ADMIN,
   ensureDevelopmentPlatformAdmin,
@@ -36,7 +38,6 @@ import {
   type MerchantPricingPlanWithChildren,
 } from "@/lib/admin/merchant/pricing-plan";
 import { assertMerchantPricingPlanModelSelectable } from "@/lib/admin/merchant/pricing-plan-model";
-import { parseCompletedMerchantPricingTranslationPackage } from "@/lib/admin/merchant/pricing-translations";
 import {
   buildDesiredPlanFeatures,
   ensureMerchantKnowledgeFeature,
@@ -44,6 +45,10 @@ import {
   validateMerchantKnowledgeConfiguration,
 } from "@/lib/admin/merchant-knowledge-plan-policy";
 import { persistMerchantPricingPlanFeatures } from "@/lib/admin/merchant/merchant-pricing-plan-feature-persistence";
+import {
+  markMerchantPricingTranslationRunApplied,
+  reconstructReadyMerchantPricingTranslationPackage,
+} from "@/lib/admin/merchant/merchant-pricing-translation-runs";
 
 const merchantPricingInclude = {
   features: {
@@ -62,9 +67,16 @@ const merchantPricingInclude = {
 };
 
 const MERCHANT_PRICING_TRANSACTION_OPTIONS = {
+  isolationLevel: "Serializable" as const,
   maxWait: 10_000,
   timeout: 20_000,
 } as const;
+
+const merchantPricingLogger = createLogger({
+  serviceNamespace: "moda-interact",
+  serviceName: "moda-interact-admin",
+  environment: resolveDeploymentEnvironmentName(),
+});
 
 function actionError(message: string): never {
   throw new Error(message);
@@ -386,18 +398,6 @@ function candidateFromPayload(
   };
 }
 
-function validateTranslation(
-  rawTranslation: string,
-  payload: MerchantPricingBuilderPayload,
-): ReturnType<typeof parseCompletedMerchantPricingTranslationPackage> {
-  return parseCompletedMerchantPricingTranslationPackage(rawTranslation, {
-    planHandle: payload.shopifyPlanHandle,
-    planName: payload.name,
-    englishDescription: payload.englishDescription,
-    highlights: payload.highlights,
-  });
-}
-
 function existingHighlightSources(existing: MerchantPricingPlanWithChildren) {
   return existing.highlights.map((highlight) => ({
     contentKey: highlight.contentKey,
@@ -498,19 +498,46 @@ function catalogueRevisionMatches(
   });
 }
 
-function assertTranslation(
-  rawTranslation: string,
-  payload: MerchantPricingBuilderPayload,
-) {
-  const parsed = validateTranslation(rawTranslation, payload);
-  if (!parsed.valid || !parsed.package) {
-    throw new Error(
-      parsed.issues
-        .map((entry) => `${entry.path}: ${entry.message}`)
-        .join("; "),
-    );
+function parseTranslationRunId(formData: FormData): string | null {
+  const value = formData.get("translationRunId");
+  if (value === null || value === "") return null;
+  if (typeof value !== "string" || !value.trim() || value.trim().length > 255) {
+    actionError("Merchant Pricing translation run id is invalid.");
   }
-  return parsed.package;
+  return value.trim();
+}
+
+function merchantPricingHighlightOrderChanged(
+  existing: MerchantPricingPlanWithChildren,
+  payload: MerchantPricingBuilderPayload,
+): boolean {
+  return existing.highlights.some(
+    (highlight, index) =>
+      highlight.contentKey !== payload.highlights[index]?.contentKey,
+  );
+}
+
+async function reorderMerchantPricingHighlights(
+  transaction: Prisma.TransactionClient,
+  merchantPricingPlanId: string,
+  highlights: MerchantPricingBuilderPayload["highlights"],
+): Promise<void> {
+  if (highlights.length < 2) return;
+  await transaction.merchantPricingPlanHighlight.updateMany({
+    where: { merchantPricingPlanId },
+    data: { position: { increment: highlights.length } },
+  });
+  for (const [position, highlight] of highlights.entries()) {
+    const updated = await transaction.merchantPricingPlanHighlight.updateMany({
+      where: { merchantPricingPlanId, contentKey: highlight.contentKey },
+      data: { position },
+    });
+    if (updated.count !== 1) {
+      actionError(
+        "Merchant Pricing highlight ordering changed while the plan was being saved. Reload and try again.",
+      );
+    }
+  }
 }
 
 function projectedPortfolio(
@@ -790,7 +817,7 @@ export async function mutateMerchantPricingPlanAction(
   }
 
   const payload = parsePayload(formData);
-  const rawTranslation = formData.get("translationJson");
+  const translationRunId = parseTranslationRunId(formData);
   const economicsOverrideRequest = parseEconomicsOverrideRequest(formData);
 
   // Load the expensive catalogue snapshot and perform deterministic validation
@@ -888,12 +915,15 @@ export async function mutateMerchantPricingPlanAction(
 
   const contentChanged =
     isCreate || translatableContentChanged(existing, payload);
-  const translations = contentChanged
-    ? assertTranslation(
-        typeof rawTranslation === "string" ? rawTranslation : "",
-        payload,
-      )
-    : null;
+  if (contentChanged && !translationRunId) {
+    actionError(
+      "Automatic Merchant Pricing translations are not ready. Return to Translations & review and wait for all languages to complete.",
+    );
+  }
+  const reorderHighlights =
+    !isCreate &&
+    !contentChanged &&
+    merchantPricingHighlightOrderChanged(existing, payload);
   const rewriteUsageEvents = isCreate || usageEventsChanged(existing, payload);
 
   const policy = await prisma.platformBillingPolicy.findUnique({
@@ -946,7 +976,9 @@ export async function mutateMerchantPricingPlanAction(
   const commerceModelChanged =
     payload.commerceModelId !== (existing?.commerceModelId ?? null);
 
-  await prisma.$transaction(async (transaction) => {
+  let mutationResult: { planId: string; appliedTranslationRunId: string | null };
+  try {
+    mutationResult = await prisma.$transaction(async (transaction) => {
     // Optimistic concurrency fence: the expensive snapshot was loaded before
     // the transaction. Verify that no plan or catalogue position changed in
     // the meantime before using that snapshot for an atomic write.
@@ -985,6 +1017,18 @@ export async function mutateMerchantPricingPlanAction(
         modelId: payload.commerceModelId,
       });
     }
+
+    const translations = contentChanged
+      ? await reconstructReadyMerchantPricingTranslationPackage(transaction, {
+          runId: translationRunId!,
+          expected: {
+            planHandle: payload.shopifyPlanHandle,
+            planName: payload.name,
+            englishDescription: payload.englishDescription,
+            highlights: payload.highlights,
+          },
+        })
+      : null;
 
     const economicsOverride = await resolveEconomicsOverrideForSave({
       transaction,
@@ -1158,7 +1202,16 @@ export async function mutateMerchantPricingPlanAction(
           relatedEntityId: created.id,
         },
       });
-      return;
+      if (contentChanged) {
+        await markMerchantPricingTranslationRunApplied(transaction, {
+          runId: translationRunId!,
+          merchantPricingPlanId: created.id,
+        });
+      }
+      return {
+        planId: created.id,
+        appliedTranslationRunId: contentChanged ? translationRunId : null,
+      };
     }
 
     const updated = await transaction.merchantPricingPlan.update({
@@ -1221,6 +1274,14 @@ export async function mutateMerchantPricingPlanAction(
           : {}),
       },
     });
+    if (reorderHighlights) {
+      await reorderMerchantPricingHighlights(
+        transaction,
+        existing.id,
+        payload.highlights,
+      );
+    }
+
     CommercePricingPlanModelAssignmentSchema.parse({
       merchantPricingPlanId: updated.id,
       shopifyPlanHandle: updated.shopifyPlanHandle,
@@ -1286,7 +1347,34 @@ export async function mutateMerchantPricingPlanAction(
         relatedEntityId: existing.id,
       },
     });
-  }, MERCHANT_PRICING_TRANSACTION_OPTIONS);
+    if (contentChanged) {
+      await markMerchantPricingTranslationRunApplied(transaction, {
+        runId: translationRunId!,
+        merchantPricingPlanId: existing.id,
+      });
+    }
+    return {
+      planId: existing.id,
+      appliedTranslationRunId: contentChanged ? translationRunId : null,
+    };
+    }, MERCHANT_PRICING_TRANSACTION_OPTIONS);
+  } catch (error) {
+    if (contentChanged && translationRunId) {
+      merchantPricingLogger.error("admin.merchant_pricing.translation_apply_failed", {
+        translationRunId,
+        shopifyPlanHandle: payload.shopifyPlanHandle,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
+    throw error;
+  }
+  if (mutationResult.appliedTranslationRunId) {
+    merchantPricingLogger.info("admin.merchant_pricing.translation_applied", {
+      translationRunId: mutationResult.appliedTranslationRunId,
+      merchantPricingPlanId: mutationResult.planId,
+      shopifyPlanHandle: payload.shopifyPlanHandle,
+    });
+  }
   revalidatePath("/billing");
   redirect("/billing?view=plans");
 }

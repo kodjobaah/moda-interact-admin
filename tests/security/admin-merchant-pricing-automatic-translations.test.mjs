@@ -96,10 +96,15 @@ test("ready package reconstruction revalidates run status, handle, source hash, 
   assert.match(serviceSource, /parseCompletedMerchantPricingTranslationPackage/);
 });
 
-test("ADMIN-002 leaves the existing workbook final mutation operational for the later integration task", () => {
-  assert.match(finalMutationSource, /formData\.get\("translationJson"\)/);
-  assert.match(finalMutationSource, /assertTranslation/);
-  assert.doesNotMatch(finalMutationSource, /translationRunId/);
+test("ADMIN-003 final mutation consumes only durable ready translation work", () => {
+  assert.match(finalMutationSource, /formData\.get\("translationRunId"\)/);
+  assert.doesNotMatch(finalMutationSource, /formData\.get\("translationJson"\)/);
+  assert.match(finalMutationSource, /reconstructReadyMerchantPricingTranslationPackage/);
+  assert.match(finalMutationSource, /markMerchantPricingTranslationRunApplied/);
+  assert.match(finalMutationSource, /isolationLevel:\s*"Serializable"/);
+  assert.match(serviceSource, /status:\s*MerchantPricingTranslationRunStatus\.READY_TO_APPLY/);
+  assert.match(serviceSource, /status:\s*MerchantPricingTranslationRunStatus\.APPLIED/);
+  assert.match(serviceSource, /appliedMerchantPricingPlanId/);
 });
 
 test("new Merchant Pricing translation semantic logs use the Shared logger", () => {
@@ -107,4 +112,45 @@ test("new Merchant Pricing translation semantic logs use the Shared logger", () 
   assert.match(serviceSource, /admin\.merchant_pricing\.translation_requested/);
   assert.match(serviceSource, /admin\.merchant_pricing\.translation_request_failed/);
   assert.doesNotMatch(serviceSource, /console\.(log|warn|error)/);
+});
+
+
+test("ADMIN-003 builder automatically requests and polls without exposing workbook controls", () => {
+  const builder = fs.readFileSync(
+    path.join(root, "src/components/admin/merchant/merchant-pricing-plan-builder.tsx"),
+    "utf8",
+  );
+  const step = fs.readFileSync(
+    path.join(root, "src/components/admin/merchant/merchant-pricing-plan-builder/translations-review-step.tsx"),
+    "utf8",
+  );
+  const hook = fs.readFileSync(
+    path.join(root, "src/components/admin/merchant/merchant-pricing-plan-builder/use-merchant-pricing-automatic-translation.ts"),
+    "utf8",
+  );
+  assert.match(builder, /name="translationRunId"/);
+  assert.doesNotMatch(builder, /translationJson|MerchantPricingTranslationWorkbook/);
+  assert.doesNotMatch(step, /Download pre-populated translation spreadsheet|Choose spreadsheet|\.xlsx/);
+  assert.match(hook, /requestMerchantPricingTranslationAction/);
+  assert.match(hook, /getMerchantPricingTranslationStatusAction/);
+  assert.match(hook, /window\.setInterval/);
+  assert.match(hook, /window\.clearInterval/);
+  assert.match(hook, /merchantPricingAutomaticTranslationTerminal/);
+  assert.match(hook, /runSourceKey === sourceKey/);
+  assert.match(hook, /message\.sourceKey === sourceKey/);
+  assert.doesNotMatch(hook, /router\.refresh/);
+});
+
+test("ADMIN-003 preserves translations on reorder-only edits without provider work", () => {
+  assert.match(finalMutationSource, /merchantPricingHighlightOrderChanged/);
+  assert.match(finalMutationSource, /reorderMerchantPricingHighlights/);
+  assert.match(finalMutationSource, /position:\s*\{\s*increment:\s*highlights\.length\s*\}/);
+  assert.match(finalMutationSource, /!contentChanged/);
+});
+
+test("translation application semantic logs use Shared logging and contain no translation text", () => {
+  assert.match(finalMutationSource, /@modainteract\/moda-interact-shared\/logging/);
+  assert.match(finalMutationSource, /admin\.merchant_pricing\.translation_applied/);
+  assert.match(finalMutationSource, /admin\.merchant_pricing\.translation_apply_failed/);
+  assert.doesNotMatch(finalMutationSource, /translatedText:\s*|sourceText:\s*/);
 });

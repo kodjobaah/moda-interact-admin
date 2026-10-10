@@ -15,7 +15,6 @@ import {
   retainInitialMerchantKnowledgeConfiguration,
   selectUnavailableCommerceModelId,
   sourceTypeKey,
-  validMerchantPricingTranslationJson,
   type MerchantPricingPlanDraft,
 } from "./merchant-pricing-plan-draft";
 import {
@@ -53,11 +52,8 @@ import { assessMerchantPricingEconomicsOverride } from "@/lib/admin/merchant/pri
 import { presentMerchantPricingEconomicsResult } from "@/lib/admin/merchant/pricing-economics-presentation";
 import { buildSupportedFeatureControls } from "@/lib/admin/merchant/pricing-plan-feature-controls";
 import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
-import {
-  buildMerchantPricingTranslationTemplate,
-  type MerchantPricingTranslationParseResult,
-} from "@/lib/admin/merchant/pricing-translations";
 import type { MerchantKnowledgeFeatureConfiguration } from "@modainteract/moda-interact-shared/merchant-knowledge";
+import { useMerchantPricingAutomaticTranslation } from "./use-merchant-pricing-automatic-translation";
 
 export type MerchantPricingPlanDraftControllerInput = {
   plan?: MerchantPricingPlanWithChildren;
@@ -254,46 +250,26 @@ export function useMerchantPricingPlanDraft({
     recoveryUsageEventHandle: draft.recoveryUsageEventHandle,
     planKind: draft.planKind,
   });
-  const retainedTemplate = plan
-    ? buildMerchantPricingTranslationTemplate({
-        planHandle: draft.handle,
-        planName: draft.name,
-        englishDescription: draft.description,
-        highlights: draft.highlights,
-        previous: {
-          englishDescription:
-            plan.translations.find((translation) => translation.locale === "en")
-              ?.merchantDescription ?? "",
-          highlights: initialHighlights(plan),
-          translations: plan.translations.map((translation) => ({
-            locale: translation.locale,
-            merchantDescription: translation.merchantDescription,
-            highlights: plan.highlights.map((highlight) => {
-              const value = highlight.translations.find(
-                (candidate) => candidate.locale === translation.locale,
-              );
-              return {
-                contentKey: highlight.contentKey,
-                title: value?.merchantTitle ?? "",
-                description: value?.merchantDescription ?? "",
-              };
-            }),
-          })),
-        },
-      })
-    : null;
   const translationsRetained = merchantPricingBuilderTranslationsRetained(
     plan,
     draft.description,
     draft.highlights,
   );
+  const automaticTranslation = useMerchantPricingAutomaticTranslation({
+    active: draft.step === 6,
+    translationsRetained,
+    merchantPricingPlanId: plan?.id ?? null,
+    shopifyPlanHandle: draft.handle,
+    englishDescription: draft.description,
+    highlights: draft.highlights,
+  });
   const canSubmit = canSubmitMerchantPricingPlan({
     requiredFieldsValid,
     merchantKnowledgeConfigurationValid,
     reason: draft.reason,
     economicsSatisfied,
     translationsRetained,
-    translationValid: Boolean(draft.translationResult?.valid),
+    translationReady: automaticTranslation.ready,
   });
   const placementLabel = plan
     ? `Current position (${plan.cataloguePosition + 1})`
@@ -401,30 +377,18 @@ export function useMerchantPricingPlanDraft({
       index: number,
       update: Partial<Omit<MerchantPricingPlanDraft["highlights"][number], "contentKey">>,
     ) => dispatch({ type: "update-highlight", index, update }),
-    onWorkbookChange: (
-      rawJson: string,
-      result: MerchantPricingTranslationParseResult | null,
-    ) => dispatch({ type: "set-translation", rawJson, result }),
+    retryAutomaticTranslation: automaticTranslation.retry,
     setSupportedFeatureKeys: (keys: string[]) =>
       dispatch({ type: "replace-supported-features", keys }),
   };
 
-  const currentTemplate = buildMerchantPricingTranslationTemplate({
-    planHandle: draft.handle,
-    planName: draft.name,
-    englishDescription: draft.description,
-    highlights: draft.highlights,
-  });
-  const validTranslationJson = validMerchantPricingTranslationJson({
-    translationJson: draft.translationJson,
-    translationValid: Boolean(draft.translationResult?.valid),
-    retainedTemplate,
-    currentTemplate,
-  });
   const formFields = buildMerchantPricingPlanDraftFormFields({
     isEditing: Boolean(plan),
     payload,
-    translationJson: validTranslationJson,
+    translationRunId:
+      translationsRetained || !automaticTranslation.ready
+        ? ""
+        : (automaticTranslation.run?.runId ?? ""),
     economicsOverrideReady,
     economicsOverrideReason: draft.economicsOverrideReason,
   });
@@ -459,14 +423,12 @@ export function useMerchantPricingPlanDraft({
       passedEconomics,
       unboundedZeroCostEventLabel,
       translationsRetained,
-      retainedTemplate,
-      currentTemplate,
+      automaticTranslation,
       serializedUsageEvents,
       economicsConfigurationKey,
       payload,
       canSubmit,
       canNavigateTo,
-      validTranslationJson,
       formFields,
       sourceTypeKey,
       formatBuilderEventPrice,

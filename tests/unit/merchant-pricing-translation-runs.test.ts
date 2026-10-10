@@ -14,6 +14,7 @@ import {
 } from "../../src/lib/admin/merchant/merchant-pricing-automatic-translations.ts";
 import {
   MERCHANT_PRICING_TRANSLATION_ERRORS,
+  markMerchantPricingTranslationRunApplied,
   reconstructReadyMerchantPricingTranslationPackage,
   requestMerchantPricingTranslationInTransaction,
 } from "../../src/lib/admin/merchant/merchant-pricing-translation-runs.ts";
@@ -243,5 +244,49 @@ test("ready package reconstruction rejects stale source identity", async () => {
       },
     }),
     new RegExp(MERCHANT_PRICING_TRANSLATION_ERRORS.runSourceMismatch),
+  );
+});
+
+
+test("ready translation run application is compare-and-set and records plan provenance", async () => {
+  const calls: unknown[] = [];
+  const db = {
+    merchantPricingTranslationRun: {
+      updateMany: async (args: unknown) => {
+        calls.push(args);
+        return { count: 1 };
+      },
+    },
+  } as never;
+  const now = new Date("2026-10-10T12:00:00.000Z");
+  await markMerchantPricingTranslationRunApplied(db, {
+    runId: "run-ready",
+    merchantPricingPlanId: "plan-1",
+    now,
+  });
+  const call = calls[0] as {
+    where: Record<string, unknown>;
+    data: Record<string, unknown>;
+  };
+  assert.equal(call.where.id, "run-ready");
+  assert.equal(call.where.status, MerchantPricingTranslationRunStatus.READY_TO_APPLY);
+  assert.equal(call.data.status, MerchantPricingTranslationRunStatus.APPLIED);
+  assert.equal(call.data.appliedMerchantPricingPlanId, "plan-1");
+  assert.equal(call.data.appliedAt, now);
+  assert.equal(call.data.completedAt, now);
+});
+
+test("already consumed translation run fails closed", async () => {
+  const db = {
+    merchantPricingTranslationRun: {
+      updateMany: async () => ({ count: 0 }),
+    },
+  } as never;
+  await assert.rejects(
+    markMerchantPricingTranslationRunApplied(db, {
+      runId: "run-ready",
+      merchantPricingPlanId: "plan-1",
+    }),
+    new RegExp(MERCHANT_PRICING_TRANSLATION_ERRORS.runAlreadyApplied),
   );
 });
