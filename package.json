@@ -18,13 +18,14 @@
     "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear",
     "admin:seed-merchant-pricing": "node scripts/seed-manual-merchant-pricing.mjs",
     "admin:seed-four-merchant-pricing": "node scripts/seed-four-merchant-pricing.mjs",
+    "admin:seed-core-merchant-pricing": "node scripts/seed-core-merchant-pricing.mjs",
     "admin:seed-promotion": "node scripts/seed-manual-promotion.mjs",
     "admin:seed-usage-overview": "node scripts/seed-usage-overview-test-data.mjs",
     "shopify-taxonomy:sync": "node scripts/sync-shopify-taxonomy.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
-    "@modainteract/moda-interact-shared": "1.3.0",
+    "@modainteract/moda-interact-shared": "1.4.0",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "codemirror": "^6.0.2",
