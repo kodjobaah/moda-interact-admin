@@ -284,8 +284,12 @@ export async function getRecoveryCreditRefundDetail(id: string): Promise<Recover
       shopifyPlanHandleSnapshot: row.purchase.shopifyPlanHandleSnapshot,
       shopifyEventHandleSnapshot: row.purchase.shopifyEventHandleSnapshot,
       providerSubscriptionIdSnapshot: row.purchase.providerSubscriptionIdSnapshot,
-      providerUsageQuantityBeforeSnapshot: row.purchase.providerUsageQuantityBeforeSnapshot.toString(),
-      providerUsageCostBeforeSnapshot: row.purchase.providerUsageCostBeforeSnapshot.toString(),
+      providerUsageQuantityBeforeSnapshot: decimalValue(
+        row.purchase.providerUsageQuantityBeforeSnapshot,
+      ),
+      providerUsageCostBeforeSnapshot: decimalValue(
+        row.purchase.providerUsageCostBeforeSnapshot,
+      ),
       providerUsageCostCurrencyBeforeSnapshot: row.purchase.providerUsageCostCurrencyBeforeSnapshot,
       providerUsageQuantityAfterSnapshot: decimalValue(row.purchase.providerUsageQuantityAfterSnapshot),
       providerUsageCostAfterSnapshot: decimalValue(row.purchase.providerUsageCostAfterSnapshot),

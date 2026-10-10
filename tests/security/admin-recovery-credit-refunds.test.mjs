@@ -20,6 +20,8 @@ test("refund triage is bounded and derives the ARCH-015 queue states", async () 
   assert.match(source, /automaticCorrectionUsageEvent:/);
   assert.match(source, /quantity: row\.automaticCorrectionUsageEvent\.quantity\.toString\(\)/);
   assert.match(source, /providerUsageQuantityBeforeCorrection/);
+  assert.match(source, /providerUsageQuantityBeforeSnapshot: decimalValue/);
+  assert.match(source, /providerUsageCostBeforeSnapshot: decimalValue/);
   assert.match(source, /expectedProviderUsageCostAfterCorrection/);
   assert.doesNotMatch(source, /update\(|create\(|delete\(/);
 });

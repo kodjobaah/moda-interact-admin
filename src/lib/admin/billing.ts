@@ -74,12 +74,14 @@ function recoveryCreditPurchaseProjection(
       brandName: row.shop.brand?.brandName ?? null,
     },
     planName: row.plan?.name ?? null,
-    usageEvent: {
-      ...row.usageEvent,
-      quantity: decimalValue(row.usageEvent.quantity),
-      providerResponseSummary:
-        row.usageEvent.providerResponseSummary?.slice(0, 2000) ?? null,
-    },
+    usageEvent: row.usageEvent
+      ? {
+          ...row.usageEvent,
+          quantity: decimalValue(row.usageEvent.quantity),
+          providerResponseSummary:
+            row.usageEvent.providerResponseSummary?.slice(0, 2000) ?? null,
+        }
+      : null,
   };
 }
 

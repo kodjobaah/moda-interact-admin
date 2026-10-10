@@ -50,8 +50,8 @@ export type RecoveryCreditPurchaseItem = {
   shopId: string;
   shop: { domain: string; brandName: string | null };
   planName: string | null;
-  shopifyPlanHandleSnapshot: string;
-  shopifyEventHandleSnapshot: string;
+  shopifyPlanHandleSnapshot: string | null;
+  shopifyEventHandleSnapshot: string | null;
   creditsGranted: number;
   status: string;
   activatedAt: Date | null;
@@ -69,7 +69,7 @@ export type RecoveryCreditPurchaseItem = {
     providerErrorCode: string | null;
     providerResponseSummary: string | null;
     shopifyEventHandle: string | null;
-  };
+  } | null;
 };
 
 export type RecoveryCreditRefundQueueStatus =
@@ -106,10 +106,10 @@ export type RecoveryCreditRefundItem = {
   currentAmountAtRequestSnapshot: number;
   reservedAmountAtRequestSnapshot: number;
   availableAmountAtRequestSnapshot: number;
-  billingPeriodIdSnapshot: string;
-  providerSubscriptionIdSnapshot: string;
-  planHandleSnapshot: string;
-  eventHandleSnapshot: string;
+  billingPeriodIdSnapshot: string | null;
+  providerSubscriptionIdSnapshot: string | null;
+  planHandleSnapshot: string | null;
+  eventHandleSnapshot: string | null;
   purchaseProviderAmountSnapshot: string;
   purchaseProviderCurrencySnapshot: string;
   finalCreditQuantity: number | null;
@@ -143,12 +143,12 @@ export type RecoveryCreditRefundItem = {
 export type RecoveryCreditRefundDetail = RecoveryCreditRefundItem & {
   purchase: RecoveryCreditRefundItem["purchase"] & {
     planName: string | null;
-    shopifyPlanHandleSnapshot: string;
-    shopifyEventHandleSnapshot: string;
-    providerSubscriptionIdSnapshot: string;
-    providerUsageQuantityBeforeSnapshot: string;
-    providerUsageCostBeforeSnapshot: string;
-    providerUsageCostCurrencyBeforeSnapshot: string;
+    shopifyPlanHandleSnapshot: string | null;
+    shopifyEventHandleSnapshot: string | null;
+    providerSubscriptionIdSnapshot: string | null;
+    providerUsageQuantityBeforeSnapshot: string | null;
+    providerUsageCostBeforeSnapshot: string | null;
+    providerUsageCostCurrencyBeforeSnapshot: string | null;
     providerUsageQuantityAfterSnapshot: string | null;
     providerUsageCostAfterSnapshot: string | null;
     providerUsageCostCurrencyAfterSnapshot: string | null;
@@ -160,7 +160,7 @@ export type RecoveryCreditRefundDetail = RecoveryCreditRefundItem & {
       periodEnd: Date;
       planNameSnapshot: string | null;
       planKindSnapshot: string | null;
-    };
+    } | null;
   };
   approvedAt: Date | null;
   holdAppliedAt: Date | null;

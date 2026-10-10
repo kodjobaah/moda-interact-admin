@@ -50,9 +50,10 @@ test("billing reads stay platform-admin protected and tenant scoped", async () =
       /where: \{ id, \.\.\.\(shopId \? \{ shopId \} : \{\}\) \}/,
     );
   }
+  assert.match(source, /usageEvent: row\.usageEvent/);
   assert.match(
     source,
-    /providerResponseSummary:\s*row\.usageEvent\.providerResponseSummary\?\.slice\(0, 2000\)/,
+    /row\.usageEvent\.providerResponseSummary\?\.slice\(0, 2000\)/,
   );
   assert.match(source, /providerErrorCode: true/);
   assert.doesNotMatch(

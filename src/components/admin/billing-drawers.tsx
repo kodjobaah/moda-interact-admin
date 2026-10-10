@@ -89,7 +89,7 @@ export function RecoveryCreditPurchaseDrawer({
     ? withParamUpdates(returnPath, params, { purchaseId: null })
     : withParamUpdates("/billing", params, { purchaseId: null });
   const event = purchase.usageEvent;
-  const eventReported = event.shopifyReportState === "REPORTED";
+  const eventReported = event?.shopifyReportState === "REPORTED";
   return (
     <AdminDetailDrawer
       title={adminI18n.t("billing.recoveryPackDetails")}
@@ -122,30 +122,30 @@ export function RecoveryCreditPurchaseDrawer({
             adminI18n.t("billing.packMeterSnapshot"),
             purchase.shopifyEventHandleSnapshot,
           ],
-          [adminI18n.t("billing.usageEventId"), event.id],
-          [adminI18n.t("billing.metric"), event.metric],
-          [adminI18n.t("billing.quantity"), event.quantity],
+          [adminI18n.t("billing.usageEventId"), event?.id ?? null],
+          [adminI18n.t("billing.metric"), event?.metric ?? null],
+          [adminI18n.t("billing.quantity"), event?.quantity ?? null],
           [
             adminI18n.t("billing.reportStateLabel"),
-            adminBillingReportStateLabel(event.shopifyReportState),
+            event ? adminBillingReportStateLabel(event.shopifyReportState) : null,
           ],
           [
             adminI18n.t("billing.submittedAt"),
-            event.reportedAt
+            event?.reportedAt
               ? adminI18n.formatDateTime(event.reportedAt)
               : null,
           ],
-          [adminI18n.t("billing.reportAttempts"), event.reportAttemptCount],
+          [adminI18n.t("billing.reportAttempts"), event?.reportAttemptCount ?? null],
           [
             adminI18n.t("billing.lastReportAttemptAt"),
-            event.lastReportAttemptAt
+            event?.lastReportAttemptAt
               ? adminI18n.formatDateTime(event.lastReportAttemptAt)
               : null,
           ],
-          [adminI18n.t("billing.providerErrorCode"), event.providerErrorCode],
+          [adminI18n.t("billing.providerErrorCode"), event?.providerErrorCode ?? null],
           [
             adminI18n.t("billing.providerResponse"),
-            event.providerResponseSummary,
+            event?.providerResponseSummary ?? null,
           ],
         ]}
       />
