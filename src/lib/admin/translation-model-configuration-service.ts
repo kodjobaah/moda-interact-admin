@@ -16,6 +16,7 @@ import {
 } from "./translation-configuration.ts";
 import {
   TRANSLATION_PROVIDER,
+  validateTranslationModelAutomaticDefaultMutation,
   validateTranslationModelConfigurationMutation,
   validateTranslationModelEnabledMutation,
 } from "./translation-configuration-validation.ts";
@@ -239,6 +240,168 @@ export async function updateTranslationModelConfiguration(
   }
 }
 
+export async function setTranslationModelConfigurationAutomaticDefault(
+  input: {
+    id: unknown;
+    operationId: unknown;
+    reason: unknown;
+    expectedEditVersion: unknown;
+  },
+  principal: PlatformAdminPrincipal,
+): Promise<TranslationModelConfigurationView> {
+  requireSuperAdmin(principal);
+  const validated = validateTranslationModelAutomaticDefaultMutation(input);
+  const environment = resolveCommerceEnvironment() as CommerceEnvironment;
+  const { prisma } = await import("@/lib/prisma");
+
+  try {
+    const result = await prisma.$transaction(
+      async (transaction) => {
+        await ensureDevelopmentPlatformAdmin(transaction, principal);
+        const existing = await transaction.commerceTranslationModelConfiguration.findFirst({
+          where: {
+            id: validated.id,
+            environment,
+            provider: TRANSLATION_PROVIDER,
+          },
+          select: {
+            id: true,
+            enabled: true,
+            automaticDefault: true,
+            editVersion: true,
+          },
+        });
+        if (!existing) {
+          throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelNotFound);
+        }
+        if (existing.editVersion !== validated.expectedEditVersion) {
+          throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
+        }
+        if (!existing.enabled) {
+          throw new Error(
+            TRANSLATION_CONFIGURATION_ERRORS.modelAutomaticDefaultRequiresEnabled,
+          );
+        }
+        if (existing.automaticDefault) {
+          const current = await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow({
+            where: { id: existing.id },
+            select: translationModelSelect,
+          });
+          return translationModelView(current);
+        }
+
+        const previousDefault =
+          await transaction.commerceTranslationModelConfiguration.findFirst({
+            where: {
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              automaticDefault: true,
+              id: { not: existing.id },
+            },
+            select: {
+              id: true,
+              providerModelId: true,
+              editVersion: true,
+            },
+          });
+
+        if (previousDefault) {
+          const cleared =
+            await transaction.commerceTranslationModelConfiguration.updateMany({
+              where: {
+                id: previousDefault.id,
+                environment,
+                provider: TRANSLATION_PROVIDER,
+                automaticDefault: true,
+                editVersion: previousDefault.editVersion,
+              },
+              data: {
+                automaticDefault: false,
+                updatedByAdminId: principal.id,
+                editVersion: { increment: 1 },
+              },
+            });
+          if (cleared.count !== 1) {
+            throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
+          }
+        }
+
+        const selected =
+          await transaction.commerceTranslationModelConfiguration.updateMany({
+            where: {
+              id: existing.id,
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              enabled: true,
+              automaticDefault: false,
+              editVersion: validated.expectedEditVersion,
+            },
+            data: {
+              automaticDefault: true,
+              updatedByAdminId: principal.id,
+              editVersion: { increment: 1 },
+            },
+          });
+        if (selected.count !== 1) {
+          throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
+        }
+
+        const row = await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow({
+          where: { id: existing.id },
+          select: translationModelSelect,
+        });
+        await transaction.commerceAuditEvent.create({
+          data: {
+            actorType: CommerceAuditActorType.PLATFORM_ADMIN,
+            actorAdminId: principal.id,
+            operationId: validated.operationId,
+            action: CommerceAuditAction.UPDATE_TRANSLATION_MODEL_CONFIGURATION,
+            environment,
+            translationModelConfigurationId: row.id,
+            reason: validated.reason,
+            metadata: {
+              change: "automaticDefault",
+              provider: TRANSLATION_PROVIDER,
+              providerModelId: row.providerModelId,
+              displayName: row.displayName,
+              previousAutomaticDefaultModelConfigurationId:
+                previousDefault?.id ?? null,
+              previousAutomaticDefaultProviderModelId:
+                previousDefault?.providerModelId ?? null,
+              previousAutomaticDefaultEditVersion:
+                previousDefault?.editVersion ?? null,
+              previousSelectedEditVersion: validated.expectedEditVersion,
+              editVersion: row.editVersion,
+              automaticDefault: true,
+            },
+          },
+        });
+        return translationModelView(row);
+      },
+      { isolationLevel: "Serializable" },
+    );
+    logger.info("admin.translation_model_configuration.automatic_default_set", {
+      environment,
+      provider: TRANSLATION_PROVIDER,
+      modelConfigurationId: result.id,
+      providerModelId: result.providerModelId,
+      editVersion: result.editVersion,
+    });
+    return result;
+  } catch (cause) {
+    logger.error("admin.translation_model_configuration.automatic_default_failed", {
+      environment,
+      provider: TRANSLATION_PROVIDER,
+      modelConfigurationId: validated.id,
+      databaseCode: databaseCode(cause) ?? null,
+    });
+    if (databaseCode(cause) === "P2002" || databaseCode(cause) === "P2034") {
+      throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
+    }
+    throw cause;
+  }
+}
+
 export async function setTranslationModelConfigurationEnabled(
   input: {
     id: unknown;
@@ -264,7 +427,12 @@ export async function setTranslationModelConfigurationEnabled(
             environment,
             provider: TRANSLATION_PROVIDER,
           },
-          select: { id: true, enabled: true, editVersion: true },
+          select: {
+            id: true,
+            enabled: true,
+            automaticDefault: true,
+            editVersion: true,
+          },
         });
         if (!existing) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelNotFound);
@@ -272,12 +440,18 @@ export async function setTranslationModelConfigurationEnabled(
         if (existing.editVersion !== validated.expectedEditVersion) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
         }
+        if (!validated.enabled && existing.automaticDefault) {
+          throw new Error(
+            TRANSLATION_CONFIGURATION_ERRORS.modelAutomaticDefaultDisableBlocked,
+          );
+        }
         const updated = await transaction.commerceTranslationModelConfiguration.updateMany({
           where: {
             id: existing.id,
             environment,
             provider: TRANSLATION_PROVIDER,
             editVersion: validated.expectedEditVersion,
+            ...(validated.enabled ? {} : { automaticDefault: false }),
           },
           data: {
             enabled: validated.enabled,

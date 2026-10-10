@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   TRANSLATION_PROVIDER,
   validateTranslationCredentialSecret,
+  validateTranslationModelAutomaticDefaultMutation,
   validateTranslationModelConfigurationMutation,
   validateTranslationModelEnabledMutation,
   validateTranslationProviderCredentialMutation,
@@ -101,5 +102,32 @@ test("translation model status changes require a positive CAS version", () => {
       reason: "disable",
       expectedEditVersion: 4,
     },
+  );
+});
+
+test("automatic default mutation requires an id and positive CAS version", () => {
+  assert.deepEqual(
+    validateTranslationModelAutomaticDefaultMutation({
+      id: " model-2 ",
+      operationId: " operation-4 ",
+      reason: " use for automatic translations ",
+      expectedEditVersion: 7,
+    }),
+    {
+      id: "model-2",
+      operationId: "operation-4",
+      reason: "use for automatic translations",
+      expectedEditVersion: 7,
+    },
+  );
+  assert.throws(
+    () =>
+      validateTranslationModelAutomaticDefaultMutation({
+        id: "model-2",
+        operationId: "operation-4",
+        reason: "use for automatic translations",
+        expectedEditVersion: 0,
+      }),
+    /expectedEditVersion is invalid/,
   );
 });

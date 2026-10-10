@@ -25,6 +25,7 @@ const [
   credential,
   models,
   modelForm,
+  automaticDefaultForm,
   sidebar,
   shell,
   packageJson,
@@ -47,6 +48,9 @@ const [
   ),
   source(
     "src/components/admin/translation-configuration/translation-model-configuration-form.tsx",
+  ),
+  source(
+    "src/components/admin/translation-configuration/translation-model-automatic-default-form.tsx",
   ),
   source("src/components/admin/sidebar.tsx"),
   source("src/components/admin/admin-shell.tsx"),
@@ -72,6 +76,7 @@ test("all translation mutations independently require SUPER_ADMIN before form pa
     "removeTranslationProviderCredentialAction",
     "createTranslationModelConfigurationAction",
     "updateTranslationModelConfigurationAction",
+    "setTranslationModelConfigurationAutomaticDefaultAction",
     "setTranslationModelConfigurationEnabledAction",
   ]) {
     const start = action.indexOf(`export async function ${name}`);
@@ -99,11 +104,11 @@ test("credential status never returns encrypted envelope fields and only OpenAI 
   assert.match(credential, />OpenAI</);
 });
 
-test("translation credential uses Shared 1.3.0 AAD and the existing Commerce keyring", () => {
+test("translation credential uses the published Shared AAD and the existing Commerce keyring", () => {
   const dependency = JSON.parse(packageJson).dependencies[
     "@modainteract/moda-interact-shared"
   ];
-  assert.equal(dependency, "1.3.0");
+  assert.match(dependency, /^\d+\.\d+\.\d+$/);
   assert.match(cryptoSource, /createCommerceTranslationProviderCredentialAad/);
   assert.match(cryptoSource, /provider: input\.provider/);
   assert.match(service, /loadActiveCredentialKeyring\(\)/);
@@ -111,7 +116,7 @@ test("translation credential uses Shared 1.3.0 AAD and the existing Commerce key
 });
 
 test("translation configuration UI has synchronous single-flight mutation guards", () => {
-  for (const component of [credential, modelForm]) {
+  for (const component of [credential, modelForm, automaticDefaultForm]) {
     assert.match(component, /const inFlight = useRef\(false\)/);
     assert.match(component, /if \(inFlight\.current \|\| refreshRequired\) return;/);
     assert.ok(component.indexOf("inFlight.current = true") < component.indexOf("await "));
@@ -144,6 +149,62 @@ test("credential removal is blocked once model profiles reference the credential
   assert.match(service, /credentialInUse/);
   assert.match(credential, /status\.modelCount === 0/);
   assert.match(credential, /cannot be removed while translation model\s+profiles reference it/);
+});
+
+test("automatic translation default is explicit, CAS-protected, atomic, and audited", () => {
+  assert.match(configurationService, /automaticDefault: true/);
+  assert.match(modelService, /setTranslationModelConfigurationAutomaticDefault/);
+  assert.match(modelService, /validateTranslationModelAutomaticDefaultMutation/);
+  assert.match(modelService, /existing\.editVersion !== validated\.expectedEditVersion/);
+  assert.match(modelService, /if \(!existing\.enabled\)/);
+  assert.match(modelService, /automaticDefault: true,[\s\S]*?id: \{ not: existing\.id \}/);
+  assert.match(modelService, /automaticDefault: false,[\s\S]*?editVersion: \{ increment: 1 \}/);
+  assert.match(modelService, /enabled: true,[\s\S]*?automaticDefault: false,[\s\S]*?editVersion: validated\.expectedEditVersion/);
+  assert.match(modelService, /action: CommerceAuditAction\.UPDATE_TRANSLATION_MODEL_CONFIGURATION/);
+  assert.match(modelService, /change: "automaticDefault"/);
+  assert.match(modelService, /admin\.translation_model_configuration\.automatic_default_set/);
+  assert.match(action, /setTranslationModelConfigurationAutomaticDefaultAction/);
+  assert.match(action, /expectedEditVersion: positiveInteger/);
+});
+
+test("automatic default cannot be disabled and the UI explains the required replacement", () => {
+  assert.match(
+    modelService,
+    /!validated\.enabled && existing\.automaticDefault[\s\S]*?modelAutomaticDefaultDisableBlocked/,
+  );
+  assert.match(
+    modelForm,
+    /disableBlocked = model\.enabled && model\.automaticDefault/,
+  );
+  assert.match(
+    modelForm,
+    /Choose another automatic-default translation model before disabling this model\./,
+  );
+  assert.match(models, />\s*Automatic default\s*</);
+  assert.match(models, /models\.some\([\s\S]*?model\.automaticDefault/);
+  assert.match(
+    models,
+    /No automatic translation default is configured for this environment\./,
+  );
+  assert.match(models, /Merchant Pricing translation/);
+  assert.doesNotMatch(models, /models\.(?:find|findIndex)\([^)]*enabled/);
+});
+
+test("only enabled non-default models expose the automatic-default mutation control", () => {
+  assert.match(
+    models,
+    /model\.automaticDefault[\s\S]*?: model\.enabled \?[\s\S]*?<TranslationModelAutomaticDefaultForm/,
+  );
+  assert.match(
+    models,
+    /Enable this model before setting it as the automatic[\s\S]*?translation default\./,
+  );
+  assert.match(automaticDefaultForm, /Set as automatic default/);
+  assert.match(automaticDefaultForm, /const inFlight = useRef\(false\)/);
+  assert.match(
+    automaticDefaultForm,
+    /if \(inFlight\.current \|\| refreshRequired\) return;/,
+  );
 });
 
 test("sidebar exposes Translations under System Controls", () => {

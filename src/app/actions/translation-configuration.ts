@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin/translation-provider-credential-service";
 import {
   createTranslationModelConfiguration,
+  setTranslationModelConfigurationAutomaticDefault,
   setTranslationModelConfigurationEnabled,
   updateTranslationModelConfiguration,
 } from "@/lib/admin/translation-model-configuration-service";
@@ -212,6 +213,29 @@ export async function updateTranslationModelConfigurationAction(
         id: formText(formData, "id"),
         displayName: formText(formData, "displayName"),
         providerModelId: formText(formData, "providerModelId"),
+        reason: formText(formData, "reason"),
+        operationId: formText(formData, "operationId"),
+        expectedEditVersion: positiveInteger(formData, "expectedEditVersion"),
+      },
+      principal,
+    );
+  });
+}
+
+export async function setTranslationModelConfigurationAutomaticDefaultAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const principal = await requireSuperAdmin();
+  return finish(async () => {
+    assertFields(formData, [
+      "id",
+      "reason",
+      "operationId",
+      "expectedEditVersion",
+    ]);
+    await setTranslationModelConfigurationAutomaticDefault(
+      {
+        id: formText(formData, "id"),
         reason: formText(formData, "reason"),
         operationId: formText(formData, "operationId"),
         expectedEditVersion: positiveInteger(formData, "expectedEditVersion"),

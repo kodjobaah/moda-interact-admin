@@ -22,6 +22,7 @@ export type TranslationModelConfigurationView = {
   providerModelId: string;
   displayName: string;
   enabled: boolean;
+  automaticDefault: boolean;
   editVersion: number;
   createdAt: string;
   updatedAt: string;
@@ -50,6 +51,10 @@ export const TRANSLATION_CONFIGURATION_ERRORS = {
     "Translation model configuration changed. Refresh and try again.",
   modelDuplicate:
     "A translation model with this display name or provider model ID already exists in this environment.",
+  modelAutomaticDefaultRequiresEnabled:
+    "Only an enabled translation model can be the automatic default.",
+  modelAutomaticDefaultDisableBlocked:
+    "Choose another automatic-default translation model before disabling this model.",
 } as const;
 
 export const translationCredentialStatusSelect = {
@@ -66,6 +71,7 @@ export const translationModelSelect = {
   providerModelId: true,
   displayName: true,
   enabled: true,
+  automaticDefault: true,
   editVersion: true,
   createdAt: true,
   updatedAt: true,
@@ -102,6 +108,7 @@ export function translationModelView(row: {
   providerModelId: string;
   displayName: string;
   enabled: boolean;
+  automaticDefault: boolean;
   editVersion: number;
   createdAt: Date;
   updatedAt: Date;

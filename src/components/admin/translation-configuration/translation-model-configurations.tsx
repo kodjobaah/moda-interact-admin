@@ -1,4 +1,5 @@
 import type { TranslationModelConfigurationView } from "@/lib/admin/translation-configuration";
+import { TranslationModelAutomaticDefaultForm } from "./translation-model-automatic-default-form";
 import {
   TranslationModelConfigurationForm,
   TranslationModelEnabledForm,
@@ -13,6 +14,10 @@ export function TranslationModelConfigurations({
   canMutate: boolean;
   credentialConfigured: boolean;
 }) {
+  const automaticDefaultConfigured = models.some(
+    (model) => model.automaticDefault,
+  );
+
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
       <div>
@@ -20,10 +25,20 @@ export function TranslationModelConfigurations({
           Translation model profiles
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-gray-600">
-          Define the OpenAI models that later Store Category enablement can
-          choose from. Profiles are configuration only
+          Define the OpenAI models available to platform translation workflows.
+          Store Category localisation can select an enabled profile; automatic
+          workflows use the designated automatic default.
         </p>
       </div>
+
+      {!automaticDefaultConfigured ? (
+        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          No automatic translation default is configured for this environment.
+          Automatic workflows such as Merchant Pricing translation are
+          unavailable until an enabled model is designated as the automatic
+          default.
+        </p>
+      ) : null}
 
       {canMutate ? (
         credentialConfigured ? (
@@ -63,15 +78,22 @@ export function TranslationModelConfigurations({
                     {model.provider}/{model.providerModelId}
                   </p>
                 </div>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    model.enabled
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {model.enabled ? "Enabled" : "Disabled"}
-                </span>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {model.automaticDefault ? (
+                    <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                      Automatic default
+                    </span>
+                  ) : null}
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      model.enabled
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {model.enabled ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
               </div>
 
               <dl className="mt-4 grid gap-3 border-y border-gray-200 py-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
@@ -110,10 +132,28 @@ export function TranslationModelConfigurations({
                     mode="edit"
                     model={model}
                   />
-                  <TranslationModelEnabledForm
-                    key={`status-${model.id}-${model.editVersion}`}
-                    model={model}
-                  />
+                  <div className="space-y-5">
+                    {model.automaticDefault ? (
+                      <p className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                        This profile is the automatic translation default. Choose
+                        another automatic default before disabling it.
+                      </p>
+                    ) : model.enabled ? (
+                      <TranslationModelAutomaticDefaultForm
+                        key={`default-${model.id}-${model.editVersion}`}
+                        model={model}
+                      />
+                    ) : (
+                      <p className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                        Enable this model before setting it as the automatic
+                        translation default.
+                      </p>
+                    )}
+                    <TranslationModelEnabledForm
+                      key={`status-${model.id}-${model.editVersion}`}
+                      model={model}
+                    />
+                  </div>
                 </div>
               ) : null}
             </article>

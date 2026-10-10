@@ -28,6 +28,13 @@ export type TranslationModelEnabledMutationInput = {
   expectedEditVersion: number;
 };
 
+export type TranslationModelAutomaticDefaultMutationInput = {
+  id: string;
+  operationId: string;
+  reason: string;
+  expectedEditVersion: number;
+};
+
 function boundedTrimmed(
   value: unknown,
   name: string,
@@ -125,6 +132,20 @@ export function validateTranslationModelEnabledMutation(input: {
   return {
     id: boundedTrimmed(input.id, "id", 128),
     enabled: input.enabled,
+    operationId: boundedTrimmed(input.operationId, "operationId", 128),
+    reason: boundedTrimmed(input.reason, "reason", 1000, true),
+    expectedEditVersion: positiveVersion(input.expectedEditVersion),
+  };
+}
+
+export function validateTranslationModelAutomaticDefaultMutation(input: {
+  id: unknown;
+  operationId: unknown;
+  reason: unknown;
+  expectedEditVersion: unknown;
+}): TranslationModelAutomaticDefaultMutationInput {
+  return {
+    id: boundedTrimmed(input.id, "id", 128),
     operationId: boundedTrimmed(input.operationId, "operationId", 128),
     reason: boundedTrimmed(input.reason, "reason", 1000, true),
     expectedEditVersion: positiveVersion(input.expectedEditVersion),

@@ -164,10 +164,11 @@ export function TranslationModelEnabledForm({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [refreshRequired, setRefreshRequired] = useState(false);
+  const disableBlocked = model.enabled && model.automaticDefault;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current || refreshRequired) return;
+    if (inFlight.current || refreshRequired || disableBlocked) return;
     const formData = new FormData(event.currentTarget);
     formData.set("operationId", crypto.randomUUID());
     formData.set("id", model.id);
@@ -215,13 +216,13 @@ export function TranslationModelEnabledForm({
           rows={2}
           maxLength={1000}
           required
-          disabled={pending || refreshRequired}
+          disabled={pending || refreshRequired || disableBlocked}
         />
       </label>
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={pending || refreshRequired}
+          disabled={pending || refreshRequired || disableBlocked}
           aria-busy={pending}
           className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -236,7 +237,11 @@ export function TranslationModelEnabledForm({
         {refreshRequired ? <RefreshButton /> : null}
       </div>
       <p role="status" aria-live="polite" className="min-h-5 text-sm text-gray-700">
-        {pending ? "Updating translation model status…" : message}
+        {disableBlocked
+          ? "Choose another automatic-default translation model before disabling this model."
+          : pending
+            ? "Updating translation model status…"
+            : message}
       </p>
     </form>
   );

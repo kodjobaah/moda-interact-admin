@@ -16,9 +16,10 @@ export function TranslationConfigurationsPanel({
           Translations
         </h1>
         <p className="mt-1 max-w-4xl text-sm text-gray-600">
-          Configure the provider credential and selectable translation models
-          used by Store Category localisation. This page manages configuration
-          only; translation execution is introduced by later ARCH-029 tasks.
+          Configure the provider credential and translation model profiles used
+          across platform localisation. Store Category translation can select an
+          enabled profile, while automatic workflows such as Merchant Pricing use
+          the designated automatic default.
         </p>
       </div>
       <TranslationProviderCredential
