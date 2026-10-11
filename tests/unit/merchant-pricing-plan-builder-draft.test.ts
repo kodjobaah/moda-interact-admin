@@ -12,6 +12,7 @@ import {
   isEconomicsOverrideReady,
   isFreePlanOptionDisabled,
   merchantPricingPlanDraftReducer,
+  merchantPricingPlanSaveBlockers,
   retainInitialMerchantKnowledgeConfiguration,
   selectUnavailableCommerceModelId,
   sourceTypeKey,
@@ -138,11 +139,14 @@ test("navigation gates only forward movement from the three guarded steps", () =
   const navigation = {
     currentStep: 0,
     targetStep: 0,
+    currentStepValid: true,
     hasUnboundedZeroCostFixedEvent: false,
     merchantContentValid: false,
     economicsSatisfied: false,
   };
 
+  assert.equal(canNavigateTo({ ...navigation, currentStep: 0, targetStep: 1, currentStepValid: false }), false);
+  assert.equal(canNavigateTo({ ...navigation, currentStep: 2, targetStep: 3, currentStepValid: false }), false);
   assert.equal(canNavigateTo({ ...navigation, currentStep: 3, targetStep: 4 }), true);
   assert.equal(canNavigateTo({ ...navigation, currentStep: 3, targetStep: 4, hasUnboundedZeroCostFixedEvent: true }), false);
   assert.equal(canNavigateTo({ ...navigation, currentStep: 3, targetStep: 4, hasUnboundedZeroCostFixedEvent: false }), true);
@@ -153,6 +157,52 @@ test("navigation gates only forward movement from the three guarded steps", () =
   assert.equal(canNavigateTo({ ...navigation, currentStep: 5, targetStep: 4 }), true);
   assert.equal(canNavigateTo({ ...navigation, currentStep: 5, targetStep: 0 }), true);
   assert.equal(canNavigateTo({ ...navigation, currentStep: 2, targetStep: 4 }), false);
+});
+
+test("save blockers explain the exact earlier fields that keep Save draft disabled", () => {
+  const readyDraft = draft({
+    handle: "growth",
+    name: "Growth",
+    planKind: "PAID_METERED",
+    credits: 8,
+    recoveryUsageEventHandle: "recovery-growth",
+    currency: "USD",
+    description: "Recover more checkouts",
+    reason: "Approved",
+    events: [],
+  });
+
+  assert.deepEqual(
+    merchantPricingPlanSaveBlockers({
+      draft: readyDraft,
+      merchantKnowledgeConfigurationValid: true,
+      economicsSatisfied: true,
+    }),
+    [],
+  );
+
+  assert.deepEqual(
+    merchantPricingPlanSaveBlockers({
+      draft: { ...readyDraft, recoveryUsageEventHandle: "" },
+      merchantKnowledgeConfigurationValid: true,
+      economicsSatisfied: true,
+    }),
+    [
+      {
+        step: 2,
+        message: "Step 3 Shopify pricing: Recovery usage-event handle is required for a paid plan.",
+      },
+    ],
+  );
+
+  assert.match(
+    merchantPricingPlanSaveBlockers({
+      draft: readyDraft,
+      merchantKnowledgeConfigurationValid: false,
+      economicsSatisfied: true,
+    })[0]?.message ?? "",
+    /Merchant Knowledge configuration is incomplete/,
+  );
 });
 
 test("submit selector requires each independent readiness condition", () => {

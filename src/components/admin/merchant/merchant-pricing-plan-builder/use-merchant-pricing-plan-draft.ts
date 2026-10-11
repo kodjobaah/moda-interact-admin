@@ -7,11 +7,11 @@ import {
   buildMerchantPricingPlanDraftPayload,
   buildEconomicsConfigurationKey,
   canNavigateTo as selectCanNavigateTo,
-  canSubmitMerchantPricingPlan,
   createMerchantPricingPlanDraft,
   isFreePlanOptionDisabled,
   isEconomicsOverrideReady,
   merchantPricingPlanDraftReducer,
+  merchantPricingPlanSaveBlockers,
   retainInitialMerchantKnowledgeConfiguration,
   selectUnavailableCommerceModelId,
   sourceTypeKey,
@@ -280,12 +280,12 @@ export function useMerchantPricingPlanDraft({
     );
   const activationLocked =
     !plan || plan.publicationStatus !== "READY" || !translationsRetained;
-  const canSubmit = canSubmitMerchantPricingPlan({
-    requiredFieldsValid,
+  const saveBlockers = merchantPricingPlanSaveBlockers({
+    draft,
     merchantKnowledgeConfigurationValid,
-    reason: draft.reason,
     economicsSatisfied,
   });
+  const canSubmit = saveBlockers.length === 0;
   const placementLabel = plan
     ? `Current position (${plan.cataloguePosition + 1})`
     : effectivePlacement === "ONLY"
@@ -297,6 +297,7 @@ export function useMerchantPricingPlanDraft({
     selectCanNavigateTo({
       currentStep: draft.step,
       targetStep,
+      currentStepValid: !saveBlockers.some(({ step }) => step === draft.step),
       hasUnboundedZeroCostFixedEvent: draft.events.some(
         hasUnboundedZeroCostFixedEvent,
       ),
@@ -441,6 +442,7 @@ export function useMerchantPricingPlanDraft({
       automaticTranslation,
       translationRunAvailable,
       activationLocked,
+      saveBlockers,
       serializedUsageEvents,
       economicsConfigurationKey,
       payload,

@@ -101,6 +101,7 @@ export function MerchantPricingPlanBuilder({
     translationsRetained,
     automaticTranslation,
     activationLocked,
+    saveBlockers,
     canSubmit,
     canNavigateTo,
     formFields,
@@ -275,6 +276,7 @@ export function MerchantPricingPlanBuilder({
         retryAutomaticTranslation={retryAutomaticTranslation}
         translationsRetained={translationsRetained}
         automaticTranslation={automaticTranslation}
+        saveBlockers={saveBlockers}
         placementLabel={placementLabel}
         economicsPassed={economicsPassed}
         economicsOverrideReady={economicsOverrideReady}

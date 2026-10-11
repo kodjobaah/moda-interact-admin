@@ -1,3 +1,5 @@
+import { deleteImmutableShopPrompts } from './merchant-prompt-cleanup.mjs';
+
 /**
  * Development-only, single-tenant database deletion. The database's actual foreign
  * keys remain authoritative: an unaccounted-for restriction rolls the transaction
@@ -12,6 +14,7 @@ export function parseOptions(argv) {
   const flags = new Set([
     '--confirm-test-data', '--confirm-workers-stopped',
     '--external-assets-handled', '--allow-remote-development-db',
+    '--confirm-immutable-prompt-purge',
   ]);
   for (let index = 0; index < rest.length; index += 1) {
     const entry = rest[index];
@@ -38,6 +41,7 @@ export function parseOptions(argv) {
     confirmWorkersStopped: Boolean(values.get('--confirm-workers-stopped')),
     externalAssetsHandled: Boolean(values.get('--external-assets-handled')),
     allowRemoteDevelopmentDb: Boolean(values.get('--allow-remote-development-db')),
+    confirmImmutablePromptPurge: Boolean(values.get('--confirm-immutable-prompt-purge')),
   };
 }
 
@@ -70,6 +74,9 @@ export function validateDeletion(options, shop, inventory, env) {
   if (!local && !options.allowRemoteDevelopmentDb) {
     throw new Error('Remote database refused. Use --allow-remote-development-db only for a verified non-production database.');
   }
+  if (inventory.commerceAgentPrompts > 0 && !options.confirmImmutablePromptPurge) {
+    throw new Error('Merchant has immutable ARCH-021 prompt records. Inspect the preview, then pass --confirm-immutable-prompt-purge to remove them from a disposable development/test database.');
+  }
   if (inventory.merchantKnowledgeUploadedAssets > 0 && !options.externalAssetsHandled) {
     throw new Error('Merchant has uploaded knowledge assets. Delete/retain the R2 objects deliberately, then pass --external-assets-handled.');
   }
@@ -95,6 +102,8 @@ export async function merchantInventory(db, shop) {
     commerceAuditEvents: ['commerceAuditEvent', scoped],
     billingAuditEvents: ['billingAuditEvent', scoped],
     commerceAgentConfigurations: ['commerceAgentConfiguration', scoped],
+    commerceAgentPrompts: ['commerceAgentPrompt', scoped],
+    commerceAgentPromptRevisions: ['commerceAgentPromptRevision', { prompt: { is: scoped } }],
     commerceModelAvailability: ['commerceModelAvailability', scoped],
     commerceStudioMerchantAccess: ['commerceStudioMerchantAccess', scoped],
     merchantKnowledgeSources: ['merchantKnowledgeSource', scoped],
@@ -109,7 +118,7 @@ export async function merchantInventory(db, shop) {
 const byShop = (shopId) => ({ where: { shopId } });
 
 /** Only shop-owned rows are explicitly removed. Global catalogue rows survive. */
-export async function deleteMerchantDatabaseRows(tx, shop) {
+export async function deleteMerchantDatabaseRows(tx, shop, { confirmImmutablePromptPurge = false } = {}) {
   const shopId = shop.id;
   const removed = {};
   const erase = async (name, args) => {
@@ -140,10 +149,7 @@ export async function deleteMerchantDatabaseRows(tx, shop) {
   await erase('commerceStudioMerchantAccess', byShop(shopId));
   await erase('commerceShopProfile', byShop(shopId));
   await erase('commerceAgentConfiguration', byShop(shopId));
-  await erase('commerceAgentPromptRevision', {
-    where: { prompt: { is: { shopId } } },
-  });
-  await erase('commerceAgentPrompt', byShop(shopId));
+  await deleteImmutableShopPrompts(tx, shopId, erase, confirmImmutablePromptPurge);
   await erase('commerceModelCatalogueEntry', {
     where: { availability: { is: { shopId } } },
   });

@@ -38,6 +38,17 @@ checks cannot independently prove that a connection is safe: verify the DB
 host and name yourself. Exact-domain confirmation is always required, even if
 `--shop` is a shop ID.
 
+If the preview reports `commerceAgentPrompts > 0`, deletion requires an extra
+`--confirm-immutable-prompt-purge` flag. This authorises the script to suspend
+**only** the two ARCH-021 prompt immutability guards during the transaction.
+The revision guard is restored in its original `ENABLE ALWAYS` mode. The
+lineage guard is restored in its original enabled mode. This requires
+PostgreSQL table-owner privileges and briefly locks the protected tables, so
+stop all writers in this disposable development/test environment first.
+Foreign-key triggers are not disabled. A transaction rollback restores the
+original trigger states and any deleted rows; normal production prompt
+immutability is unchanged. This is NOT a production data-erasure mechanism.
+
 If the preview shows uploaded Merchant Knowledge assets, delete/retain their
 R2 objects deliberately before deleting the database records and pass
 `--external-assets-handled`. The tool deliberately does not contain storage

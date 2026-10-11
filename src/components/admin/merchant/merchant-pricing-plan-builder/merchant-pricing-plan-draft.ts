@@ -344,9 +344,156 @@ export function merchantPricingPlanDraftReducer(
   }
 }
 
+export type MerchantPricingPlanSaveBlocker = {
+  step: number;
+  message: string;
+};
+
+export function merchantPricingPlanSaveBlockers(input: {
+  draft: Pick<
+    MerchantPricingPlanDraft,
+    | "handle"
+    | "name"
+    | "planKind"
+    | "credits"
+    | "recoveryUsageEventHandle"
+    | "currency"
+    | "description"
+    | "reason"
+    | "events"
+    | "highlights"
+  >;
+  merchantKnowledgeConfigurationValid: boolean;
+  economicsSatisfied: boolean;
+}): MerchantPricingPlanSaveBlocker[] {
+  const blockers: MerchantPricingPlanSaveBlocker[] = [];
+  const { draft } = input;
+
+  if (!draft.handle.trim()) {
+    blockers.push({ step: 0, message: "Step 1 Plan: Shopify plan handle is required." });
+  }
+  if (!draft.name.trim()) {
+    blockers.push({ step: 0, message: "Step 1 Plan: Display name is required." });
+  }
+  if (!Number.isSafeInteger(Number(draft.credits)) || Number(draft.credits) < 0) {
+    blockers.push({
+      step: 0,
+      message: "Step 1 Plan: Included recovery credits must be a non-negative whole number.",
+    });
+  }
+  if (!input.merchantKnowledgeConfigurationValid) {
+    blockers.push({
+      step: 0,
+      message: "Step 1 Plan: Merchant Knowledge configuration is incomplete.",
+    });
+  }
+
+  if (!/^[A-Z]{3}$/.test(draft.currency.trim().toUpperCase())) {
+    blockers.push({
+      step: 2,
+      message: "Step 3 Shopify pricing: Currency must be a 3-letter code.",
+    });
+  }
+  if (draft.planKind === "PAID_METERED" && !draft.recoveryUsageEventHandle.trim()) {
+    blockers.push({
+      step: 2,
+      message: "Step 3 Shopify pricing: Recovery usage-event handle is required for a paid plan.",
+    });
+  }
+  if (draft.planKind === "FREE" && draft.recoveryUsageEventHandle.trim()) {
+    blockers.push({
+      step: 2,
+      message: "Step 3 Shopify pricing: Recovery usage-event handle must be empty for a FREE plan.",
+    });
+  }
+
+  draft.events.forEach((event, index) => {
+    if (!event.adminLabel.trim()) {
+      blockers.push({
+        step: 3,
+        message: `Step 4 Usage events: Usage event ${index + 1} needs an admin label.`,
+      });
+    }
+    if (!event.eventHandle.trim()) {
+      blockers.push({
+        step: 3,
+        message: `Step 4 Usage events: Usage event ${index + 1} needs an event handle.`,
+      });
+    }
+    if (!Number.isSafeInteger(event.creditsGrantedPerUnit) || event.creditsGrantedPerUnit < 1) {
+      blockers.push({
+        step: 3,
+        message: `Step 4 Usage events: Usage event ${index + 1} credits per event must be at least 1.`,
+      });
+    }
+  });
+
+  const description = draft.description.trim();
+  if (!description) {
+    blockers.push({
+      step: 4,
+      message: "Step 5 Merchant content: English merchant description is required.",
+    });
+  } else if (description.length > 2000) {
+    blockers.push({
+      step: 4,
+      message: "Step 5 Merchant content: English merchant description must be 2000 characters or fewer.",
+    });
+  }
+  draft.highlights.forEach((highlight, index) => {
+    const title = highlight.title.trim();
+    const description = highlight.description.trim();
+    if (!title) {
+      blockers.push({
+        step: 4,
+        message: `Step 5 Merchant content: Highlight ${index + 1} title is required.`,
+      });
+    } else if (title.length > 120) {
+      blockers.push({
+        step: 4,
+        message: `Step 5 Merchant content: Highlight ${index + 1} title must be 120 characters or fewer.`,
+      });
+    }
+    if (!description) {
+      blockers.push({
+        step: 4,
+        message: `Step 5 Merchant content: Highlight ${index + 1} description is required.`,
+      });
+    } else if (description.length > 500) {
+      blockers.push({
+        step: 4,
+        message: `Step 5 Merchant content: Highlight ${index + 1} description must be 500 characters or fewer.`,
+      });
+    }
+  });
+
+  if (!input.economicsSatisfied) {
+    blockers.push({
+      step: 5,
+      message: "Step 6 Portfolio economics: Resolve the economics validation or provide a valid override.",
+    });
+  }
+
+  const reason = draft.reason.trim();
+  if (!reason) {
+    blockers.push({
+      step: 6,
+      message: "Step 7 Translations & review: Admin reason is required.",
+    });
+  } else if (reason.length > 2000) {
+    blockers.push({
+      step: 6,
+      message: "Step 7 Translations & review: Admin reason must be 2000 characters or fewer.",
+    });
+  }
+
+  return blockers;
+}
+
 export function canNavigateTo(input: {
   currentStep: number;
   targetStep: number;
+  currentStepValid: boolean;
   hasUnboundedZeroCostFixedEvent: boolean;
   merchantContentValid: boolean;
   economicsSatisfied: boolean;
@@ -354,6 +501,7 @@ export function canNavigateTo(input: {
   const { currentStep, targetStep } = input;
   if (targetStep <= currentStep) return true;
   if (targetStep > currentStep + 1) return false;
+  if (!input.currentStepValid) return false;
   if (currentStep === 3 && input.hasUnboundedZeroCostFixedEvent) return false;
   if (currentStep === 4 && !input.merchantContentValid) return false;
   if (currentStep === 5 && !input.economicsSatisfied) return false;

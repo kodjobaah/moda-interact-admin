@@ -22,7 +22,10 @@ Destructive deletion (development/test only):
 
 If merchant uploaded Merchant Knowledge files, first handle the R2 objects and
 also provide --external-assets-handled. For verified remote DEV databases only,
-add --allow-remote-development-db.
+add --allow-remote-development-db. If the preview shows ARCH-021 agent prompt
+records, also pass --confirm-immutable-prompt-purge to authorise temporarily
+suspending the two prompt immutability guards inside the rollback-safe transaction.
+This needs table-owner privileges; foreign-key triggers are never disabled.
 
 IMPORTANT: This removes the merchant's Shop, billing history, recoveries,
 conversations and associated relational data. It is irreversible. It never
@@ -69,7 +72,9 @@ async function main() {
       if (!current || current.domain !== shop.domain || current.platform !== shop.platform) {
         throw new Error('Merchant identity changed during deletion; transaction aborted.');
       }
-      return deleteMerchantDatabaseRows(tx, current);
+      return deleteMerchantDatabaseRows(tx, current, {
+        confirmImmutablePromptPurge: options.confirmImmutablePromptPurge,
+      });
     }, { maxWait: 15_000, timeout: 120_000 });
     console.log(JSON.stringify({
       result: 'deleted', shopId: shop.id, domain: shop.domain,
@@ -82,18 +87,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  // Never print DATABASE_URL, raw ORM query parameters or provider content.
-  const message = error instanceof Error ? error.message : 'Unexpected error';
-  if (message.startsWith('Mutation refused') || message.startsWith('Production ') ||
-      message.startsWith('Remote database ') || message.startsWith('Merchant has ') ||
-      message.startsWith('Merchant identity ') || message.startsWith('DATABASE_URL ')) {
-    console.error(`Merchant deletion stopped: ${message}`);
-  } else {
-    console.error('Merchant deletion stopped. No successful transaction was committed.');
-    console.error(`Error type: ${error instanceof Error ? error.name : 'Unknown'}`);
-    if (error && typeof error === 'object' && typeof error.code === 'string') {
-      console.error(`Error code: ${error.code}`);
-    }
-  }
+  // Print the complete error and stack for local development diagnostics.
+  // This may contain database details: do not post the output unredacted.
+  console.error('Merchant deletion failed:', error);
   process.exitCode = 1;
 });

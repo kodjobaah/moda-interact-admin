@@ -229,6 +229,7 @@ test("Merchant Pricing Step 7 uses automatic durable translations instead of wor
   assert.match(status, /Translation has not started/);
   assert.match(status, /Save the draft/);
   assert.match(translationStep, /start automatic translation/);
+  assert.match(translationStep, /Save draft is unavailable until these items are fixed/);
   assert.match(status, /System Controls \/ Translations/);
   assert.doesNotMatch(
     `${builder}\n${translationStep}\n${status}`,

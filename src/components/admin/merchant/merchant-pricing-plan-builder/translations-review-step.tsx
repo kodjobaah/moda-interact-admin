@@ -23,6 +23,7 @@ type TranslationsReviewStepProps = Pick<
     Controller["selectors"],
     | "translationsRetained"
     | "automaticTranslation"
+    | "saveBlockers"
     | "placementLabel"
     | "economicsPassed"
     | "economicsOverrideReady"
@@ -52,6 +53,7 @@ export function TranslationsReviewStep({
   retryAutomaticTranslation,
   translationsRetained,
   automaticTranslation,
+  saveBlockers,
   placementLabel,
   economicsPassed,
   economicsOverrideReady,
@@ -143,6 +145,17 @@ export function TranslationsReviewStep({
           onChange={(event) => setReason(event.target.value)}
         />
       </label>
+
+      {saveBlockers.length ? (
+        <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <p className="font-semibold">Save draft is unavailable until these items are fixed:</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {saveBlockers.map((blocker) => (
+              <li key={`${blocker.step}:${blocker.message}`}>{blocker.message}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {!translationsRetained ? (
         <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
