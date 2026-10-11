@@ -179,6 +179,7 @@ async function existingTranslationState(
     where: { id: merchantPricingPlanId },
     select: {
       shopifyPlanHandle: true,
+      publicationStatus: true,
       translations: {
         select: { locale: true, merchantDescription: true },
       },
@@ -199,6 +200,11 @@ async function existingTranslationState(
   if (!existing) throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.planNotFound);
   if (existing.shopifyPlanHandle !== shopifyPlanHandle) {
     throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.planHandleMismatch);
+  }
+  if (
+    existing.publicationStatus !== MerchantPricingPlanPublicationStatus.READY
+  ) {
+    return undefined;
   }
 
   const englishPlan = exactEnglish(
@@ -662,6 +668,52 @@ export async function validateMerchantPricingTranslationRunForDraft(
     status: run.status,
     publicationStatus:
       run.status === MerchantPricingTranslationRunStatus.FAILED
+        ? MerchantPricingPlanPublicationStatus.TRANSLATION_FAILED
+        : MerchantPricingPlanPublicationStatus.TRANSLATING,
+  };
+}
+
+export async function ensureMerchantPricingTranslationRunForDraftSave(
+  transaction: TranslationDb,
+  input: {
+    merchantPricingPlanId: string | null;
+    runId: string | null;
+    expected: MerchantPricingTranslationExpected;
+    principalId: string;
+  },
+): Promise<{
+  runId: string;
+  status: MerchantPricingTranslationRunStatus;
+  publicationStatus: MerchantPricingPlanPublicationStatus;
+}> {
+  if (input.runId) {
+    return validateMerchantPricingTranslationRunForDraft(transaction, {
+      runId: input.runId,
+      expected: input.expected,
+    });
+  }
+
+  const source = canonicalMerchantPricingTranslationSource({
+    shopifyPlanHandle: input.expected.planHandle,
+    englishDescription: input.expected.englishDescription,
+    highlights: input.expected.highlights ?? [],
+  });
+  const requested = await requestMerchantPricingTranslationInTransaction(
+    transaction,
+    {
+      merchantPricingPlanId: input.merchantPricingPlanId,
+      source,
+      sourceHash: merchantPricingTranslationSourceHash(source),
+      environment: resolveCommerceEnvironment() as CommerceEnvironment,
+      principalId: input.principalId,
+    },
+  );
+
+  return {
+    runId: requested.runId,
+    status: requested.status,
+    publicationStatus:
+      requested.status === MerchantPricingTranslationRunStatus.FAILED
         ? MerchantPricingPlanPublicationStatus.TRANSLATION_FAILED
         : MerchantPricingPlanPublicationStatus.TRANSLATING,
   };

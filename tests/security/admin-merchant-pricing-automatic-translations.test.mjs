@@ -99,7 +99,7 @@ test("ready package reconstruction revalidates run status, handle, source hash, 
 test("ADMIN-003 save persists an inactive English-only draft linked to durable translation work", () => {
   assert.match(finalMutationSource, /formData\.get\("translationRunId"\)/);
   assert.doesNotMatch(finalMutationSource, /formData\.get\("translationJson"\)/);
-  assert.match(finalMutationSource, /validateMerchantPricingTranslationRunForDraft/);
+  assert.match(finalMutationSource, /ensureMerchantPricingTranslationRunForDraftSave/);
   assert.match(finalMutationSource, /publicationStatus:\s*translationRun!\.publicationStatus/);
   assert.match(finalMutationSource, /currentTranslationRunId:\s*translationRun!\.runId/);
   assert.match(finalMutationSource, /isActive:\s*false/);
@@ -117,7 +117,7 @@ test("new Merchant Pricing translation semantic logs use the Shared logger", () 
 });
 
 
-test("ADMIN-003 builder automatically requests and polls without exposing workbook controls", () => {
+test("ADMIN-003 starts translation only from save/retry and polls persisted work without exposing workbook controls", () => {
   const builder = fs.readFileSync(
     path.join(root, "src/components/admin/merchant/merchant-pricing-plan-builder.tsx"),
     "utf8",
@@ -135,6 +135,8 @@ test("ADMIN-003 builder automatically requests and polls without exposing workbo
   assert.doesNotMatch(step, /Download pre-populated translation spreadsheet|Choose spreadsheet|\.xlsx/);
   assert.match(hook, /requestMerchantPricingTranslationAction/);
   assert.match(hook, /getMerchantPricingTranslationStatusAction/);
+  assert.doesNotMatch(hook, /void requestRun\(false\)/);
+  assert.match(step, /automatic translation begins after this draft is saved/);
   assert.match(hook, /window\.setInterval/);
   assert.match(hook, /window\.clearInterval/);
   assert.match(hook, /merchantPricingAutomaticTranslationTerminal/);

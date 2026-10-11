@@ -21,6 +21,7 @@
     "admin:seed-core-merchant-pricing": "node scripts/seed-core-merchant-pricing.mjs",
     "admin:seed-promotion": "node scripts/seed-manual-promotion.mjs",
     "admin:seed-usage-overview": "node scripts/seed-usage-overview-test-data.mjs",
+    "admin:delete-merchant-data": "node scripts/delete-merchant-data.mjs",
     "shopify-taxonomy:sync": "node scripts/sync-shopify-taxonomy.mjs"
   },
   "dependencies": {

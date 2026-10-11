@@ -275,7 +275,6 @@ export function MerchantPricingPlanBuilder({
         retryAutomaticTranslation={retryAutomaticTranslation}
         translationsRetained={translationsRetained}
         automaticTranslation={automaticTranslation}
-        translationRunAvailable={controller.selectors.translationRunAvailable}
         placementLabel={placementLabel}
         economicsPassed={economicsPassed}
         economicsOverrideReady={economicsOverrideReady}

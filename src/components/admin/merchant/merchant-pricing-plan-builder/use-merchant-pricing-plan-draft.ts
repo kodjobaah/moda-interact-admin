@@ -285,8 +285,6 @@ export function useMerchantPricingPlanDraft({
     merchantKnowledgeConfigurationValid,
     reason: draft.reason,
     economicsSatisfied,
-    translationsRetained,
-    translationRunAvailable,
   });
   const placementLabel = plan
     ? `Current position (${plan.cataloguePosition + 1})`

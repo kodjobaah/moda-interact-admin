@@ -365,8 +365,6 @@ export function canSubmitMerchantPricingPlan(input: {
   merchantKnowledgeConfigurationValid: boolean;
   reason: string;
   economicsSatisfied: boolean;
-  translationsRetained: boolean;
-  translationRunAvailable: boolean;
 }): boolean {
   const trimmedReason = input.reason.trim();
   return (
@@ -374,8 +372,7 @@ export function canSubmitMerchantPricingPlan(input: {
     input.merchantKnowledgeConfigurationValid &&
     Boolean(trimmedReason) &&
     trimmedReason.length <= 2000 &&
-    input.economicsSatisfied &&
-    (input.translationsRetained || input.translationRunAvailable)
+    input.economicsSatisfied
   );
 }
 

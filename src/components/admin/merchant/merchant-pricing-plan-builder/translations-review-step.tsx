@@ -23,7 +23,6 @@ type TranslationsReviewStepProps = Pick<
     Controller["selectors"],
     | "translationsRetained"
     | "automaticTranslation"
-    | "translationRunAvailable"
     | "placementLabel"
     | "economicsPassed"
     | "economicsOverrideReady"
@@ -53,7 +52,6 @@ export function TranslationsReviewStep({
   retryAutomaticTranslation,
   translationsRetained,
   automaticTranslation,
-  translationRunAvailable,
   placementLabel,
   economicsPassed,
   economicsOverrideReady,
@@ -131,7 +129,7 @@ export function TranslationsReviewStep({
                 ? `${automaticTranslation.run?.completeLocaleCount ?? 0}/${automaticTranslation.run?.localeCount ?? 20} ready`
                 : automaticTranslation.run
                   ? `${automaticTranslation.run.completeLocaleCount}/${automaticTranslation.run.localeCount} translating`
-                  : "Creating durable translation request"}
+                  : "Not started — automatic translation begins after this draft is saved"}
         </p>
       </section>
 
@@ -148,11 +146,11 @@ export function TranslationsReviewStep({
 
       {!translationsRetained ? (
         <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
-          {translationRunAvailable
-            ? isUpdate
-              ? "You can save this draft now. It will remain inactive until automatic translation and finalisation complete."
-              : "You can create this plan now. It will appear in the catalogue as a Draft and remain inactive until automatic translation and finalisation complete."
-            : "Save is waiting for a durable automatic translation request to be created."}
+          {automaticTranslation.run
+            ? "This draft already has durable translation work. Saving keeps the plan inactive while translation and finalisation complete."
+            : isUpdate
+              ? "Save this draft to persist the changes and start automatic translation. The plan will remain inactive while translation and finalisation complete."
+              : "Save this draft to create the plan in the catalogue and start automatic translation. The plan will remain inactive while translation and finalisation complete."}
         </p>
       ) : null}
 

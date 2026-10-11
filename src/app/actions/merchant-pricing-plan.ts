@@ -47,7 +47,7 @@ import {
 } from "@/lib/admin/merchant-knowledge-plan-policy";
 import { persistMerchantPricingPlanFeatures } from "@/lib/admin/merchant/merchant-pricing-plan-feature-persistence";
 import {
-  validateMerchantPricingTranslationRunForDraft,
+  ensureMerchantPricingTranslationRunForDraftSave,
 } from "@/lib/admin/merchant/merchant-pricing-translation-runs";
 
 const merchantPricingInclude = {
@@ -927,11 +927,6 @@ export async function mutateMerchantPricingPlanAction(
 
   const contentChanged =
     isCreate || translatableContentChanged(existing, payload);
-  if (contentChanged && !translationRunId) {
-    actionError(
-      "A durable automatic Merchant Pricing translation request is required before this plan can be saved as a draft.",
-    );
-  }
   const reorderHighlights =
     !isCreate &&
     !contentChanged &&
@@ -1031,8 +1026,10 @@ export async function mutateMerchantPricingPlanAction(
     }
 
     const translationRun = contentChanged
-      ? await validateMerchantPricingTranslationRunForDraft(transaction, {
-          runId: translationRunId!,
+      ? await ensureMerchantPricingTranslationRunForDraftSave(transaction, {
+          merchantPricingPlanId: existing?.id ?? null,
+          runId: translationRunId,
+          principalId: adminId,
           expected: {
             planHandle: payload.shopifyPlanHandle,
             planName: payload.name,
@@ -1361,11 +1358,11 @@ export async function mutateMerchantPricingPlanAction(
     };
     }, MERCHANT_PRICING_TRANSACTION_OPTIONS);
   } catch (error) {
-    if (contentChanged && translationRunId) {
+    if (contentChanged) {
       merchantPricingLogger.error(
         "admin.merchant_pricing.translation_draft_save_failed",
         {
-          translationRunId,
+          translationRunId: translationRunId ?? null,
           shopifyPlanHandle: payload.shopifyPlanHandle,
           errorName: error instanceof Error ? error.name : "UnknownError",
         },

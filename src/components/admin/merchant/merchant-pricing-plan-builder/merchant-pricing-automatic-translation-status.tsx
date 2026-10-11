@@ -57,15 +57,21 @@ export function MerchantPricingAutomaticTranslationStatus({
         </div>
       ) : null}
 
+      {!run && !requestPending && !error ? (
+        <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-blue-800">
+          Translation has not started. Save the draft to persist the plan and start automatic translation.
+        </p>
+      ) : null}
+
       {!run && requestPending ? (
         <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-blue-800">
-          Creating the durable automatic translation request… Save becomes available as soon as the request exists.
+          Starting a new automatic translation run for this saved draft…
         </p>
       ) : null}
 
       {run && (run.status === "PENDING" || run.status === "PROCESSING") ? (
         <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-blue-800">
-          Translation is in progress. You can save the plan now. It will appear in Merchant Pricing as a Draft and remain inactive while translations finish.
+          Translation is in progress for this saved draft. The plan remains inactive until automatic translation and finalisation finish.
         </p>
       ) : null}
 

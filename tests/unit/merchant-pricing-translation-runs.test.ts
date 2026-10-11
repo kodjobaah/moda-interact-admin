@@ -15,6 +15,7 @@ import {
 } from "../../src/lib/admin/merchant/merchant-pricing-automatic-translations.ts";
 import {
   MERCHANT_PRICING_TRANSLATION_ERRORS,
+  ensureMerchantPricingTranslationRunForDraftSave,
   markMerchantPricingTranslationRunApplied,
   reconstructReadyMerchantPricingTranslationPackage,
   requestMerchantPricingTranslationInTransaction,
@@ -338,4 +339,75 @@ test("draft run validation accepts in-progress and failed matching work but reje
     ),
     new RegExp(MERCHANT_PRICING_TRANSLATION_ERRORS.runNotPersistable),
   );
+});
+
+
+test("draft save starts a translation run when the browser has not created one", async () => {
+  const source = translationSource();
+  const sourceHash = merchantPricingTranslationSourceHash(source);
+  const createdRuns: unknown[] = [];
+  const createdItems: unknown[] = [];
+  const transaction = {
+    commerceTranslationModelConfiguration: {
+      findFirst: async () => ({
+        id: "model-1",
+        provider: "openai",
+        providerModelId: "gpt-test",
+        displayName: "Automatic",
+        editVersion: 1,
+        credential: { id: "credential-1" },
+      }),
+    },
+    merchantPricingPlan: {
+      findUnique: async () => null,
+    },
+    merchantPricingTranslationRun: {
+      findFirst: async () => null,
+      updateMany: async () => ({ count: 0 }),
+      create: async ({ data }: { data: unknown }) => {
+        createdRuns.push(data);
+        return { id: "run-after-save" };
+      },
+      findUniqueOrThrow: async () => ({
+        id: "run-after-save",
+        status: MerchantPricingTranslationRunStatus.PENDING,
+        failureCode: null,
+        sourceSnapshot: source,
+        translationModel: { displayName: "Automatic" },
+        items: [
+          {
+            targetLanguageTag: "en",
+            status: MerchantPricingTranslationItemStatus.AVAILABLE,
+          },
+        ],
+      }),
+    },
+    merchantPricingTranslationItem: {
+      createMany: async ({ data }: { data: unknown[] }) => {
+        createdItems.push(...data);
+        return { count: data.length };
+      },
+    },
+  } as never;
+
+  const result = await ensureMerchantPricingTranslationRunForDraftSave(
+    transaction,
+    {
+      merchantPricingPlanId: null,
+      runId: null,
+      expected: {
+        planHandle: "starter",
+        planName: "Starter",
+        englishDescription: "English description",
+        highlights: [],
+      },
+      principalId: "admin-1",
+    },
+  );
+
+  assert.equal(result.runId, "run-after-save");
+  assert.equal(result.publicationStatus, MerchantPricingPlanPublicationStatus.TRANSLATING);
+  assert.equal(createdRuns.length, 1);
+  assert.ok(createdItems.length > 0);
+  assert.equal((createdRuns[0] as { sourceHash: string }).sourceHash, sourceHash);
 });

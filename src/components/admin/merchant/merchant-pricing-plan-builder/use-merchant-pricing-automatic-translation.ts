@@ -192,23 +192,6 @@ export function useMerchantPricingAutomaticTranslation(input: {
   useEffect(() => {
     if (
       !input.active ||
-      input.translationsRetained ||
-      currentRun !== null ||
-      requestInFlightRef.current
-    ) {
-      return;
-    }
-    void requestRun(false);
-  }, [
-    currentRun,
-    input.active,
-    input.translationsRetained,
-    requestRun,
-  ]);
-
-  useEffect(() => {
-    if (
-      !input.active ||
       !currentRun ||
       merchantPricingAutomaticTranslationTerminal(currentRun)
     ) {

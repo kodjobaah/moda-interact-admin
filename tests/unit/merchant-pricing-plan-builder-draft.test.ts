@@ -161,8 +161,6 @@ test("submit selector requires each independent readiness condition", () => {
     merchantKnowledgeConfigurationValid: true,
     reason: "approved",
     economicsSatisfied: true,
-    translationsRetained: false,
-    translationRunAvailable: true,
   };
 
   assert.equal(canSubmitMerchantPricingPlan(ready), true);
@@ -170,17 +168,12 @@ test("submit selector requires each independent readiness condition", () => {
     "requiredFieldsValid",
     "merchantKnowledgeConfigurationValid",
     "economicsSatisfied",
-    "translationRunAvailable",
   ] as const) {
     assert.equal(canSubmitMerchantPricingPlan({ ...ready, [key]: false }), false);
   }
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "  " }), false);
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2000) }), true);
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2001) }), false);
-  assert.equal(
-    canSubmitMerchantPricingPlan({ ...ready, translationsRetained: true, translationRunAvailable: false }),
-    true,
-  );
 });
 
 test("Merchant Knowledge configuration is retained only for one valid mapping with active source pairs", () => {
