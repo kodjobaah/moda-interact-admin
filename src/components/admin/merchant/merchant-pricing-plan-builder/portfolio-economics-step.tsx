@@ -158,20 +158,9 @@ export function PortfolioEconomicsStep({
         </details>
       ) : null}
 
-      {economicsPreview.length ? (
-        <ul className="space-y-2">
-          {economicsPreview.map((result) => (
-            <li
-              key={`${result.lowerPlanId}-${result.higherPlanId}`}
-              className="rounded border border-amber-200 bg-white p-2"
-            >
-              {/* existing economics result content */}
-            </li>
-          ))}
-        </ul>
-      ) : (
+      {!economicsPreview.length ? (
         <p>No active plan pair requires comparison yet.</p>
-      )}
+      ) : null}
 
       {economicsOverrideAssessment.kind === "OVERRIDEABLE" ? (
         <div className="space-y-3 rounded-md border border-amber-300 bg-white p-4">
