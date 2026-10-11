@@ -159,7 +159,7 @@ const PLAN_DEFINITIONS = {
     allowancePeriod: "LIFETIME",
     billingPeriod: "EVERY_30_DAYS",
     recurringAmountMinor: 0,
-    currency: "GBP",
+    currency: "USD",
     screenshotDescription: "Perfect for testing Moda Interact on live abandoned checkouts.",
   },
   starter: {
@@ -174,7 +174,7 @@ const PLAN_DEFINITIONS = {
     allowancePeriod: "EVERY_30_DAYS",
     billingPeriod: "EVERY_30_DAYS",
     recurringAmountMinor: 3500,
-    currency: "GBP",
+    currency: "USD",
     screenshotDescription: "For smaller stores starting automated WhatsApp checkout recovery.",
   },
   growth: {
@@ -189,7 +189,7 @@ const PLAN_DEFINITIONS = {
     allowancePeriod: "EVERY_30_DAYS",
     billingPeriod: "EVERY_30_DAYS",
     recurringAmountMinor: 7500,
-    currency: "GBP",
+    currency: "USD",
     screenshotDescription: "For growing stores recovering more abandoned checkouts each month.",
   },
   scale: {
@@ -204,7 +204,7 @@ const PLAN_DEFINITIONS = {
     allowancePeriod: "EVERY_30_DAYS",
     billingPeriod: "EVERY_30_DAYS",
     recurringAmountMinor: 14900,
-    currency: "GBP",
+    currency: "USD",
     screenshotDescription: "For higher-volume stores running WhatsApp recovery at scale.",
   },
 };
@@ -278,7 +278,7 @@ function usageEventsFor(key) {
     ...event,
     position,
     pricingMode: "FIXED",
-    currency: "GBP",
+    currency: "USD",
     maximumUnitsPerBillingPeriod: null,
   }));
 }
