@@ -12,6 +12,7 @@ export async function AdminShell({
     | "tenants"
     | "observability"
     | "queues"
+    | "operational-incidents"
     | "merchant-support"
     | "billing"
     | "promotions"

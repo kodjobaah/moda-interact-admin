@@ -13,6 +13,7 @@ export function Sidebar({
     | "tenants"
     | "observability"
     | "queues"
+    | "operational-incidents"
     | "merchant-support"
     | "billing"
     | "promotions"
@@ -79,6 +80,10 @@ export function Sidebar({
         >
           <Icon name="message" className="h-5 w-5 text-[var(--brand-700)]" />
           {adminI18n.t("nav.merchantMessages")}
+        </Link>
+        <Link href="/operational-incidents" aria-current={active === "operational-incidents" ? "page" : undefined} className={`${base} ${active === "operational-incidents" ? selected : idle}`}>
+          <Icon name="box" className="h-5 w-5 text-[var(--brand-700)]" />
+          Operational Incidents
         </Link>
         <Link
           href="/billing"
