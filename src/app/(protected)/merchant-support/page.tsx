@@ -7,8 +7,6 @@ import {
 } from '@/lib/admin/merchant-support';
 import { cleanSearch, firstParam, paramsToRecord, positiveInt, type SearchParamRecord } from '@/lib/admin/query';
 import { MerchantSupportInbox } from '@/components/admin/merchant-support-inbox';
-import { McpOperationalIssues } from '@/components/admin/mcp-operational-issues';
-import { getOpenMcpOperationalIssues } from '@/lib/admin/mcp-operational-issues';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,12 +35,10 @@ export default async function MerchantSupportPage({ searchParams }: PageProps) {
     search,
   });
   const thread = threadId ? await getMerchantSupportThread(threadId) : null;
-  const operationalIssues = await getOpenMcpOperationalIssues();
 
   return (
     <AdminShell active="merchant-support">
       <div className="flex-1 overflow-auto p-4 sm:p-8">
-        <McpOperationalIssues issues={operationalIssues} />
         <MerchantSupportInbox
           principal={principal}
           pending={pending}

@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { operationalIncidentAction } from '@/app/actions/operational-incidents';
+import { getPlatformAdminPrincipal } from '@/lib/auth/platform-admin';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { requirePlatformAdminPage } from '@/lib/auth/platform-admin';
 import { getOperationalIncidents, getOperationalIncidentDetail, type IncidentFilter } from '@/lib/admin/operational-incidents';
@@ -10,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function OperationalIncidentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requirePlatformAdminPage();
+  const principal = await getPlatformAdminPrincipal();
   const params = await searchParams;
   const statusInput = first(params.status);
   const status: IncidentFilter = statusInput === 'OPEN' || statusInput === 'RESOLVED' ? statusInput : 'ALL';
@@ -29,7 +32,7 @@ export default async function OperationalIncidentsPage({ searchParams }: { searc
     return `/operational-incidents?${url}`;
   };
   return <AdminShell active="operational-incidents"><div className="flex-1 overflow-auto p-4 sm:p-8 space-y-5">
-    <header><p className="text-sm font-semibold uppercase tracking-widest text-green-800">Operations</p><h1 className="text-3xl font-bold">Operational Incidents</h1><p className="text-sm text-gray-600">Internal investigation and immutable audit history. Administrative actions follow in ARCH-033-ADMIN-002.</p></header>
+    <header><p className="text-sm font-semibold uppercase tracking-widest text-green-800">Operations</p><h1 className="text-3xl font-bold">Operational Incidents</h1><p className="text-sm text-gray-600">Internal investigation and immutable audit history. Claim, assign and resolve actionable service incidents.</p></header>
     <form action="/operational-incidents" className="flex flex-wrap gap-3 rounded-lg border bg-white p-4">
       <label className="text-sm">Status <select name="status" defaultValue={status} className="ml-2 border rounded p-2"><option value="ALL">All</option><option value="OPEN">Open</option><option value="RESOLVED">Resolved</option></select></label>
       {([['source', sourceService, 'Source'], ['severity', severity, 'Severity'], ['environment', environment, 'Environment']] as const).map(([name, value, label]) => <label key={name} className="text-sm">{label}<input name={name} defaultValue={value ?? ''} maxLength={64} className="ml-2 border rounded p-2" /></label>)}
@@ -49,6 +52,27 @@ export default async function OperationalIncidentsPage({ searchParams }: { searc
           {([['Status', detail.status], ['Severity', detail.severity], ['Shop', detail.shop?.domain ?? 'Platform'], ['Resource', detail.resourceKey], ['Occurrences', String(detail.occurrenceCount)], ['First occurrence', date(detail.firstOccurredAt)], ['Last occurrence', date(detail.lastOccurredAt)], ['Correlation', detail.lastCorrelationId], ['Owner ID', detail.ownerPlatformAdminId ?? 'Unassigned'], ['Resolved by ID', detail.resolvedByPlatformAdminId ?? '—'], ['Resolved at', date(detail.resolvedAt)], ['Resolution note', detail.resolutionNote ?? '—']] as const).map(([label, value]) => <div key={label} className="contents"><dt className="font-medium">{label}</dt><dd>{value}</dd></div>)}
         </dl>
         {detail.shop?.merchantSupportThread?.id && <Link className="text-sm underline" href={`/merchant-support?thread=${encodeURIComponent(detail.shop.merchantSupportThread.id)}`}>View merchant support thread</Link>}
+        {detail.status === 'OPEN' && <div className="border-t pt-4 space-y-3" aria-label="Incident ownership actions">
+          <p className="text-sm font-medium">Incident ownership and resolution</p>
+          {!detail.ownerPlatformAdminId && <form action={operationalIncidentAction}>
+            <input type="hidden" name="incidentKey" value={detail.incidentKey} /><input type="hidden" name="action" value="TAKE" />
+            <button className="rounded bg-green-900 px-3 py-2 text-white" type="submit">Take ownership</button>
+          </form>}
+          {detail.ownerPlatformAdminId === principal?.id && <div className="flex flex-wrap gap-3">
+            <form action={operationalIncidentAction}><input type="hidden" name="incidentKey" value={detail.incidentKey} /><input type="hidden" name="action" value="RELEASE" />
+              <button className="rounded border px-3 py-2" type="submit">Release ownership</button></form>
+            <form action={operationalIncidentAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="incidentKey" value={detail.incidentKey} /><input type="hidden" name="action" value="RESOLVE" />
+              <label className="text-sm">Resolution rationale <textarea name="resolutionNote" required minLength={1} maxLength={1000} className="block rounded border p-2" /></label>
+              <button type="submit" className="rounded bg-green-900 px-3 py-2 text-white">Mark resolved</button>
+            </form>
+          </div>}
+          {principal?.role === 'SUPER_ADMIN' && <form action={operationalIncidentAction} className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="incidentKey" value={detail.incidentKey} /><input type="hidden" name="action" value="REASSIGN" />
+            <label className="text-sm">Reassign to active administrator ID <input name="targetAdminId" required maxLength={128} className="block rounded border p-2" /></label>
+            <button className="rounded border px-3 py-2" type="submit">Reassign</button>
+          </form>}
+        </div>}
         <h3 className="font-semibold mt-5">Audit events (latest 100)</h3><ol className="divide-y">{detail.events.map(event => <li key={event.id} className="py-2 text-sm"><span className="font-medium">{event.eventType}</span> · {date(event.occurredAt)}<div className="text-gray-600">Actor: {event.actorPlatformAdminId ?? 'System'} · Correlation: {event.correlationId ?? '—'}</div></li>)}</ol>
       </>}</section>
     </div>

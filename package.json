@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "test:unit": "node --experimental-strip-types --test tests/unit/*.test.ts",
     "test": "node --test tests/observability/*.test.mjs tests/security/*.test.mjs",
+    "test:arch033-admin-incidents:postgres": "node scripts/test-arch033-admin-incidents-postgres.mjs",
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
     "admin:provision": "node scripts/provision-platform-admin.mjs",
@@ -27,7 +28,7 @@
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
-    "@modainteract/moda-interact-shared": "1.4.0",
+    "@modainteract/moda-interact-shared": "2.0.0",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "codemirror": "^6.0.2",
@@ -50,6 +51,7 @@
     "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
