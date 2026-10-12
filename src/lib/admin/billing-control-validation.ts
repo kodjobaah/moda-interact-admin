@@ -10,6 +10,7 @@ export type PlatformBillingPolicyInput = {
   defaultOutboundSoftLimit: number;
   defaultOutboundHardLimit: number;
   terminalMessageReservedSlots: number;
+  whatsappRecipientSuppressionDays: number;
   reason: string;
 };
 
@@ -67,6 +68,10 @@ export function parsePlatformBillingPolicyForm(
     formData.get("terminalMessageReservedSlots"),
     "Terminal message reserved slots",
   );
+  const whatsappRecipientSuppressionDays = requiredPositiveInt(
+    formData.get("whatsappRecipientSuppressionDays"),
+    "WhatsApp recipient suppression days",
+  );
   if (defaultOutboundHardLimit < 2)
     throw new Error("Default outbound hard limit must be at least 2.");
   if (defaultOutboundSoftLimit > defaultOutboundHardLimit)
@@ -110,6 +115,7 @@ export function parsePlatformBillingPolicyForm(
     defaultOutboundSoftLimit,
     defaultOutboundHardLimit,
     terminalMessageReservedSlots,
+    whatsappRecipientSuppressionDays,
     reason: requiredReason(formData.get("reason")),
   };
 }

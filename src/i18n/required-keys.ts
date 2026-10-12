@@ -390,6 +390,8 @@ export const ADMIN_REQUIRED_I18N_KEYS = [
   "billingControls.defaultHardLimitHelp",
   "billingControls.terminalReservedSlots",
   "billingControls.terminalReservedSlotsHelp",
+  "billingControls.whatsappRecipientSuppressionDays",
+  "billingControls.whatsappRecipientSuppressionDaysHelp",
   "billingControls.minimumUpgradePremium",
   "billingControls.minimumUpgradePremiumHelp",
   "billingControls.warningPercent",

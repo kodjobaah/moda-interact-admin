@@ -362,6 +362,8 @@
   "billingControls.defaultHardLimitHelp": "Default per-conversation automated outbound-message hard cap for shops without an active hard-limit override. The terminal-message reserve is included inside this total. It must not exceed the absolute hard limit.",
   "billingControls.terminalReservedSlots": "Terminal message reserved slots",
   "billingControls.terminalReservedSlotsHelp": "Slots kept inside the hard cap for deterministic terminal responses after normal automated replies are exhausted. Normal generated replies cannot consume these slots. The value must be at least 1 and lower than the default hard limit.",
+  "billingControls.whatsappRecipientSuppressionDays": "WhatsApp recipient suppression duration (days)",
+  "billingControls.whatsappRecipientSuppressionDaysHelp": "How many days a recipient remains suppressed after WhatsApp reports that they cannot be reached. The value must be a positive whole number; the default is 7 days.",
   "billingControls.minimumUpgradePremium": "Minimum stay+top-up premium above next-plan upgrade",
   "billingControls.minimumUpgradePremiumHelp": "Pricing guardrail for lower-plan plus recovery-credit top-up economics. The stay+top-up path must be at least this much more expensive than upgrading to the next plan. 2000 bps equals 20.00%.",
   "billingControls.warningPercent": "Default warning threshold (%)",
