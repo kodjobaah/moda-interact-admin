@@ -50,6 +50,7 @@ export function PlatformPolicyControls({
     defaultOutboundSoftLimit: number;
     defaultOutboundHardLimit: number;
     terminalMessageReservedSlots: number;
+    whatsappRecipientSuppressionDays: number;
   } | null;
 }) {
   return (
@@ -106,6 +107,26 @@ export function PlatformPolicyControls({
               className="mt-1 block text-xs font-normal leading-5 text-gray-500"
             >
               {adminI18n.t("billingControls.absoluteHardLimitHelp")}
+            </span>
+          </label>
+
+          <label className="text-sm font-medium text-gray-700">
+            {adminI18n.t("billingControls.whatsappRecipientSuppressionDays")}
+            <input
+              aria-describedby="whatsappRecipientSuppressionDays-help"
+              className={inputClass}
+              type="number"
+              min="1"
+              step="1"
+              name="whatsappRecipientSuppressionDays"
+              defaultValue={policy?.whatsappRecipientSuppressionDays ?? 7}
+              required
+            />
+            <span
+              id="whatsappRecipientSuppressionDays-help"
+              className="mt-1 block text-xs font-normal leading-5 text-gray-500"
+            >
+              {adminI18n.t("billingControls.whatsappRecipientSuppressionDaysHelp")}
             </span>
           </label>
 

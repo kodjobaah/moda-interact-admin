@@ -45,6 +45,7 @@ const platformBillingPolicyPublicErrors = new Set([
   "Default outbound soft limit must not exceed the hard limit.",
   "Default outbound hard limit must not exceed the absolute hard limit.",
   "Terminal message reserved slots must be lower than the default outbound hard limit.",
+  "WhatsApp recipient suppression days must be positive.",
   "Warning threshold must be between 0 and 100 percent.",
   "Lifetime Free recovery grant must be non-negative.",
   "Minimum upgrade premium must be between 0 and 10000 bps.",
@@ -55,7 +56,7 @@ function platformBillingPolicyClientMessage(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : "";
   if (platformBillingPolicyPublicErrors.has(message)) return message;
   if (
-    /^(Absolute outbound hard limit|Default outbound soft limit|Default outbound hard limit|Terminal message reserved slots|Warning threshold|Lifetime Free recovery grant|Minimum upgrade premium|A reason) (is required|is invalid|must be)/.test(
+    /^(Absolute outbound hard limit|Default outbound soft limit|Default outbound hard limit|Terminal message reserved slots|WhatsApp recipient suppression days|Warning threshold|Lifetime Free recovery grant|Minimum upgrade premium|A reason) (is required|is invalid|must be)/.test(
       message,
     )
   ) {
@@ -89,6 +90,8 @@ export async function mutatePlatformBillingPolicyAction(
           defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
           defaultOutboundHardLimit: values.defaultOutboundHardLimit,
           terminalMessageReservedSlots: values.terminalMessageReservedSlots,
+          whatsappRecipientSuppressionDays:
+            values.whatsappRecipientSuppressionDays,
           minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
         },
         update: {
@@ -98,6 +101,8 @@ export async function mutatePlatformBillingPolicyAction(
           defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
           defaultOutboundHardLimit: values.defaultOutboundHardLimit,
           terminalMessageReservedSlots: values.terminalMessageReservedSlots,
+          whatsappRecipientSuppressionDays:
+            values.whatsappRecipientSuppressionDays,
           defaultWarningPercent: values.defaultWarningPercent,
           lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
           version: { increment: 1 },
