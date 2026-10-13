@@ -19,6 +19,9 @@ import {
   ensureDevelopmentPlatformAdmin,
 } from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
+import { parseCreatePlanPolicyDraft } from "@/lib/admin/commerce-model-plan-create-policy";
+import { mutateLivePlanPolicy } from "@/lib/admin/commerce-model-plan-policy";
+import { resolveAdminCommerceEnvironment } from "@/lib/admin/commerce-environment";
 import {
   MerchantPricingPayloadError,
   parseMerchantPricingBuilderPayload,
@@ -831,6 +834,7 @@ export async function mutateMerchantPricingPlanAction(
   const payload = parsePayload(formData);
   const translationRunId = parseTranslationRunId(formData);
   const economicsOverrideRequest = parseEconomicsOverrideRequest(formData);
+  const createPlanPolicy = !payload.id ? parseCreatePlanPolicyDraft(formData.get("commercePolicyDraft")) : null;
 
   // Load the expensive catalogue snapshot and perform deterministic validation
   // before opening the interactive transaction. The transaction below only
@@ -1176,6 +1180,12 @@ export async function mutateMerchantPricingPlanAction(
         shopifyPlanHandle: created.shopifyPlanHandle,
         modelId: created.commerceModelId,
       });
+
+      if (createPlanPolicy) {
+        await mutateLivePlanPolicy(transaction, {
+          planId: created.id, budget: createPlanPolicy.budget, expectedEditVersion: 0, reason: createPlanPolicy.reason,
+        }, resolveAdminCommerceEnvironment(), adminId);
+      }
 
       await persistMerchantPricingPlanFeatures(transaction, {
         merchantPricingPlanId: created.id,

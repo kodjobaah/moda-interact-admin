@@ -41,6 +41,7 @@ export type CreateMerchantPricingPlanDraftInput = {
   initialEvents: BuilderEvent[];
   initialHighlights: MerchantPricingBuilderHighlight[];
   initialKnowledgeConfiguration: MerchantKnowledgeFeatureConfiguration | null;
+  initialStep?: number;
 };
 
 export type MerchantPricingPlanDraftAction =
@@ -166,10 +167,11 @@ export function createMerchantPricingPlanDraft({
   initialEvents,
   initialHighlights,
   initialKnowledgeConfiguration,
+  initialStep = 0,
 }: CreateMerchantPricingPlanDraftInput): MerchantPricingPlanDraft {
   return {
     isEditing: Boolean(plan),
-    step: 0,
+    step: initialStep,
     name: plan?.displayName ?? "",
     handle: plan?.shopifyPlanHandle ?? "",
     planKind: plan?.planKind ?? (hasFreePlan ? "PAID_METERED" : "FREE"),
@@ -477,13 +479,13 @@ export function merchantPricingPlanSaveBlockers(input: {
   const reason = draft.reason.trim();
   if (!reason) {
     blockers.push({
-      step: 6,
-      message: "Step 7 Translations & review: Admin reason is required.",
+      step: 7,
+      message: "Step 8 Translations & review: Admin reason is required.",
     });
   } else if (reason.length > 2000) {
     blockers.push({
-      step: 6,
-      message: "Step 7 Translations & review: Admin reason must be 2000 characters or fewer.",
+      step: 7,
+      message: "Step 8 Translations & review: Admin reason must be 2000 characters or fewer.",
     });
   }
 
