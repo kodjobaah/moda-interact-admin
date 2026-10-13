@@ -9,7 +9,7 @@
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:unit": "node --experimental-strip-types --test tests/unit/*.test.ts",
+    "test:unit": "node --experimental-strip-types --test tests/unit/*.test.ts tests/unit/*.test.mjs",
     "test": "node --test tests/observability/*.test.mjs tests/security/*.test.mjs",
     "test:arch033-admin-incidents:postgres": "node scripts/test-arch033-admin-incidents-postgres.mjs",
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
