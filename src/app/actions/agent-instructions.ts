@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
-import { mutateAgentInstructions, validatePromptText, type PromptMutation } from "@/lib/admin/agent-instructions";
+import { AgentInstructionsStaleMutationError, mutateAgentInstructions, validatePromptText, type PromptMutation } from "@/lib/admin/agent-instructions";
 import { prisma } from "@/lib/prisma";
 
 function text(formData: FormData, key: string, maxLength: number): string {
@@ -83,8 +83,23 @@ export async function mutateAgentInstructionsAction(formData: FormData): Promise
     }, { isolationLevel: "Serializable" });
   } catch (error) {
     if (databaseCode(error) === "P2002") throw new Error("Agent Instructions configuration conflicts with an existing record.");
-    if (databaseCode(error) === "P2034") throw new Error("Agent Instructions changed; reload and retry.");
+    if (databaseCode(error) === "P2034") throw new AgentInstructionsStaleMutationError("Agent Instructions changed; reload and retry.");
     throw error;
   }
   revalidatePath("/system-controls/agent-instructions");
+}
+/** Return only known optimistic conflicts as recoverable UI state; never bypass validation or authentication. */
+export async function publishAgentInstructionsAction(formData: FormData): Promise<
+  { status: "published" } | { status: "conflict"; message: string }
+> {
+  if (formData.get("intent") !== "publish") throw new Error("Unsupported Agent Instructions action.");
+  try {
+    await mutateAgentInstructionsAction(formData);
+    return { status: "published" };
+  } catch (error) {
+    if (error instanceof AgentInstructionsStaleMutationError) {
+      return { status: "conflict", message: error.message };
+    }
+    throw error;
+  }
 }

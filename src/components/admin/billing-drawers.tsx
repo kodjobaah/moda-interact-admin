@@ -11,6 +11,8 @@ import { MerchantPricingPlanBuilder } from "./merchant/merchant-pricing-plan-bui
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
 import type { MerchantKnowledgeSourceTypeOption } from "@/lib/admin/merchant/pricing-plan";
 import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
+import { LivePlanPolicyControls } from "./commerce-model-policy/live-plan-policy";
+import type { LivePlanPolicyHistoryEntry, LivePlanPolicyView } from "@/lib/admin/commerce-model-plan-policy";
 
 function DetailList({
   items,
@@ -40,6 +42,8 @@ export function MerchantPricingPlanDrawer({
   merchantKnowledgeSourceTypes = [],
   commerceModelOptions = [],
   minimumUpgradePremiumBps = 2000,
+  planPolicy, planPolicyHistory = [], planPolicyHistoryPage = 0, planPolicyHasMore = false,
+  canEditPlanPolicy = false,
   params,
   register = false,
 }: {
@@ -49,6 +53,11 @@ export function MerchantPricingPlanDrawer({
   merchantKnowledgeSourceTypes?: MerchantKnowledgeSourceTypeOption[];
   commerceModelOptions?: MerchantPricingPlanModelOption[];
   minimumUpgradePremiumBps?: number;
+  planPolicy?: LivePlanPolicyView;
+  planPolicyHistory?: LivePlanPolicyHistoryEntry[];
+  planPolicyHistoryPage?: number;
+  planPolicyHasMore?: boolean;
+  canEditPlanPolicy?: boolean;
   params: Record<string, string>;
   register?: boolean;
 }) {
@@ -64,6 +73,18 @@ export function MerchantPricingPlanDrawer({
       closeHref={closeHref}
       size="wide"
     >
+      {plan && planPolicy ? <LivePlanPolicyControls
+        key={`${plan.id}:${planPolicy.editVersion}`}
+        policy={planPolicy}
+        history={planPolicyHistory}
+        page={planPolicyHistoryPage}
+        hasMore={planPolicyHasMore}
+        canEdit={canEditPlanPolicy}
+        historyBaseHref={withParamUpdates("/billing", params, {
+          view: "plans", section: "pricing", planId: plan.id, commercePlanHistoryPage: null,
+        })}
+      /> : null}
+      {!plan ? <p className="mb-4 rounded-md bg-gray-50 p-3 text-sm text-gray-600">Save the new Price Plan before setting optional CommerceAgent budgets.</p> : null}
       <MerchantPricingPlanBuilder
         plan={plan}
         cataloguePlans={cataloguePlans}

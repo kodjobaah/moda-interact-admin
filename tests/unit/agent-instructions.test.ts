@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { getAgentInstructionsScopeData, mutateAgentInstructions, validatePromptText } from "../../src/lib/admin/agent-instructions.ts";
+import { AgentInstructionsStaleMutationError, getAgentInstructionsScopeData, mutateAgentInstructions, validatePromptText } from "../../src/lib/admin/agent-instructions.ts";
 import { resolveAdminCommerceEnvironment } from "../../src/lib/admin/commerce-environment.ts";
 
 function makePromotionTransaction(options: { configurationConflict?: boolean; profileConflict?: boolean } = {}) {
@@ -342,7 +342,7 @@ test("Agent Instructions edits drafts through CodeMirror while preserving form s
 test("Agent Instructions explains draft dirty state and publish readiness", () => {
   assert.match(consoleSource, /const hasUnsavedChanges = promptText !== savedText/);
   assert.match(consoleSource, /const canSave = hasPrompt && hasUnsavedChanges && !saving/);
-  assert.match(consoleSource, /const canPublish = hasPrompt && !hasUnsavedChanges && !saving/);
+  assert.match(consoleSource, /const canPublish = hasPrompt && !hasUnsavedChanges && !saving && !publishing && !publishConflict/);
   assert.match(consoleSource, /● Unsaved changes/);
   assert.match(consoleSource, /✓ Draft saved/);
   assert.match(consoleSource, /Save the current draft before publishing\./);
@@ -498,5 +498,43 @@ test("pending category publish rolls back every write when profile CAS loses the
     assert.equal(state.profile.pendingCategoryId, "category-home");
     assert.equal(state.profile.pendingPromptRevisionId, "shop-revision-2");
     assert.deepEqual(state.audits, []);
+  });
+});
+test("a second Platform publish rejects an already-published revision without mutating it", async () => {
+  await withProductionEnvironment(async () => {
+    const revision = {
+      id: "platform-revision-1",
+      promptId: "platform-prompt",
+      status: "PUBLISHED",
+      editVersion: 5,
+      promptText: "Original platform instructions",
+      prompt: { scope: "PLATFORM", shopId: null },
+    };
+    let writes = 0;
+    const tx = {
+      commerceAgentPromptRevision: {
+        findUnique: async () => revision,
+        updateMany: async () => { writes++; return { count: 1 }; },
+      },
+      commerceAgentConfiguration: {
+        findMany: async () => { writes++; return []; },
+      },
+      commerceAuditEvent: {
+        create: async () => { writes++; },
+      },
+    };
+    await assert.rejects(
+      mutateAgentInstructions(tx as never, {
+        kind: "publish",
+        revisionId: "platform-revision-1",
+        expectedRevisionEditVersion: 4,
+        expectedConfigurationPromptEditVersion: 1,
+        reason: "Attempt to publish twice",
+      }, "admin-1"),
+      (error: unknown) => error instanceof AgentInstructionsStaleMutationError &&
+        error.message === "Prompt revision is unavailable.",
+    );
+    assert.equal(writes, 0);
+    assert.equal(revision.status, "PUBLISHED");
   });
 });

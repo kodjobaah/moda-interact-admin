@@ -47,3 +47,15 @@ test("oversized prompt text is rejected before admin/database work and matches t
   assert.match(actionSource, /validatePromptText\(String\(formData\.get\("promptText"\) \?\? ""\)\)/);
   assert.match(consoleSource, /maxLength=\{32_000\}/);
 });
+test("Platform publish returns a recoverable stale conflict while preserving server validation", () => {
+  assert.match(actionSource, /export async function publishAgentInstructionsAction/);
+  assert.match(actionSource, /if \(formData\.get\("intent"\) !== "publish"\)/);
+  assert.match(actionSource, /await mutateAgentInstructionsAction\(formData\)/);
+  assert.match(actionSource, /error instanceof AgentInstructionsStaleMutationError/);
+  assert.match(actionSource, /throw error;/);
+  assert.match(consoleSource, /publishingRef\.current \|\| !canPublish/);
+  assert.match(consoleSource, /await publishAgentInstructionsAction\(formData\)/);
+  assert.match(consoleSource, /setPublishConflict\(result\.message\)/);
+  assert.match(consoleSource, /Reload current revision/);
+  assert.match(consoleSource, /role="alert"/);
+});

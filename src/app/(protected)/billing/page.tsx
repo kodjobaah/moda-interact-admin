@@ -44,6 +44,7 @@ import {
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
+import { getLivePlanPolicyDashboard } from "@/lib/admin/commerce-model-plan-policy";
 import { getFeatureCatalogue } from "@/lib/admin/feature-catalogue";
 import { FeatureCatalogue } from "@/components/admin/feature-catalogue";
 import {
@@ -119,6 +120,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
     firstParam(rawParams.planId)
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
       : null;
+  const planPolicyHistoryPage = Math.min(1000, positiveInt(rawParams.commercePlanHistoryPage, 1) - 1);
+  const selectedPlanPolicy = selectedPlan
+    ? await getLivePlanPolicyDashboard(selectedPlan.id, planPolicyHistoryPage)
+    : null;
   const planDrawerOpen =
     view === "plans" &&
     planSection === "pricing" &&
@@ -288,6 +293,11 @@ export default async function BillingPage({ searchParams }: PageProps) {
         (params.drawer === "register-plan" || selectedPlan) ? (
           <MerchantPricingPlanDrawer
             plan={selectedPlan ?? undefined}
+            planPolicy={selectedPlanPolicy?.policy}
+            planPolicyHistory={selectedPlanPolicy?.history}
+            planPolicyHistoryPage={planPolicyHistoryPage}
+            planPolicyHasMore={selectedPlanPolicy?.hasMore}
+            canEditPlanPolicy={principal.role === "SUPER_ADMIN"}
             cataloguePlans={cataloguePlans ?? []}
             featureCatalogue={features ?? []}
             merchantKnowledgeSourceTypes={merchantKnowledgeSourceTypes}

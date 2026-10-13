@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { mutateAgentInstructionsAction } from "@/app/actions/agent-instructions";
+import { mutateAgentInstructionsAction, publishAgentInstructionsAction } from "@/app/actions/agent-instructions";
 import type { AgentInstructionsScopeConflict, getAgentInstructionsData } from "@/lib/admin/agent-instructions";
 import { AgentInstructionsTabs, type AgentInstructionsTab } from "./agent-instructions-tabs";
 import { PromptCodeEditor } from "./prompt-code-editor";
@@ -56,11 +56,14 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
   const [promptText, setPromptText] = useState(draft?.promptText ?? "");
   const [savedText, setSavedText] = useState(draft?.promptText ?? "");
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const publishingRef = useRef(false);
+  const [publishConflict, setPublishConflict] = useState<string | null>(null);
 
   const hasPrompt = promptText.trim().length > 0;
   const hasUnsavedChanges = promptText !== savedText;
   const canSave = hasPrompt && hasUnsavedChanges && !saving;
-  const canPublish = hasPrompt && !hasUnsavedChanges && !saving;
+  const canPublish = hasPrompt && !hasUnsavedChanges && !saving && !publishing && !publishConflict;
 
   const saveAction = async (formData: FormData) => {
     setSaving(true);
@@ -70,6 +73,23 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
       router.refresh();
     } finally {
       setSaving(false);
+    }
+  };
+  const publishAction = async (formData: FormData) => {
+    if (publishingRef.current || !canPublish) return;
+    publishingRef.current = true;
+    setPublishing(true);
+    setPublishConflict(null);
+    try {
+      const result = await publishAgentInstructionsAction(formData);
+      if (result.status === "conflict") {
+        setPublishConflict(result.message);
+        return;
+      }
+      router.refresh();
+    } finally {
+      publishingRef.current = false;
+      setPublishing(false);
     }
   };
   return (
@@ -163,7 +183,7 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
       )}
       {draft ? (
         <div className="space-y-2">
-          <form action={mutateAgentInstructionsAction} className="flex flex-wrap items-end gap-3">
+          <form action={publishAction} className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="intent" value="publish" />
             <input type="hidden" name="revisionId" value={draft.id} />
             <input type="hidden" name="expectedRevisionEditVersion" value={draft.editVersion} />
@@ -184,9 +204,22 @@ function PromptEditor({ data, configurationVersion }: { data: ScopeData; configu
                     : undefined
               }
             >
-              Publish and Activate
+              {publishing ? "Publishing…" : "Publish and Activate"}
             </button>
           </form>
+          {publishConflict ? (
+            <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+              <p>{publishConflict} The draft may already have been published or changed.</p>
+              <a
+                href={data.scope === "PLATFORM"
+                  ? "/system-controls/agent-instructions?tab=platform"
+                  : `/system-controls/agent-instructions?tab=shop&shop=${encodeURIComponent(data.shopId ?? "")}`}
+                className="mt-2 inline-block font-semibold underline"
+              >
+                Reload current revision
+              </a>
+            </div>
+          ) : null}
           <p
             className={`text-xs ${canPublish ? "text-emerald-700" : "text-amber-700"}`}
             role="status"

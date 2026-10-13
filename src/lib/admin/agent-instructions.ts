@@ -61,8 +61,15 @@ export type PromptMutation =
   | { kind: "publish"; revisionId: string; expectedRevisionEditVersion: number; expectedConfigurationPromptEditVersion: number; reason: string }
   | { kind: "activate"; promptRevisionId: string; scope: Scope; shopId: string | null; expectedConfigurationPromptEditVersion: number; reason: string };
 
+export class AgentInstructionsStaleMutationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentInstructionsStaleMutationError";
+  }
+}
+
 function conflict(message = "Agent Instructions changed; reload and retry."): never {
-  throw new Error(message);
+  throw new AgentInstructionsStaleMutationError(message);
 }
 
 function configurationConflict(
