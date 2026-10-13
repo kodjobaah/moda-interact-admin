@@ -1,6 +1,6 @@
 import type { Prisma, CommerceEnvironment } from "@prisma/client";
 import { resolveAdminCommerceEnvironment } from "./commerce-environment.ts";
-import { readCommerceModelBudget, type CommerceModelBudget } from "./commerce-model-policy-fields.ts";
+import { canEditLiveCommerceBudget, readCommerceModelBudget, type CommerceModelBudget } from "./commerce-model-policy-fields.ts";
 
 type Tx = Prisma.TransactionClient;
 
@@ -166,10 +166,11 @@ export async function loadLivePlatformPolicyDashboard(
 
 /** Environment is always determined from the trusted server deployment. */
 export async function getLivePlatformPolicyDashboard(page: number) {
-  const [{ requirePlatformAdminRead }, { prisma }] = await Promise.all([
+  const [{ requirePlatformAdminRead, PlatformAdminUnauthorizedError }, { prisma }] = await Promise.all([
     import("@/lib/auth/platform-admin"),
     import("@/lib/prisma"),
   ]);
-  await requirePlatformAdminRead();
+  const principal = await requirePlatformAdminRead();
+  if (!canEditLiveCommerceBudget(principal.role)) throw new PlatformAdminUnauthorizedError();
   return loadLivePlatformPolicyDashboard(prisma, resolveAdminCommerceEnvironment(), page);
 }
