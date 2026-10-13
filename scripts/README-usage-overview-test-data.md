@@ -68,6 +68,10 @@ This creates:
 - three closed billing periods containing 16, 11, and 7 usage events respectively;
 - enough customer groups to exercise Recovery breakdown pagination;
 - enough current usage rows to exercise Billable usage pagination.
+- customer names suffixed with the shop domain, for example `Ada--store.example`, so rendered rows identify the source shop;
+- UsageEvents whose `provider` matches the selected Shop's `platform` (`SHOPIFY` or `WOOCOMMERCE`).
+
+To compare platforms, seed one Shopify shop and one WooCommerce shop separately. In each shop's usage view, the linked customer names carry that shop's domain. The underlying UsageEvent rows should also show `provider=SHOPIFY` for a Shopify Shop and `provider=WOOCOMMERCE` for a WooCommerce Shop. The seeder reads `Shop.platform`; it does not guess platform from the domain or allow a caller-supplied override.
 
 If the shop already has an OPEN billing period, the fixture places current usage in that real period. If there is no OPEN period, the script creates a fixture OPEN period for display testing but does not assign it to `Subscription.billingPeriodId`.
 
@@ -160,6 +164,7 @@ Verify:
 - page sizes 10, 25, 50, and 100 can be selected;
 - Recovery and Customer columns are populated rather than all showing `Unlinked`;
 - Quantity, idempotency key, and Recorded columns are populated.
+- Recovery-linked customer names include `--<shop-domain>` so the source shop is visible in the row.
 
 ### Past monthly bills
 

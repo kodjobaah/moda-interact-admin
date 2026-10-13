@@ -46,6 +46,8 @@ What seed creates:
   - current bill usage (27 events)
   - three closed past bills (16 / 11 / 7 events)
   - enough customer and usage rows to exercise pagination
+  - customer names suffixed with the selected shop domain for visual identification
+  - usage events tagged with the selected shop platform (SHOPIFY / WOOCOMMERCE)
   - with --with-pending: 12 delayed pending-recovery jobs for pending pagination
 
 Important:
@@ -173,7 +175,7 @@ function recoveryFixtures(shopId, now) {
   });
 }
 
-function customerFixtures(shopId, now) {
+function customerFixtures(shopId, shopDomain, now) {
   const firstNames = [
     "Ada", "Grace", "Linus", "Margaret", "Alan", "Dorothy",
     "Edsger", "Barbara", "Donald", "Frances", "Ken",
@@ -188,7 +190,7 @@ function customerFixtures(shopId, now) {
     return {
       id: idFor(shopId, `customer-${String(number).padStart(2, "0")}`),
       shopId,
-      firstName,
+      firstName: `${firstName}--${shopDomain}`,
       lastName: lastNames[index],
       email: `usage-fixture-${number}@example.invalid`,
       shopifyCustomerId: idFor(shopId, `shopify-customer-${String(number).padStart(2, "0")}`),
@@ -335,7 +337,7 @@ function occurredAtWithin(period, index, count, now) {
   return new Date(start + Math.floor((end - start) * ratio));
 }
 
-function usageRows(shopId, period, label, count, recoveries, now) {
+function usageRows(shopId, period, label, count, recoveries, now, provider) {
   return Array.from({ length: count }, (_, index) => ({
     id: idFor(shopId, `usage-${label}-${String(index + 1).padStart(3, "0")}`),
     shopId,
@@ -347,7 +349,7 @@ function usageRows(shopId, period, label, count, recoveries, now) {
     sourceId: recoveries[index % recoveries.length].id,
     occurredAt: occurredAtWithin(period, index, count, now),
     shopifyReportState: "NOT_APPLICABLE",
-    provider: "SHOPIFY",
+    provider,
   }));
 }
 
@@ -399,7 +401,7 @@ async function seedDatabase(shop) {
   return prisma.$transaction(async (transaction) => {
     await cleanupDatabase(transaction, shop.id);
 
-    const customers = customerFixtures(shop.id, now);
+    const customers = customerFixtures(shop.id, shop.domain, now);
     await transaction.customer.createMany({ data: customers });
 
     const recoveries = recoveryFixtures(shop.id, now).map((row) => ({
@@ -421,10 +423,10 @@ async function seedDatabase(shop) {
     await transaction.billingPeriod.createMany({ data: pastPeriods });
 
     const usageEvents = [
-      ...usageRows(shop.id, currentPeriod, "current", 27, recoveries, now),
-      ...usageRows(shop.id, pastPeriods[0], "past-1", 16, recoveries, now),
-      ...usageRows(shop.id, pastPeriods[1], "past-2", 11, recoveries, now),
-      ...usageRows(shop.id, pastPeriods[2], "past-3", 7, recoveries, now),
+      ...usageRows(shop.id, currentPeriod, "current", 27, recoveries, now, shop.platform),
+      ...usageRows(shop.id, pastPeriods[0], "past-1", 16, recoveries, now, shop.platform),
+      ...usageRows(shop.id, pastPeriods[1], "past-2", 11, recoveries, now, shop.platform),
+      ...usageRows(shop.id, pastPeriods[2], "past-3", 7, recoveries, now, shop.platform),
     ];
     await transaction.usageEvent.createMany({ data: usageEvents });
 
@@ -434,6 +436,7 @@ async function seedDatabase(shop) {
       conversations: conversations.length,
       messages: messages.length,
       usageEvents: usageEvents.length,
+      usageProvider: shop.platform,
       currentUsageEvents: 27,
       pastUsageEvents: 34,
       pastBillingPeriods: pastPeriods.length,
@@ -623,6 +626,7 @@ async function printStatus(shop) {
   console.log("=============================");
   console.log(`Shop: ${shop.domain}`);
   console.log(`Shop ID: ${shop.id}`);
+  console.log(`Usage provider: ${shop.platform}`);
   console.log(`Subscription: ${shop.subscription.status}`);
   console.log(`Plan: ${shop.subscription.plan?.name ?? shop.subscription.observedShopifyPlanHandle ?? "(unmapped)"}`);
   console.log("");
@@ -681,6 +685,7 @@ async function main() {
     console.log("Usage Overview test data seeded");
     console.log("===============================");
     console.log(`Shop: ${shop.domain}`);
+    console.log(`Usage provider: ${shop.platform}`);
     console.table([dbResult]);
     console.log("Pending recoveries:", pendingResult);
     console.log("");
