@@ -1,5 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { LivePlanPolicyControls } from "@/components/admin/commerce-model-policy/live-plan-policy";
+import { CommerceAgentPolicyStep, createEmptyNewPlanBudgetDraft, isNewPlanBudgetDraftValid, serializeNewPlanBudgetDraft } from "./merchant-pricing-plan-builder/commerce-agent-policy-step";
+import type { LivePlanPolicyHistoryEntry, LivePlanPolicyView } from "@/lib/admin/commerce-model-plan-policy";
+import type { CommerceModelBudget } from "@/lib/admin/commerce-model-policy-fields";
+
 import { mutateMerchantPricingPlanAction } from "@/app/actions/merchant-pricing-plan";
 import type {
   MerchantKnowledgeSourceTypeOption,
@@ -18,6 +24,14 @@ import { TranslationsReviewStep } from "./merchant-pricing-plan-builder/translat
 
 export function MerchantPricingPlanBuilder({
   plan,
+  planPolicy,
+  createPlanPlatformPolicy = null,
+  planPolicyHistory = [],
+  planPolicyHistoryPage = 0,
+  planPolicyHasMore = false,
+  canEditPlanPolicy = false,
+  initialPolicyStep = false,
+  policyHistoryBaseHref = "/billing?view=plans",
   cataloguePlans = [],
   featureCatalogue = [],
   merchantKnowledgeSourceTypes = [],
@@ -25,6 +39,14 @@ export function MerchantPricingPlanBuilder({
   minimumUpgradePremiumBps = 2000,
 }: {
   plan?: MerchantPricingPlanWithChildren;
+  planPolicy?: LivePlanPolicyView;
+  createPlanPlatformPolicy?: CommerceModelBudget | null;
+  planPolicyHistory?: LivePlanPolicyHistoryEntry[];
+  planPolicyHistoryPage?: number;
+  planPolicyHasMore?: boolean;
+  canEditPlanPolicy?: boolean;
+  initialPolicyStep?: boolean;
+  policyHistoryBaseHref?: string;
   cataloguePlans?: MerchantPricingPlanWithChildren[];
   featureCatalogue?: Feature[];
   merchantKnowledgeSourceTypes?: MerchantKnowledgeSourceTypeOption[];
@@ -38,7 +60,24 @@ export function MerchantPricingPlanBuilder({
     merchantKnowledgeSourceTypes,
     commerceModelOptions,
     minimumUpgradePremiumBps,
+    initialPolicyStep,
   });
+  const [policyDraft, setPolicyDraft] = useState(() => createEmptyNewPlanBudgetDraft(createPlanPlatformPolicy));
+  const canLeavePolicyStep = Boolean(createPlanPlatformPolicy) && isNewPlanBudgetDraftValid(policyDraft);
+  const canMoveTo = (target: number) =>
+    (Boolean(plan) && target === 6 || controller.selectors.canNavigateTo(target)) && !(step === 6 && !plan && target > step && !canLeavePolicyStep);
+  const navigate = (target: number | ((previous: number) => number)) => {
+    const next = typeof target === "function" ? target(controller.draft.step) : target;
+    if (canMoveTo(next)) controller.actions.setStep(next);
+  };
+  const planPolicySummary = plan
+    ? planPolicy
+      ? `Deadline: ${planPolicy.effective.deadlineMs} ms (${planPolicy.sources.deadlineMs}); output: ${planPolicy.effective.outputTokens} tokens (${planPolicy.sources.outputTokens})`
+      : "Unavailable"
+    : [
+        `Deadline: ${policyDraft.overrides.deadlineMs ? `${policyDraft.values.deadlineMs} ms (Price Plan override)` : `${createPlanPlatformPolicy?.deadlineMs ?? "unavailable"} ms (Platform)`}`,
+        `Output: ${policyDraft.overrides.outputTokens ? `${policyDraft.values.outputTokens} tokens (Price Plan override)` : `${createPlanPlatformPolicy?.outputTokens ?? "unavailable"} tokens (Platform)`}`,
+      ].join("; ");
   const {
     step,
     name,
@@ -62,7 +101,6 @@ export function MerchantPricingPlanBuilder({
     highlights,
   } = controller.draft;
   const {
-    setStep,
     setName,
     setHandle,
     handlePlanKindChange,
@@ -103,7 +141,6 @@ export function MerchantPricingPlanBuilder({
     activationLocked,
     saveBlockers,
     canSubmit,
-    canNavigateTo,
     formFields,
     sourceTypeKey,
     formatBuilderEventPrice,
@@ -111,7 +148,39 @@ export function MerchantPricingPlanBuilder({
   } = controller.selectors;
 
   return (
-    <form action={mutateMerchantPricingPlanAction} className="space-y-6">
+    <div className="space-y-6">
+      <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        {[
+          "Plan",
+          "Catalogue placement",
+          "Shopify pricing",
+          "Usage events",
+          "Merchant content",
+          "Portfolio economics",
+          "CommerceAgent Policy",
+          "Translations & review",
+        ].map((label, index) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => {
+              if (canMoveTo(index)) navigate(index);
+            }}
+            className={`rounded-md border px-2 py-2 text-left text-xs font-semibold ${step === index ? "border-[var(--brand-700)] bg-[var(--brand-50)] text-[var(--brand-800)]" : "border-gray-200 text-gray-600"}`}
+          >
+            {index + 1} {label}
+          </button>
+        ))}
+      </nav>
+      {step === 6 && plan ? (
+        planPolicy ? <LivePlanPolicyControls
+          key={`${plan.id}:${planPolicy.editVersion}`}
+          policy={planPolicy} history={planPolicyHistory}
+          page={planPolicyHistoryPage} hasMore={planPolicyHasMore}
+          canEdit={canEditPlanPolicy} historyBaseHref={policyHistoryBaseHref}
+        /> : <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm">This Price Plan’s LIVE execution policy is unavailable. Reload the drawer or contact a platform administrator.</p>
+      ) : (
+      <form action={mutateMerchantPricingPlanAction} className="space-y-6">
       <input type="hidden" name="intent" value={formFields.intent} />
       <input type="hidden" name="payload" value={formFields.payload} />
       <input
@@ -130,28 +199,7 @@ export function MerchantPricingPlanBuilder({
         name="economicsOverrideReason"
         value={formFields.economicsOverrideReason}
       />
-      <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        {[
-          "Plan",
-          "Catalogue placement",
-          "Shopify pricing",
-          "Usage events",
-          "Merchant content",
-          "Portfolio economics",
-          "Translations & review",
-        ].map((label, index) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => {
-              if (canNavigateTo(index)) setStep(index);
-            }}
-            className={`rounded-md border px-2 py-2 text-left text-xs font-semibold ${step === index ? "border-[var(--brand-700)] bg-[var(--brand-50)] text-[var(--brand-800)]" : "border-gray-200 text-gray-600"}`}
-          >
-            {index + 1} {label}
-          </button>
-        ))}
-      </nav>
+      {!plan ? <input type="hidden" name="commercePolicyDraft" value={serializeNewPlanBudgetDraft(policyDraft)} /> : null}
       {step === 0 ? (
         <PlanStep
           commerceModelOptions={commerceModelOptions}
@@ -260,8 +308,12 @@ export function MerchantPricingPlanBuilder({
           formatMinorUnits={formatMinorUnits}
         />
       ) : null}
+      {step === 6 && !plan ? (
+        <CommerceAgentPolicyStep platform={createPlanPlatformPolicy} draft={policyDraft} onChange={setPolicyDraft} />
+      ) : null}
       <TranslationsReviewStep
         step={step}
+        planPolicySummary={planPolicySummary}
         name={name}
         handle={handle}
         recurring={recurring}
@@ -276,35 +328,39 @@ export function MerchantPricingPlanBuilder({
         retryAutomaticTranslation={retryAutomaticTranslation}
         translationsRetained={translationsRetained}
         automaticTranslation={automaticTranslation}
-        saveBlockers={saveBlockers}
+        saveBlockers={saveBlockers.concat(!plan && !canLeavePolicyStep ? [
+          { step: 6, message: "Step 7 CommerceAgent Policy: Review the optional overrides or restore inheritance." },
+        ] : [])}
         placementLabel={placementLabel}
         economicsPassed={economicsPassed}
         economicsOverrideReady={economicsOverrideReady}
         economicsOverrideAssessment={economicsOverrideAssessment}
         formatBuilderEventPrice={formatBuilderEventPrice}
-        canSubmit={canSubmit}
+        canSubmit={canSubmit && (Boolean(plan) || canLeavePolicyStep)}
         isUpdate={Boolean(plan)}
       />
+      </form>
+      )}
       <div className="flex justify-between gap-3">
         <button
           type="button"
           disabled={step === 0}
-          onClick={() => setStep((current) => Math.max(0, current - 1))}
+          onClick={() => navigate((current) => Math.max(0, current - 1))}
           className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-50"
         >
           Back
         </button>
-        {step < 6 ? (
+        {step < 7 ? (
           <button
             type="button"
-            disabled={!canNavigateTo(step + 1)}
-            onClick={() => setStep((current) => current + 1)}
+            disabled={!canMoveTo(step + 1)}
+            onClick={() => navigate((current) => current + 1)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-50"
           >
             Next
           </button>
         ) : null}
       </div>
-    </form>
+    </div>
   );
 }

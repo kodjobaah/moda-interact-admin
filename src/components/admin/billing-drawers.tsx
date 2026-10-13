@@ -11,6 +11,8 @@ import { MerchantPricingPlanBuilder } from "./merchant/merchant-pricing-plan-bui
 import type { MerchantPricingPlanWithChildren } from "@/lib/admin/merchant/pricing-plan";
 import type { MerchantKnowledgeSourceTypeOption } from "@/lib/admin/merchant/pricing-plan";
 import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
+import type { CommerceModelBudget } from "@/lib/admin/commerce-model-policy-fields";
+import type { LivePlanPolicyHistoryEntry, LivePlanPolicyView } from "@/lib/admin/commerce-model-plan-policy";
 
 function DetailList({
   items,
@@ -40,6 +42,8 @@ export function MerchantPricingPlanDrawer({
   merchantKnowledgeSourceTypes = [],
   commerceModelOptions = [],
   minimumUpgradePremiumBps = 2000,
+  planPolicy, createPlanPlatformPolicy = null, planPolicyHistory = [], planPolicyHistoryPage = 0, planPolicyHasMore = false,
+  canEditPlanPolicy = false,
   params,
   register = false,
 }: {
@@ -49,6 +53,12 @@ export function MerchantPricingPlanDrawer({
   merchantKnowledgeSourceTypes?: MerchantKnowledgeSourceTypeOption[];
   commerceModelOptions?: MerchantPricingPlanModelOption[];
   minimumUpgradePremiumBps?: number;
+  planPolicy?: LivePlanPolicyView;
+  createPlanPlatformPolicy?: CommerceModelBudget | null;
+  planPolicyHistory?: LivePlanPolicyHistoryEntry[];
+  planPolicyHistoryPage?: number;
+  planPolicyHasMore?: boolean;
+  canEditPlanPolicy?: boolean;
   params: Record<string, string>;
   register?: boolean;
 }) {
@@ -66,6 +76,16 @@ export function MerchantPricingPlanDrawer({
     >
       <MerchantPricingPlanBuilder
         plan={plan}
+        planPolicy={planPolicy}
+        createPlanPlatformPolicy={createPlanPlatformPolicy}
+        planPolicyHistory={planPolicyHistory}
+        planPolicyHistoryPage={planPolicyHistoryPage}
+        planPolicyHasMore={planPolicyHasMore}
+        canEditPlanPolicy={canEditPlanPolicy}
+        initialPolicyStep={Boolean(params.commercePlanPolicyTab) && Boolean(plan)}
+        policyHistoryBaseHref={withParamUpdates("/billing", params, {
+          view: "plans", section: "pricing", planId: plan?.id ?? null, commercePlanHistoryPage: null, commercePlanPolicyTab: "1",
+        })}
         cataloguePlans={cataloguePlans}
         featureCatalogue={featureCatalogue}
         merchantKnowledgeSourceTypes={merchantKnowledgeSourceTypes}

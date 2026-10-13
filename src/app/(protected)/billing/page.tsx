@@ -44,6 +44,8 @@ import {
 } from "@/lib/admin/query";
 import { ShopifyReportState } from "@prisma/client";
 import { getPlatformBillingPolicy } from "@/lib/admin/billing-controls";
+import { getLivePlanPolicyDashboard } from "@/lib/admin/commerce-model-plan-policy";
+import { getLivePlatformPolicyDashboard } from "@/lib/admin/commerce-model-platform-policy";
 import { getFeatureCatalogue } from "@/lib/admin/feature-catalogue";
 import { FeatureCatalogue } from "@/components/admin/feature-catalogue";
 import {
@@ -118,6 +120,14 @@ export default async function BillingPage({ searchParams }: PageProps) {
     planSection === "pricing" &&
     firstParam(rawParams.planId)
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
+      : null;
+  const planPolicyHistoryPage = Math.min(1000, positiveInt(rawParams.commercePlanHistoryPage, 1) - 1);
+  const selectedPlanPolicy = selectedPlan
+    ? await getLivePlanPolicyDashboard(selectedPlan.id, planPolicyHistoryPage)
+    : null;
+  const createPlanPlatformPolicy = view === "plans" && planSection === "pricing" &&
+    params.drawer === "register-plan" && principal.role === "SUPER_ADMIN"
+      ? (await getLivePlatformPolicyDashboard(0)).policy?.budget ?? null
       : null;
   const planDrawerOpen =
     view === "plans" &&
@@ -288,6 +298,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
         (params.drawer === "register-plan" || selectedPlan) ? (
           <MerchantPricingPlanDrawer
             plan={selectedPlan ?? undefined}
+            planPolicy={selectedPlanPolicy?.policy}
+            createPlanPlatformPolicy={createPlanPlatformPolicy}
+            planPolicyHistory={selectedPlanPolicy?.history}
+            planPolicyHistoryPage={planPolicyHistoryPage}
+            planPolicyHasMore={selectedPlanPolicy?.hasMore}
+            canEditPlanPolicy={principal.role === "SUPER_ADMIN"}
             cataloguePlans={cataloguePlans ?? []}
             featureCatalogue={features ?? []}
             merchantKnowledgeSourceTypes={merchantKnowledgeSourceTypes}
