@@ -32,6 +32,7 @@ type TranslationsReviewStepProps = Pick<
     | "canSubmit"
   > & {
     isUpdate: boolean;
+    planPolicySummary: string;
   };
 
 const inputClass =
@@ -39,6 +40,7 @@ const inputClass =
 
 export function TranslationsReviewStep({
   step,
+  planPolicySummary,
   name,
   handle,
   recurring,
@@ -62,7 +64,7 @@ export function TranslationsReviewStep({
   canSubmit,
   isUpdate,
 }: TranslationsReviewStepProps) {
-  if (step !== 6) return null;
+  if (step !== 7) return null;
 
   return (
     <>
@@ -84,6 +86,7 @@ export function TranslationsReviewStep({
           Recurring pricing: {recurring} {currency}
         </p>
         <p>Allowance: {credits} recovery credits</p>
+        <p>CommerceAgent LIVE policy: {planPolicySummary}</p>
         <p>Usage events: {events.length}</p>
         <ul className="list-disc pl-5">
           {events.map((event) => (

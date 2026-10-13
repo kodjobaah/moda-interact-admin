@@ -64,6 +64,7 @@ export type MerchantPricingPlanDraftControllerInput = {
   merchantKnowledgeSourceTypes?: MerchantKnowledgeSourceTypeOption[];
   commerceModelOptions?: MerchantPricingPlanModelOption[];
   minimumUpgradePremiumBps?: number;
+  initialPolicyStep?: boolean;
 };
 
 function initialKnowledgeConfiguration(
@@ -97,6 +98,7 @@ export function useMerchantPricingPlanDraft({
   merchantKnowledgeSourceTypes = [],
   commerceModelOptions = [],
   minimumUpgradePremiumBps = 2000,
+  initialPolicyStep = false,
 }: MerchantPricingPlanDraftControllerInput) {
   const nextEventKeyRef = useRef(0);
   const cataloguePlanIds = cataloguePlans.map(({ id }) => id);
@@ -111,6 +113,7 @@ export function useMerchantPricingPlanDraft({
     merchantPricingPlanDraftReducer,
     {
       plan,
+      initialStep: plan && initialPolicyStep ? 6 : 0,
       hasFreePlan,
       initialPlacement: plan
         ? "UNCHANGED"
@@ -263,7 +266,7 @@ export function useMerchantPricingPlanDraft({
     draft.highlights,
   );
   const automaticTranslation = useMerchantPricingAutomaticTranslation({
-    active: draft.step === 6,
+    active: draft.step === 7,
     translationsRetained,
     merchantPricingPlanId: plan?.id ?? null,
     initialRunId:
@@ -307,7 +310,7 @@ export function useMerchantPricingPlanDraft({
 
   function setStep(next: number | ((current: number) => number)) {
     const target = typeof next === "function" ? next(draft.step) : next;
-    if (canNavigateTo(target)) dispatch({ type: "set-step", step: target });
+    if ((plan && target === 6) || canNavigateTo(target)) dispatch({ type: "set-step", step: target });
   }
 
   const actions = {
