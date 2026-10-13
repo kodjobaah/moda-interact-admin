@@ -291,7 +291,7 @@ function AgentInstructionsConsoleContent({
                   </span>
                 </div>
                 <PromptEditor
-                  key={`${data.platform.draft?.id ?? "none"}:${data.platform.draft?.editVersion ?? 0}`}
+                  key={data.platform.draft?.id ?? "none"}
                   data={data.platform}
                   configurationVersion={data.platform.configuration?.promptEditVersion ?? 1}
                 />
@@ -372,7 +372,7 @@ function AgentInstructionsConsoleContent({
                       </span>
                     </div>
                     <PromptEditor
-                      key={`${selected.id}:${data.shopData.draft?.id ?? "none"}:${data.shopData.draft?.editVersion ?? 0}`}
+                      key={`${selected.id}:${data.shopData.draft?.id ?? "none"}`}
                       data={data.shopData}
                       configurationVersion={data.shopData.configuration?.promptEditVersion ?? 1}
                     />

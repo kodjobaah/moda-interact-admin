@@ -351,10 +351,16 @@ test("Agent Instructions explains draft dirty state and publish readiness", () =
   assert.match(consoleSource, /disabled=\{!canPublish\}/);
   assert.match(consoleSource, /setSavedText\(promptText\)/);
   assert.match(consoleSource, /router\.refresh\(\)/);
-  assert.match(consoleSource, /draft\?\.editVersion/);
+  // A server refresh after saving must not remount the editor and mark it dirty again.
+  assert.match(consoleSource, /name="expectedEditVersion" value=\{draft\.editVersion\}/);
   assert.match(consoleSource, /key=\{data\.platform\.draft\?\.id \?\? "none"\}/);
   assert.match(consoleSource, /key=\{`\$\{selected\.id\}:\$\{data\.shopData\.draft\?\.id \?\? "none"\}`\}/);
   assert.doesNotMatch(consoleSource, /key=\{`\$\{data\.platform\.draft\?\.id.*editVersion/);
+  assert.doesNotMatch(consoleSource, /key=\{`\$\{selected\.id\}:\$\{data\.shopData\.draft\?\.id.*editVersion/);
+  // Server-driven CodeMirror updates must not be counted as user edits.
+  assert.match(promptCodeEditorSource, /if \(!update\.docChanged \|\| syncingValueRef\.current\) return/);
+  assert.match(promptCodeEditorSource, /syncingValueRef\.current = true/);
+  assert.match(promptCodeEditorSource, /syncingValueRef\.current = false/);
 });
 
 test("pending category publish atomically promotes the exact edited prompt and preserves selection generation", async () => {

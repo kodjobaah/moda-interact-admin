@@ -56,6 +56,7 @@ export function PromptCodeEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
+  const syncingValueRef = useRef(false);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -86,7 +87,8 @@ export function PromptCodeEditor({
           return nextLength > maxLength;
         }),
         EditorView.updateListener.of((update) => {
-          if (!update.docChanged) return;
+          // Updating the controlled value is not a user edit.
+          if (!update.docChanged || syncingValueRef.current) return;
           onChangeRef.current(update.state.doc.toString());
         }),
         promptEditorTheme(),
@@ -106,13 +108,18 @@ export function PromptCodeEditor({
     const currentValue = view.state.doc.toString();
     if (currentValue === value) return;
 
-    view.dispatch({
-      changes: {
-        from: 0,
-        to: view.state.doc.length,
-        insert: value,
-      },
-    });
+    syncingValueRef.current = true;
+    try {
+      view.dispatch({
+        changes: {
+          from: 0,
+          to: view.state.doc.length,
+          insert: value,
+        },
+      });
+    } finally {
+      syncingValueRef.current = false;
+    }
   }, [value]);
 
   return <div ref={hostRef} data-testid="agent-instructions-prompt-editor" />;
