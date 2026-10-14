@@ -98,3 +98,11 @@ test('submit form carries server-issued Shop scope, never derives it from editab
   assert.equal(find(root, n => n.type === 'input' && n.props.name === 'shopPolicyScope')?.props.value, 'signed-shop-1');
   assert.equal(find(root, n => n.type === 'input' && n.props.name === 'shopId')?.props.value, 'shop-1');
 });
+
+
+test('an empty policy history explicitly shows the no-changes message', () => {
+  const root = setup({ history: [], page: 0, hasMore: false }).render();
+  assert.match(elementText(root), /Policy History/);
+  assert.match(elementText(root), /No policy changes recorded\./);
+  assert.equal(find(root, n => n.type === 'a' && elementText(n) === 'Next'), undefined);
+});

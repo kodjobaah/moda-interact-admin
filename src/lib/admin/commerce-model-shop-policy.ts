@@ -33,6 +33,47 @@ function shopPolicyId(environment: CommerceEnvironment, shopId: string) {
   return `arch038-live-shop-${environment.toLowerCase()}-${shopId}`;
 }
 
+/**
+ * A deleted sparse override has no row-level editVersion. The Shop-scoped audit
+ * stream is durable, so its event count and last recorded transition preserve a
+ * logical CAS revision across create -> clear -> recreate cycles.
+ *
+ * All reads used for mutation occur in the caller's serializable transaction;
+ * concurrent creations/clears also conflict on the unique Shop policy identity.
+ */
+async function shopPolicyRevision(
+  client: Pick<Tx, "commerceAuditEvent">,
+  environment: CommerceEnvironment,
+  shopId: string,
+): Promise<number> {
+  const where = {
+    modelPolicyId: shopPolicyId(environment, shopId), environment,
+    action: "SET_LIVE_SHOP_BUDGET_OVERRIDE" as const, actorType: "PLATFORM_ADMIN" as const,
+  };
+  const [count, latest] = await Promise.all([
+    client.commerceAuditEvent.count({ where }),
+    client.commerceAuditEvent.findFirst({
+      where, select: { metadata: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    }),
+  ]);
+  const metadata = latest?.metadata;
+  const values = metadata && typeof metadata === "object" && !Array.isArray(metadata)
+    ? metadata as Record<string, unknown> : {};
+  const safeVersion = (value: unknown) =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  const previous = safeVersion(values.previousEditVersion);
+  const next = safeVersion(values.nextEditVersion);
+  // Legacy CLEAR events wrote nextEditVersion: 0. Count and the preceding
+  // revision prevent those records from making an old form valid again.
+  const cleared = values.operation === "CLEAR";
+  const lastRevision = cleared ? Math.max(next, previous + 1) : Math.max(next, previous);
+  const revision = Math.max(count, lastRevision);
+  if (!Number.isSafeInteger(revision) || revision >= Number.MAX_SAFE_INTEGER) {
+    throw new Error("Merchant execution policy revision is unavailable.");
+  }
+  return revision;
+}
+
 /** Reject malformed/unknown sparse overrides instead of falling back to less restrictive defaults. */
 function readSparseShopBudget(value: unknown, version: number): SparseShopCommerceBudget {
   if (version !== 1 || !value || typeof value !== "object" || Array.isArray(value)) {
@@ -126,7 +167,8 @@ export async function loadLiveShopPolicyDashboard(
       previousEditVersion: typeof m.previousEditVersion === "number" ? m.previousEditVersion : 0,
       nextEditVersion: typeof m.nextEditVersion === "number" ? m.nextEditVersion : 0 };
   });
-  return { policy: { shopId, environment, editVersion: shopRecord?.editVersion ?? 0, budget, platformBudget, planBudget, effective, sources, currentPlan },
+  const revision = await shopPolicyRevision(client, environment, shopId);
+  return { policy: { shopId, environment, editVersion: Math.max(shopRecord?.editVersion ?? 0, revision), budget, platformBudget, planBudget, effective, sources, currentPlan },
     history, hasMore: audit.length > 10 };
 }
 
@@ -144,7 +186,8 @@ export async function mutateLiveShopPolicy(
   if (rows.length > 1) throw new Error("Ambiguous Merchant execution policy.");
   const old = rows[0];
   const previousBudget = old ? readSparseShopBudget(old.budget, old.budgetSchemaVersion) : {};
-  const oldVersion = old?.editVersion ?? 0;
+  const oldRowVersion = old?.editVersion ?? 0;
+  const oldVersion = Math.max(oldRowVersion, await shopPolicyRevision(tx, environment, input.shopId));
   if (oldVersion !== input.expectedEditVersion) throw new CommerceModelPolicyConflict();
   const nextBudget = input.budget;
   if (JSON.stringify(previousBudget) === JSON.stringify(nextBudget)) throw new Error("No CommerceAgent Merchant settings have changed.");
@@ -152,19 +195,20 @@ export async function mutateLiveShopPolicy(
   if (!Object.keys(nextBudget).length) {
     if (!old) throw new Error("No CommerceAgent Merchant settings have changed.");
     const result = await tx.commerceModelPolicy.deleteMany({
-      where: { id: old.id, environment, context: "LIVE", scope: "SHOP", shopId: input.shopId, editVersion: oldVersion },
+      where: { id: old.id, environment, context: "LIVE", scope: "SHOP", shopId: input.shopId, editVersion: oldRowVersion },
     });
     if (result.count !== 1) throw new CommerceModelPolicyConflict();
   } else if (old) {
     const result = await tx.commerceModelPolicy.updateMany({
-      where: { id: old.id, environment, context: "LIVE", scope: "SHOP", shopId: input.shopId, editVersion: oldVersion },
+      where: { id: old.id, environment, context: "LIVE", scope: "SHOP", shopId: input.shopId, editVersion: oldRowVersion },
       data: { budget: nextBudget, editVersion: { increment: 1 }, updatedByAdminId: actorAdminId },
     });
     if (result.count !== 1) throw new CommerceModelPolicyConflict();
   } else {
     await tx.commerceModelPolicy.create({ data: {
       id, environment, context: "LIVE", scope: "SHOP", shopId: input.shopId, budget: nextBudget,
-      budgetSchemaVersion: 1, createdByAdminId: actorAdminId, updatedByAdminId: actorAdminId,
+      budgetSchemaVersion: 1, editVersion: oldVersion + 1,
+      createdByAdminId: actorAdminId, updatedByAdminId: actorAdminId,
     } });
   }
   await tx.commerceAuditEvent.create({ data: {
@@ -172,7 +216,7 @@ export async function mutateLiveShopPolicy(
     modelPolicyId: id, environment, reason: input.reason,
     metadata: { context: "LIVE", scope: "SHOP", shopId: input.shopId,
       previousBudget, nextBudget, previousEditVersion: oldVersion,
-      nextEditVersion: Object.keys(nextBudget).length ? oldVersion + 1 : 0,
+      nextEditVersion: oldVersion + 1,
       operation: !Object.keys(nextBudget).length ? "CLEAR" : old ? "SET" : "CREATE" },
   } });
 }

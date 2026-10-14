@@ -25,6 +25,8 @@ function mockDb({ shopExists = true, currentStatus = "ACTIVE", handle = "growth"
     },
     commerceAuditEvent: {
       findMany: async (args: any) => { calls.push({ op: "history", args }); return history; },
+      count: async (args: any) => { calls.push({ op: "revision-count", args }); return history.length; },
+      findFirst: async (args: any) => { calls.push({ op: "revision-latest", args }); return history[0] ?? null; },
       create: async (args: any) => { calls.push({ op: "audit", args }); if (auditFails) throw Error("audit insert failed"); },
     },
   };
@@ -108,4 +110,65 @@ test("reject stale CAS, unknown Shop and audit insertion failures", async () => 
     const { tx } = mockDb(opts);
     await assert.rejects(mutateLiveShopPolicy(tx, changedInput, "DEVELOPMENT", "admin-1"), expected);
   }
+});
+
+
+test("create, clear, then replay an original version-0 form cannot recreate the Shop override", async () => {
+  let stored: any = null;
+  const events: Array<{ metadata: Record<string, unknown> }> = [];
+  let writes = 0;
+  const shopId = "shop-1";
+  const id = "arch038-live-shop-development-shop-1";
+  const client = {
+    shop: { findUnique: async () => ({ id: shopId }) },
+    subscription: { findUnique: async () => null },
+    merchantPricingPlan: { findUnique: async () => null },
+    commerceModelPolicy: {
+      findMany: async ({ where }: any) => where.scope === "PLATFORM"
+        ? [{ budget: { deadlineMs: 60000, outputTokens: 800 }, budgetSchemaVersion: 1 }]
+        : stored ? [stored] : [],
+      create: async ({ data }: any) => { assert.equal(stored, null); stored = { ...data }; writes++; },
+      deleteMany: async ({ where }: any) => {
+        if (!stored || stored.editVersion !== where.editVersion) return { count: 0 };
+        stored = null; writes++; return { count: 1 };
+      },
+    },
+    commerceAuditEvent: {
+      count: async ({ where }: any) => { assert.equal(where.modelPolicyId, id); return events.length; },
+      findFirst: async ({ where }: any) => { assert.equal(where.modelPolicyId, id); return events.at(-1) ?? null; },
+      findMany: async () => [],
+      create: async ({ data }: any) => { events.push({ metadata: data.metadata }); },
+    },
+  } as never;
+  const original = { shopId, expectedEditVersion: 0, budget: { outputTokens: 1200 }, reason: "First override" };
+  await mutateLiveShopPolicy(client, original, "DEVELOPMENT", "admin-1");
+  assert.equal(stored.editVersion, 1);
+  const afterCreate = await loadLiveShopPolicyDashboard(client, "DEVELOPMENT", shopId, 0);
+  assert.equal(afterCreate.policy.editVersion, 1);
+  await mutateLiveShopPolicy(client, { ...original, budget: {}, expectedEditVersion: 1, reason: "Clear the override" }, "DEVELOPMENT", "admin-1");
+  assert.equal(stored, null);
+  assert.equal(events.at(-1)?.metadata.nextEditVersion, 2, "clear must advance the durable revision");
+  const afterClear = await loadLiveShopPolicyDashboard(client, "DEVELOPMENT", shopId, 0);
+  assert.deepEqual(afterClear.policy.budget, {});
+  assert.equal(afterClear.policy.editVersion, 2, "no row must not reset dashboard revision to zero");
+  const beforeReplay = { writes, audits: events.length };
+  await assert.rejects(mutateLiveShopPolicy(client, original, "DEVELOPMENT", "admin-1"), CommerceModelPolicyConflict);
+  assert.equal(stored, null);
+  assert.deepEqual({ writes, audits: events.length }, beforeReplay, "replay must not write policy or audit");
+  await mutateLiveShopPolicy(client, { ...original, expectedEditVersion: 2, reason: "New authorised override" }, "DEVELOPMENT", "admin-1");
+  assert.equal((stored as { editVersion: number } | null)?.editVersion, 3, "recreated row must retain the monotonic policy revision");
+  assert.equal(events.at(-1)?.metadata.nextEditVersion, 3);
+});
+
+test("legacy clear audit with nextEditVersion zero still has a nonzero durable revision", async () => {
+  const { tx } = mockDb({ shopBudget: null, history: [{
+    id: "legacy-clear", createdAt: new Date("2026-10-13T12:00:00Z"), reason: "Clear",
+    actor: null, actorAdminId: "admin-1",
+    metadata: { operation: "CLEAR", previousEditVersion: 1, nextEditVersion: 0 },
+  }] });
+  const dashboard = await loadLiveShopPolicyDashboard(tx, "DEVELOPMENT", "shop-1", 0);
+  assert.equal(dashboard.policy.editVersion, 2);
+  await assert.rejects(mutateLiveShopPolicy(tx, {
+    shopId: "shop-1", expectedEditVersion: 0, budget: { outputTokens: 1600 }, reason: "Replay",
+  }, "DEVELOPMENT", "admin-1"), CommerceModelPolicyConflict);
 });
