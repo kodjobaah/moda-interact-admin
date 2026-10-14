@@ -111,7 +111,7 @@ test("translation credential uses the published Shared AAD and the existing Comm
   assert.match(dependency, /^\d+\.\d+\.\d+$/);
   assert.match(cryptoSource, /createCommerceTranslationProviderCredentialAad/);
   assert.match(cryptoSource, /provider: input\.provider/);
-  assert.match(service, /loadActiveCredentialKeyring\(\)/);
+  assert.match(service, /loadActiveSharedCredentialKeyring\(\)/);
   assert.doesNotMatch(cryptoSource, /createDecipheriv/);
 });
 

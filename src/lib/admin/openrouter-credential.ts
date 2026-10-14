@@ -7,8 +7,8 @@ import {
 import type { PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
 import {
   CREDENTIAL_ENCRYPTION_UNAVAILABLE,
-  loadActiveCredentialKeyring,
 } from "./openrouter-credential-keyring.ts";
+import { loadActiveSharedCredentialKeyring } from "./shared-credential-keyring.ts";
 import { sealOpenRouterCredential } from "./openrouter-credential-crypto.ts";
 import { resolveCommerceEnvironment } from "./openrouter-credential-environment.ts";
 import { validateOpenRouterCredentialMutation } from "./openrouter-credential-validation.ts";
@@ -245,9 +245,9 @@ async function executeMutation(
       expectedEditVersion: validated.expectedEditVersion!,
     };
   } else {
-    let active: ReturnType<typeof loadActiveCredentialKeyring>;
+    let active: ReturnType<typeof loadActiveSharedCredentialKeyring>;
     try {
-      active = loadActiveCredentialKeyring();
+      active = loadActiveSharedCredentialKeyring();
     } catch {
       throw new Error(CREDENTIAL_ENCRYPTION_UNAVAILABLE);
     }
