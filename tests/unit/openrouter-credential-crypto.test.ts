@@ -6,11 +6,18 @@ import {
   createCommerceOpenRouterCredentialAad,
   type CommerceEnvironment,
 } from "@modainteract/moda-interact-shared/commerce/model";
+import {
+  decryptCredential,
+  parseCredentialKeyring,
+} from "@modainteract/moda-interact-shared/security/credentials/node";
 import { sealOpenRouterCredential } from "../../src/lib/admin/openrouter-credential-crypto.ts";
 
 const environment: CommerceEnvironment = "TEST";
 const keyId = "arch024-test-key";
 const key = new Uint8Array(Buffer.alloc(32, 11));
+const keyring = parseCredentialKeyring(JSON.stringify({
+  [keyId]: Buffer.from(key).toString("base64"),
+}));
 const secret = "  exact credential-é  ";
 
 function decrypt(
@@ -39,7 +46,7 @@ test("seals exact UTF-8 secret with interoperable Shared AAD", () => {
   const sealed = sealOpenRouterCredential({
     environment,
     secret,
-    keyring: { [keyId]: key },
+    keyring,
     activeKeyId: keyId,
   });
   assert.equal(sealed.nonce.byteLength, 12);
@@ -50,11 +57,22 @@ test("seals exact UTF-8 secret with interoperable Shared AAD", () => {
     false,
   );
   assert.equal(decrypt(sealed), secret);
+  assert.equal(decryptCredential({
+    keyring,
+    envelope: sealed,
+    aad: createCommerceOpenRouterCredentialAad({ environment, keyId }),
+  }), secret);
+  assert.throws(() => decryptCredential({
+    keyring,
+    envelope: sealed,
+    aad: createCommerceOpenRouterCredentialAad({ environment: "PRODUCTION", keyId }),
+  }));
   assert.throws(() => decrypt(sealed, "PRODUCTION"));
   assert.throws(() => decrypt(sealed, environment, "another-key"));
   const changedTag = { ...sealed, authTag: new Uint8Array(sealed.authTag) };
   changedTag.authTag[0] ^= 1;
   assert.throws(() => decrypt(changedTag));
+  assert.throws(() => decryptCredential({ keyring, envelope: changedTag, aad: createCommerceOpenRouterCredentialAad({ environment, keyId }) }));
   const changedCiphertext = {
     ...sealed,
     ciphertext: new Uint8Array(sealed.ciphertext),
@@ -72,7 +90,7 @@ test("production sealer uses Shared AAD and has no secret logging or fingerprint
     "utf8",
   );
   assert.match(source, /createCommerceOpenRouterCredentialAad\(/);
-  assert.match(source, /Buffer\.from\(aad, "utf8"\)/);
+  assert.match(source, /encryptCredential\(/);
   assert.doesNotMatch(source, /console\.|createHash|fingerprint|digest\(/i);
-  assert.doesNotMatch(source, /createDecipheriv/);
+  assert.doesNotMatch(source, /createCipheriv|createDecipheriv|randomBytes/);
 });

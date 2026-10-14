@@ -8,7 +8,7 @@ import {
 import type { PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
 import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
-import { loadActiveCredentialKeyring } from "./openrouter-credential-keyring.ts";
+import { loadActiveSharedCredentialKeyring } from "./shared-credential-keyring.ts";
 import { resolveCommerceEnvironment } from "./openrouter-credential-environment.ts";
 import {
   TRANSLATION_CONFIGURATION_ERRORS,
@@ -51,7 +51,7 @@ function sealCredential(input: {
   secret: string;
 }) {
   try {
-    const active = loadActiveCredentialKeyring();
+    const active = loadActiveSharedCredentialKeyring();
     return sealTranslationProviderCredential({
       environment: input.environment,
       provider: TRANSLATION_PROVIDER,
