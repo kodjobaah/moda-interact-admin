@@ -11,7 +11,7 @@ import {
   type ReferenceTaxonomyIndexStatus,
 } from "@/lib/admin/shopify-taxonomy-index-management";
 import { EMBEDDING_CONFIGURATION_ERRORS } from "@/lib/admin/embedding-configuration";
-import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "@/lib/admin/embedding-configuration-crypto";
+import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "@/lib/admin/embedding-configuration-validation";
 
 const logger = createLogger({
   serviceNamespace: "moda-interact",

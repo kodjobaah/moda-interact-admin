@@ -49,7 +49,7 @@ test("taxonomy sync resolves the database-backed Reference Taxonomy embedding co
   assert.match(management, /SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS/);
   assert.match(management, /EMBEDDING_API_KEY: config\.apiKey/);
   assert.match(management, /shell: false/);
-  assert.match(service, /openEmbeddingCredential/);
+  assert.match(service, /decryptCredential/);
   assert.match(taxonomy, /getEmbeddingRuntimeConfiguration/);
   assert.match(taxonomy, /loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime/);
   assert.doesNotMatch(taxonomy, /process\.env\.EMBEDDING_API_KEY/);

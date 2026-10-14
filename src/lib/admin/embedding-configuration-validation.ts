@@ -1,5 +1,8 @@
 import { CommerceEmbeddingPurpose } from "@prisma/client";
 
+export const EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE =
+  "Embedding credential encryption is unavailable.";
+
 const PURPOSES = new Set<CommerceEmbeddingPurpose>([
   CommerceEmbeddingPurpose.MERCHANT_KNOWLEDGE,
   CommerceEmbeddingPurpose.REFERENCE_TAXONOMY,

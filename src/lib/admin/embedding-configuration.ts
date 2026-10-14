@@ -8,15 +8,18 @@ import {
 import type { PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
 import {
-  EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE,
-  openEmbeddingCredential,
-  sealEmbeddingCredential,
-} from "./embedding-configuration-crypto.ts";
+  createCommerceEmbeddingCredentialAad,
+  decryptCredential,
+  encryptCredential,
+  parseCredentialKeyring,
+} from "@modainteract/moda-interact-shared/security/credentials/node";
 import {
+  EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE,
   validateEmbeddingConfigurationMutation,
   validateEmbeddingConfigurationRemoval,
+  validateEmbeddingCredentialSecret,
 } from "./embedding-configuration-validation.ts";
-import { loadActiveCredentialKeyring } from "./openrouter-credential-keyring.ts";
+import { loadActiveSharedCredentialKeyring } from "./shared-credential-keyring.ts";
 import { resolveCommerceEnvironment } from "./openrouter-credential-environment.ts";
 
 export const EMBEDDING_PURPOSES = [
@@ -150,23 +153,30 @@ export async function getEmbeddingRuntimeConfiguration(
     throw new Error(EMBEDDING_CONFIGURATION_ERRORS.notConfigured);
   }
 
-  let active: ReturnType<typeof loadActiveCredentialKeyring>;
+  // Readers require only the canonical keyring; the stored envelope selects the key.
+  // Do not require an active writer key when recovering an existing credential.
+  let apiKey: string;
   try {
-    active = loadActiveCredentialKeyring();
+    const keyring = parseCredentialKeyring(process.env.COMMERCE_CONNECTION_KEYS_JSON);
+    const aad = createCommerceEmbeddingCredentialAad({
+      environment,
+      purpose,
+      provider: row.embeddingProvider,
+      keyId: row.keyId,
+    });
+    apiKey = validateEmbeddingCredentialSecret(decryptCredential({
+      keyring,
+      envelope: {
+        ciphertext: new Uint8Array(row.ciphertext),
+        nonce: new Uint8Array(row.nonce),
+        authTag: new Uint8Array(row.authTag),
+        keyId: row.keyId,
+      },
+      aad,
+    }));
   } catch {
     throw new Error(EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE);
   }
-
-  const apiKey = openEmbeddingCredential({
-    environment,
-    purpose,
-    provider: row.embeddingProvider,
-    ciphertext: new Uint8Array(row.ciphertext),
-    nonce: new Uint8Array(row.nonce),
-    authTag: new Uint8Array(row.authTag),
-    keyId: row.keyId,
-    keyring: active.keyring,
-  });
 
   return {
     environment,
@@ -187,26 +197,24 @@ function databaseCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined;
 }
 
-function sealCredential(input: {
+function encryptValidatedEmbeddingSecret(input: {
   environment: CommerceEnvironment;
   purpose: CommerceEmbeddingPurpose;
   provider: string;
   secret: string;
 }) {
+  // Keep domain plaintext validation distinct from shared cryptographic validation.
+  const secret = validateEmbeddingCredentialSecret(input.secret);
   try {
-    const active = loadActiveCredentialKeyring();
-    return sealEmbeddingCredential({
-      ...input,
-      keyring: active.keyring,
-      activeKeyId: active.activeKeyId,
+    const { keyring, activeKeyId } = loadActiveSharedCredentialKeyring();
+    const aad = createCommerceEmbeddingCredentialAad({
+      environment: input.environment,
+      purpose: input.purpose,
+      provider: input.provider,
+      keyId: activeKeyId,
     });
-  } catch (cause) {
-    if (
-      cause instanceof Error &&
-      cause.message === "Embedding credential is invalid."
-    ) {
-      throw cause;
-    }
+    return encryptCredential({ keyring, activeKeyId, plaintext: secret, aad });
+  } catch {
     throw new Error(EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE);
   }
 }
@@ -257,7 +265,7 @@ export async function saveEmbeddingConfiguration(
           if (!validated.secret) {
             throw new Error(EMBEDDING_CONFIGURATION_ERRORS.credentialRequired);
           }
-          const sealed = sealCredential({
+          const sealed = encryptValidatedEmbeddingSecret({
             environment,
             purpose: validated.purpose,
             provider: validated.embeddingProvider,
@@ -313,7 +321,7 @@ export async function saveEmbeddingConfiguration(
             );
           }
           const sealed = validated.secret
-            ? sealCredential({
+            ? encryptValidatedEmbeddingSecret({
                 environment,
                 purpose: validated.purpose,
                 provider: validated.embeddingProvider,

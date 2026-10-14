@@ -4,7 +4,7 @@ import { CredentialSecurityError } from "@modainteract/moda-interact-shared/secu
 import {
   loadActiveSharedCredentialKeyring,
 } from "../../src/lib/admin/shared-credential-keyring.ts";
-import { CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "../../src/lib/admin/openrouter-credential-keyring.ts";
+import { CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "../../src/lib/admin/shared-credential-keyring.ts";
 
 const keysBefore = process.env.COMMERCE_CONNECTION_KEYS_JSON;
 const activeBefore = process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID;
