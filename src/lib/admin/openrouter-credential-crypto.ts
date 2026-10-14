@@ -7,7 +7,7 @@ import {
   type CredentialEnvelope,
   type CredentialKeyring,
 } from "@modainteract/moda-interact-shared/security/credentials/node";
-import { CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "./openrouter-credential-keyring.ts";
+import { CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "./shared-credential-keyring.ts";
 import { validateOpenRouterCredentialSecret } from "./openrouter-credential-validation.ts";
 
 export type SealedOpenRouterCredential = CredentialEnvelope;

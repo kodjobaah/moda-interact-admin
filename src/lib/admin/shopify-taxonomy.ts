@@ -12,7 +12,7 @@ import {
   EMBEDDING_CONFIGURATION_ERRORS,
   getEmbeddingRuntimeConfiguration,
 } from "./embedding-configuration.ts";
-import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "./embedding-configuration-crypto.ts";
+import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "./embedding-configuration-validation.ts";
 
 export const SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS =
   "idx:moda:shopify-taxonomy:top";

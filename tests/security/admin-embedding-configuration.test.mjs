@@ -59,19 +59,18 @@ test("browser payload never exposes the stored embedding secret envelope", async
 });
 
 test("embedding credentials use the shared keyring and purpose-bound AES-GCM AAD", async () => {
-  const [crypto, service] = await Promise.all([
-    source("src/lib/admin/embedding-configuration-crypto.ts"),
+  const [service, sharedKeyring] = await Promise.all([
     source("src/lib/admin/embedding-configuration.ts"),
+    source("src/lib/admin/shared-credential-keyring.ts"),
   ]);
-  assert.match(crypto, /createCipheriv\("aes-256-gcm"/);
-  assert.match(crypto, /createDecipheriv\("aes-256-gcm"/);
-  assert.match(crypto, /openEmbeddingCredential/);
-  assert.match(crypto, /canonicalJson\(\{/);
-  assert.match(crypto, /credentialType: "EMBEDDING"/);
-  assert.match(crypto, /environment: input\.environment/);
-  assert.match(crypto, /purpose: input\.purpose/);
-  assert.match(crypto, /provider: input\.provider/);
-  assert.match(service, /loadActiveCredentialKeyring\(\)/);
+  assert.match(service, /createCommerceEmbeddingCredentialAad/);
+  assert.match(service, /encryptCredential\(\{/);
+  assert.match(service, /decryptCredential\(\{/);
+  assert.match(service, /loadActiveSharedCredentialKeyring\(\)/);
+  assert.match(service, /parseCredentialKeyring\(process\.env\.COMMERCE_CONNECTION_KEYS_JSON\)/);
+  assert.match(service, /keyId: row\.keyId/);
+  assert.match(sharedKeyring, /resolveActiveCredentialKey/);
+  assert.doesNotMatch(service, /createCipheriv|createDecipheriv|randomBytes|canonicalJson/);
   assert.doesNotMatch(service, /process\.env\.EMBEDDING_API_KEY/);
 });
 

@@ -8,7 +8,7 @@ import {
   saveEmbeddingConfiguration,
   type EmbeddingConfigurationStatus,
 } from "@/lib/admin/embedding-configuration";
-import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "@/lib/admin/embedding-configuration-crypto";
+import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "@/lib/admin/embedding-configuration-validation";
 
 type ActionResult =
   | { ok: true; status: EmbeddingConfigurationStatus }
