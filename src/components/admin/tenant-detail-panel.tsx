@@ -14,10 +14,16 @@ import { TenantAdministration } from "./tenant-administration";
 import { TenantBillingView } from "./tenant-billing";
 import { TenantRecoverySettings } from "./tenant-recovery-settings";
 import { adminI18n } from "@/i18n";
+import { LiveShopPolicyControls } from "./commerce-model-policy/live-shop-policy";
+import type { LiveShopPolicyView, LiveShopPolicyHistoryEntry } from "@/lib/admin/commerce-model-shop-policy";
 
 export function TenantDetailPanel({
   tenant,
   tab,
+  canEditCommercePolicy,
+  shopPolicyDashboard,
+  shopPolicyScope,
+  shopPolicyHistoryPage,
   customers,
   customerSearch,
   selectedCustomer,
@@ -34,7 +40,11 @@ export function TenantDetailPanel({
   selectedEvent,
 }: {
   tenant: TenantDetail;
-  tab: "admin" | "recovery" | "logs" | "billing";
+  tab: "admin" | "recovery" | "logs" | "billing" | "commerce";
+  canEditCommercePolicy: boolean;
+  shopPolicyDashboard: { policy: LiveShopPolicyView; history: LiveShopPolicyHistoryEntry[]; hasMore: boolean } | null;
+  shopPolicyScope: string | null;
+  shopPolicyHistoryPage: number;
   customers: PageResult<CustomerListItem> | null;
   customerSearch: string;
   selectedCustomer: CustomerListItem | null;
@@ -64,6 +74,7 @@ export function TenantDetailPanel({
     purchaseId: null,
     eventId: null,
     saved: null,
+    commerceShopHistoryPage: null,
     discountSyncRequested: null,
   } as const;
 
@@ -85,6 +96,7 @@ export function TenantDetailPanel({
     tab: "billing",
     billingView: "overview",
   });
+  const commerceHref = withParamUpdates("/", params, { ...commonReset, tab: "commerce" });
   const activeClass =
     "border-b-2 border-[var(--brand-700)] pb-2 font-semibold text-[var(--brand-700)]";
   const idleClass =
@@ -117,12 +129,23 @@ export function TenantDetailPanel({
         >
           {adminI18n.t("tenant.billing")}
         </Link>
+        {canEditCommercePolicy ? <Link href={commerceHref} className={tab === "commerce" ? activeClass : idleClass}>CommerceAgent</Link> : null}
       </div>
       {tab === "admin" ? (
         <TenantAdministration
           tenant={tenant}
           returnTo={returnTo}
           saved={saved}
+        />
+      ) : tab === "commerce" && shopPolicyDashboard ? (
+        <LiveShopPolicyControls
+          key={`${shopPolicyDashboard.policy.shopId}-${shopPolicyDashboard.policy.editVersion}`}
+          policy={shopPolicyDashboard.policy}
+          history={shopPolicyDashboard.history}
+          page={shopPolicyHistoryPage}
+          hasMore={shopPolicyDashboard.hasMore}
+          historyBaseHref={commerceHref}
+          shopPolicyScope={shopPolicyScope!}
         />
       ) : tab === "recovery" ? (
         <TenantRecoverySettings
