@@ -14,11 +14,16 @@ import { adminI18n } from "@/i18n";
 import { Pagination } from "./pagination";
 import { TenantDetailPanel } from "./tenant-detail-panel";
 import { TenantRow } from "./tenant-row";
+import type { LiveShopPolicyView, LiveShopPolicyHistoryEntry } from "@/lib/admin/commerce-model-shop-policy";
 
 export function TenantTable({
   tenants,
   selectedTenant,
   tab,
+  canEditCommercePolicy,
+  shopPolicyDashboard,
+  shopPolicyScope,
+  shopPolicyHistoryPage,
   customers,
   customerSearch,
   selectedCustomer,
@@ -36,7 +41,11 @@ export function TenantTable({
 }: {
   tenants: PageResult<TenantListItem>;
   selectedTenant: TenantDetail | null;
-  tab: "admin" | "recovery" | "logs" | "billing";
+  tab: "admin" | "recovery" | "logs" | "billing" | "commerce";
+  canEditCommercePolicy: boolean;
+  shopPolicyDashboard: { policy: LiveShopPolicyView; history: LiveShopPolicyHistoryEntry[]; hasMore: boolean } | null;
+  shopPolicyScope: string | null;
+  shopPolicyHistoryPage: number;
   customers: PageResult<CustomerListItem> | null;
   customerSearch: string;
   selectedCustomer: CustomerListItem | null;
@@ -91,6 +100,7 @@ export function TenantTable({
                       purchaseId: null,
                       eventId: null,
                       saved: null,
+                      commerceShopHistoryPage: null,
                       discountSyncRequested: null,
                     })
                   : withParamUpdates("/", params, {
@@ -109,6 +119,7 @@ export function TenantTable({
                       purchaseId: null,
                       eventId: null,
                       saved: null,
+                      commerceShopHistoryPage: null,
                       discountSyncRequested: null,
                     });
 
@@ -124,6 +135,10 @@ export function TenantTable({
                         <TenantDetailPanel
                           tenant={selectedTenant}
                           tab={tab}
+                          canEditCommercePolicy={canEditCommercePolicy}
+                          shopPolicyDashboard={shopPolicyDashboard}
+                          shopPolicyScope={shopPolicyScope}
+                          shopPolicyHistoryPage={shopPolicyHistoryPage}
                           customers={customers}
                           customerSearch={customerSearch}
                           selectedCustomer={selectedCustomer}
@@ -165,6 +180,7 @@ export function TenantTable({
         resetParams={[
           "tenant",
           "tab",
+          "commerceShopHistoryPage",
           "customerSearch",
           "customerPage",
           "customerId",

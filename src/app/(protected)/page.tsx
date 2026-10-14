@@ -29,6 +29,9 @@ import type {
   RecoveryListItem,
 } from "@/lib/admin/types";
 import { adminI18n } from "@/i18n";
+import { canEditLiveCommerceBudget } from "@/lib/admin/commerce-model-policy-fields";
+import { getLiveShopPolicyDashboard } from "@/lib/admin/commerce-model-shop-policy";
+import { issueLiveShopPolicyScope } from "@/lib/admin/commerce-model-shop-policy-scope";
 import {
   cleanSearch,
   firstParam,
@@ -54,15 +57,17 @@ type PageProps = {
 };
 
 export default async function Home({ searchParams }: PageProps) {
-  await requirePlatformAdminPage();
+  const principal = await requirePlatformAdminPage();
   const rawParams = await searchParams;
   const params = paramsToRecord(rawParams);
   const search = cleanSearch(rawParams.q);
   const tenantPage = positiveInt(rawParams.page);
   const tenantId = firstParam(rawParams.tenant) ?? null;
   const rawTab = firstParam(rawParams.tab);
+  const canEditCommercePolicy = canEditLiveCommerceBudget(principal.role);
   const tab =
-    rawTab === "recovery" || rawTab === "logs" || rawTab === "billing"
+    rawTab === "recovery" || rawTab === "logs" || rawTab === "billing" ||
+    (rawTab === "commerce" && canEditCommercePolicy)
       ? rawTab
       : "admin";
   const rawBillingView = firstParam(rawParams.billingView);
@@ -96,6 +101,13 @@ export default async function Home({ searchParams }: PageProps) {
 
 
   const selectedTenant = tenantId ? await getTenantDetail(tenantId) : null;
+  const commerceShopHistoryPage = positiveInt(rawParams.commerceShopHistoryPage);
+  const shopPolicyScope = selectedTenant && tab === "commerce" && canEditCommercePolicy
+    ? issueLiveShopPolicyScope(selectedTenant.id, principal.id)
+    : null;
+  const shopPolicyDashboard = selectedTenant && tab === "commerce" && canEditCommercePolicy
+    ? await getLiveShopPolicyDashboard(selectedTenant.id, commerceShopHistoryPage - 1)
+    : null;
   const tenantBilling =
     selectedTenant && tab === "billing"
       ? await getTenantBilling(
@@ -239,6 +251,10 @@ export default async function Home({ searchParams }: PageProps) {
           tenants={directory.tenants}
           selectedTenant={selectedTenant}
           tab={tab}
+          canEditCommercePolicy={canEditCommercePolicy}
+          shopPolicyDashboard={shopPolicyDashboard}
+          shopPolicyScope={shopPolicyScope}
+          shopPolicyHistoryPage={commerceShopHistoryPage - 1}
           customers={customers}
           customerSearch={customerSearch}
           selectedCustomer={selectedCustomer}
