@@ -41,6 +41,7 @@ export function PlatformPolicyControls({
   policy,
 }: {
   policy: {
+    version: number;
     globalPauseNewRecoveries: boolean;
     globalPauseAutomatedWhatsapp: boolean;
     absoluteOutboundHardLimit: number;
@@ -83,6 +84,7 @@ export function PlatformPolicyControls({
       ) : null}
 
       <PlatformPolicyForm>
+        <input type="hidden" name="expectedVersion" value={policy?.version ?? -1}/>
         <p className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-700">
           <span className="font-semibold">
             {adminI18n.t("billingControls.platformLimitRulesTitle")}

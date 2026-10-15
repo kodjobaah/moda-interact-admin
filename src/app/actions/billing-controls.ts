@@ -50,6 +50,8 @@ const platformBillingPolicyPublicErrors = new Set([
   "Lifetime Free recovery grant must be non-negative.",
   "Minimum upgrade premium must be between 0 and 10000 bps.",
   "Reason must be 1000 characters or fewer.",
+  "Invalid policy version. Reload the page.",
+  "Platform policy changed. Reload the page before saving again.",
 ]);
 
 function platformBillingPolicyClientMessage(cause: unknown): string {
@@ -78,37 +80,37 @@ export async function mutatePlatformBillingPolicyAction(
       const before = await transaction.platformBillingPolicy.findUnique({
         where: { id: "default" },
       });
-      const after = await transaction.platformBillingPolicy.upsert({
-        where: { id: "default" },
-        create: {
-          id: "default",
-          globalPauseNewRecoveries: values.globalPauseNewRecoveries,
-          globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
-          absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
-          defaultWarningPercent: values.defaultWarningPercent,
-          lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
-          defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
-          defaultOutboundHardLimit: values.defaultOutboundHardLimit,
-          terminalMessageReservedSlots: values.terminalMessageReservedSlots,
-          whatsappRecipientSuppressionDays:
-            values.whatsappRecipientSuppressionDays,
-          minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
-        },
-        update: {
-          globalPauseNewRecoveries: values.globalPauseNewRecoveries,
-          globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
-          absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
-          defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
-          defaultOutboundHardLimit: values.defaultOutboundHardLimit,
-          terminalMessageReservedSlots: values.terminalMessageReservedSlots,
-          whatsappRecipientSuppressionDays:
-            values.whatsappRecipientSuppressionDays,
-          defaultWarningPercent: values.defaultWarningPercent,
-          lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
-          version: { increment: 1 },
-          minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
-        },
-      });
+      if (before && before.version !== values.expectedVersion) {
+        throw new Error("Platform policy changed. Reload the page before saving again.");
+      }
+      if (!before && values.expectedVersion !== -1) {
+        throw new Error("Platform policy changed. Reload the page before saving again.");
+      }
+      const fields = {
+        globalPauseNewRecoveries: values.globalPauseNewRecoveries,
+        globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
+        absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
+        defaultWarningPercent: values.defaultWarningPercent,
+        lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
+        defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
+        defaultOutboundHardLimit: values.defaultOutboundHardLimit,
+        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
+        whatsappRecipientSuppressionDays: values.whatsappRecipientSuppressionDays,
+        minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
+      };
+      if (before) {
+        const changed = await transaction.platformBillingPolicy.updateMany({
+          where: { id: "default", version: values.expectedVersion },
+          data: { ...fields, version: { increment: 1 } },
+        });
+        if (changed.count !== 1) throw new Error("Platform policy changed. Reload the page before saving again.");
+      } else {
+        // Preserve the historical create-on-missing path, but reject competing creators.
+        await transaction.platformBillingPolicy.create({
+          data: { id: "default", ...fields },
+        });
+      }
+      const after = await transaction.platformBillingPolicy.findUniqueOrThrow({ where: { id: "default" } });
       await transaction.billingAuditEvent.create({
         data: {
           action: BillingAuditAction.PLATFORM_POLICY_CHANGED,
@@ -120,11 +122,14 @@ export async function mutatePlatformBillingPolicyAction(
           afterValue: after as unknown as Prisma.InputJsonValue,
         },
       });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     revalidatePath("/billing");
     revalidatePath("/system-controls/platform-policy");
     return { ok: true };
   } catch (cause) {
+    if (cause instanceof Prisma.PrismaClientKnownRequestError && (cause.code === "P2034" || cause.code === "P2002")) {
+      return { ok: false, message: "Platform policy changed. Reload the page before saving again." };
+    }
     return { ok: false, message: platformBillingPolicyClientMessage(cause) };
   }
 }

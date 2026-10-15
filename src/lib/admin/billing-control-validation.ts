@@ -1,6 +1,7 @@
 const MAX_REASON_LENGTH = 1000;
 
 export type PlatformBillingPolicyInput = {
+  expectedVersion: number;
   globalPauseNewRecoveries: boolean;
   globalPauseAutomatedWhatsapp: boolean;
   absoluteOutboundHardLimit: number;
@@ -52,6 +53,11 @@ export function shopBillingOverrideRequiresSuperAdmin(
 export function parsePlatformBillingPolicyForm(
   formData: FormData,
 ): PlatformBillingPolicyInput {
+  const rawVersion = formData.get("expectedVersion");
+  if (typeof rawVersion !== "string" || !/^(0|[1-9][0-9]*|-1)$/.test(rawVersion) || !Number.isSafeInteger(Number(rawVersion))) {
+    throw new Error("Invalid policy version. Reload the page.");
+  }
+  const expectedVersion = Number(rawVersion);
   const absoluteOutboundHardLimit = requiredPositiveInt(
     formData.get("absoluteOutboundHardLimit"),
     "Absolute outbound hard limit",
@@ -103,6 +109,7 @@ export function parsePlatformBillingPolicyForm(
     throw new Error("Minimum upgrade premium must be between 0 and 10000 bps.");
   }
   return {
+    expectedVersion,
     globalPauseNewRecoveries: checkbox(formData, "globalPauseNewRecoveries"),
     globalPauseAutomatedWhatsapp: checkbox(
       formData,
