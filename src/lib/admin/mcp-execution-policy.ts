@@ -87,6 +87,9 @@ export function readMcpExecutionPolicy(value: unknown): McpExecutionPolicyDocume
     if (!MCP_ENVIRONMENTS.includes(key as McpEnvironment)) {
       throw new Error("MCP execution policy contains an unknown environment.");
     }
+    // A JSON null environment entry is unprovisioned, just like an absent key.
+    // Normalize it away so a later save can provision the environment normally.
+    if (entry === null) continue;
     environments[key as McpEnvironment] = readLimits(entry);
   }
   return { schemaVersion: 1, environments };

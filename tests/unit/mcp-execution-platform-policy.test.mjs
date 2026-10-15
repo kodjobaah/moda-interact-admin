@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadPolicyModule } from './helpers/commerce-model-policy-module-harness.mjs';
+import { loadPolicyModule, createComponentHarness, findElement, elementText } from './helpers/commerce-model-policy-module-harness.mjs';
 
 const prismaTypes = {
   Prisma: { DbNull: 'DbNull', TransactionIsolationLevel: { Serializable: 'Serializable' },
@@ -14,9 +14,9 @@ const form = (options = {}) => {
     reason: 'Change test limits', ...VALID, ...options })) f.set(key, String(value));
   return f;
 };
-function fixture({ role = 'SUPER_ADMIN', missing = false } = {}) {
+function fixture({ role = 'SUPER_ADMIN', missing = false, environments } = {}) {
   let stored = missing ? null : { id: 'default', version: 4, mcpExecutionPolicy: { schemaVersion: 1,
-    environments: { DEVELOPMENT: { ...VALID }, PRODUCTION: { ...VALID } } } };
+    environments: environments ?? { DEVELOPMENT: { ...VALID }, PRODUCTION: { ...VALID } } } };
   const audits = [];
   let commits = 0;
   let casLoss = false;
@@ -68,10 +68,54 @@ function fixture({ role = 'SUPER_ADMIN', missing = false } = {}) {
 test('strict JSONB parsing retains each configured environment and rejects malformed entries', () => {
   assert.deepEqual(policy.readMcpExecutionPolicy(null), { schemaVersion: 1, environments: {} });
   assert.equal(policy.readMcpExecutionPolicy({ schemaVersion: 1, environments: { LOCAL: VALID } }).environments.LOCAL.maxProviderRequests, 12);
+  assert.deepEqual(policy.readMcpExecutionPolicy({ schemaVersion: 1, environments: {
+    DEVELOPMENT: null, PRODUCTION: VALID,
+  } }).environments, { PRODUCTION: VALID });
+  assert.deepEqual(policy.readMcpExecutionPolicy({ schemaVersion: 1, environments: {
+    PRODUCTION: VALID,
+  } }).environments, { PRODUCTION: VALID });
+  assert.throws(() => policy.readMcpExecutionPolicy({ schemaVersion: 1, environments: { INVALID: null } }), /unknown environment/);
   assert.throws(() => policy.readMcpExecutionPolicy({ schemaVersion: 2, environments: {} }), /Unsupported/);
   assert.throws(() => policy.readMcpExecutionPolicy({ schemaVersion: 1, environments: { INVALID: VALID } }), /unknown environment/);
   assert.throws(() => policy.readMcpExecutionPolicy({ schemaVersion: 1, environments: { LOCAL: { ...VALID, providerResponseTimeoutMs: 20000 } } }), /must not exceed/);
 });
+test('null and absent entries render as unconfigured, with the clear action disabled', () => {
+  const componentHarness = createComponentHarness();
+  const { McpExecutionPolicyControls } = loadPolicyModule(
+    'src/components/admin/mcp-execution-policy/mcp-execution-policy-controls.tsx',
+    {
+      react: componentHarness.react,
+      'react/jsx-runtime': componentHarness.jsxRuntime,
+      'next/navigation': { useRouter: () => ({ refresh() {} }) },
+      '@/app/actions/mcp-execution-policy': { mutateMcpExecutionPolicyAction: async () => ({ ok: true }) },
+      '@/lib/admin/mcp-execution-policy': policy,
+      './mcp-execution-policy-fields': { McpExecutionPolicyFields: () => null },
+    },
+  );
+  for (const rawEnvironments of [
+    { DEVELOPMENT: null, PRODUCTION: VALID },
+    { PRODUCTION: VALID },
+  ]) {
+    const document = policy.readMcpExecutionPolicy({ schemaVersion: 1, environments: rawEnvironments });
+    const tree = componentHarness.render(McpExecutionPolicyControls, { version: 4, document, error: null });
+    const status = findElement(tree, (node) => node.props?.role === 'status');
+    assert.match(elementText(status), /Not configured — saving will provision this environment/);
+    const clear = findElement(tree, (node) => node.type === 'button' && node.props?.value === 'clear');
+    assert.equal(clear.props.disabled, true);
+  }
+});
+
+test('saving a null environment provisions it without modifying other environments', async () => {
+  const f = fixture({ environments: { DEVELOPMENT: null, PRODUCTION: { ...VALID }, LOCAL: null } });
+  assert.deepEqual(await f.action.mutateMcpExecutionPolicyAction(form({ maxProviderRequests: 15 })), { ok: true });
+  assert.equal(f.current().version, 5);
+  assert.equal(f.current().mcpExecutionPolicy.environments.DEVELOPMENT.maxProviderRequests, 15);
+  assert.deepEqual(f.current().mcpExecutionPolicy.environments.PRODUCTION, VALID);
+  assert.equal(Object.hasOwn(f.current().mcpExecutionPolicy.environments, 'LOCAL'), false);
+  assert.equal(f.audits[0].beforeValue.limits, null);
+  assert.equal(f.audits[0].afterValue.limits.maxProviderRequests, 15);
+});
+
 test('bounded numeric fields, audit reason and selected environment validated before transaction', () => {
   assert.throws(() => policy.parseMcpPolicyEdit(form({ providerResponseTimeoutMs: 10001 })), /must not exceed/);
   assert.throws(() => policy.parseMcpPolicyEdit(form({ maxProviderRequests: -2 })), /whole number/);
