@@ -28,7 +28,7 @@ test("accepts strict non-negative lifetime Free defaults", () => {
     import { parsePlatformBillingPolicyForm } from ${JSON.stringify(validationUrl)};
     const attempt = (value) => {
       const form = new FormData();
-      for (const [key, entry] of Object.entries({ absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', whatsappRecipientSuppressionDays: '7', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: value, minimumUpgradePremiumBps: '2000', reason: 'policy change' })) form.set(key, entry);
+      for (const [key, entry] of Object.entries({ expectedVersion: '2', absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', whatsappRecipientSuppressionDays: '7', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: value, minimumUpgradePremiumBps: '2000', reason: 'policy change' })) form.set(key, entry);
       try { return parsePlatformBillingPolicyForm(form).lifetimeFreeRecoveryAllowance; } catch { return null; }
     };
     console.log(JSON.stringify({
@@ -53,7 +53,7 @@ test("enforces existing platform policy bounds and a required reason", () => {
     import { parsePlatformBillingPolicyForm } from ${JSON.stringify(validationUrl)};
     const attempt = (values) => {
       const form = new FormData();
-      for (const [key, value] of Object.entries({ absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', whatsappRecipientSuppressionDays: '7', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: '5', minimumUpgradePremiumBps: '2000', reason: 'policy change', ...values })) form.set(key, value);
+      for (const [key, value] of Object.entries({ expectedVersion: '2', absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', whatsappRecipientSuppressionDays: '7', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: '5', minimumUpgradePremiumBps: '2000', reason: 'policy change', ...values })) form.set(key, value);
       try { parsePlatformBillingPolicyForm(form); return false; } catch { return true; }
     };
     console.log(JSON.stringify({
@@ -76,7 +76,7 @@ test("requires a positive whole-number WhatsApp recipient suppression duration",
     import { parsePlatformBillingPolicyForm } from ${JSON.stringify(validationUrl)};
     const attempt = (value, include = true) => {
       const form = new FormData();
-      for (const [key, entry] of Object.entries({ absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: '5', minimumUpgradePremiumBps: '2000', reason: 'policy change' })) form.set(key, entry);
+      for (const [key, entry] of Object.entries({ expectedVersion: '2', absoluteOutboundHardLimit: '20', defaultOutboundSoftLimit: '10', defaultOutboundHardLimit: '20', terminalMessageReservedSlots: '1', defaultWarningPercent: '80', lifetimeFreeRecoveryAllowance: '5', minimumUpgradePremiumBps: '2000', reason: 'policy change' })) form.set(key, entry);
       if (include) form.set('whatsappRecipientSuppressionDays', value);
       try { return parsePlatformBillingPolicyForm(form).whatsappRecipientSuppressionDays; } catch { return null; }
     };
@@ -97,33 +97,14 @@ test("requires a positive whole-number WhatsApp recipient suppression duration",
   });
 });
 
-test("keeps policy creation Prisma-safe while auditing the mutation reason", () => {
-  const createBlock = actionSource.match(
-    /platformBillingPolicy\.upsert\(\{[\s\S]*?create: \{([\s\S]*?)\n\s+\},\n\s+update:/,
-  )?.[1];
-  assert.ok(createBlock);
-  assert.doesNotMatch(createBlock, /\.\.\.values/);
-  assert.match(
-    createBlock,
-    /lifetimeFreeRecoveryAllowance: values\.lifetimeFreeRecoveryAllowance/,
-  );
-  assert.match(
-    createBlock,
-    /whatsappRecipientSuppressionDays:\s*values\.whatsappRecipientSuppressionDays/,
-  );
-  assert.match(
-    actionSource,
-    /update: \{[\s\S]*?whatsappRecipientSuppressionDays:\s*values\.whatsappRecipientSuppressionDays/,
-  );
-  assert.doesNotMatch(createBlock, /reason/);
-  assert.match(
-    actionSource,
-    /reason: values\.reason,\n\s+relatedEntityType: "PlatformBillingPolicy"/,
-  );
-  assert.match(
-    actionSource,
-    /lifetimeFreeRecoveryAllowance: values\.lifetimeFreeRecoveryAllowance,\n\s+version: \{ increment: 1 \}/,
-  );
+test("billing policy writes use the shared row CAS and preserve MCP JSONB", () => {
+  assert.match(actionSource, /version !== values\.expectedVersion/);
+  assert.match(actionSource, /platformBillingPolicy\.updateMany/);
+  assert.match(actionSource, /where: \{ id: "default", version: values\.expectedVersion \}/);
+  assert.match(actionSource, /version: \{ increment: 1 \}/);
+  assert.match(actionSource, /isolationLevel: Prisma\.TransactionIsolationLevel\.Serializable/);
+  assert.doesNotMatch(actionSource, /mcpExecutionPolicy: values\./);
+  assert.match(actionSource, /reason: values\.reason,\n\s+relatedEntityType: "PlatformBillingPolicy"/);
 });
 
 test("preserves nullable shop override inheritance and validates effective limits", () => {

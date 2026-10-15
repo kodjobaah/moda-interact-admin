@@ -27,6 +27,12 @@ function setup(role, { billingPolicy = { id: 'billing-policy' }, commerceHistory
         'data-testid': 'billing-policy', policy,
       }),
     },
+    '@/components/admin/mcp-execution-policy/mcp-execution-policy-controls': {
+      McpExecutionPolicyControls: (props) => h.jsxRuntime.jsx('section', { 'data-testid': 'mcp-platform-policy', ...props }),
+    },
+    '@/lib/admin/mcp-execution-policy': {
+      readMcpExecutionPolicy: (value) => value ?? { schemaVersion: 1, environments: {} },
+    },
     '@/components/admin/commerce-model-policy/live-platform-policy': {
       LivePlatformPolicyControls: (props) => h.jsxRuntime.jsx('section', {
         'data-testid': 'live-platform-policy', ...props,
@@ -65,6 +71,7 @@ for (const role of ['ADMIN', 'SUPPORT']) {
     assert.deepEqual(context.calls.commerce, []);
     assert.deepEqual(byTestId(root, 'billing-policy')?.props.policy, { id: 'billing-policy' });
     assert.equal(byTestId(root, 'live-platform-policy'), undefined);
+    assert.equal(byTestId(root, 'mcp-platform-policy'), undefined);
   });
 }
 
@@ -74,6 +81,7 @@ test('SUPER_ADMIN can see billing plus LIVE policy/history, with correct paginat
   assert.equal(context.calls.billing, 1);
   assert.deepEqual(context.calls.commerce, [4]);
   assert.ok(byTestId(root, 'billing-policy'));
+  assert.ok(byTestId(root, 'mcp-platform-policy'));
   const livePolicy = byTestId(root, 'live-platform-policy');
   assert.equal(livePolicy?.props.policy, context.dashboard.policy);
   assert.equal(livePolicy?.props.history, context.dashboard.history);
