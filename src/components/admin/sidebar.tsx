@@ -17,6 +17,7 @@ export function Sidebar({
     | "merchant-support"
     | "billing"
     | "promotions"
+    | "platform-configuration"
     | "platform-policy"
     | "background-runtime"
     | "store-categories"
@@ -35,6 +36,7 @@ export function Sidebar({
     "border border-[var(--brand-200)] bg-white text-[var(--brand-900)] shadow-sm";
   const idle = "text-[var(--brand-800)] hover:bg-white/60";
   const systemControlsActive =
+    active === "platform-configuration" ||
     active === "platform-policy" ||
     active === "background-runtime" ||
     active === "store-categories" ||
@@ -161,6 +163,11 @@ export function Sidebar({
                 className={`${base} !rounded-md px-3 py-2 text-sm ${active === "platform-policy" ? selected : idle}`}
               >
                 {adminI18n.t("nav.platformPolicy")}
+              </Link>
+              <Link href="/system-controls/platform-configuration"
+                aria-current={active === "platform-configuration" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "platform-configuration" ? selected : idle}`}>
+                Platform Configuration
               </Link>
               <Link
                 href="/system-controls/background-runtime"
