@@ -62,7 +62,7 @@ export async function writeConfiguration(db: ConfigurationDatabase, input: {
       const version = expectedVersion + 1;
       await tx.platformConfigurationAudit.create({ data: {
         environment, key, expectedVersion, resultingVersion: version,
-        beforeValue: existing ? existing.value as Prisma.InputJsonValue : Prisma.JsonNull,
+        beforeValue: existing ? existing.value as Prisma.InputJsonValue : Prisma.DbNull,
         afterValue: values as Prisma.InputJsonValue, actorId, reason,
       } });
       return { key, version };

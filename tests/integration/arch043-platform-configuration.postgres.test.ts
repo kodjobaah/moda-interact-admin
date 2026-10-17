@@ -23,7 +23,7 @@ const values = { enabled: true, retryLimit: 3 };
 const input = (key: string, expectedVersion: number, newValues: Record<string, unknown> = values) => ({ key, expectedVersion, values: newValues, reason: "fixture change" });
 
 // Use a unique allowed server-owned contract key per test, no cleanup needed on disposable DB.
-function testContract(): string { return `fixture.${randomUUID().replaceAll("-", "")}`; }
+function testContract(): string { return `fixture.t${randomUUID().replaceAll("-", "")}`; }
 function testRegistry(key: string) { return createConfigurationRegistry([{ ...fixture, key }]); }
 function write(key: string, expectedVersion: number, next: Record<string, unknown> = values, env = environment) {
   return mutateConfigurationWithDependencies(input(key, expectedVersion, next), "save", { principal: { role: "SUPER_ADMIN" }, environment: env, actorId, db, registry: testRegistry(key) });
@@ -46,6 +46,24 @@ test("generic test-only group saves revision 1, audit, updates and preserves ver
   assert.equal(audit.entries[0].actorId, actorId);
   assert.deepEqual(audit.entries[0].afterValue, fixture.defaults);
   assert.equal((await db.platformConfiguration.findUnique({ where: { environment_key: { environment, key } } }))?.version, 3);
+});
+
+test("test-only added field persists through generic mutation and audit", async () => {
+  const key = testContract();
+  const addedField: ConfigurationContract["fields"][number] = {
+    name: "displayLabel", kind: "string", label: "Display label", description: "Test-only extension", maxLength: 24,
+  };
+  const extended = { ...fixture, key, defaults: { ...fixture.defaults, displayLabel: "default" }, fields: [...fixture.fields, addedField] };
+  const registry = createConfigurationRegistry([extended]);
+  const extendedValues = { ...values, displayLabel: "generic-value" };
+  const saved = await mutateConfigurationWithDependencies(input(key, 0, extendedValues), "save", {
+    principal: { role: "SUPER_ADMIN" }, environment, actorId, db, registry,
+  });
+  assert.equal(saved.version, 1);
+  assert.deepEqual((await readConfiguration(db, environment, key, registry)).value, extendedValues);
+  const history = await readConfigurationHistory(db, environment, key);
+  assert.equal(history.entries.length, 1);
+  assert.deepEqual(history.entries[0].afterValue, extendedValues);
 });
 
 test("concurrent CAS: at most one update and exactly one audit", async () => {
