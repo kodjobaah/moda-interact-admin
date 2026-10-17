@@ -11,7 +11,7 @@ export type GrafanaNavigation = {
   configured: boolean;
 };
 
-const ALLOWED_ENVIRONMENTS = new Set(['development', 'test', 'production']);
+const ALLOWED_ENVIRONMENTS = new Set(['local', 'development', 'test', 'staging', 'production']);
 
 function resolveEnvironment(): string {
   return (
@@ -21,7 +21,7 @@ function resolveEnvironment(): string {
   );
 }
 
-function validateUrl(raw: string | undefined, environment: string): string | null {
+function validateUrl(raw: string | undefined, environment: string, policyLink = false): string | null {
   if (!raw?.trim() || !ALLOWED_ENVIRONMENTS.has(environment)) return null;
 
   try {
@@ -34,7 +34,7 @@ function validateUrl(raw: string | undefined, environment: string): string | nul
       return null;
     }
 
-    if (url.username || url.password) return null;
+    if (url.username || url.password || (policyLink && (url.search || url.hash))) return null;
 
     return url.toString();
   } catch {
@@ -42,22 +42,27 @@ function validateUrl(raw: string | undefined, environment: string): string | nul
   }
 }
 
-export function getGrafanaNavigation(): GrafanaNavigation {
+export type GrafanaPolicyLinks = {
+  baseUrl: string | null; logsUrl: string | null; metricsUrl: string | null;
+  tracesUrl: string | null; platformDashboardUrl: string | null;
+};
+
+export function getGrafanaNavigation(policy?: GrafanaPolicyLinks): GrafanaNavigation {
   const environment = resolveEnvironment();
-  const baseUrl = validateUrl(process.env.GRAFANA_BASE_URL, environment);
+  const baseUrl = validateUrl(policy ? policy.baseUrl ?? undefined : process.env.GRAFANA_BASE_URL, environment, Boolean(policy));
   const candidates: Array<[string, string, string | undefined]> = [
     [
       'observability.dashboard',
       'observability.dashboardDescription',
-      process.env.GRAFANA_PLATFORM_DASHBOARD_URL,
+      policy ? policy.platformDashboardUrl ?? undefined : process.env.GRAFANA_PLATFORM_DASHBOARD_URL,
     ],
-    ['observability.logs', 'observability.logsDescription', process.env.GRAFANA_LOGS_URL],
-    ['observability.traces', 'observability.tracesDescription', process.env.GRAFANA_TRACES_URL],
-    ['observability.metrics', 'observability.metricsDescription', process.env.GRAFANA_METRICS_URL],
+    ['observability.logs', 'observability.logsDescription', policy ? policy.logsUrl ?? undefined : process.env.GRAFANA_LOGS_URL],
+    ['observability.traces', 'observability.tracesDescription', policy ? policy.tracesUrl ?? undefined : process.env.GRAFANA_TRACES_URL],
+    ['observability.metrics', 'observability.metricsDescription', policy ? policy.metricsUrl ?? undefined : process.env.GRAFANA_METRICS_URL],
   ];
 
   const links = candidates.flatMap(([label, description, raw]) => {
-    const href = validateUrl(raw, environment);
+    const href = validateUrl(raw, environment, Boolean(policy));
     return href ? [{ labelKey: label, descriptionKey: description, href }] : [];
   });
 

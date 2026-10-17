@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { getPlatformAdminPrincipal } from "@/lib/auth/platform-admin";
 import { getGrafanaNavigation } from "@/lib/observability/grafana";
+import { getPlatformGrafanaNavigation } from "@/lib/observability/platform-grafana-navigation";
 import { Sidebar } from "./sidebar";
 
 export async function AdminShell({
@@ -16,6 +17,7 @@ export async function AdminShell({
     | "merchant-support"
     | "billing"
     | "promotions"
+    | "platform-configuration"
     | "platform-policy"
     | "background-runtime"
     | "store-categories"
@@ -29,7 +31,7 @@ export async function AdminShell({
   children: ReactNode;
 }) {
   const principal = await getPlatformAdminPrincipal();
-  const grafanaNavigation = getGrafanaNavigation();
+  const grafanaNavigation = principal?.role === "SUPER_ADMIN" ? await getPlatformGrafanaNavigation() : getGrafanaNavigation();
   const grafanaHref = grafanaNavigation.links[0]?.href ?? "/observability";
 
   return (
