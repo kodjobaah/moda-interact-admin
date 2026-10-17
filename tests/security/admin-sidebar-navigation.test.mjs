@@ -28,7 +28,8 @@ test("sidebar exposes the approved nested Observability navigation", async () =>
   );
   assert.doesNotMatch(sidebarSource, /Overview/);
   assert.match(sidebarSource, /href="\/observability\/queues"/);
-  assert.match(sidebarSource, /nav\.shopifyQueues/);
+  assert.match(sidebarSource, /href="\/observability\/queues"/);
+  assert.match(sidebarSource, /nav\.platformQueues/);
   assert.match(sidebarSource, /nav\.grafana/);
   assert.match(sidebarSource, /active === ["']queues["']/);
   assert.match(
