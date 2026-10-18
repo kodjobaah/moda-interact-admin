@@ -42,6 +42,8 @@ export function loadConfigUnsealKeyring(): UnsealKeyring {
     const activeKeyId = resolveActiveCredentialKey(keyring, process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID);
     return { keyring, activeKeyId };
   } catch (cause) {
+    logger.error("admin.platform_configuration.unseal_keyring_failed", { error: process.env.MODA_CONFIG_UNSEAL_KEY });
+    logger.error("admin.platform_configuration.unseal_keyring_failed", { error: process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID });
     logger.error("admin.platform_configuration.unseal_keyring_failed", { error: cause });
     throw new ConfigurationError("DB_UNAVAILABLE", "Configuration encryption is unavailable.");
   }
