@@ -25,7 +25,10 @@ also provide --external-assets-handled. For verified remote DEV databases only,
 add --allow-remote-development-db. If the preview shows ARCH-021 agent prompt
 records, also pass --confirm-immutable-prompt-purge to authorise temporarily
 suspending the two prompt immutability guards inside the rollback-safe transaction.
-This needs table-owner privileges; foreign-key triggers are never disabled.
+If the preview shows immutable commerce audit records, pass
+--confirm-immutable-audit-purge to authorise suspending only their two application
+immutability guards in the same transaction. Both options need table-owner
+privileges; foreign-key triggers are never disabled.
 
 IMPORTANT: This removes the merchant's Shop, billing history, recoveries,
 conversations and associated relational data. It is irreversible. It never
@@ -74,6 +77,7 @@ async function main() {
       }
       return deleteMerchantDatabaseRows(tx, current, {
         confirmImmutablePromptPurge: options.confirmImmutablePromptPurge,
+        confirmImmutableAuditPurge: options.confirmImmutableAuditPurge,
       });
     }, { maxWait: 15_000, timeout: 120_000 });
     console.log(JSON.stringify({

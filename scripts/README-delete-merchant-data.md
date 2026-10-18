@@ -49,6 +49,18 @@ Foreign-key triggers are not disabled. A transaction rollback restores the
 original trigger states and any deleted rows; normal production prompt
 immutability is unchanged. This is NOT a production data-erasure mechanism.
 
+If the preview reports `commerceAuditEvents > 0` or
+`commerceExternalConnectionAudits > 0`, deletion also requires
+`--confirm-immutable-audit-purge`. This authorises suspension of only the
+`CommerceAuditEvent` and `CommerceExternalConnectionAudit` application
+immutability triggers inside the same transaction. The script verifies the
+expected trigger names and enabled states first, uses a short lock timeout, and
+restores both triggers before commit. Foreign-key triggers remain enabled, and
+any failure rolls back the audit deletions and trigger changes with the rest of
+the transaction. This permanently removes that merchant's audit history and is
+appropriate only for explicitly disposable development/test data. It is not a
+way to erase retained production audit records.
+
 If the preview shows uploaded Merchant Knowledge assets, delete/retain their
 R2 objects deliberately before deleting the database records and pass
 `--external-assets-handled`. The tool deliberately does not contain storage

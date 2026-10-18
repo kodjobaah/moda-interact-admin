@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { deleteImmutableShopPrompts } from '../../scripts/merchant-prompt-cleanup.mjs';
+import { deleteImmutableShopAudits } from '../../scripts/merchant-audit-cleanup.mjs';
 import {
   deleteMerchantDatabaseRows,
   merchantInventory,
@@ -18,6 +19,7 @@ const allowed = {
   externalAssetsHandled: false,
   allowRemoteDevelopmentDb: false,
   confirmImmutablePromptPurge: false,
+  confirmImmutableAuditPurge: false,
 };
 
 test('parses a merchant-specific preview and explicit deletion request', () => {
@@ -54,6 +56,16 @@ test('requires explicit authorization for immutable prompt cleanup', () => {
   assert.equal(parseOptions(['delete', '--shop', shop.id, '--confirm-immutable-prompt-purge']).confirmImmutablePromptPurge, true);
 });
 
+test('requires separate authorization for immutable commerce audit cleanup', () => {
+  assert.throws(() => validateDeletion(allowed, shop, { commerceAuditEvents: 1 }, env), /--confirm-immutable-audit-purge/);
+  assert.throws(() => validateDeletion(allowed, shop, { commerceExternalConnectionAudits: 1 }, env), /--confirm-immutable-audit-purge/);
+  assert.doesNotThrow(() => validateDeletion({ ...allowed, confirmImmutableAuditPurge: true }, shop, {
+    commerceAuditEvents: 1,
+    commerceExternalConnectionAudits: 1,
+  }, env));
+  assert.equal(parseOptions(['delete', '--shop', shop.id, '--confirm-immutable-audit-purge']).confirmImmutableAuditPurge, true);
+});
+
 test('requires separate acknowledgement for uploaded assets not erased from R2', () => {
   assert.throws(() => validateDeletion(allowed, shop, { merchantKnowledgeUploadedAssets: 1 }, env), /R2/);
   assert.doesNotThrow(() => validateDeletion({ ...allowed, externalAssetsHandled: true }, shop, { merchantKnowledgeUploadedAssets: 1 }, env));
@@ -70,8 +82,12 @@ test('preview counts merchant-scoped rows without executing writes', async () =>
   assert.equal(result.commerceAgentPrompts, 3);
   assert.equal(result.commerceAgentPromptRevisions, 3);
   assert.equal(result.merchantKnowledgeUploadedAssets, 3);
+  assert.equal(result.commerceAuditEvents, 3);
+  assert.equal(result.commerceExternalConnectionAudits, 3);
+  assert.equal(result.commerceModelPolicies, 3);
   assert.deepEqual(calls.find((entry) => entry.model === 'session').where, { shop: shop.domain });
-  for (const call of calls.filter((entry) => entry.model !== 'session' && entry.model !== 'conversation' && entry.model !== 'commerceAgentPromptRevision')) {
+  for (const call of calls.filter((entry) => entry.model !== 'session' && entry.model !== 'conversation' &&
+    entry.model !== 'commerceAgentPromptRevision' && entry.model !== 'commerceAuditEvent')) {
     assert.equal(call.where.shopId, shop.id);
   }
 });
@@ -85,10 +101,13 @@ test('deletion is targeted and ordered around restrictive foreign keys', async (
     } : model === '$executeRaw' ? async (parts, shopId) => {
       calls.push({ model: 'merchantTranslationReconciliationRequest', shopId, sql: parts.join('?') });
       return 2;
+    } : model === 'commerceAuditEvent' || model === 'commerceExternalConnectionAudit' ? {
+      count: async () => 0,
+      deleteMany: async (args) => { calls.push({ model, ...args }); return { count: 0 }; },
     } : model === 'shop' ? { delete: async (args) => {
       calls.push({ model: 'shop', ...args });
       return { id: shop.id };
-    } } : { deleteMany: async (args) => {
+    } } : { count: async () => 0, deleteMany: async (args) => {
       calls.push({ model, ...args });
       return { count: 1 };
     } },
@@ -105,6 +124,9 @@ test('deletion is targeted and ordered around restrictive foreign keys', async (
   assert.ok(position('commerceAgentConfiguration') < position('commerceAgentPromptRevision'));
   assert.ok(position('commerceAgentPromptRevision') < position('commerceAgentPrompt'));
   assert.ok(position('commerceModelCatalogueEntry') < position('commerceModelAvailability'));
+  assert.ok(position('commerceAuditEvent') < position('commerceAgentConfiguration'));
+  assert.ok(position('commerceExternalConnectionAudit') < position('commerceExternalCredential'));
+  assert.ok(position('commerceModelPolicy') < position('shop'));
   assert.ok(position('billingPeriod') < position('shop'));
   assert.ok(position('shop') < position('session'));
   assert.deepEqual(calls.find((call) => call.model === 'shop').where, { id: shop.id });
@@ -114,6 +136,53 @@ test('deletion is targeted and ordered around restrictive foreign keys', async (
       JSON.stringify(entry.where).includes(shop.id), `Unscoped deletion in ${entry.model}`);
   }
   assert.equal(calls.find((call) => call.model === 'merchantTranslationReconciliationRequest').shopId, shop.id);
+});
+
+test('confirmed audit cleanup verifies and restores only the two application guards', async () => {
+  const events = [];
+  const tx = {
+    commerceAuditEvent: { count: async () => 2 },
+    commerceExternalConnectionAudit: { count: async () => 1 },
+    $queryRaw: async () => [
+      { tableName: 'CommerceAuditEvent', triggerName: 'arch021_audit_immutable', enabledState: 'O', internal: false },
+      { tableName: 'CommerceExternalConnectionAudit', triggerName: 'CommerceExternalConnectionAudit_immutable_trigger', enabledState: 'O', internal: false },
+    ],
+    $executeRaw: async (parts) => { events.push(parts.join('')); },
+    $executeRawUnsafe: async (sql) => { events.push(sql); },
+  };
+  await deleteImmutableShopAudits(tx, shop.id, async (name, args) => { events.push({ name, args }); }, true);
+  assert.deepEqual(events.map((event) => typeof event === 'string' ? event : event.name), [
+    "SET LOCAL lock_timeout = '5s'",
+    'ALTER TABLE commerce."CommerceAuditEvent" DISABLE TRIGGER arch021_audit_immutable',
+    'ALTER TABLE commerce."CommerceExternalConnectionAudit" DISABLE TRIGGER "CommerceExternalConnectionAudit_immutable_trigger"',
+    'commerceAuditEvent',
+    'commerceExternalConnectionAudit',
+    'ALTER TABLE commerce."CommerceAuditEvent" ENABLE TRIGGER arch021_audit_immutable',
+    'ALTER TABLE commerce."CommerceExternalConnectionAudit" ENABLE TRIGGER "CommerceExternalConnectionAudit_immutable_trigger"',
+  ]);
+  const deletes = events.filter((event) => typeof event !== 'string');
+  assert.equal(deletes[0].args.where.OR[0].shopId, shop.id);
+  assert.deepEqual(deletes[1].args, { where: { shopId: shop.id } });
+});
+
+test('audit cleanup refuses unconfirmed purge and fails closed for altered triggers', async () => {
+  let inspected = false;
+  const tx = {
+    commerceAuditEvent: { count: async () => 1 },
+    commerceExternalConnectionAudit: { count: async () => 0 },
+    $queryRaw: async () => {
+      inspected = true;
+      return [
+        { tableName: 'CommerceAuditEvent', triggerName: 'arch021_audit_immutable', enabledState: 'D', internal: false },
+        { tableName: 'CommerceExternalConnectionAudit', triggerName: 'CommerceExternalConnectionAudit_immutable_trigger', enabledState: 'O', internal: false },
+      ];
+    },
+    $executeRaw: async () => assert.fail('must not alter triggers'),
+    $executeRawUnsafe: async () => assert.fail('must not alter triggers'),
+  };
+  await assert.rejects(deleteImmutableShopAudits(tx, shop.id, async () => {}, false), /--confirm-immutable-audit-purge/);
+  assert.equal(inspected, false);
+  await assert.rejects(deleteImmutableShopAudits(tx, shop.id, async () => {}, true), /expected enabled state/);
 });
 
 test('prompt cleanup refuses any unconfirmed attempt to bypass ARCH-021 immutability', async () => {
@@ -197,7 +266,7 @@ test('schema direct restrictive Shop foreign keys are explicitly handled', () =>
   assert.deepEqual(names.sort(), [
     'CommerceAgentConfiguration', 'CommerceAgentPrompt', 'CommerceAuditEvent',
     'CommerceExternalConnectionAudit', 'CommerceExternalCredential',
-    'CommerceModelAvailability', 'CommerceStudioMerchantAccess',
+    'CommerceModelAvailability', 'CommerceModelPolicy', 'CommerceStudioMerchantAccess',
     'PromotionCampaign', 'PromotionalCreditGrant',
   ].sort());
 });
