@@ -2,10 +2,10 @@
 export type FieldContract =
   | { name: string; kind: "integer"; label: string; description: string; min: number; max: number; unit?: string }
   | { name: string; kind: "boolean"; label: string; description: string }
-  | { name: string; kind: "string"; label: string; description: string; maxLength: number; pattern?: "model-id" | "bucket" }
+  | { name: string; kind: "string"; label: string; description: string; maxLength: number; optional?: boolean; pattern?: "model-id" | "bucket" }
   | { name: string; kind: "enum"; label: string; description: string; options: readonly string[] }
   | { name: string; kind: "nullable-https-url"; label: string; description: string; maxLength: number; purpose?: "r2" }
-  | { name: string; kind: "secret"; label: string; description: string; writeOnly: true };
+  | { name: string; kind: "secret"; label: string; description: string; revealable: true; optional?: boolean };
 
 export type ConfigurationContract = Readonly<{
   key: string; title: string; description: string; kind: "policy" | "secret";
@@ -18,6 +18,11 @@ export type PublicContract = Omit<ConfigurationContract, "refine">;
 export type Registry = ReadonlyMap<string, ConfigurationContract>;
 export type ValidationResult = { ok: true; values: Record<string, unknown> } |
   { ok: false; fieldErrors: Record<string, string>; message: string };
+
+/** Environment names are documentation hints only; PostgreSQL is the configuration store. */
+const withEnvironmentReference = (field: FieldContract, name: string): FieldContract => ({
+  ...field, description: `${field.description} Environment variable: ${name}.`,
+});
 
 const integer = (name: string, label: string, min: number, max: number, unit?: string): FieldContract =>
   ({ name, label, kind: "integer", min, max, unit, description: `Whole number from ${min} to ${max}${unit ? ` ${unit}` : ""}.` });
@@ -45,7 +50,7 @@ export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Objec
       integer("requestTimeoutMs", "Request timeout", 1000, 30000, "ms"),
       integer("maxResponseBytes", "Response size limit", 16384, 4194304, "bytes"),
       integer("maxScanDurationMs", "Maximum scan duration", 30000, 600000, "ms"),
-      integer("workerConcurrency", "Worker concurrency", 1, 32),
+      withEnvironmentReference(integer("workerConcurrency", "Worker concurrency", 1, 32), "WOO_COUPON_SYNC_WORKER_CONCURRENCY"),
     ],
     defaults: {
       dispatchBatchSize: 500, refreshIntervalMinutes: 30, dispatchCooldownMinutes: 5,
@@ -54,34 +59,14 @@ export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Objec
     },
   },
   {
-    key: "merchantKnowledge.upload", title: "Merchant Knowledge uploads", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Required R2 location and upload ceilings. No endpoint or bucket is implicitly configured; relocation is separately owned.",
-    canReset: false,
-    fields: [
-      integer("maxUploadBytes", "Maximum upload bytes", 1, 2147483647, "bytes"),
-      integer("maxXlsxUncompressedBytes", "Maximum expanded XLSX bytes", 1, 2147483647, "bytes"),
-      { name: "r2Endpoint", label: "R2 endpoint", kind: "nullable-https-url", maxLength: 2048, purpose: "r2", description: "Required public HTTPS R2 endpoint. No credentials, placeholder or local/private endpoint." },
-      { name: "r2Bucket", label: "R2 bucket", kind: "string", maxLength: 63, pattern: "bucket", description: "Required existing bucket name (3–63 letters, digits, dots or hyphens)." },
-    ],
-  },
-  {
     key: "speech.transcription", title: "Speech transcription", kind: "policy", requiredRole: "SUPER_ADMIN",
     description: "Background speech provider and model selection; API keys are managed separately.",
     canReset: true,
     fields: [
-      { name: "provider", label: "Provider", description: "Speech-to-text provider.", kind: "enum", options: ["groq", "openai"] },
-      model("groqModelId", "Groq model ID"), model("openaiModelId", "OpenAI model ID"),
+      withEnvironmentReference({ name: "provider", label: "Provider", description: "Speech-to-text provider.", kind: "enum", options: ["groq", "openai"] }, "WHATSAPP_TRANSCRIPTION_PROVIDER"),
+      withEnvironmentReference(model("groqModelId", "Groq model ID"), "GROQ_TRANSCRIPTION_MODEL"), withEnvironmentReference(model("openaiModelId", "OpenAI model ID"), "OPENAI_TRANSCRIPTION_MODEL"),
     ],
     defaults: { provider: "groq", groqModelId: "whisper-large-v3-turbo", openaiModelId: "gpt-4o-mini-transcribe" },
-  },
-  {
-    key: "support.translation", title: "Support-message translation", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Background merchant support messages only, not Commerce product or pricing translation.",
-    canReset: false,
-    fields: [
-      { name: "provider", label: "Translation provider", kind: "enum", options: ["openai"], description: "Approved support-message translation provider." },
-      model("model", "Translation model ID"),
-    ],
   },
   {
     key: "commerce.preview", title: "Commerce Studio preview", kind: "policy", requiredRole: "SUPER_ADMIN",
@@ -98,9 +83,9 @@ export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Objec
     description: "Optional Admin navigation links only; telemetry exporters and credentials remain unchanged.",
     canReset: true,
     fields: [
-      grafana("baseUrl", "Grafana base URL"), grafana("logsUrl", "Logs URL"),
-      grafana("metricsUrl", "Metrics URL"), grafana("tracesUrl", "Traces URL"),
-      grafana("platformDashboardUrl", "Platform dashboard URL"),
+      withEnvironmentReference(grafana("baseUrl", "Grafana base URL"), "GRAFANA_BASE_URL"), withEnvironmentReference(grafana("logsUrl", "Logs URL"), "GRAFANA_LOGS_URL"),
+      withEnvironmentReference(grafana("metricsUrl", "Metrics URL"), "GRAFANA_METRICS_URL"), withEnvironmentReference(grafana("tracesUrl", "Traces URL"), "GRAFANA_TRACES_URL"),
+      withEnvironmentReference(grafana("platformDashboardUrl", "Platform dashboard URL"), "GRAFANA_PLATFORM_DASHBOARD_URL"),
     ],
     defaults: { baseUrl: null, logsUrl: null, metricsUrl: null, tracesUrl: null, platformDashboardUrl: null },
   },
@@ -123,9 +108,12 @@ export function createConfigurationRegistry(definitions: readonly ConfigurationC
   return registry;
 }
 export const PLATFORM_POLICY_REGISTRY = createConfigurationRegistry(PLATFORM_POLICY_CONTRACTS);
+// ADMIN-002 reuses the same registry architecture; the non-secret entrypoint remains policy-only.
+import { PLATFORM_SECRET_CONTRACTS } from "./secrets-contracts";
+export const PLATFORM_CONFIGURATION_REGISTRY = createConfigurationRegistry([...PLATFORM_POLICY_CONTRACTS, ...PLATFORM_SECRET_CONTRACTS]);
 
-export function publicContracts(registry: Registry = PLATFORM_POLICY_REGISTRY): PublicContract[] {
-  return [...registry.values()].filter((contract) => contract.kind === "policy").map((contract) => ({
+export function publicContracts(registry: Registry = PLATFORM_POLICY_REGISTRY, includeSecrets = false): PublicContract[] {
+  return [...registry.values()].filter((contract) => includeSecrets || contract.kind === "policy").map((contract) => ({
     key: contract.key,
     title: contract.title,
     description: contract.description,

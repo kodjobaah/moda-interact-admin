@@ -1,7 +1,8 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 
-import { assertPlatformAdminAuthConfiguration } from '@/lib/auth/environment';
+import { assertPlatformAdminAuthRoutingConfiguration } from '@/lib/auth/environment';
+import { resolveAdminAuthCredentials } from '@/lib/auth/platform-auth-credentials';
 import { logAdminSecurityEvent } from '@/lib/auth/audit';
 import { prisma } from '@/lib/prisma';
 import {
@@ -10,8 +11,14 @@ import {
 } from '@/lib/auth/security-policy';
 import { isHostedAdminEnvironment } from '@/lib/auth/environment';
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [Google],
+// Auth.js v5 lazy configuration: credentials are read only when an auth request,
+// session check, or auth action needs them, not when the module starts.
+export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
+  assertPlatformAdminAuthRoutingConfiguration();
+  const credentials = await resolveAdminAuthCredentials();
+  return {
+  secret: credentials.authSecret,
+  providers: [Google({ clientId: credentials.googleClientId, clientSecret: credentials.googleClientSecret })],
   pages: {
     signIn: '/login',
   },
@@ -48,7 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
     async signIn({ account, profile }) {
-      assertPlatformAdminAuthConfiguration();
+      assertPlatformAdminAuthRoutingConfiguration();
 
       if (account?.provider !== 'google') {
         logAdminSecurityEvent('admin.auth.login_denied', {
@@ -97,4 +104,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return allowed;
     },
   },
+  };
 });
