@@ -15,9 +15,9 @@ const fixture: ConfigurationContract = {
   ],
 };
 
-test("production allowlist has exactly four canonical policy groups with 20 fields", () => {
-  assert.deepEqual([...registry.keys()], ["woo.couponSync", "speech.transcription", "commerce.preview", "admin.grafana"]);
-  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 20);
+test("production allowlist has exactly five canonical policy groups with 22 fields", () => {
+  assert.deepEqual([...registry.keys()], ["woo.couponSync", "speech.transcription", "commerce.preview", "admin.grafana", "omini.moderation"]);
+  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 22);
   for (const contract of registry.values()) {
     assert.equal(contract.requiredRole, "SUPER_ADMIN");
     assert.equal(contract.kind, "policy");

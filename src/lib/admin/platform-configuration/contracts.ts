@@ -30,6 +30,8 @@ const model = (name: string, label: string): FieldContract =>
   ({ name, label, kind: "string", maxLength: 128, pattern: "model-id", description: "Required model identifier (up to 128 characters)." });
 const grafana = (name: string, label: string): FieldContract =>
   ({ name, label, kind: "nullable-https-url", maxLength: 2048, description: "Optional HTTPS URL without credentials, query parameters or fragments." });
+const httpsUrl = (name: string, label: string, description: string): FieldContract =>
+  ({ name, label, kind: "nullable-https-url", maxLength: 2048, description });
 
 /** The 120-second preview reservation is defined by Commerce src/commerce/preview/store.ts.
  * Commerce's run-budgets.ts preserves a 30-second terminal-commit margin. */
@@ -88,6 +90,16 @@ export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Objec
       withEnvironmentReference(grafana("platformDashboardUrl", "Platform dashboard URL"), "GRAFANA_PLATFORM_DASHBOARD_URL"),
     ],
     defaults: { baseUrl: null, logsUrl: null, metricsUrl: null, tracesUrl: null, platformDashboardUrl: null },
+  },
+  {
+    key: "omini.moderation", title: "OpenAI SDK moderation", kind: "policy", requiredRole: "SUPER_ADMIN",
+    description: "OpenAI SDK moderation settings",
+    canReset: true,
+    fields: [
+      withEnvironmentReference(httpsUrl("baseUrl", "OpenAI moderation base URL", "Optional HTTPS base URL without credentials, query parameters or fragments."), "OPENAI_MODERATION_BASE_URL"),
+      withEnvironmentReference(model("modelId", "OpenAI SDK OpenAI Moderation model ID"), "OPENAI_MODERATION_MODEL_ID"),
+    ],
+    defaults: { baseUrl: 'https://api.openai.com/v1/moderations', modelId: 'omni-moderation-latest' },
   },
 ]);
 
