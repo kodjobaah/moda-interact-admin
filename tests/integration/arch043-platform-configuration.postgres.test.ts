@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { parseCredentialKeyring } from "@modainteract/moda-interact-shared/security/credentials/node";
+import { mutateSecretWithDependencies, revealSecretFieldWithDependencies, readSecretHistory, readSecretStatus } from "../../src/lib/admin/platform-configuration/secret-service.ts";
 import { test, after } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { createConfigurationRegistry, type ConfigurationContract } from "../../src/lib/admin/platform-configuration/contracts.ts";
@@ -113,4 +115,80 @@ test("reject role spoofing, request environment and secret-purpose fields, and n
   const extended = createConfigurationRegistry([{ ...fixture, key, fields: [...fixture.fields, { name: "newField", label: "New", description: "Test", kind: "string", maxLength: 20 }] }]);
   await assert.rejects(mutateConfigurationWithDependencies(input(key, 0), "save", { principal: { role: "SUPER_ADMIN" }, environment, actorId, db, registry: extended }), /Correct the highlighted/);
   assert.equal((await readConfigurationHistory(db, environment, key)).entries.length, 0);
+});
+
+const wrappingKeyring = parseCredentialKeyring(JSON.stringify({ "arch043-integration-key": Buffer.alloc(32, 31).toString("base64") }));
+const secretDependencies = {
+  principal: { id: actorId, role: "SUPER_ADMIN", developmentBypass: false },
+  environment, db, wrapping: { keyring: wrappingKeyring, activeKeyId: "arch043-integration-key" },
+};
+const pair = { consumerKey: `ck_${"a".repeat(40)}`, consumerSecret: `cs_${"b".repeat(40)}` };
+
+// These share the known key, so they run sequentially and clear their state
+// inside the disposable database. They do not depend on merchant credentials.
+test("ARCH-043 secret: initial setup, audited reveal without revision, and partial rotation", async () => {
+  const key = "woocommerce.auth";
+  assert.equal((await readSecretStatus(db, environment, key)).version, 0);
+  const first = await mutateSecretWithDependencies({ key, operation: "set", expectedVersion: 0, values: pair }, secretDependencies);
+  assert.equal(first.version, 1);
+  const recorded: Array<Record<string, unknown>> = [];
+  const shown = await revealSecretFieldWithDependencies({ key, field: "consumerSecret", expectedVersion: 1 }, {
+    ...secretDependencies, recordReveal: (details) => { recorded.push(details); },
+  });
+  assert.deepEqual(shown, { field: "consumerSecret", value: pair.consumerSecret, version: 1 });
+  assert.deepEqual(recorded, [{ actorId, environment, key, field: "consumerSecret", version: 1 }]);
+  assert.equal((await readSecretHistory(db, environment, key)).entries.length, 1);
+  await assert.rejects(revealSecretFieldWithDependencies({ key, field: "consumerSecret", expectedVersion: 1 }, {
+    ...secretDependencies, principal: { id: "operator", role: "ADMIN", developmentBypass: false }, recordReveal: () => {},
+  }), /SUPER_ADMIN/);
+  await assert.rejects(revealSecretFieldWithDependencies({ key, field: "unknown", expectedVersion: 1 }, secretDependencies), /Unsupported/);
+  await assert.rejects(revealSecretFieldWithDependencies({ key, field: "consumerKey", expectedVersion: 1, environment: "production" }, secretDependencies), /Invalid secret/);
+  const rotatedSecret = `cs_${"c".repeat(40)}`;
+  await mutateSecretWithDependencies({ key, operation: "rotate", expectedVersion: 1,
+    values: { consumerSecret: rotatedSecret }, reason: "scheduled-rotation", confirmation: "ROTATE" }, secretDependencies);
+  assert.equal((await revealSecretFieldWithDependencies({ key, field: "consumerKey", expectedVersion: 2 }, {
+    ...secretDependencies, recordReveal: () => {},
+  })).value, pair.consumerKey);
+  assert.equal((await revealSecretFieldWithDependencies({ key, field: "consumerSecret", expectedVersion: 2 }, {
+    ...secretDependencies, recordReveal: () => {},
+  })).value, rotatedSecret);
+  const history = await readSecretHistory(db, environment, key);
+  assert.deepEqual(history.entries.map((entry) => entry.reason), ["scheduled-rotation", "initial-setup"]);
+  assert.deepEqual(history.entries.map((entry) => entry.resultingVersion), [2, 1]);
+  const serialized = JSON.stringify(history);
+  assert.ok(!serialized.includes(pair.consumerSecret) && !serialized.includes(rotatedSecret));
+  await assert.rejects(revealSecretFieldWithDependencies({ key, field: "consumerSecret", expectedVersion: 1 }, secretDependencies), /Refresh/);
+});
+
+test("ARCH-043 secret: revoke is terminal, only set may reactivate and version remains monotonic", async () => {
+  const key = "woocommerce.auth";
+  await mutateSecretWithDependencies({ key, operation: "revoke", expectedVersion: 2,
+    reason: "decommission", confirmation: "REVOKE" }, secretDependencies);
+  assert.deepEqual((await readSecretStatus(db, environment, key)).configured, false);
+  await assert.rejects(revealSecretFieldWithDependencies({ key, field: "consumerSecret", expectedVersion: 3 }, secretDependencies), /No active/);
+  await assert.rejects(mutateSecretWithDependencies({ key, operation: "rotate", expectedVersion: 3,
+    values: { consumerSecret: `cs_${"d".repeat(40)}` }, reason: "scheduled-rotation", confirmation: "ROTATE" }, secretDependencies));
+  assert.equal((await mutateSecretWithDependencies({ key, operation: "set", expectedVersion: 3, values: pair }, secretDependencies)).version, 4);
+  assert.deepEqual((await readSecretHistory(db, environment, key)).entries.map((entry) => entry.reason),
+    ["initial-setup", "decommission", "scheduled-rotation", "initial-setup"]);
+});
+
+test("ARCH-043 secret: update non-credential fields without rotating or revealing credentials", async () => {
+  const key = "merchant.knowledge.r2";
+  assert.equal((await readSecretStatus(db, environment, key)).version, 0);
+  const r2 = { endpoint: `https://${"a".repeat(32)}.r2.cloudflarestorage.com`, bucket: "merchant-knowledge",
+    accessKeyId: "test-r2-access", secretAccessKey: "test-r2-secret", maxUploadBytes: 1048576, maxXlsxUncompressedBytes: 2097152 };
+  await mutateSecretWithDependencies({ key, operation: "set", expectedVersion: 0, values: r2 }, secretDependencies);
+  await mutateSecretWithDependencies({ key, operation: "update", expectedVersion: 1, values: { maxUploadBytes: 1048577 } }, secretDependencies);
+  assert.equal((await revealSecretFieldWithDependencies({ key, field: "secretAccessKey", expectedVersion: 2 }, {
+    ...secretDependencies, recordReveal: () => {},
+  })).value, r2.secretAccessKey);
+  assert.equal((await revealSecretFieldWithDependencies({ key, field: "maxUploadBytes", expectedVersion: 2 }, {
+    ...secretDependencies, recordReveal: () => {},
+  })).value, 1048577);
+  assert.equal((await readSecretHistory(db, environment, key)).entries[0].reason, "configuration-update");
+  await assert.rejects(mutateSecretWithDependencies({ key, operation: "update", expectedVersion: 2,
+    values: { secretAccessKey: "different" } }, secretDependencies), /Rotate credentials/);
+  await assert.rejects(mutateSecretWithDependencies({ key, operation: "rotate", expectedVersion: 2,
+    values: { bucket: "other-bucket" }, reason: "scheduled-rotation", confirmation: "ROTATE" }, secretDependencies), /requires changing/);
 });

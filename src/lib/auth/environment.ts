@@ -24,7 +24,10 @@ export function isDevelopmentAuthBypass(): boolean {
     );
   }
 
-  return true;
+  // The historical development bypass stays enabled by default. Developers may
+  // explicitly disable it to exercise the real Google/SUPER_ADMIN login path.
+  // This flag cannot enable bypass outside development or under NODE_ENV=production.
+  return process.env.ADMIN_DEVELOPMENT_AUTH_BYPASS !== 'false';
 }
 
 export function assertPlatformAdminAuthConfiguration(): void {
@@ -50,4 +53,13 @@ export function assertPlatformAdminAuthConfiguration(): void {
 export function isHostedAdminEnvironment(): boolean {
   const environment = resolveDeploymentEnvironmentName();
   return environment === TEST || environment === PRODUCTION;
+}
+
+/** Auth.js credentials are resolved lazily. Routing still requires an external URL,
+ * even when all credential values are sealed in PostgreSQL. */
+export function assertPlatformAdminAuthRoutingConfiguration(): void {
+  if (isDevelopmentAuthBypass()) return;
+  if (!process.env.AUTH_URL?.trim()) {
+    throw new Error('Platform-admin authentication is not configured: missing AUTH_URL.');
+  }
 }

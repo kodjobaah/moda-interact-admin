@@ -27,7 +27,7 @@ try {
   const port = docker(["port", container, "5432/tcp"]).trim().match(/:(\d+)$/)?.[1];
   assert.ok(port, "Unable to resolve disposable PostgreSQL port");
   const databaseUrl = `postgresql://postgres:fixture-only@127.0.0.1:${port}/${dbName}?schema=public`;
-  execFileSync("npx", ["tsx", "--test", "tests/integration/arch043-platform-configuration.postgres.test.ts"], {
+  execFileSync(process.execPath, ["--conditions=import", "--import", "tsx", "--test", "tests/integration/arch043-platform-configuration.postgres.test.ts"], {
     env: { ...process.env, DATABASE_URL: databaseUrl, ARCH043_DISPOSABLE_POSTGRES: "1" }, stdio: "inherit",
   });
   console.log("PASS ARCH-043 ADMIN-001 disposable PostgreSQL");

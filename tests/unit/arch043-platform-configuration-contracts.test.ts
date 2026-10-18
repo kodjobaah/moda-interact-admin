@@ -15,9 +15,9 @@ const fixture: ConfigurationContract = {
   ],
 };
 
-test("production allowlist is exactly six groups with all 26 fields", () => {
-  assert.deepEqual([...registry.keys()], ["woo.couponSync", "merchantKnowledge.upload", "speech.transcription", "support.translation", "commerce.preview", "admin.grafana"]);
-  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 26);
+test("production allowlist has exactly four canonical policy groups with 20 fields", () => {
+  assert.deepEqual([...registry.keys()], ["woo.couponSync", "speech.transcription", "commerce.preview", "admin.grafana"]);
+  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 20);
   for (const contract of registry.values()) {
     assert.equal(contract.requiredRole, "SUPER_ADMIN");
     assert.equal(contract.kind, "policy");
@@ -52,17 +52,6 @@ test("single-source descriptor controls strict types, bounds and unknown fields"
   }
 });
 
-test("R2 endpoint/bucket are required, placeholders and local origins denied", () => {
-  const contract = registry.get("merchantKnowledge.upload")!;
-  const base = { maxUploadBytes: 10485760, maxXlsxUncompressedBytes: 52428800, r2Endpoint: "https://valid.r2.cloudflarestorage.com", r2Bucket: "production-bucket" };
-  assert.equal(validateConfiguration(contract, base).ok, true);
-  for (const endpoint of [null, "", "https://example.invalid", "https://localhost", "https://127.0.0.1", "http://valid.example.com", "https://valid.example.com/?token=x"]) {
-    assert.equal(validateConfiguration(contract, { ...base, r2Endpoint: endpoint }).ok, false);
-  }
-  assert.equal(isSafeHttpsUrl("https://grafana.example.com/dashboards"), true);
-  assert.equal(validateConfiguration(contract, { ...base, r2Bucket: "configured-bucket" }).ok, false);
-});
-
 test("test-only new group and field need only registry extension", () => {
   const expanded = createConfigurationRegistry([...PLATFORM_POLICY_CONTRACTS, fixture]);
   assert.equal(publicContracts(expanded).some((item) => item.key === "fixture.sample"), true);
@@ -75,9 +64,13 @@ test("test-only new group and field need only registry extension", () => {
   assert.equal(validateConfiguration(modified.get("fixture.sample")!, { enabled: true, retryLimit: 3, label: "value" }).ok, true);
 });
 
-test("reserved secrets cannot enter standard policy validation", () => {
+test("only canonical configuration keys are accepted as policies", () => {
+  assert.equal(registry.has("merchantKnowledge.upload"), false);
+  assert.equal(registry.has("support.translation"), false);
+  assert.equal(isSafeHttpsUrl("https://grafana.example.com/dashboards"), true);
+
   const secret: ConfigurationContract = { key: "auth.test", title: "Secret test", description: "Test only", kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
-    fields: [{ name: "value", kind: "secret", label: "Secret", description: "Write only", writeOnly: true }] };
+    fields: [{ name: "value", kind: "secret", label: "Secret", description: "Revealable secret", revealable: true }] };
   const extended = createConfigurationRegistry([...PLATFORM_POLICY_CONTRACTS, secret]);
   assert.equal(publicContracts(extended).some((item) => item.key === "auth.test"), false);
   assert.equal(validateConfiguration(extended.get("auth.test")!, { value: "anything" }).ok, false);

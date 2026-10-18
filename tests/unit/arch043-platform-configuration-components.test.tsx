@@ -18,7 +18,7 @@ const contract: ConfigurationContract = {
 test("a registered policy group renders automatically in selector", () => {
   const contracts = publicContracts(createConfigurationRegistry([...PLATFORM_POLICY_CONTRACTS, contract]));
   const html = renderToStaticMarkup(<ConfigurationNavigation contracts={contracts} selectedKey="fixture.sample" />);
-  assert.equal((html.match(/href=/g) || []).length, 7);
+  assert.equal((html.match(/href=/g) || []).length, contracts.length);
   assert.match(html, /Dynamic fixture/);
   assert.match(html, /aria-current="page"/);
 });

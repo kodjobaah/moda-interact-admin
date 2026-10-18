@@ -11,7 +11,7 @@ const repositoryRoot = path.resolve(
 );
 const sourcePath = (relativePath) => path.join(repositoryRoot, relativePath);
 
-function runEnvironmentCheck(nodeEnvironment, deploymentEnvironment) {
+function runEnvironmentCheck(nodeEnvironment, deploymentEnvironment, disableBypass = false) {
   const environmentPath = sourcePath('src/lib/auth/environment.ts');
   const script = `
     import {
@@ -33,6 +33,7 @@ function runEnvironmentCheck(nodeEnvironment, deploymentEnvironment) {
         ...process.env,
         NODE_ENV: nodeEnvironment,
         DEPLOYMENT_ENVIRONMENT_NAME: deploymentEnvironment,
+        ADMIN_DEVELOPMENT_AUTH_BYPASS: disableBypass ? 'false' : '',
         AUTH_SECRET: '',
         AUTH_GOOGLE_ID: '',
         AUTH_GOOGLE_SECRET: '',
@@ -217,6 +218,10 @@ function runMutationBoundaryCheck() {
 test('environment matrix enforces the development-only bypass invariant', () => {
   assert.equal(runEnvironmentCheck('development', 'development').bypass, true);
   assert.equal(runEnvironmentCheck('test', 'development').bypass, true);
+  const verifiedDevelopment = runEnvironmentCheck('development', 'development', true);
+  assert.equal(verifiedDevelopment.bypass, false);
+  assert.match(verifiedDevelopment.configuration, /missing AUTH_SECRET/);
+  assert.equal(runEnvironmentCheck('test', 'test', true).bypass, false);
 
   for (const [nodeEnvironment, deploymentEnvironment] of [
     ['test', 'test'],

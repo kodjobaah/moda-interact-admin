@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { signIn } from '@/auth';
 import {
-  assertPlatformAdminAuthConfiguration,
+  assertPlatformAdminAuthRoutingConfiguration,
   isDevelopmentAuthBypass,
 } from '@/lib/auth/environment';
 import { getPlatformAdminPrincipal } from '@/lib/auth/platform-admin';
@@ -22,14 +22,14 @@ function first(value: string | string[] | undefined): string | undefined {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (isDevelopmentAuthBypass()) redirect('/');
 
-  assertPlatformAdminAuthConfiguration();
+  assertPlatformAdminAuthRoutingConfiguration();
   if (await getPlatformAdminPrincipal()) redirect('/');
 
   const error = first((await searchParams).error);
 
   async function signInWithGoogle() {
     'use server';
-    assertPlatformAdminAuthConfiguration();
+    assertPlatformAdminAuthRoutingConfiguration();
     await signIn('google', { redirectTo: '/' });
   }
 

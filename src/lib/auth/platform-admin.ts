@@ -3,7 +3,7 @@ import { cache } from 'react';
 
 import { logAdminSecurityEvent } from './audit.ts';
 import {
-  assertPlatformAdminAuthConfiguration,
+  assertPlatformAdminAuthRoutingConfiguration,
   isDevelopmentAuthBypass,
 } from './environment.ts';
 import { isAuthorizedPlatformAdmin } from './security-policy.ts';
@@ -55,7 +55,7 @@ export async function resolvePlatformAdminPrincipal(
       return DEVELOPMENT_PRINCIPAL;
     }
 
-    assertPlatformAdminAuthConfiguration();
+    assertPlatformAdminAuthRoutingConfiguration();
 
     const user = await dependencies.getSession();
     const email = user?.email?.trim().toLowerCase();
