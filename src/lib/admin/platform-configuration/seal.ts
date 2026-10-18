@@ -4,7 +4,14 @@ import {
   encryptCredential, decryptCredential, parseCredentialKeyring, resolveActiveCredentialKey,
   type CredentialEnvelope, type CredentialKeyring,
 } from "@modainteract/moda-interact-shared/security/credentials/node";
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
+import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
 import { ConfigurationError } from "./errors";
+
+const logger = createLogger({
+  serviceName: "moda-interact-admin",
+  environment: resolveDeploymentEnvironmentName(),
+});
 
 const ENVIRONMENTS = new Set(["local", "test", "development", "staging", "production"]);
 const PURPOSES = new Set(["commerce.connectionKeys", "auth.admin", "auth.commerce", "commerce.bootstrap", "merchant.knowledge.r2", "woocommerce.auth", "shopify.oauth", "messaging.meta", "woocommerce.billing", "shopify.partner", "shopify.appEvents", "messaging.sender", "ai.providers"]);
@@ -34,7 +41,8 @@ export function loadConfigUnsealKeyring(): UnsealKeyring {
     const keyring = parseCredentialKeyring(process.env.MODA_CONFIG_UNSEAL_KEY);
     const activeKeyId = resolveActiveCredentialKey(keyring, process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID);
     return { keyring, activeKeyId };
-  } catch {
+  } catch (cause) {
+    logger.error("admin.platform_configuration.unseal_keyring_failed", { error: cause });
     throw new ConfigurationError("DB_UNAVAILABLE", "Configuration encryption is unavailable.");
   }
 }
@@ -69,11 +77,17 @@ export function sealSecret(input: {
     const envelope = encryptCredential({ keyring: input.wrapping.keyring, activeKeyId: input.wrapping.activeKeyId, plaintext: input.plaintext, aad });
     return { kind: "sealed", schemaVersion: 1, algorithm: "AES-256-GCM", wrappingKeyId: envelope.keyId,
       nonce: base64(envelope.nonce), ciphertext: base64(envelope.ciphertext), authTag: base64(envelope.authTag) };
-  } catch { throw new ConfigurationError("DB_UNAVAILABLE", "Configuration encryption is unavailable."); }
+  } catch (cause) {
+    logger.error("admin.platform_configuration.secret_seal_failed", { error: cause });
+    throw new ConfigurationError("DB_UNAVAILABLE", "Configuration encryption is unavailable.");
+  }
 }
 /** Server-only verification helper for independent consumer vector tests, NEVER imported into React. */
 export function unsealSecret(input: { environment: string; key: string; version: number; value: unknown; wrapping: UnsealKeyring }): string {
   const aad = secretAAD(input.environment, input.key, input.version);
   try { return decryptCredential({ keyring: input.wrapping.keyring, envelope: parseStoredSecret(input.value), aad }); }
-  catch { throw new ConfigurationError("INVALID_INPUT", "Invalid sealed secret."); }
+  catch (cause) {
+    logger.error("admin.platform_configuration.secret_unseal_failed", { error: cause });
+    throw new ConfigurationError("INVALID_INPUT", "Invalid sealed secret.");
+  }
 }
