@@ -20,7 +20,7 @@ test("Shopify, R2, WooCommerce and Meta inputs disclose their environment refere
   checkFieldEnvironment(source, 'secret("consumerSecret", "Consumer secret")', "WOOCOMMERCE_CUSTOMER_SECRET");
   checkFieldEnvironment(source, 'secret("verifyToken", "Verify token")', "WHATSAPP_VERIFY_TOKEN");
   checkFieldEnvironment(source, 'secret("accessToken", "Partner access token")', "SHOPIFY_PARTNER_ACCESS_TOKEN", "SHOPIFY_PARTNER_API_TOKEN");
-  checkFieldEnvironment(source, 'secret("openAiSpeechApiKey", "OpenAI speech API key", true)', "OPENAI_API_KEY", "WHATSAPP_OPENAI_API_KEY");
+  checkFieldEnvironment(source, 'secret("openAiApiKey", "OpenAI API key", true)', "OPENAI_API_KEY", "WHATSAPP_OPENAI_API_KEY");
 });
 
 test("Policy inputs disclose known environment references without changing configuration semantics", () => {

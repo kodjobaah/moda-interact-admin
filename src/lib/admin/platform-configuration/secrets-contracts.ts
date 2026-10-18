@@ -53,10 +53,10 @@ export const PLATFORM_SECRET_CONTRACTS: readonly ConfigurationContract[] = Objec
     fields: [withEnvironmentReference(secret("accessToken", "WhatsApp access token"), "WHATSAPP_ACCESS_TOKEN"),
       withEnvironmentReference({ name: "phoneNumberId", kind: "string", label: "Phone number ID", maxLength: 32, description: "Required Meta phone number ID." }, "WHATSAPP_PHONE_NUMBER_ID"),
       withEnvironmentReference({ name: "businessAccountId", kind: "string", label: "Business account ID", maxLength: 32, description: "Required WhatsApp Business Account ID." }, "WHATSAPP_BUSINESS_ACCOUNT_ID")] },
-  { key: "ai.providers", title: "Speech provider API keys", description: "Speech-only Groq/OpenAI credentials. Translation credentials remain in System Controls → Translations.",
+  { key: "ai.providers", title: "AI provider API keys", description: "API keys for AI service providers such as Groq and OpenAI. ",
     kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
-    fields: [withEnvironmentReference(secret("groqSpeechApiKey", "Groq speech API key", true), "GROQ_API_KEY"),
-      withEnvironmentReference(secret("openAiSpeechApiKey", "OpenAI speech API key", true), "OPENAI_API_KEY", "WHATSAPP_OPENAI_API_KEY")] },
+    fields: [withEnvironmentReference(secret("groqApiKey", "Groq API key", true), "GROQ_API_KEY"),
+      withEnvironmentReference(secret("openAiApiKey", "OpenAI API key", true), "OPENAI_API_KEY", "WHATSAPP_OPENAI_API_KEY")] },
 ]);
 export type SecretPurpose = "commerce.connectionKeys" | "auth.admin" | "auth.commerce" | "commerce.bootstrap" | "merchant.knowledge.r2" | "woocommerce.auth" | "shopify.oauth" | "messaging.meta" | "woocommerce.billing" | "shopify.partner" | "shopify.appEvents" | "messaging.sender" | "ai.providers";
 export const SECRET_PURPOSES = new Set<string>(PLATFORM_SECRET_CONTRACTS.map((entry) => entry.key));

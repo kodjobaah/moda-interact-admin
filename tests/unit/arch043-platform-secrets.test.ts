@@ -67,7 +67,9 @@ test("five reconciled groups use exact closed schemas", () => {
   const sender = { accessToken: "meta-token", phoneNumberId: "1234567890", businessAccountId: "9876543210" };
   assert.deepEqual(validateSecretPayload("messaging.sender", sender), sender);
   assert.throws(() => validateSecretPayload("messaging.sender", { ...sender, phoneNumberId: "invalid/identity" }));
-  assert.deepEqual(validateSecretPayload("ai.providers", { openAiSpeechApiKey: "speech-key" }), { openAiSpeechApiKey: "speech-key" });
+  assert.deepEqual(validateSecretPayload("ai.providers", { openAiApiKey: "provider-key" }), { openAiApiKey: "provider-key" });
+  assert.throws(() => validateSecretPayload("ai.providers", { openAiSpeechApiKey: "legacy-key" }));
+  assert.throws(() => validateSecretPayload("ai.providers", { groqSpeechApiKey: "legacy-key" }));
   assert.throws(() => validateSecretPayload("ai.providers", {}));
   assert.throws(() => validateSecretPayload("ai.providers", { openAiTranslationApiKey: "" }));
   assert.throws(() => validateSecretPayload("ai.providers", { OPENAI_API_KEY: "legacy" }));
