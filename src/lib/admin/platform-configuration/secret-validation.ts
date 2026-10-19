@@ -8,6 +8,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const R2_ENDPOINT = /^https:\/\/[a-f0-9]{32}\.r2\.cloudflarestorage\.com\/?$/i;
 const BUCKET = /^(?!\.)(?!.*\.\.)(?!.*\.$)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
 const CONTROL = /[\u0000-\u001f\u007f]/;
+// Retain existing legacy IDs while accepting Shopify Partner GraphQL App GIDs intact.
+const SHOPIFY_APP_ID = /^(?:[A-Za-z0-9_-]{1,128}|gid:\/\/shopify\/App\/[1-9][0-9]{0,19})$/;
 
 /** Validate ALL fields on each Set/Rotate; never silently retain or return secret material. */
 export function validateSecretPayload(key: string, value: unknown): Record<string, string | number> {
@@ -59,10 +61,14 @@ export function validateSecretPayload(key: string, value: unknown): Record<strin
       throw new ConfigurationError("INVALID_INPUT", "Uncompressed XLSX limit cannot be lower than upload limit.");
     }
   } else if (key === "shopify.partner") {
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(cleaned.organizationId as string) ||
-        !/^[A-Za-z0-9_-]{1,128}$/.test(cleaned.appId as string) ||
-        cleaned.apiVersion !== undefined && !/^20\d{2}-(?:01|04|07|10)$/.test(cleaned.apiVersion as string)) {
-      throw new ConfigurationError("INVALID_INPUT", "Invalid Shopify Partner identity or API version.");
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(cleaned.organizationId as string)) {
+      throw new ConfigurationError("INVALID_INPUT", "Invalid Shopify Partner organisation ID.");
+    }
+    if (!SHOPIFY_APP_ID.test(cleaned.appId as string)) {
+      throw new ConfigurationError("INVALID_INPUT", "Invalid Shopify application ID.");
+    }
+    if (cleaned.apiVersion !== undefined && !/^20\d{2}-(?:01|04|07|10)$/.test(cleaned.apiVersion as string)) {
+      throw new ConfigurationError("INVALID_INPUT", "Invalid Shopify Partner API version.");
     }
   } else if (key === "messaging.sender") {
     if (!/^\d{4,32}$/.test(cleaned.phoneNumberId as string) ||

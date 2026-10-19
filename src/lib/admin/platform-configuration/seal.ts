@@ -35,16 +35,30 @@ export function secretAAD(environment: string, key: string, version: number): st
   return JSON.stringify(["moda-platform-config-v1", environment, key, version, 1]);
 }
 
-/** Dedicated external wrapping keyring, never the Commerce keyring that this service manages. */
+/** Dedicated external wrapping keyring, never the Commerce keyring that this service manages.
+ * Parse the opaque descriptor in the same Shared module instance that seals/unseals.
+ * The CLI must not construct this descriptor via its own Shared import: key bytes
+ * are held in a module-private WeakMap, not in the returned descriptor.
+ */
+export function createConfigUnsealKeyring(
+  raw: string | undefined, requestedActiveKeyId: string | undefined,
+): UnsealKeyring {
+  try {
+    const keyring = parseCredentialKeyring(raw);
+    const activeKeyId = resolveActiveCredentialKey(keyring, requestedActiveKeyId);
+    return { keyring, activeKeyId };
+  } catch {
+    throw new ConfigurationError("DB_UNAVAILABLE", "Configuration encryption is unavailable.");
+  }
+}
 export function loadConfigUnsealKeyring(): UnsealKeyring {
   try {
-    const keyring = parseCredentialKeyring(process.env.MODA_CONFIG_UNSEAL_KEY);
-    const activeKeyId = resolveActiveCredentialKey(keyring, process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID);
-    return { keyring, activeKeyId };
-  } catch (cause) {
-    logger.error("admin.platform_configuration.unseal_keyring_failed", { error: process.env.MODA_CONFIG_UNSEAL_KEY });
-    logger.error("admin.platform_configuration.unseal_keyring_failed", { error: process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID });
-    logger.error("admin.platform_configuration.unseal_keyring_failed", { error: cause });
+    return createConfigUnsealKeyring(
+      process.env.MODA_CONFIG_UNSEAL_KEY, process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID,
+    );
+  } catch {
+    // Never log the keyring JSON, key ID, or raw security configuration.
+    logger.error("admin.platform_configuration.unseal_keyring_failed", { reasonCode: "KEYRING_UNAVAILABLE" });
     throw new ConfigurationError("DB_UNAVAILABLE", "Configuration encryption is unavailable.");
   }
 }

@@ -43,7 +43,7 @@ export const PLATFORM_SECRET_CONTRACTS: readonly ConfigurationContract[] = Objec
     kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
     fields: [withEnvironmentReference(secret("accessToken", "Partner access token"), "SHOPIFY_PARTNER_ACCESS_TOKEN", "SHOPIFY_PARTNER_API_TOKEN"),
       withEnvironmentReference({ name: "organizationId", kind: "string", label: "Partner organisation ID", maxLength: 128, description: "Required Shopify Partner organisation ID." }, "SHOPIFY_PARTNER_ORG_ID", "SHOPIFY_PARTNER_ORGANIZATION_ID"),
-      withEnvironmentReference({ name: "appId", kind: "string", label: "Shopify application ID", maxLength: 128, description: "Required Shopify application identity." }, "SHOPIFY_APP_ID"),
+      withEnvironmentReference({ name: "appId", kind: "string", label: "Shopify application ID", maxLength: 128, description: "Required Shopify application identity; accepts a Shopify App GID (gid://shopify/App/<numeric-id>) or existing short ID." }, "SHOPIFY_APP_ID"),
       withEnvironmentReference({ name: "apiVersion", kind: "string", label: "Partner API version", maxLength: 7, optional: true, description: "Optional Shopify YYYY-MM API version; otherwise the owning consumer's approved default." }, "SHOPIFY_PARTNER_API_VERSION")] },
   { key: "shopify.appEvents", title: "Shopify App Events credentials", description: "Dedicated App Events API identity, separate from Shopify OAuth and Partner billing.",
     kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,

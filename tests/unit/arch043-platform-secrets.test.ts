@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PLATFORM_SECRET_CONTRACTS, SECRET_PURPOSES } from "../../src/lib/admin/platform-configuration/secrets-contracts.ts";
 import { validateSecretPayload } from "../../src/lib/admin/platform-configuration/secret-validation.ts";
-import { secretAAD } from "../../src/lib/admin/platform-configuration/seal.ts";
+import { createConfigUnsealKeyring, sealSecret, secretAAD, unsealSecret } from "../../src/lib/admin/platform-configuration/seal.ts";
 
 const pair = { consumerKey: `ck_${"a".repeat(40)}`, consumerSecret: `cs_${"b".repeat(40)}` };
 const r2 = { endpoint: `https://${"a".repeat(32)}.r2.cloudflarestorage.com`, bucket: "merchant-knowledge", accessKeyId: "r2-access", secretAccessKey: "r2-secret", maxUploadBytes: 10485760, maxXlsxUncompressedBytes: 52428800 };
@@ -51,6 +51,24 @@ test("AAD is bound to environment, key and resulting revision", () => {
   assert.throws(() => secretAAD("production", "other.secret", 3));
 });
 
+test("Admin's keyring factory seals and unseals actual Shared ciphertext in both target environments", () => {
+  const activeKeyId = "disposable-test-root";
+  const raw = JSON.stringify({ [activeKeyId]: Buffer.alloc(32, 0x35).toString("base64") });
+  const wrapping = createConfigUnsealKeyring(raw, activeKeyId);
+  const plaintext = JSON.stringify({ apiKey: "fixture-id", apiSecret: "fixture-secret" });
+  const rows = ["development", "test"].map((environment) => ({
+    environment,
+    sealed: sealSecret({ environment, key: "shopify.oauth", version: 1, plaintext, wrapping }),
+  }));
+  for (const { environment, sealed } of rows) {
+    assert.equal(sealed.wrappingKeyId, activeKeyId);
+    assert.equal(unsealSecret({ environment, key: "shopify.oauth", version: 1, value: sealed, wrapping }), plaintext);
+  }
+  assert.throws(() => unsealSecret({ environment: "test", key: "shopify.oauth", version: 1,
+    value: rows[0].sealed, wrapping }), /Invalid sealed secret/);
+  assert.throws(() => createConfigUnsealKeyring(raw, "wrong-id"), /Configuration encryption is unavailable/);
+});
+
 test("five reconciled groups use exact closed schemas", () => {
   const billing = { apiKey: "woo-billing-key", apiSecret: "woo-billing-secret" };
   assert.deepEqual(validateSecretPayload("woocommerce.billing", billing), billing);
@@ -59,8 +77,29 @@ test("five reconciled groups use exact closed schemas", () => {
   assert.deepEqual(validateSecretPayload("shopify.partner", partner), partner);
   assert.deepEqual(validateSecretPayload("shopify.partner", { accessToken: "shp-token", organizationId: "12345", appId: "54321" }),
     { accessToken: "shp-token", organizationId: "12345", appId: "54321" });
+  const shopifyAppGid = "gid://shopify/App/413747675137";
+  assert.deepEqual(validateSecretPayload("shopify.partner", { ...partner, appId: shopifyAppGid }),
+    { ...partner, appId: shopifyAppGid });
+  for (const invalidAppId of [
+    "gid://shopify/Shop/413747675137",
+    "gid://partners/App/413747675137",
+    "gid://shopify/App/",
+    "gid://shopify/App/0",
+    "gid://shopify/App/abc",
+    "gid://shopify/App/413747675137/other",
+    "gid://shopify/App/413747675137?different=true",
+  ]) {
+    assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, appId: invalidAppId }),
+      /Invalid Shopify application ID\./);
+  }
   assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, apiVersion: "latest" }));
   assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, organizationId: "" }));
+  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, organizationId: "org/123" }),
+    /Invalid Shopify Partner organisation ID\./);
+  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, appId: "gid:\/\/partners\/App\/123" }),
+    /Invalid Shopify application ID\./);
+  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, apiVersion: "2026-11" }),
+    /Invalid Shopify Partner API version\./);
   const events = { clientId: "events-client", clientSecret: "events-secret" };
   assert.deepEqual(validateSecretPayload("shopify.appEvents", events), events);
   assert.throws(() => validateSecretPayload("shopify.appEvents", { ...events, extra: "unexpected" }));

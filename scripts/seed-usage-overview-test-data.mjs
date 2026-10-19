@@ -10,6 +10,9 @@ const prisma = new PrismaClient();
 
 const CONFIRM_FLAG = "--confirm-test-data";
 const WITH_PENDING_FLAG = "--with-pending";
+const WITH_HUMAN_FLAG = "--with-human-handover";
+const TEST_RECIPIENT_FLAG = "--test-recipient";
+const CONFIRM_RECIPIENT_FLAG = "--confirm-test-recipient";
 const PREFIX = "manual-usage-overview-";
 const PENDING_QUEUE = "pending-recovery-candidates";
 const PENDING_JOB = "evaluate-pending-recovery";
@@ -34,6 +37,13 @@ Usage:
     --confirm-test-data \\
     --with-pending
 
+  node scripts/seed-usage-overview-test-data.mjs seed \\
+    --shop <domain-or-id> \\
+    --confirm-test-data \\
+    --with-human-handover \\
+    --test-recipient <controlled-E164-number> \\
+    --confirm-test-recipient
+
   node scripts/seed-usage-overview-test-data.mjs delete \\
     --shop <domain-or-id> \\
     --confirm-test-data
@@ -49,6 +59,14 @@ What seed creates:
   - customer names suffixed with the selected shop domain for visual identification
   - usage events tagged with the selected shop platform (SHOPIFY / WOOCOMMERCE)
   - with --with-pending: 12 delayed pending-recovery jobs for pending pagination
+  - with --with-human-handover: recent inbound, initial outreach and basket
+    fixtures for Grace (AI/open), Linus (HUMAN/open), Margaret (missing
+    recipient), Barbara (closed/template), Donald (follow-up already used)
+  - an approved WhatsApp template is NEVER fabricated; the real shop must
+    already have one to test selection of an approved template
+  - the recipient MUST be a number you control; sending can trigger real Meta
+    traffic if Background is running, so use a disposable development database
+  - production use is refused; active merchant send commands prevent re-seeding
 
 Important:
   - The script never creates or changes a Shopify subscription.
@@ -71,6 +89,79 @@ function hasFlag(name) {
   return process.argv.includes(name);
 }
 
+function validateHumanScenarioOptions() {
+  if (!hasFlag(WITH_HUMAN_FLAG)) {
+    if (argument(TEST_RECIPIENT_FLAG) || hasFlag(CONFIRM_RECIPIENT_FLAG)) {
+      throw new Error(`Use ${WITH_HUMAN_FLAG} together with recipient options.`);
+    }
+    return null;
+  }
+  const environment = (process.env.DEPLOYMENT_ENVIRONMENT_NAME || process.env.NODE_ENV || "").toLowerCase();
+  if (!["local", "development", "test"].includes(environment) || process.env.NODE_ENV === "production") {
+    throw new Error(`${WITH_HUMAN_FLAG} is permitted only in an explicitly configured local/development/test environment.`);
+  }
+  if (!hasFlag(CONFIRM_RECIPIENT_FLAG)) {
+    throw new Error(`Use ${CONFIRM_RECIPIENT_FLAG} to confirm that you control the recipient and accept the risk of real sends.`);
+  }
+  const e164Recipient = argument(TEST_RECIPIENT_FLAG);
+  if (!e164Recipient || !/^\+[1-9][0-9]{6,14}$/.test(e164Recipient)) {
+    throw new Error(`${TEST_RECIPIENT_FLAG} must be a controlled E.164 WhatsApp number, e.g. +<countrycode><number>.`);
+  }
+  // ARCH-028 persists WhatsApp recipients as ASCII digits (no leading '+').
+  // Use the same canonical value for reachability and outreach records.
+  return { recipient: e164Recipient.slice(1) };
+}
+
+const handoverCases = [
+  { index: 1, name: "Grace", scenario: "AI, open 24-hour window, Take over then type/send" },
+  { index: 2, name: "Linus", scenario: "already HUMAN, open 24-hour window, type/send" },
+  { index: 3, name: "Margaret", scenario: "open window but no sequence-one recipient; test safe send failure" },
+  { index: 7, name: "Barbara", scenario: "HUMAN, closed window; template only if already approved for the shop" },
+  { index: 8, name: "Donald", scenario: "HUMAN, closed window, sequence-two follow-up already consumed" },
+];
+
+function humanCase(index) { return handoverCases.some((entry) => entry.index === index); }
+function recentInboundCase(index) { return index === 1 || index === 2 || index === 3; }
+
+function basketFixture(recovery) {
+  // Uses the saved recovery value and its currency; never calls a live product API.
+  return [{ title: "Fixture checkout product", variantTitle: "Standard", quantity: 1,
+    price: Number(recovery.totalPrice).toFixed(2), imageUrl: null }];
+}
+
+async function checkHumanScenarioReadiness(shop, options) {
+  if (!options) return { approvedTemplates: 0 };
+  if (shop.status !== "ACTIVE" || !["ACTIVE", "TRIALING"].includes(shop.subscription.status) ||
+      !shop.subscription.plan?.active) {
+    throw new Error("This shop needs an active/trial subscription on an active plan for HUMAN takeover testing.");
+  }
+  const entitlement = await prisma.billingPlanFeature.findFirst({
+    where: { planId: shop.subscription.planId, enabled: true,
+      feature: { key: "checkout_recovery", active: true } },
+    select: { id: true },
+  });
+  if (!entitlement) {
+    throw new Error("Checkout Recovery is not enabled for this BillingPlan; do not fabricate an entitlement.");
+  }
+  const suppressed = await prisma.whatsAppRecipientReachability.findUnique({
+    where: { shopId_recipient: { shopId: shop.id, recipient: options.recipient } },
+    select: { suppressUntil: true },
+  });
+  if (suppressed?.suppressUntil && suppressed.suppressUntil > new Date()) {
+    throw new Error("The controlled test recipient is currently suppressed. Choose an eligible controlled recipient.");
+  }
+  const restriction = await prisma.shopHumanMessagingRestriction.findUnique({
+    where: { shopId: shop.id }, select: { status: true },
+  });
+  if (restriction?.status === "SUSPENDED") {
+    throw new Error("HUMAN messaging is suspended for this shop; use a separate shop to test active replies.");
+  }
+  const approvedTemplates = await prisma.whatsAppTemplateVariant.count({
+    where: { shopId: shop.id, purpose: "checkout-recovery", enabled: true, status: "APPROVED" },
+  });
+  return { approvedTemplates };
+}
+
 function requireConfirmation() {
   if (!hasFlag(CONFIRM_FLAG)) {
     throw new Error(`Mutation refused. Re-run with ${CONFIRM_FLAG}.`);
@@ -91,6 +182,9 @@ function prefixFor(shopId) {
 
 function idFor(shopId, suffix) {
   return `${prefixFor(shopId)}${suffix}`;
+}
+function recoveriesFixtureId(shopId, index) {
+  return idFor(shopId, `recovery-${String(index + 1).padStart(2, "0")}`);
 }
 
 async function resolveShop(raw) {
@@ -207,7 +301,7 @@ function conversationOutcome(status) {
   return "IN_PROGRESS";
 }
 
-function conversationFixtures(shopId, recoveries) {
+function conversationFixtures(shopId, recoveries, now, withHuman) {
   return recoveries.map((recovery, index) => ({
     id: idFor(shopId, `conversation-${String(index + 1).padStart(2, "0")}`),
     shopId,
@@ -221,14 +315,21 @@ function conversationFixtures(shopId, recoveries) {
     currencyCode: recovery.currency,
     timeZone: "Europe/London",
     summary: `Manual Usage Overview fixture conversation ${index + 1}`,
-    lastInboundAt: new Date(recovery.lastExternalActivityAt.getTime() + 20 * 60 * 1000),
-    lastMessageAt: new Date(recovery.lastExternalActivityAt.getTime() + 40 * 60 * 1000),
+    lastInboundAt: withHuman && recentInboundCase(index)
+      ? new Date(now.getTime() - 5 * 60_000)
+      : new Date(recovery.lastExternalActivityAt.getTime() + 20 * 60 * 1000),
+    lastMessageAt: withHuman && recentInboundCase(index)
+      ? new Date(now.getTime() - 5 * 60_000)
+      : new Date(recovery.lastExternalActivityAt.getTime() + 40 * 60 * 1000),
+    ...(withHuman && [2, 7, 8].includes(index)
+      ? { controlMode: "HUMAN", controlRevision: 1, controlChangedAt: now }
+      : {}),
     createdAt: recovery.detectedAt,
     updatedAt: recovery.lastExternalActivityAt,
   }));
 }
 
-function messageFixtures(shopId, conversations) {
+function messageFixtures(shopId, conversations, withHuman) {
   const rows = [];
   conversations.forEach((conversation, index) => {
     const base = conversation.createdAt.getTime() + HOUR_MS;
@@ -267,6 +368,23 @@ function messageFixtures(shopId, conversations) {
         sentAt: index === 4 ? null : new Date(base + 20 * 60_000),
       },
     );
+    if (withHuman && recentInboundCase(index)) {
+      const recentAt = conversation.lastInboundAt;
+      rows.push({
+        id: idFor(shopId, `message-${n}-04`), conversationId: conversation.id,
+        direction: "INBOUND", senderType: "CUSTOMER", status: "DELIVERED",
+        content: "Hello — can you help me with my recovery?",
+        createdAt: recentAt, sentAt: recentAt, deliveredAt: recentAt,
+      });
+    }
+    if (withHuman && index === 8) {
+      const followUpAt = new Date(base + 25 * HOUR_MS);
+      rows.push({ id: idFor(shopId, "message-09-follow-up"), conversationId: conversation.id,
+        direction: "OUTBOUND", senderType: "AGENT", status: "SENT",
+        content: "Fixture: historical recovery follow-up already used.",
+        createdAt: followUpAt, sentAt: followUpAt, deliveredAt: null,
+      });
+    }
   });
   return rows;
 }
@@ -365,6 +483,24 @@ async function cleanupDatabase(transaction, shopId) {
     select: { id: true },
   });
   const conversationIds = conversations.map((row) => row.id);
+  if (conversationIds.length) {
+    const commands = await transaction.merchantConversationSendCommand.count({
+      where: { conversationId: { in: conversationIds } },
+    });
+    if (commands) {
+      throw new Error(`Refusing to erase ${commands} durable HUMAN send command(s). ` +
+        "Use a new disposable development database/shop for further send tests; do not delete send audit history.");
+    }
+  }
+
+  // Delete fixture outreach before fixture messages. The ARCH-040 immutable
+  // outboundMessageId guard rejects ON DELETE SET NULL on a used attempt.
+  const recoveryIds = (await transaction.checkoutRecovery.findMany({
+    where: { id: { startsWith: prefix } }, select: { id: true },
+  })).map((row) => row.id);
+  const outreach = recoveryIds.length ? await transaction.recoveryOutreachAttempt.deleteMany({
+    where: { checkoutRecoveryId: { in: recoveryIds } },
+  }) : { count: 0 };
 
   const messages = conversationIds.length
     ? await transaction.conversationMessage.deleteMany({
@@ -375,6 +511,8 @@ async function cleanupDatabase(transaction, shopId) {
   const conversationDelete = await transaction.conversation.deleteMany({
     where: { id: { startsWith: prefix } },
   });
+
+
   const recoveries = await transaction.checkoutRecovery.deleteMany({
     where: { id: { startsWith: prefix } },
   });
@@ -389,13 +527,14 @@ async function cleanupDatabase(transaction, shopId) {
     usageEvents: usage.count,
     messages: messages.count,
     conversations: conversationDelete.count,
+    outreachAttempts: outreach.count,
     recoveries: recoveries.count,
     customers: customers.count,
     billingPeriods: periods.count,
   };
 }
 
-async function seedDatabase(shop) {
+async function seedDatabase(shop, humanOptions = null) {
   const now = new Date();
 
   return prisma.$transaction(async (transaction) => {
@@ -404,17 +543,64 @@ async function seedDatabase(shop) {
     const customers = customerFixtures(shop.id, shop.domain, now);
     await transaction.customer.createMany({ data: customers });
 
-    const recoveries = recoveryFixtures(shop.id, now).map((row) => ({
+    const recoveries = recoveryFixtures(shop.id, now).map((row, index) => ({
       ...row,
       shopId: shop.id,
+      ...(humanOptions && humanCase(index) ? { lineItems: basketFixture(row) } : {}),
     }));
     await transaction.checkoutRecovery.createMany({ data: recoveries });
 
-    const conversations = conversationFixtures(shop.id, recoveries);
+    const conversations = conversationFixtures(shop.id, recoveries, now, Boolean(humanOptions));
     await transaction.conversation.createMany({ data: conversations });
 
-    const messages = messageFixtures(shop.id, conversations);
+    const messages = messageFixtures(shop.id, conversations, Boolean(humanOptions));
     await transaction.conversationMessage.createMany({ data: messages });
+
+    if (humanOptions) {
+      const handovers = conversations.filter((_, index) => [2, 7, 8].includes(index));
+      await transaction.conversationControlEvent.createMany({
+        data: handovers.map((conversation) => ({
+          conversationId: conversation.id, fromMode: "AI", toMode: "HUMAN",
+          fromRevision: 0, toRevision: 1, occurredAt: now,
+        })),
+      });
+      // Never change subscription/plan entitlements or fabricate provider approvals.
+      // A real initial outreach with a controlled recipient is needed by Send.
+      const initial = [1, 2, 7, 8].map((index) => {
+        const messageId = idFor(shop.id, `message-${String(index + 1).padStart(2, "0")}-01`);
+        const outbound = messages.find((message) => message.id === messageId);
+        if (!outbound || outbound.conversationId !== conversations[index].id ||
+            outbound.direction !== "OUTBOUND" || !(outbound.sentAt instanceof Date)) {
+          throw new Error(`Initial outreach fixture is missing its sent outbound message for recovery ${index + 1}.`);
+        }
+        return {
+          id: idFor(shop.id, `outreach-${String(index + 1).padStart(2, "0")}-01`),
+          checkoutRecoveryId: recoveries[index].id,
+          sequence: 1, trigger: "INITIAL", status: index === 8 || index === 2 ? "WAITING_FOR_RESPONSE" : "ENGAGED",
+          // ARCH-016: WAITING_FOR_RESPONSE requires sentAt and outboundMessageId.
+          // Link the genuine saved fixture message rather than inventing dispatch evidence.
+          outboundMessageId: outbound.id, sentAt: outbound.sentAt,
+          // Initial attempts cannot have a partial claim tuple under ARCH-040.
+          recipient: humanOptions.recipient,
+          configuredOfferMode: "NONE",
+        };
+      });
+      await transaction.recoveryOutreachAttempt.createMany({ data: initial });
+
+      // An explicitly synthetic already-used follow-up, with a persisted outbound
+      // fixture message: no provider call or new credit is made by this script.
+      const usedAt = new Date(recoveries[8].detectedAt.getTime() + 27 * HOUR_MS);
+      await transaction.recoveryOutreachAttempt.create({ data: {
+        id: idFor(shop.id, "outreach-09-02"),
+        checkoutRecoveryId: recoveries[8].id,
+        recipient: humanOptions.recipient, sequence: 2,
+        trigger: "POST_WINDOW_FOLLOW_UP", status: "NO_RESPONSE",
+        initiatedBy: "AUTOMATION", initiationKey: idFor(shop.id, "used-follow-up-09"),
+        claimedAt: usedAt, sentAt: usedAt, closedAt: usedAt,
+        configuredOfferMode: "NONE",
+        outboundMessageId: idFor(shop.id, "message-09-follow-up"),
+      } });
+    }
 
     const { period: currentPeriod, created: createdCurrentPeriod } =
       await ensureCurrentPeriod(transaction, shop, now);
@@ -442,6 +628,7 @@ async function seedDatabase(shop) {
       pastBillingPeriods: pastPeriods.length,
       currentBillingPeriodId: currentPeriod.id,
       createdCurrentPeriod,
+      humanHandoverScenarios: humanOptions ? handoverCases.length : 0,
     };
   }, TRANSACTION_OPTIONS);
 }
@@ -674,10 +861,12 @@ async function main() {
 
   if (command === "seed") {
     requireConfirmation();
+    const humanOptions = validateHumanScenarioOptions();
+    const humanReadiness = await checkHumanScenarioReadiness(shop, humanOptions);
     // Clean any older fixture queue state first. This prevents a previous
     // --with-pending run from surviving a later database-only re-seed.
     let pendingResult = await cleanupPending(shop);
-    const dbResult = await seedDatabase(shop);
+    const dbResult = await seedDatabase(shop, humanOptions);
     if (hasFlag(WITH_PENDING_FLAG)) pendingResult = await seedPending(shop);
     else if (!pendingResult.skipped) pendingResult = { skipped: true, reason: `${WITH_PENDING_FLAG} not supplied; previous fixture pending jobs were removed` };
 
@@ -688,6 +877,15 @@ async function main() {
     console.log(`Usage provider: ${shop.platform}`);
     console.table([dbResult]);
     console.log("Pending recoveries:", pendingResult);
+    if (humanOptions) {
+      console.log("\nHUMAN handover scenarios (test data only; do not send to uncontrolled recipients):");
+      console.table(handoverCases.map(({ index, name, scenario }) => ({
+        recoveryId: recoveriesFixtureId(shop.id, index), customer: name, expected: scenario,
+      })));
+      console.log(`Approved checkout-recovery templates already in this shop: ${humanReadiness.approvedTemplates}`);
+      console.log("No Meta template approvals were created or modified by this script.");
+      console.log("To test shop-wide suspension, use the dedicated UI fixture; this script never suspends a real shop.");
+    }
     console.log("");
     console.log("Manual checks:");
     console.log("1. Open /app and verify Current usage and Past paid usage are non-zero.");

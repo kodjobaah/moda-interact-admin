@@ -18,6 +18,8 @@
     "test:arch043-admin-config:unit": "tsx --test tests/unit/arch043-platform-configuration-contracts.test.ts tests/unit/arch043-platform-configuration-ui.test.mjs tests/unit/arch043-platform-secret-reveal-ui.test.mjs",
     "test:arch043-admin-config:components": "tsx --test tests/unit/arch043-platform-configuration-components.test.tsx",
     "test:arch043-admin-config:postgres": "node scripts/test-arch043-admin-configuration-postgres.mjs",
+    "update_platform": "node --conditions=import --import tsx scripts/update_platform.mjs",
+    "test:update-platform": "node --test tests/unit/update-platform-import.test.mjs",
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
     "admin:provision": "node scripts/provision-platform-admin.mjs",
