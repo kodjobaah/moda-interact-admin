@@ -69,6 +69,33 @@ test("Admin's keyring factory seals and unseals actual Shared ciphertext in both
   assert.throws(() => createConfigUnsealKeyring(raw, "wrong-id"), /Configuration encryption is unavailable/);
 });
 
+test("sealed secret storage rejects malformed, tampered, and oversized values", () => {
+  const activeKeyId = "disposable-test-root";
+  const raw = JSON.stringify({ [activeKeyId]: Buffer.alloc(32, 0x35).toString("base64") });
+  const wrapping = createConfigUnsealKeyring(raw, activeKeyId);
+  const sealed = sealSecret({
+    environment: "test", key: "shopify.oauth", version: 1,
+    plaintext: "secret-value", wrapping,
+  });
+
+  assert.throws(() => unsealSecret({
+    environment: "test", key: "shopify.oauth", version: 1,
+    value: { ...sealed, unexpected: true }, wrapping,
+  }), /Invalid sealed secret/);
+
+  const authTag = Buffer.from(sealed.authTag, "base64");
+  authTag[0] ^= 1;
+  assert.throws(() => unsealSecret({
+    environment: "test", key: "shopify.oauth", version: 1,
+    value: { ...sealed, authTag: authTag.toString("base64") }, wrapping,
+  }), /Invalid sealed secret/);
+
+  assert.throws(() => sealSecret({
+    environment: "test", key: "shopify.oauth", version: 1,
+    plaintext: "x".repeat(8193), wrapping,
+  }), /Secret payload exceeds the supported size/);
+});
+
 test("five reconciled groups use exact closed schemas", () => {
   const billing = { apiKey: "woo-billing-key", apiSecret: "woo-billing-secret" };
   assert.deepEqual(validateSecretPayload("woocommerce.billing", billing), billing);

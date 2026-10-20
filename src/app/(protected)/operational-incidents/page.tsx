@@ -49,7 +49,7 @@ export default async function OperationalIncidentsPage({ searchParams }: { searc
       <section className="rounded-lg border bg-white p-4">{!detail ? <p className="text-sm text-gray-500">Select an incident to inspect its safe diagnostic information and history.</p> : <>
         <h2 className="font-semibold break-all">{detail.reasonCode}</h2><p className="text-sm text-gray-600">{detail.category} · {detail.sourceService} · {detail.environment}</p>
         <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 py-4 text-sm break-all">
-          {([['Status', detail.status], ['Severity', detail.severity], ['Shop', detail.shop?.domain ?? 'Platform'], ['Resource', detail.resourceKey], ['Occurrences', String(detail.occurrenceCount)], ['First occurrence', date(detail.firstOccurredAt)], ['Last occurrence', date(detail.lastOccurredAt)], ['Correlation', detail.lastCorrelationId], ['Owner ID', detail.ownerPlatformAdminId ?? 'Unassigned'], ['Resolved by ID', detail.resolvedByPlatformAdminId ?? '—'], ['Resolved at', date(detail.resolvedAt)], ['Resolution note', detail.resolutionNote ?? '—']] as const).map(([label, value]) => <div key={label} className="contents"><dt className="font-medium">{label}</dt><dd>{value}</dd></div>)}
+          {([['Status', detail.status], ['Severity', detail.severity], ['Shop', detail.shop?.domain ?? 'Platform'], ['Resource', detail.resourceKey], ['Occurrences', String(detail.occurrenceCount)], ['First occurrence', date(detail.firstOccurredAt)], ['Last occurrence', date(detail.lastOccurredAt)], ['Correlation', detail.lastCorrelationId], ['Last error (redacted)', detail.lastErrorMessage ?? '—'], ['Owner ID', detail.ownerPlatformAdminId ?? 'Unassigned'], ['Resolved by ID', detail.resolvedByPlatformAdminId ?? '—'], ['Resolved at', date(detail.resolvedAt)], ['Resolution note', detail.resolutionNote ?? '—']] as const).map(([label, value]) => <div key={label} className="contents"><dt className="font-medium">{label}</dt><dd>{value}</dd></div>)}
         </dl>
         {detail.shop?.merchantSupportThread?.id && <Link className="text-sm underline" href={`/merchant-support?thread=${encodeURIComponent(detail.shop.merchantSupportThread.id)}`}>View merchant support thread</Link>}
         {detail.status === 'OPEN' && <div className="border-t pt-4 space-y-3" aria-label="Incident ownership actions">
@@ -73,7 +73,7 @@ export default async function OperationalIncidentsPage({ searchParams }: { searc
             <button className="rounded border px-3 py-2" type="submit">Reassign</button>
           </form>}
         </div>}
-        <h3 className="font-semibold mt-5">Audit events (latest 100)</h3><ol className="divide-y">{detail.events.map(event => <li key={event.id} className="py-2 text-sm"><span className="font-medium">{event.eventType}</span> · {date(event.occurredAt)}<div className="text-gray-600">Actor: {event.actorPlatformAdminId ?? 'System'} · Correlation: {event.correlationId ?? '—'}</div></li>)}</ol>
+        <h3 className="font-semibold mt-5">Audit events (latest 100)</h3><ol className="divide-y">{detail.events.map(event => <li key={event.id} className="py-2 text-sm"><span className="font-medium">{event.eventType}</span> · {date(event.occurredAt)}<div className="text-gray-600">Actor: {event.actorPlatformAdminId ?? 'System'} · Correlation: {event.correlationId ?? '—'}</div>{event.errorMessage && <div className="mt-1 whitespace-pre-wrap break-words text-gray-700">Error: {event.errorMessage}</div>}</li>)}</ol>
       </>}</section>
     </div>
   </div></AdminShell>;

@@ -11,8 +11,17 @@ test('generic incidents require platform admin authentication before Prisma quer
 });
 test('incident list is internal and Merchant Support remains independent', () => {
   const page = read('src/app/(protected)/operational-incidents/page.tsx');
+  const reader = read('src/lib/admin/operational-incidents.ts');
   assert.match(page, /requirePlatformAdminPage\(\)/);
   assert.match(page, /getOperationalIncidentDetail/);
+  assert.match(page, /\['Last error \(redacted\)', detail\.lastErrorMessage \?\? '—'\]/);
+  assert.match(page, /\{event\.errorMessage &&/);
+  assert.match(page, /<div className="mt-1 whitespace-pre-wrap break-words text-gray-700">Error: \{event\.errorMessage\}<\/div>/);
+  const detailReader = reader.slice(reader.indexOf('export async function getOperationalIncidentDetail'));
+  const listReader = reader.slice(0, reader.indexOf('export async function getOperationalIncidentDetail'));
+  assert.match(detailReader, /lastErrorMessage: true/);
+  assert.match(detailReader, /errorMessage: true/);
+  assert.doesNotMatch(listReader, /lastErrorMessage|errorMessage/);
   assert.match(page, /operationalIncidentAction/);
   assert.doesNotMatch(read('src/app/(protected)/merchant-support/page.tsx'), /McpOperationalIssues/);
 });
