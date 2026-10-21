@@ -45,11 +45,13 @@ export function TenantHumanMessaging({ dashboard, params }: {
         {dashboard.history.items.length ? (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead><tr className="border-b text-gray-600"><th className="p-2">Time</th><th className="p-2">Action</th><th className="p-2">Revision</th><th className="p-2">Reason</th><th className="p-2">Administrator</th></tr></thead>
+              <thead><tr className="border-b text-gray-600"><th className="p-2">Time</th><th className="p-2">Action</th><th className="p-2">Revision</th><th className="p-2">Reason</th><th className="p-2">Internal note (SUPER_ADMIN only)</th><th className="p-2">Administrator</th></tr></thead>
               <tbody>{dashboard.history.items.map((item) => (
                 <tr key={item.id} className="border-b"><td className="p-2">{formatDateTime(item.createdAt)}</td>
                   <td className="p-2">{item.fromStatus} → {item.toStatus}</td><td className="p-2">{item.revision}</td>
-                  <td className="p-2">{item.reasonCode}</td><td className="p-2">{item.admin}</td></tr>
+                  <td className="p-2">{item.reasonCode}</td>
+                  <td className="max-w-md whitespace-pre-wrap break-words p-2">{item.reasonNote ?? '—'}</td>
+                  <td className="p-2">{item.admin}</td></tr>
               ))}</tbody>
             </table>
           </div>

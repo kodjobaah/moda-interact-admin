@@ -76,6 +76,7 @@ export type HumanMessagingHistoryItem = {
   toStatus: HumanRestrictionStatus;
   revision: number;
   reasonCode: string;
+  reasonNote: string | null;
   admin: string;
 };
 

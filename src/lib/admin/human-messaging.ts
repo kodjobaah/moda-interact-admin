@@ -20,7 +20,7 @@ function boundedPage(value: number, count: number, pageSize: number): number {
   return Math.min(Math.max(1, Math.floor(value) || 1), Math.max(1, Math.ceil(count / pageSize)));
 }
 
-/** Dedicated privileged, shop-scoped projection. No message content, provider scores, or notes. */
+/** SUPER_ADMIN-only shop projection. Internal restriction notes never enter moderation incidents. */
 export async function getHumanMessagingDashboard(
   shopId: string,
   historyPage: number,
@@ -53,7 +53,8 @@ export async function readHumanMessagingDashboard(
       where: { shopId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (safeHistoryPage - 1) * HISTORY_PAGE_SIZE, take: HISTORY_PAGE_SIZE,
       select: {
-        id: true, createdAt: true, fromStatus: true, toStatus: true, revision: true, reasonCode: true,
+        id: true, createdAt: true, fromStatus: true, toStatus: true, revision: true,
+        reasonCode: true, reasonNote: true,
         platformAdmin: { select: { displayName: true, email: true } },
       },
     }),
@@ -69,6 +70,7 @@ export async function readHumanMessagingDashboard(
   const history: HumanMessagingHistoryItem[] = events.map((event) => ({
     id: event.id, createdAt: event.createdAt, fromStatus: event.fromStatus,
     toStatus: event.toStatus, revision: event.revision, reasonCode: event.reasonCode,
+    reasonNote: event.reasonNote,
     admin: event.platformAdmin.displayName ?? event.platformAdmin.email,
   }));
   const incidents: ModerationIncidentItem[] = assessments.map((assessment) => ({

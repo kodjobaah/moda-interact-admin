@@ -113,6 +113,11 @@ if (!postgres) {
       assert.deepEqual(before.incidents.items[0]?.categories, ['violence']);
       assert.equal(before.incidents.items[0]?.reviewed, false);
       assert.equal(before.history.items.length, 2);
+      assert.deepEqual(before.history.items.map((item) => item.reasonNote), [note, note]);
+      assert.equal(before.history.items[0]?.reasonCode, 'POLICY_ABUSE');
+      assert.equal('reasonNote' in before.incidents.items[0]!, false);
+      assert.equal('content' in before.incidents.items[0]!, false);
+      assert.equal('categoryScores' in before.incidents.items[0]!, false);
       await assert.rejects(() => reviewHumanModerationAssessment(db, admin, {
         shopId: shopify, assessmentId: assessment.id, disposition: 'ACKNOWLEDGED',
       }), code('NOT_FOUND'));

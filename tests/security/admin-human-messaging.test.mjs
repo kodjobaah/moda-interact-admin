@@ -31,8 +31,25 @@ test('selected merchant displays only privileged, paginated metadata with double
   assert.match(projection, /where: \{ shopId \}/);
   assert.match(projection, /take: HISTORY_PAGE_SIZE/);
   assert.match(projection, /take: INCIDENT_PAGE_SIZE/);
-  assert.doesNotMatch(projection, /categoryScores: true|content: true|reasonNote: true/);
+  assert.doesNotMatch(projection, /categoryScores: true|content: true/);
   assert.match(ui, /ModerationReviewControl/);
   assert.match(controls, /data\.submitting|dataset\.submitting/);
   assert.match(controls, /disabled=\{pending\}/);
+});
+
+// Only the SUPER_ADMIN selected-merchant dashboard may read and render the audit note.
+test('restriction history includes privileged notes while incidents stay content-free', () => {
+  assert.match(page, /principal\.role === "SUPER_ADMIN"/);
+  assert.match(projection, /requirePlatformAdminRead/);
+  assert.match(projection, /principal\.role !== 'SUPER_ADMIN'/);
+  const historyQuery = projection.split('database.shopHumanMessagingRestrictionEvent.findMany(')[1]?.split('database.conversationModerationAssessment.findMany(')[0];
+  assert.ok(historyQuery, 'restriction event query must remain distinct');
+  assert.match(historyQuery, /reasonCode:\s*true,\s*reasonNote:\s*true/);
+  assert.match(projection, /reasonNote: event\.reasonNote/);
+  assert.match(ui, /Internal note \(SUPER_ADMIN only\)/);
+  assert.match(ui, /item\.reasonNote \?\? '—'/);
+  const incidentQuery = projection.split('database.conversationModerationAssessment.findMany(')[1]?.split('const history:')[0];
+  assert.ok(incidentQuery, 'incident query must remain distinct');
+  assert.doesNotMatch(incidentQuery, /\b(?:content|categoryScores|reasonNote): true/);
+  assert.doesNotMatch(ui.split('human-moderation-incidents')[1] ?? '', /reasonNote|content|categoryScores/);
 });
