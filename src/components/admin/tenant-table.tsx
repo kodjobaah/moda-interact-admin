@@ -13,12 +13,14 @@ import { translateAdminText } from "@/i18n";
 import { adminI18n } from "@/i18n";
 import { Pagination } from "./pagination";
 import { TenantDetailPanel } from "./tenant-detail-panel";
+import type { HumanMessagingDashboard } from "@/lib/admin/human-messaging-contract";
 import { TenantRow } from "./tenant-row";
 import type { LiveShopPolicyView, LiveShopPolicyHistoryEntry } from "@/lib/admin/commerce-model-shop-policy";
 
 export function TenantTable({
   tenants,
   selectedTenant,
+  humanMessaging,
   tab,
   canEditCommercePolicy,
   shopPolicyDashboard,
@@ -41,6 +43,7 @@ export function TenantTable({
 }: {
   tenants: PageResult<TenantListItem>;
   selectedTenant: TenantDetail | null;
+  humanMessaging: HumanMessagingDashboard | null;
   tab: "admin" | "recovery" | "logs" | "billing" | "commerce";
   canEditCommercePolicy: boolean;
   shopPolicyDashboard: { policy: LiveShopPolicyView; history: LiveShopPolicyHistoryEntry[]; hasMore: boolean } | null;
@@ -100,6 +103,8 @@ export function TenantTable({
                       purchaseId: null,
                       eventId: null,
                       saved: null,
+                      humanHistoryPage: null,
+                      humanIncidentPage: null,
                       commerceShopHistoryPage: null,
                       discountSyncRequested: null,
                     })
@@ -119,6 +124,8 @@ export function TenantTable({
                       purchaseId: null,
                       eventId: null,
                       saved: null,
+                      humanHistoryPage: null,
+                      humanIncidentPage: null,
                       commerceShopHistoryPage: null,
                       discountSyncRequested: null,
                     });
@@ -134,6 +141,7 @@ export function TenantTable({
                       selected && selectedTenant ? (
                         <TenantDetailPanel
                           tenant={selectedTenant}
+                          humanMessaging={humanMessaging}
                           tab={tab}
                           canEditCommercePolicy={canEditCommercePolicy}
                           shopPolicyDashboard={shopPolicyDashboard}
@@ -189,6 +197,8 @@ export function TenantTable({
           "drawerTab",
           "messagePage",
           "saved",
+          "humanHistoryPage",
+          "humanIncidentPage",
           "discountSyncRequested",
         ]}
       />

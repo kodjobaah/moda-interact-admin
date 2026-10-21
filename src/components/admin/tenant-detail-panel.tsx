@@ -16,9 +16,11 @@ import { TenantRecoverySettings } from "./tenant-recovery-settings";
 import { adminI18n } from "@/i18n";
 import { LiveShopPolicyControls } from "./commerce-model-policy/live-shop-policy";
 import type { LiveShopPolicyView, LiveShopPolicyHistoryEntry } from "@/lib/admin/commerce-model-shop-policy";
+import type { HumanMessagingDashboard } from "@/lib/admin/human-messaging-contract";
 
 export function TenantDetailPanel({
   tenant,
+  humanMessaging,
   tab,
   canEditCommercePolicy,
   shopPolicyDashboard,
@@ -40,6 +42,7 @@ export function TenantDetailPanel({
   selectedEvent,
 }: {
   tenant: TenantDetail;
+  humanMessaging: HumanMessagingDashboard | null;
   tab: "admin" | "recovery" | "logs" | "billing" | "commerce";
   canEditCommercePolicy: boolean;
   shopPolicyDashboard: { policy: LiveShopPolicyView; history: LiveShopPolicyHistoryEntry[]; hasMore: boolean } | null;
@@ -74,6 +77,8 @@ export function TenantDetailPanel({
     purchaseId: null,
     eventId: null,
     saved: null,
+    humanHistoryPage: null,
+    humanIncidentPage: null,
     commerceShopHistoryPage: null,
     discountSyncRequested: null,
   } as const;
@@ -134,6 +139,8 @@ export function TenantDetailPanel({
       {tab === "admin" ? (
         <TenantAdministration
           tenant={tenant}
+          humanMessaging={humanMessaging}
+          params={params}
           returnTo={returnTo}
           saved={saved}
         />
