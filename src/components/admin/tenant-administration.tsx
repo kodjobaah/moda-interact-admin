@@ -2,6 +2,8 @@ import { updateTenantAction } from "@/app/actions/tenant";
 import { formatDateTime } from "@/lib/admin/format";
 import type { TenantDetail } from "@/lib/admin/types";
 import { adminI18n, adminStatusLabel } from "@/i18n";
+import type { HumanMessagingDashboard } from "@/lib/admin/human-messaging-contract";
+import { TenantHumanMessaging } from "./tenant-human-messaging";
 
 function SummaryValue({
   label,
@@ -20,10 +22,14 @@ function SummaryValue({
 
 export function TenantAdministration({
   tenant,
+  humanMessaging,
+  params,
   returnTo,
   saved,
 }: {
   tenant: TenantDetail;
+  humanMessaging: HumanMessagingDashboard | null;
+  params: Record<string, string>;
   returnTo: string;
   saved?: boolean;
 }) {
@@ -146,6 +152,8 @@ export function TenantAdministration({
           </dl>
         </section>
       </div>
+
+      {humanMessaging ? <TenantHumanMessaging dashboard={humanMessaging} params={params} /> : null}
 
       <section className="rounded-lg border border-gray-200 bg-gray-50 px-5 py-4">
         <h3 className="text-sm font-semibold text-gray-900">

@@ -31,6 +31,7 @@ import type {
 import { adminI18n } from "@/i18n";
 import { canEditLiveCommerceBudget } from "@/lib/admin/commerce-model-policy-fields";
 import { getLiveShopPolicyDashboard } from "@/lib/admin/commerce-model-shop-policy";
+import { getHumanMessagingDashboard } from "@/lib/admin/human-messaging";
 import { issueLiveShopPolicyScope } from "@/lib/admin/commerce-model-shop-policy-scope";
 import {
   cleanSearch,
@@ -101,6 +102,13 @@ export default async function Home({ searchParams }: PageProps) {
 
 
   const selectedTenant = tenantId ? await getTenantDetail(tenantId) : null;
+  const humanMessaging = selectedTenant && tab === "admin" && principal.role === "SUPER_ADMIN"
+    ? await getHumanMessagingDashboard(
+        selectedTenant.id,
+        positiveInt(rawParams.humanHistoryPage),
+        positiveInt(rawParams.humanIncidentPage),
+      )
+    : null;
   const commerceShopHistoryPage = positiveInt(rawParams.commerceShopHistoryPage);
   const shopPolicyScope = selectedTenant && tab === "commerce" && canEditCommercePolicy
     ? issueLiveShopPolicyScope(selectedTenant.id, principal.id)
@@ -250,6 +258,7 @@ export default async function Home({ searchParams }: PageProps) {
         <TenantTable
           tenants={directory.tenants}
           selectedTenant={selectedTenant}
+          humanMessaging={humanMessaging}
           tab={tab}
           canEditCommercePolicy={canEditCommercePolicy}
           shopPolicyDashboard={shopPolicyDashboard}
