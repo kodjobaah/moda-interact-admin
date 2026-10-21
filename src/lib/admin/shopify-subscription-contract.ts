@@ -1,10 +1,10 @@
+import { requireAdminShopifyPartnerCredentials } from "./shopify-partner-configuration";
+
 import type {
   MerchantPricingBillingPeriod,
   MerchantPricingPlanKind,
   MerchantPricingUsagePricingMode,
 } from "@prisma/client";
-
-const DEFAULT_API_VERSION = "2026-07";
 
 type PartnerTier = {
   upTo: number | null;
@@ -77,29 +77,10 @@ function minor(amount: string | number): number | null {
   return Math.round(numeric * 100);
 }
 
-function partnerConfig() {
-  const organizationId =
-    process.env.SHOPIFY_PARTNER_ORGANIZATION_ID ??
-    process.env.SHOPIFY_PARTNER_ORG_ID;
-  const token =
-    process.env.SHOPIFY_PARTNER_API_TOKEN ??
-    process.env.SHOPIFY_PARTNER_ACCESS_TOKEN;
-  const appId = process.env.SHOPIFY_APP_ID;
-  const apiVersion =
-    process.env.SHOPIFY_PARTNER_API_VERSION ?? DEFAULT_API_VERSION;
-  if (!organizationId || !token || !appId) return null;
-  return { organizationId, token, appId, apiVersion };
-}
-
 async function loadActiveSubscription(
   shopifyShopId: string,
 ): Promise<ActiveSubscription | null> {
-  const config = partnerConfig();
-  if (!config) {
-    throw new Error(
-      "Shopify Partner API is not configured. Set SHOPIFY_PARTNER_ORGANIZATION_ID, SHOPIFY_PARTNER_API_TOKEN and SHOPIFY_APP_ID.",
-    );
-  }
+  const config = await requireAdminShopifyPartnerCredentials();
 
   const response = await fetch(
     `https://partners.shopify.com/${encodeURIComponent(config.organizationId)}/api/${config.apiVersion}/graphql.json`,
@@ -107,7 +88,7 @@ async function loadActiveSubscription(
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-shopify-access-token": config.token,
+        "x-shopify-access-token": config.accessToken,
       },
       cache: "no-store",
       body: JSON.stringify({
