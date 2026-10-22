@@ -5,21 +5,28 @@ import process from "node:process";
 import { Queue } from "bullmq";
 import Redis from "ioredis";
 import { PrismaClient } from "@prisma/client";
+import { createRecoveryIdempotencyKey } from "@modainteract/moda-interact-shared/billing";
+import { buildPaidAllowanceFixtures, verifyPaidFixtureCleanup } from "./usage-overview-paid-allocations.mjs";
 
 const prisma = new PrismaClient();
 
 const CONFIRM_FLAG = "--confirm-test-data";
 const WITH_PENDING_FLAG = "--with-pending";
 const WITH_HUMAN_FLAG = "--with-human-handover";
+const WITH_PAST_PAID_HISTORY_FLAG = "--with-past-paid-history";
+const LEGACY_HISTORICAL_PAID_PLAN_FLAG = "--historical-paid-plan-id";
 const TEST_RECIPIENT_FLAG = "--test-recipient";
 const CONFIRM_RECIPIENT_FLAG = "--confirm-test-recipient";
 const PREFIX = "manual-usage-overview-";
 const PENDING_QUEUE = "pending-recovery-candidates";
 const PENDING_JOB = "evaluate-pending-recovery";
 const PENDING_COUNT = 12;
+const FREE_USAGE_EVENTS = 4;
+const FREE_COUNTER = "LIFETIME_FREE_RECOVERY_CREDITS";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
-const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
+const RECENT_INBOUND_AGE_MS = 5 * 60 * 1000;
+const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 20_000, isolationLevel: "Serializable" };
 
 function usage() {
   return `
@@ -27,6 +34,11 @@ Usage Overview manual test-data seeder
 
 Usage:
   node scripts/seed-usage-overview-test-data.mjs status --shop <domain-or-id>
+
+  node scripts/seed-usage-overview-test-data.mjs seed \\
+    --shop <domain-or-id> \\
+    --confirm-test-data \\
+    --with-past-paid-history
 
   node scripts/seed-usage-overview-test-data.mjs seed \\
     --shop <domain-or-id> \\
@@ -52,10 +64,14 @@ What seed creates:
   - 12 customer groups (11 named customers + 1 guest)
   - 13 checkout recoveries covering every recovery status
   - conversations and messages (SENT / DELIVERED / FAILED)
-  - usage events linked to recoveries
-  - current bill usage (27 events)
-  - three closed past bills (16 / 11 / 7 events)
-  - enough customer and usage rows to exercise pagination
+  - Free plan: up to four lifetime usage events backed by fixture COMMITTED
+    reservations and the real lifetime entitlement counter (no current billing period)
+  - Optional --with-past-paid-history on a currently Free shop: three synthetic
+    CLOSED periods with PAID_METERED plan snapshots (16 / 11 / 7 usage events),
+    plus fixture-only committed included-allowance reservations/counters,
+    modelling a past-paid-now-Free test-only scenario without a paid BillingPlan
+  - Paid metered plan: 27 current-period usage events, three fixture CLOSED
+    past periods (16 / 11 / 7 events), and usage pagination
   - customer names suffixed with the selected shop domain for visual identification
   - usage events tagged with the selected shop platform (SHOPIFY / WOOCOMMERCE)
   - with --with-pending: 12 delayed pending-recovery jobs for pending pagination
@@ -66,13 +82,30 @@ What seed creates:
     already have one to test selection of an approved template
   - the recipient MUST be a number you control; sending can trigger real Meta
     traffic if Background is running, so use a disposable development database
-  - production use is refused; active merchant send commands prevent re-seeding
+  - writes require a database named for test/development and are refused in
+    production; active merchant send commands prevent re-seeding
 
 Important:
-  - The script never creates or changes a Shopify subscription.
-  - It uses the merchant's existing Subscription and BillingPlan.
-  - It reuses an existing OPEN BillingPeriod when present. If none exists, it
-    creates a fixture OPEN period without changing Subscription.billingPeriodId.
+  - Every shop (Shopify or WooCommerce, Free or paid) MUST already have a
+    real Subscription and BillingPlan. This script never changes them.
+  - Free lifetime usage has no CURRENT BillingPeriod. Seeding temporarily
+    commits up to four available Free credits, restored by "delete". Historical
+    genuine paid periods (if any) are preserved.
+  - Historical paid-period simulation is OPT-IN and permitted only in a disposable
+    test/development database. It adds explicitly prefixed fixture CLOSED periods
+    with planId NULL and an explicitly synthetic PAID_METERED plan snapshot.
+    BillingPeriod.planId is nullable: the historical paid plan need not still be
+    materialised in BillingPlan. Fixture-only historical entitlement counters are
+    created and removed together with fixture reservations. No real subscription,
+    current entitlement, charge, invoice, provider history or current billing
+    period is changed. It is NOT evidence
+    that an always-Free merchant actually had a past paid subscription.
+  - Past periods for a truly never-paid Free merchant are correctly empty.
+  - Paid metered requires the existing subscription's real OPEN BillingPeriod;
+    the script never creates an unlinked fake current billing period.
+  - Existing non-fixture usage and credit balances are preserved.
+  - The Shopify Usage History reader is period-based, so Free lifetime events
+    are for the hosted WooCommerce reader; Shopify Free UI needs its own reader.
   - Pending jobs are scheduled seven days into the future so a live recovery
     worker should not process them during normal manual testing.
 `.trim();
@@ -166,6 +199,22 @@ function requireConfirmation() {
   if (!hasFlag(CONFIRM_FLAG)) {
     throw new Error(`Mutation refused. Re-run with ${CONFIRM_FLAG}.`);
   }
+  // Mutating fixture counters and usage is only safe against a disposable
+  // development/test database, never against a merchant's real ledger.
+  const environment = (process.env.DEPLOYMENT_ENVIRONMENT_NAME || process.env.NODE_ENV || "").toLowerCase();
+  const nodeEnvironment = (process.env.NODE_ENV || "").toLowerCase();
+  if (["production", "prod"].includes(environment) || ["production", "prod"].includes(nodeEnvironment)) {
+    throw new Error("Usage fixtures are forbidden in production.");
+  }
+  let databaseName;
+  try {
+    databaseName = decodeURIComponent(new URL(process.env.DATABASE_URL).pathname.replace(/^\//, ""));
+  } catch {
+    throw new Error("Set DATABASE_URL to a disposable development/test PostgreSQL database.");
+  }
+  if (!/(?:^|[_-])(test|testing|dev|development|sandbox)(?:$|[_-])/i.test(databaseName)) {
+    throw new Error("Refusing to mutate a database without test/development in its name.");
+  }
 }
 
 function safe(value) {
@@ -188,7 +237,7 @@ function recoveriesFixtureId(shopId, index) {
 }
 
 async function resolveShop(raw) {
-  if (!raw) throw new Error("--shop <myshopify-domain-or-shop-id> is required.");
+  if (!raw) throw new Error("--shop <domain-or-shop-id> is required.");
   const normalized = String(raw).trim().toLowerCase();
   const shop = await prisma.shop.findFirst({
     where: {
@@ -210,8 +259,18 @@ async function resolveShop(raw) {
   if (!shop) throw new Error(`Shop not found: ${raw}`);
   if (!shop.subscription) {
     throw new Error(
-      `Shop ${shop.domain} has no Subscription. Reconcile the real Shopify subscription first; this fixture will not fabricate one.`,
+      `Shop ${shop.domain} has no Subscription. Complete real platform onboarding first; this fixture will not fabricate one.`,
     );
+  }
+  if (!shop.subscription.plan || !["FREE", "PAID_METERED"].includes(shop.subscription.plan.kind)) {
+    throw new Error(`Shop ${shop.domain} needs an existing FREE or PAID_METERED BillingPlan.`);
+  }
+  if (shop.status !== "ACTIVE" || !["ACTIVE", "TRIALING"].includes(shop.subscription.status) ||
+      !shop.subscription.plan.active) {
+    throw new Error("The shop, its subscription and its BillingPlan must be active for usage fixtures.");
+  }
+  if (!["SHOPIFY", "WOOCOMMERCE"].includes(shop.platform)) {
+    throw new Error(`Unsupported shop platform: ${shop.platform}`);
   }
   return shop;
 }
@@ -316,10 +375,10 @@ function conversationFixtures(shopId, recoveries, now, withHuman) {
     timeZone: "Europe/London",
     summary: `Manual Usage Overview fixture conversation ${index + 1}`,
     lastInboundAt: withHuman && recentInboundCase(index)
-      ? new Date(now.getTime() - 5 * 60_000)
+      ? new Date(now.getTime() - RECENT_INBOUND_AGE_MS)
       : new Date(recovery.lastExternalActivityAt.getTime() + 20 * 60 * 1000),
     lastMessageAt: withHuman && recentInboundCase(index)
-      ? new Date(now.getTime() - 5 * 60_000)
+      ? new Date(now.getTime() - RECENT_INBOUND_AGE_MS)
       : new Date(recovery.lastExternalActivityAt.getTime() + 40 * 60 * 1000),
     ...(withHuman && [2, 7, 8].includes(index)
       ? { controlMode: "HUMAN", controlRevision: 1, controlChangedAt: now }
@@ -373,6 +432,7 @@ function messageFixtures(shopId, conversations, withHuman) {
       rows.push({
         id: idFor(shopId, `message-${n}-04`), conversationId: conversation.id,
         direction: "INBOUND", senderType: "CUSTOMER", status: "DELIVERED",
+        providerMessageId: idFor(shopId, `provider-inbound-${n}`),
         content: "Hello — can you help me with my recovery?",
         createdAt: recentAt, sentAt: recentAt, deliveredAt: recentAt,
       });
@@ -389,11 +449,9 @@ function messageFixtures(shopId, conversations, withHuman) {
   return rows;
 }
 
-function closedPeriodDefinitions(shop, now) {
+function closedPeriodDefinitions(shop, currentPeriod) {
   const subscription = shop.subscription;
-  const currentStart = subscription.billingPeriod?.periodStart
-    ?? subscription.currentPeriodStart
-    ?? new Date(now.getTime() - 5 * DAY_MS);
+  const currentStart = currentPeriod.periodStart;
   const plan = subscription.plan;
 
   return [1, 2, 3].map((number) => {
@@ -406,7 +464,7 @@ function closedPeriodDefinitions(shop, now) {
       planId: subscription.planId,
       shopifyPlanHandleSnapshot: subscription.observedShopifyPlanHandle ?? plan?.shopifyPlanHandle ?? null,
       planNameSnapshot: plan?.name ?? subscription.observedShopifyPlanHandle ?? "Test plan",
-      planKindSnapshot: plan?.kind ?? null,
+      planKindSnapshot: "PAID_METERED",
       includedRecoveryCreditsGranted: plan?.includedRecoveryConversationAllowance ?? null,
       periodStart,
       periodEnd,
@@ -417,34 +475,148 @@ function closedPeriodDefinitions(shop, now) {
   });
 }
 
-async function ensureCurrentPeriod(transaction, shop, now) {
-  const existing = await transaction.billingPeriod.findFirst({
-    where: { shopId: shop.id, status: "OPEN" },
-    orderBy: { periodStart: "desc" },
-  });
-  if (existing) return { period: existing, created: false };
-
+/** Do not manufacture a paid current period disconnected from Subscription. */
+async function requireCurrentPaidPeriod(transaction, shop, now) {
   const subscription = shop.subscription;
-  const plan = subscription.plan;
-  const periodStart = subscription.currentPeriodStart ?? new Date(now.getTime() - 5 * DAY_MS);
-  const periodEnd = subscription.currentPeriodEnd ?? new Date(periodStart.getTime() + 30 * DAY_MS);
-
-  const created = await transaction.billingPeriod.create({
-    data: {
-      id: idFor(shop.id, "billing-period-current"),
-      shopId: shop.id,
-      subscriptionId: subscription.id,
-      planId: subscription.planId,
-      shopifyPlanHandleSnapshot: subscription.observedShopifyPlanHandle ?? plan?.shopifyPlanHandle ?? null,
-      planNameSnapshot: plan?.name ?? subscription.observedShopifyPlanHandle ?? "Test plan",
-      planKindSnapshot: plan?.kind ?? null,
-      includedRecoveryCreditsGranted: plan?.includedRecoveryConversationAllowance ?? null,
-      periodStart,
-      periodEnd,
-      status: "OPEN",
-    },
+  if (!subscription.billingPeriodId || !subscription.currentPeriodStart || !subscription.currentPeriodEnd) {
+    throw new Error("Paid usage fixtures require Subscription.billingPeriodId and currentPeriodStart/currentPeriodEnd. Reconcile the real subscription first.");
+  }
+  const period = await transaction.billingPeriod.findFirst({
+    where: { id: subscription.billingPeriodId, shopId: shop.id, subscriptionId: subscription.id },
   });
-  return { period: created, created: true };
+  if (!period || period.status !== "OPEN" || period.planKindSnapshot !== "PAID_METERED" ||
+      period.periodStart.getTime() !== subscription.currentPeriodStart.getTime() ||
+      period.periodEnd.getTime() !== subscription.currentPeriodEnd.getTime() ||
+      period.periodStart >= period.periodEnd || period.periodStart > now || period.periodEnd <= now) {
+    throw new Error("Paid current BillingPeriod must be OPEN, PAID_METERED, in-window, and match the existing Subscription. Reconcile billing first.");
+  }
+  if (period.id.startsWith(prefixFor(shop.id))) {
+    throw new Error("Paid current billing period cannot be a synthetic usage-overview fixture period.");
+  }
+  return period;
+}
+
+/** Generate the same ledger shape as a committed Free reservation, not a fake bill. */
+function freeUsageFixtures(shopId, count, now, provider) {
+  return Array.from({ length: count }, (_, index) => {
+    const ordinal = String(index + 1).padStart(3, "0");
+    const eventId = idFor(shopId, `usage-free-${ordinal}`);
+    const reservationId = idFor(shopId, `reservation-free-${ordinal}`);
+    const occurredAt = new Date(now.getTime() - (count - index) * DAY_MS);
+    return {
+      event: {
+        id: eventId, shopId, billingPeriodId: null,
+        metric: "RECOVERY_CONVERSATION", quantity: 1,
+        idempotencyKey: idFor(shopId, `usage-key-free-${ordinal}`),
+        sourceType: "FREE_RECOVERY_RESERVATION", sourceId: reservationId,
+        occurredAt, shopifyReportState: "NOT_APPLICABLE", provider,
+      },
+      reservation: {
+        id: reservationId, shopId,
+        // Match Background's canonical recovery lineage for test-only debits.
+        sourceKey: createRecoveryIdempotencyKey(shopId, recoveriesFixtureId(shopId, index)),
+        quantity: 1, status: "COMMITTED", committedUsageEventId: eventId,
+        createdAt: occurredAt,
+      },
+    };
+  });
+}
+
+async function seedFreeUsage(transaction, shop, now) {
+  const subscription = shop.subscription;
+  if (subscription.billingPeriodId !== null || subscription.currentPeriodStart !== null ||
+      subscription.currentPeriodEnd !== null) {
+    throw new Error("Free lifetime subscription cannot have a current BillingPeriod or period dates. Reconcile billing first.");
+  }
+  const counter = await transaction.shopEntitlementCounter.findUnique({
+    where: { shopId_counter: { shopId: shop.id, counter: FREE_COUNTER } },
+  });
+  if (!counter) throw new Error("The shop has no lifetime Free recovery counter. Reconcile Free onboarding first.");
+  const { grantedQuantity, committedQuantity, reservedQuantity } = counter;
+  if (![grantedQuantity, committedQuantity, reservedQuantity].every((value) => Number.isSafeInteger(value) && value >= 0) ||
+      grantedQuantity < committedQuantity + reservedQuantity) {
+    throw new Error("Inconsistent lifetime Free counter; refusing fixture mutation.");
+  }
+  const available = grantedQuantity - committedQuantity - reservedQuantity;
+  const count = Math.min(FREE_USAGE_EVENTS, available);
+  if (count < 1) {
+    throw new Error("No Free lifetime credits remain for fixture usage. Use a disposable shop with available Free credits.");
+  }
+  const fixtures = freeUsageFixtures(shop.id, count, now, shop.platform);
+  await transaction.usageEvent.createMany({ data: fixtures.map(({ event }) => event) });
+  await transaction.usageReservation.createMany({
+    data: fixtures.map(({ reservation }) => ({ ...reservation, counterId: counter.id })),
+  });
+  const updated = await transaction.shopEntitlementCounter.updateMany({
+    where: { id: counter.id, shopId: shop.id, version: counter.version,
+      grantedQuantity, committedQuantity, reservedQuantity },
+    data: { committedQuantity: { increment: count }, version: { increment: 1 } },
+  });
+  if (updated.count !== 1) throw new Error("Free counter changed concurrently; transaction aborted.");
+  return { usageEvents: count, currentUsageEvents: count, pastUsageEvents: 0,
+    pastBillingPeriods: 0, currentBillingPeriodId: null, createdCurrentPeriod: false,
+    usageMode: "FREE_LIFETIME", freeCreditsCommitted: count };
+}
+
+/**
+ * An opt-in Free-now/Paid-before UI fixture. BillingPeriod.planId is nullable
+ * because historical plan snapshots survive deletion/unmaterialisation of plans.
+ * Do not create BillingPlan or change the merchant's current Free subscription.
+ * These synthetic CLOSED periods prove only the historical usage UI behaviour.
+ */
+function validatePastPaidHistoryOption(shop, enabled) {
+  if (enabled && shop.subscription.plan?.kind !== "FREE") {
+    throw new Error(`${WITH_PAST_PAID_HISTORY_FLAG} is only supported for a currently Free shop. Paid shops already seed past periods.`);
+  }
+}
+
+async function seedHistoricalPaidUsage(transaction, shop, now, recoveries) {
+  validatePastPaidHistoryOption(shop, true);
+  // All synthetic paid periods end before the earliest synthetic Free usage.
+  // This preserves an unambiguous paid-before-Free test scenario.
+  const firstFreeEvent = new Date(now.getTime() - FREE_USAGE_EVENTS * DAY_MS);
+  const historicalStart = new Date(firstFreeEvent.getTime() - 2 * DAY_MS);
+  const periods = closedPeriodDefinitions(shop, { periodStart: historicalStart })
+    .map((period, index) => ({
+      ...period,
+      planId: null,
+      shopifyPlanHandleSnapshot: null,
+      planNameSnapshot: "TEST FIXTURE - historical paid plan",
+      planKindSnapshot: "PAID_METERED",
+      includedRecoveryCreditsGranted: null,
+      // The final historical paid period ends before the present Free state.
+      closeReason: index === 0 ? "PLAN_CHANGED" : "RENEWED_SAME_PLAN",
+    }));
+  if (periods.some((period) => period.planKindSnapshot !== "PAID_METERED" ||
+      period.planId !== null || period.periodEnd >= firstFreeEvent ||
+      period.subscriptionId !== shop.subscription.id || period.shopId !== shop.id)) {
+    throw new Error("Historical paid usage fixture crosses the Free lifetime window or subscription scope.");
+  }
+  const paid = await seedFixturePaidPeriods(transaction, shop, now, recoveries, periods);
+  return { periodCount: periods.length, eventCount: paid.eventCount };
+}
+
+/** Persist the complete synthetic paid allocation ledger in the caller's
+ * transaction. No genuine paid counter or provider billing state is touched. */
+async function seedFixturePaidPeriods(transaction, shop, now, recoveries, periods) {
+  const batches = periods.map((period, index) => {
+    const label = `past-${index + 1}`;
+    const count = [16, 11, 7][index];
+    const events = usageRows(shop.id, period, label, count, recoveries, now, shop.platform);
+    return { events, allocation: buildPaidAllowanceFixtures(shop.id, period, label, events, idFor) };
+  });
+  await transaction.billingPeriod.createMany({ data: periods.map((period, index) => ({
+    ...period, includedRecoveryCreditsGranted: batches[index].allocation.counter.grantedQuantity,
+  })) });
+  await transaction.billingPeriodEntitlementCounter.createMany({
+    data: batches.map((batch) => batch.allocation.counter),
+  });
+  const usageEvents = batches.flatMap((batch) => batch.events);
+  await transaction.usageEvent.createMany({ data: usageEvents });
+  await transaction.usageReservation.createMany({
+    data: batches.flatMap((batch) => batch.allocation.reservations),
+  });
+  return { eventCount: usageEvents.length };
 }
 
 function occurredAtWithin(period, index, count, now) {
@@ -474,9 +646,126 @@ function usageRows(shopId, period, label, count, recoveries, now, provider) {
 async function cleanupDatabase(transaction, shopId) {
   const prefix = prefixFor(shopId);
 
-  const usage = await transaction.usageEvent.deleteMany({
-    where: { id: { startsWith: prefix } },
+  // Both Free and paid fixture reservations must be inspected before any
+  // deletion. Fixture cleanup runs atomically in the calling transaction.
+  const fixtureReservations = await transaction.usageReservation.findMany({
+    where: { shopId, id: { startsWith: prefix } },
+    select: { id: true, shopId: true, sourceKey: true, counterId: true,
+      billingPeriodEntitlementCounterId: true, purchasedCreditPurchaseId: true,
+      promotionalCreditGrantId: true, quantity: true, status: true,
+      committedUsageEventId: true, compensationUsageEventId: true },
   });
+  const freeReservations = fixtureReservations.filter((row) => row.id.startsWith(`${prefix}reservation-free-`));
+  const paidReservations = fixtureReservations.filter((row) => row.id.startsWith(`${prefix}reservation-paid-`));
+  if (freeReservations.length + paidReservations.length !== fixtureReservations.length) {
+    throw new Error("Unknown fixture reservation type; refusing cleanup.");
+  }
+  const eventIds = fixtureReservations.map(({ committedUsageEventId }) => committedUsageEventId).filter(Boolean);
+  const events = eventIds.length ? await transaction.usageEvent.findMany({
+    where: { shopId, id: { in: eventIds } },
+    select: { id: true, shopId: true, billingPeriodId: true, quantity: true, metric: true,
+      sourceType: true, sourceId: true, correctionOfUsageEventId: true },
+  }) : [];
+  const byId = new Map(events.map((event) => [event.id, event]));
+
+  // Synthetic historical counters are fixture owned, unlike the real Free
+  // counter. Never let deletion cascade onto unrecognised reservations/events.
+  const fixturePeriods = await transaction.billingPeriod.findMany({
+    where: { shopId, id: { startsWith: prefix } },
+    select: { id: true, shopId: true, status: true, planKindSnapshot: true },
+  });
+  const periodIds = fixturePeriods.map((period) => period.id);
+  const paidCounters = periodIds.length ? await transaction.billingPeriodEntitlementCounter.findMany({
+    where: { shopId, billingPeriodId: { in: periodIds } },
+    select: { id: true, shopId: true, billingPeriodId: true, counter: true,
+      grantedQuantity: true, committedQuantity: true, reservedQuantity: true,
+      forfeitedQuantity: true, currentAllowanceQuantity: true },
+  }) : [];
+  const paidCounterIds = verifyPaidFixtureCleanup(
+    shopId, paidReservations, events, paidCounters, fixturePeriods, idFor);
+  if (paidCounterIds.length) {
+    const unexpectedReservations = await transaction.usageReservation.count({
+      where: { billingPeriodEntitlementCounterId: { in: paidCounterIds },
+        id: { not: { startsWith: prefix } } },
+    });
+    if (unexpectedReservations) throw new Error("Non-fixture reservation uses a fixture paid counter.");
+  }
+  if (periodIds.length) {
+    const unexpectedEvents = await transaction.usageEvent.count({
+      where: { billingPeriodId: { in: periodIds }, id: { not: { startsWith: prefix } } },
+    });
+    if (unexpectedEvents) throw new Error("Non-fixture usage uses a fixture paid period.");
+  }
+
+  if (freeReservations.length) {
+    const counter = await transaction.shopEntitlementCounter.findUnique({
+      where: { shopId_counter: { shopId, counter: FREE_COUNTER } },
+    });
+    if (!counter) throw new Error("Cannot reverse fixture usage: lifetime Free counter is missing.");
+    for (const reservation of freeReservations) {
+      const event = byId.get(reservation.committedUsageEventId);
+      const ordinal = reservation.id.slice(`${prefix}reservation-free-`.length);
+      const canonicalSource = /^\d{3}$/.test(ordinal) && Number(ordinal) > 0 && Number(ordinal) <= FREE_USAGE_EVENTS
+        ? createRecoveryIdempotencyKey(shopId, recoveriesFixtureId(shopId, Number(ordinal) - 1))
+        : null;
+      const legacySource = idFor(shopId, `free-source-${ordinal}`);
+      if (reservation.status !== "COMMITTED" || reservation.compensationUsageEventId !== null ||
+          (reservation.sourceKey !== canonicalSource && reservation.sourceKey !== legacySource) ||
+          reservation.counterId !== counter.id || reservation.billingPeriodEntitlementCounterId !== null ||
+          reservation.purchasedCreditPurchaseId !== null || reservation.promotionalCreditGrantId !== null ||
+          !Number.isSafeInteger(reservation.quantity) || reservation.quantity <= 0 ||
+          typeof reservation.committedUsageEventId !== "string" ||
+          !reservation.committedUsageEventId.startsWith(prefix) || !event ||
+          event.shopId !== shopId || event.billingPeriodId !== null ||
+          event.metric !== "RECOVERY_CONVERSATION" || event.sourceType !== "FREE_RECOVERY_RESERVATION" ||
+          event.sourceId !== reservation.id || Number(event.quantity) !== reservation.quantity) {
+        throw new Error("Fixture Free reservation has changed; refusing to rewrite billing history.");
+      }
+    }
+    const committed = freeReservations.reduce((sum, reservation) => sum + reservation.quantity, 0);
+    const adjusted = await transaction.shopEntitlementCounter.updateMany({
+      where: { id: counter.id, shopId, version: counter.version, committedQuantity: { gte: committed } },
+      data: { committedQuantity: { decrement: committed }, version: { increment: 1 } },
+    });
+    if (adjusted.count !== 1) throw new Error("Free counter changed concurrently; cleanup aborted.");
+  }
+  if (fixtureReservations.length) {
+    const removed = await transaction.usageReservation.deleteMany({
+      where: { shopId, id: { in: fixtureReservations.map((row) => row.id) } },
+    });
+    if (removed.count !== fixtureReservations.length) {
+      throw new Error("Fixture reservations changed during cleanup; transaction aborted.");
+    }
+  }
+  // A genuine subscription may never depend on a fixture period we are deleting.
+  const subscription = await transaction.subscription.findUnique({
+    where: { shopId }, select: { billingPeriodId: true },
+  });
+  if (subscription?.billingPeriodId?.startsWith(prefix)) {
+    throw new Error("Subscription refers to a fixture billing period; refusing cleanup.");
+  }
+  const fixtureEventIds = (await transaction.usageEvent.findMany({
+    where: { shopId, id: { startsWith: prefix } }, select: { id: true },
+  })).map((row) => row.id);
+  if (fixtureEventIds.length) {
+    const externalCorrections = await transaction.usageEvent.count({
+      where: { correctionOfUsageEventId: { in: fixtureEventIds }, id: { not: { startsWith: prefix } } },
+    });
+    if (externalCorrections) {
+      throw new Error("Non-fixture corrections reference seeded usage; refusing destructive cleanup.");
+    }
+  }
+  const usage = await transaction.usageEvent.deleteMany({
+    where: { shopId, id: { startsWith: prefix } },
+  });
+  if (paidCounterIds.length) {
+    const removed = await transaction.billingPeriodEntitlementCounter.deleteMany({
+      where: { shopId, id: { in: paidCounterIds } },
+    });
+    if (removed.count !== paidCounterIds.length) {
+      throw new Error("Fixture paid counters changed during cleanup; transaction aborted.");
+    }
+  }
 
   const conversations = await transaction.conversation.findMany({
     where: { id: { startsWith: prefix } },
@@ -534,7 +823,7 @@ async function cleanupDatabase(transaction, shopId) {
   };
 }
 
-async function seedDatabase(shop, humanOptions = null) {
+async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = false) {
   const now = new Date();
 
   return prisma.$transaction(async (transaction) => {
@@ -602,32 +891,38 @@ async function seedDatabase(shop, humanOptions = null) {
       } });
     }
 
-    const { period: currentPeriod, created: createdCurrentPeriod } =
-      await ensureCurrentPeriod(transaction, shop, now);
-
-    const pastPeriods = closedPeriodDefinitions(shop, now);
-    await transaction.billingPeriod.createMany({ data: pastPeriods });
-
-    const usageEvents = [
-      ...usageRows(shop.id, currentPeriod, "current", 27, recoveries, now, shop.platform),
-      ...usageRows(shop.id, pastPeriods[0], "past-1", 16, recoveries, now, shop.platform),
-      ...usageRows(shop.id, pastPeriods[1], "past-2", 11, recoveries, now, shop.platform),
-      ...usageRows(shop.id, pastPeriods[2], "past-3", 7, recoveries, now, shop.platform),
-    ];
-    await transaction.usageEvent.createMany({ data: usageEvents });
+    let billingFixture;
+    if (shop.subscription.plan.kind === "FREE") {
+      billingFixture = await seedFreeUsage(transaction, shop, now);
+      if (withPastPaidHistory) {
+        const past = await seedHistoricalPaidUsage(transaction, shop, now, recoveries);
+        billingFixture = { ...billingFixture,
+          usageEvents: billingFixture.usageEvents + past.eventCount,
+          pastUsageEvents: past.eventCount, pastBillingPeriods: past.periodCount,
+          usageMode: "FREE_NOW_PREVIOUSLY_PAID" };
+      }
+    } else {
+      validatePastPaidHistoryOption(shop, withPastPaidHistory);
+      const currentPeriod = await requireCurrentPaidPeriod(transaction, shop, now);
+      const pastPeriods = closedPeriodDefinitions(shop, currentPeriod);
+      const currentEvents = usageRows(shop.id, currentPeriod, "current", 27, recoveries, now, shop.platform);
+      const past = await seedFixturePaidPeriods(transaction, shop, now, recoveries, pastPeriods);
+      // Current paid usage is deliberately not allocated against real live
+      // subscription credits by this UI fixture. Its source remains UNATTRIBUTED.
+      await transaction.usageEvent.createMany({ data: currentEvents });
+      billingFixture = { usageEvents: currentEvents.length + past.eventCount, currentUsageEvents: 27,
+        pastUsageEvents: past.eventCount, pastBillingPeriods: pastPeriods.length,
+        currentBillingPeriodId: currentPeriod.id, createdCurrentPeriod: false,
+        usageMode: "PAID_METERED", freeCreditsCommitted: 0 };
+    }
 
     return {
       customers: customers.length,
       recoveries: recoveries.length,
       conversations: conversations.length,
       messages: messages.length,
-      usageEvents: usageEvents.length,
+      ...billingFixture,
       usageProvider: shop.platform,
-      currentUsageEvents: 27,
-      pastUsageEvents: 34,
-      pastBillingPeriods: pastPeriods.length,
-      currentBillingPeriodId: currentPeriod.id,
-      createdCurrentPeriod,
       humanHandoverScenarios: humanOptions ? handoverCases.length : 0,
     };
   }, TRANSACTION_OPTIONS);
@@ -761,20 +1056,24 @@ async function seedPending(shop) {
 
 async function databaseStatus(shop) {
   const prefix = prefixFor(shop.id);
-  const [customers, recoveries, conversations, messages, usageEvents, billingPeriods] = await Promise.all([
+  const [customers, recoveries, conversations, messages, usageEvents, billingPeriods, fixtureReservations, fixturePaidCounters] = await Promise.all([
     prisma.customer.count({ where: { id: { startsWith: prefix } } }),
     prisma.checkoutRecovery.count({ where: { id: { startsWith: prefix } } }),
     prisma.conversation.count({ where: { id: { startsWith: prefix } } }),
     prisma.conversationMessage.count({ where: { id: { startsWith: prefix } } }),
-    prisma.usageEvent.count({ where: { id: { startsWith: prefix } } }),
+    prisma.usageEvent.count({ where: { shopId: shop.id, id: { startsWith: prefix } } }),
     prisma.billingPeriod.findMany({
       where: { id: { startsWith: prefix } },
       orderBy: { periodStart: "desc" },
       select: { id: true, status: true, periodStart: true, periodEnd: true },
     }),
+    prisma.usageReservation.count({ where: { shopId: shop.id, id: { startsWith: prefix } } }),
+    prisma.billingPeriodEntitlementCounter.count({ where: { shopId: shop.id,
+      id: { startsWith: `${prefix}counter-paid-` } } }),
   ]);
 
-  return { customers, recoveries, conversations, messages, usageEvents, billingPeriods };
+  return { customers, recoveries, conversations, messages, usageEvents, billingPeriods,
+    fixtureReservations, fixturePaidCounters };
 }
 
 async function pendingStatus(shop) {
@@ -824,6 +1123,8 @@ async function printStatus(shop) {
     messages: db.messages,
     usageEvents: db.usageEvents,
     fixtureBillingPeriods: db.billingPeriods.length,
+    fixtureReservations: db.fixtureReservations,
+    fixturePaidCounters: db.fixturePaidCounters,
     pendingJobs: pending.available ? pending.jobs.length : "unavailable",
   }]);
 
@@ -862,11 +1163,20 @@ async function main() {
   if (command === "seed") {
     requireConfirmation();
     const humanOptions = validateHumanScenarioOptions();
+    // Fail explicitly for the old flag rather than silently ignoring a paid-plan
+    // identifier. Materialised BillingPlan rows are not required for snapshots.
+    if (hasFlag(LEGACY_HISTORICAL_PAID_PLAN_FLAG) ||
+        argument(LEGACY_HISTORICAL_PAID_PLAN_FLAG) !== undefined) {
+      throw new Error(`${LEGACY_HISTORICAL_PAID_PLAN_FLAG} is obsolete; use ${WITH_PAST_PAID_HISTORY_FLAG} instead.`);
+    }
+    const withPastPaidHistory = hasFlag(WITH_PAST_PAID_HISTORY_FLAG);
+    // Validate before pending-job cleanup to keep rejected options side-effect free.
+    validatePastPaidHistoryOption(shop, withPastPaidHistory);
     const humanReadiness = await checkHumanScenarioReadiness(shop, humanOptions);
     // Clean any older fixture queue state first. This prevents a previous
     // --with-pending run from surviving a later database-only re-seed.
     let pendingResult = await cleanupPending(shop);
-    const dbResult = await seedDatabase(shop, humanOptions);
+    const dbResult = await seedDatabase(shop, humanOptions, withPastPaidHistory);
     if (hasFlag(WITH_PENDING_FLAG)) pendingResult = await seedPending(shop);
     else if (!pendingResult.skipped) pendingResult = { skipped: true, reason: `${WITH_PENDING_FLAG} not supplied; previous fixture pending jobs were removed` };
 
@@ -888,11 +1198,24 @@ async function main() {
     }
     console.log("");
     console.log("Manual checks:");
-    console.log("1. Open /app and verify Current usage and Past paid usage are non-zero.");
-    console.log("2. Click View current bill; verify performance/recovery data, then View all usage for this bill.");
-    console.log("3. Exercise usage pagination and rows-per-page (10/25/50/100).");
-    console.log("4. Return to /app and select each of the three seeded past bills.");
-    console.log("5. On a past bill, use the bill selector and usage pagination.");
+    if (shop.subscription.plan.kind === "FREE") {
+      console.log("1. WooCommerce: Current usage shows lifetime Free records without a BillingPeriod.");
+      console.log("2. Verify Free credits remaining decreased by the fixture amount.");
+      console.log("3. Run delete and verify the original Free credit balance is restored.");
+      if (withPastPaidHistory) {
+        console.log("4. Past periods contains 3 CLOSED, synthetically historical PAID_METERED periods (no paid BillingPlan required).");
+        console.log("5. Historical rows should show Included plan allowance, not Unattributed.");
+        console.log("6. Check period selection and event pagination without changing current Free subscription.");
+      } else {
+        console.log("4. Past periods is correctly empty for a never-paid Free merchant.");
+        console.log(`   To simulate past PAID history, pass ${WITH_PAST_PAID_HISTORY_FLAG}.`);
+      }
+      console.log("6. Shopify's existing period-based Usage History does not display Free lifetime events.");
+    } else {
+      console.log("1. Current usage shows 27 events linked to the existing OPEN paid BillingPeriod.");
+      console.log("2. Verify 3 closed fixture periods with Included plan allowance attribution.");
+      console.log("3. Exercise paid usage pagination and rows-per-page (10/25/50/100).");
+    }
     if (hasFlag(WITH_PENDING_FLAG)) {
       console.log("6. Verify Pending recoveries shows 12 Scheduled rows across two pages and Refresh works.");
     }
