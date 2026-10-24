@@ -20,7 +20,7 @@ function harness() {
   vm.runInNewContext(source + `\n;globalThis.__seeder = {
     requireConfirmation, resolveShop, freeUsageFixtures, seedFreeUsage,
     requireCurrentPaidPeriod, closedPeriodDefinitions, cleanupDatabase, seedDatabase,
-    validatePastPaidHistoryOption, seedHistoricalPaidUsage, usageRows,
+    validatePastPaidHistoryOption, seedHistoricalPaidUsage, usageRows, requireCurrentFreePeriod,
   };`, context, { filename: "seed-usage-overview-test-data.mjs" });
   return { api: context.__seeder, context };
 }
@@ -84,6 +84,37 @@ test("Free usage has no billing period and matches the committed-reservation sch
       `recovery:shop-1:manual-usage-overview-shop-1-recovery-${String(i + 1).padStart(2, "0")}`);
   }
   assert.equal(writes.mutations[0].committedQuantity.increment, 4);
+});
+
+test("Shopify Free usage accepts a genuine current period but keeps events periodless", async () => {
+  const { api } = harness();
+  const s = shop();
+  s.platform = "SHOPIFY";
+  s.subscription.billingPeriodId = "genuine-free-period";
+  s.subscription.currentPeriodStart = new Date("2026-10-01T00:00:00.000Z");
+  s.subscription.currentPeriodEnd = new Date("2026-11-01T00:00:00.000Z");
+  const period = { id: s.subscription.billingPeriodId, shopId: s.id,
+    subscriptionId: s.subscription.id, status: "OPEN", planKindSnapshot: "FREE",
+    periodStart: s.subscription.currentPeriodStart, periodEnd: s.subscription.currentPeriodEnd };
+  const { tx, writes } = fakeFreeTransaction(5);
+  tx.billingPeriod = { findFirst: async () => period };
+  const summary = await api.seedFreeUsage(tx, s, NOW);
+  assert.equal(summary.usageMode, "FREE_LIFETIME");
+  assert.equal(writes.events.every((event) => event.provider === "SHOPIFY" && event.billingPeriodId === null), true);
+});
+
+test("Shopify Free fixtures reject a mismatched current period", async () => {
+  const { api } = harness();
+  const s = shop();
+  s.platform = "SHOPIFY";
+  s.subscription.billingPeriodId = "genuine-free-period";
+  s.subscription.currentPeriodStart = new Date("2026-10-01T00:00:00.000Z");
+  s.subscription.currentPeriodEnd = new Date("2026-11-01T00:00:00.000Z");
+  const { tx } = fakeFreeTransaction();
+  tx.billingPeriod = { findFirst: async () => ({ id: "genuine-free-period", shopId: s.id,
+    subscriptionId: s.subscription.id, status: "OPEN", planKindSnapshot: "PAID_METERED",
+    periodStart: s.subscription.currentPeriodStart, periodEnd: s.subscription.currentPeriodEnd }) };
+  await assert.rejects(() => api.seedFreeUsage(tx, s, NOW), /Shopify Free current BillingPeriod/);
 });
 
 test("Free fixture never exceeds the real available allowance", async () => {
@@ -178,6 +209,13 @@ test("mutation guard rejects production and non-test databases", () => {
   delete context.process.env.NODE_ENV;
   context.process.env.DATABASE_URL = "postgresql://localhost:5432/moda_interact_postgres";
   assert.throws(() => api.requireConfirmation(), /without test\/development/);
+});
+
+test("CLI keeps HUMAN audit purge explicit and fixture-scoped", () => {
+  assert.match(source, /const PURGE_HUMAN_AUDIT_FLAG = "--purge-human-send-audit";/);
+  assert.match(source, /Re-run with \$\{PURGE_HUMAN_AUDIT_FLAG\}/);
+  assert.match(source, /shopId, conversationId: \{ in: conversationIds \}/);
+  assert.match(source, /purgeHumanSendAudit: hasFlag\(PURGE_HUMAN_AUDIT_FLAG\)/);
 });
 
 function seedTransaction(kind) {
@@ -315,6 +353,12 @@ test("historical paid records retain the merchant provider, including Shopify", 
   const { api, context } = harness();
   const { store, tx, writes } = seedTransaction("FREE");
   store.platform = "SHOPIFY";
+  store.subscription.billingPeriodId = "actual-free-period";
+  store.subscription.currentPeriodStart = new Date("2026-10-01T00:00:00.000Z");
+  store.subscription.currentPeriodEnd = new Date("2026-11-01T00:00:00.000Z");
+  tx.billingPeriod.findFirst = async () => ({ id: "actual-free-period", shopId: store.id,
+    subscriptionId: store.subscription.id, status: "OPEN", planKindSnapshot: "FREE",
+    periodStart: store.subscription.currentPeriodStart, periodEnd: store.subscription.currentPeriodEnd });
   context.__prisma.$transaction = async (fn) => fn(tx);
   const result = await api.seedDatabase(store, null, true);
   assert.equal(result.pastUsageEvents, 34);
