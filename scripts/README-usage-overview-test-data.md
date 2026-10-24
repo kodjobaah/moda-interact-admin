@@ -120,6 +120,8 @@ The 12 rows are enough to exercise:
 
 The fixture intentionally does **not** manufacture BullMQ `active` jobs. An `active` job is owned by a running worker, and forcing that state would risk causing test data to enter the real recovery workflow.
 
+Free billing state is platform-specific: WooCommerce Free subscriptions must have no current BillingPeriod because their usage is lifetime-counter based, while Shopify Free subscriptions must already have a genuine subscription-linked `OPEN` Free BillingPeriod. Shopify Free fixture usage still uses the lifetime counter and remains periodless; the current Shopify period is validated but never fabricated or modified by this seeder.
+
 ## Manual test sequence
 
 After seeding, open the merchant application at `/app`.
@@ -204,6 +206,18 @@ This removes only fixture-owned:
 - Pending Recovery BullMQ jobs and their Redis indexes when `REDIS_URL` is available.
 
 An existing merchant OPEN BillingPeriod that was merely reused is never deleted.
+
+If HUMAN handover testing created durable send commands against these fixture conversations, the normal delete intentionally refuses to remove them. To reset the complete deterministic fixture, including those test-only HUMAN command records, use the explicit audit purge flag:
+
+```bash
+npm run admin:seed-usage-overview -- \
+  delete \
+  --shop eugene-bdx7mzhn.myshopify.com \
+  --confirm-test-data \
+  --purge-human-send-audit
+```
+
+This purges commands only when they belong to the seeder's `manual-usage-overview-<shop>-` conversations, inside the same transaction as the fixture cleanup. It never deletes HUMAN send commands from non-fixture conversations. The flag is required because durable HUMAN send commands are normally retained as audit history.
 
 ## Re-seeding
 

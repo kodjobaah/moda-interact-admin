@@ -13,6 +13,7 @@ const prisma = new PrismaClient();
 const CONFIRM_FLAG = "--confirm-test-data";
 const WITH_PENDING_FLAG = "--with-pending";
 const WITH_HUMAN_FLAG = "--with-human-handover";
+const PURGE_HUMAN_AUDIT_FLAG = "--purge-human-send-audit";
 const WITH_PAST_PAID_HISTORY_FLAG = "--with-past-paid-history";
 const LEGACY_HISTORICAL_PAID_PLAN_FLAG = "--historical-paid-plan-id";
 const TEST_RECIPIENT_FLAG = "--test-recipient";
@@ -59,6 +60,11 @@ Usage:
   node scripts/seed-usage-overview-test-data.mjs delete \\
     --shop <domain-or-id> \\
     --confirm-test-data
+
+  node scripts/seed-usage-overview-test-data.mjs delete \\
+    --shop <domain-or-id> \\
+    --confirm-test-data \\
+    --purge-human-send-audit
 
 What seed creates:
   - 12 customer groups (11 named customers + 1 guest)
@@ -524,8 +530,10 @@ function freeUsageFixtures(shopId, count, now, provider) {
 
 async function seedFreeUsage(transaction, shop, now) {
   const subscription = shop.subscription;
-  if (subscription.billingPeriodId !== null || subscription.currentPeriodStart !== null ||
-      subscription.currentPeriodEnd !== null) {
+  if (shop.platform === "SHOPIFY") {
+    await requireCurrentFreePeriod(transaction, shop, now);
+  } else if (subscription.billingPeriodId !== null || subscription.currentPeriodStart !== null ||
+             subscription.currentPeriodEnd !== null) {
     throw new Error("Free lifetime subscription cannot have a current BillingPeriod or period dates. Reconcile billing first.");
   }
   const counter = await transaction.shopEntitlementCounter.findUnique({
@@ -556,6 +564,26 @@ async function seedFreeUsage(transaction, shop, now) {
   return { usageEvents: count, currentUsageEvents: count, pastUsageEvents: 0,
     pastBillingPeriods: 0, currentBillingPeriodId: null, createdCurrentPeriod: false,
     usageMode: "FREE_LIFETIME", freeCreditsCommitted: count };
+}
+
+async function requireCurrentFreePeriod(transaction, shop, now) {
+  const subscription = shop.subscription;
+  if (!subscription.billingPeriodId || !subscription.currentPeriodStart || !subscription.currentPeriodEnd) {
+    throw new Error("Shopify Free usage fixtures require Subscription.billingPeriodId and current period dates.");
+  }
+  const period = await transaction.billingPeriod.findFirst({
+    where: { id: subscription.billingPeriodId, shopId: shop.id, subscriptionId: subscription.id },
+  });
+  if (!period || period.status !== "OPEN" || period.planKindSnapshot !== "FREE" ||
+      period.periodStart.getTime() !== subscription.currentPeriodStart.getTime() ||
+      period.periodEnd.getTime() !== subscription.currentPeriodEnd.getTime() ||
+      period.periodStart >= period.periodEnd || period.periodStart > now || period.periodEnd <= now) {
+    throw new Error("Shopify Free current BillingPeriod must be OPEN, FREE, in-window, and match the existing Subscription. Reconcile billing first.");
+  }
+  if (period.id.startsWith(prefixFor(shop.id))) {
+    throw new Error("Shopify Free current billing period cannot be a synthetic usage-overview fixture period.");
+  }
+  return period;
 }
 
 /**
@@ -643,7 +671,7 @@ function usageRows(shopId, period, label, count, recoveries, now, provider) {
   }));
 }
 
-async function cleanupDatabase(transaction, shopId) {
+async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = false } = {}) {
   const prefix = prefixFor(shopId);
 
   // Both Free and paid fixture reservations must be inspected before any
@@ -773,12 +801,17 @@ async function cleanupDatabase(transaction, shopId) {
   });
   const conversationIds = conversations.map((row) => row.id);
   if (conversationIds.length) {
-    const commands = await transaction.merchantConversationSendCommand.count({
-      where: { conversationId: { in: conversationIds } },
-    });
-    if (commands) {
+    const commandWhere = { shopId, conversationId: { in: conversationIds } };
+    const commands = await transaction.merchantConversationSendCommand.count({ where: commandWhere });
+    if (commands && !purgeHumanSendAudit) {
       throw new Error(`Refusing to erase ${commands} durable HUMAN send command(s). ` +
-        "Use a new disposable development database/shop for further send tests; do not delete send audit history.");
+        `Re-run with ${PURGE_HUMAN_AUDIT_FLAG} only to purge commands attached to these deterministic test fixtures.`);
+    }
+    if (commands) {
+      const removedCommands = await transaction.merchantConversationSendCommand.deleteMany({ where: commandWhere });
+      if (removedCommands.count !== commands) {
+        throw new Error("HUMAN send-command rows changed during fixture cleanup; transaction aborted.");
+      }
     }
   }
 
@@ -1228,7 +1261,9 @@ async function main() {
     // cannot leave us with a half-cleaned database/Redis test state.
     const pendingResult = await cleanupPending(shop);
     const dbResult = await prisma.$transaction(
-      (transaction) => cleanupDatabase(transaction, shop.id),
+      (transaction) => cleanupDatabase(transaction, shop.id, {
+        purgeHumanSendAudit: hasFlag(PURGE_HUMAN_AUDIT_FLAG),
+      }),
       TRANSACTION_OPTIONS,
     );
     console.log("");
