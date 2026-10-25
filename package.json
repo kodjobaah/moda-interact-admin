@@ -24,6 +24,8 @@
     "test:update-platform": "node --test tests/unit/update-platform-import.test.mjs",
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
+    "test:arch047-admin-authoring:unit": "tsx --test tests/unit/arch047-template-authoring-ast.test.ts tests/unit/arch047-template-authoring-service.test.ts tests/unit/arch047-template-authoring-components.test.tsx",
+    "test:arch047-admin-authoring:postgres": "node scripts/test-arch047-admin-authoring-postgres.mjs",
     "admin:provision": "node scripts/provision-platform-admin.mjs",
     "admin:seed-promotions": "node scripts/seed-promotion-test-data.mjs",
     "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear",

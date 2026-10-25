@@ -21,6 +21,7 @@ export async function AdminShell({
     | "platform-policy"
     | "background-runtime"
     | "store-categories"
+    | "whatsapp-templates"
     | "agent-instructions"
     | "embeddings"
     | "translations"
