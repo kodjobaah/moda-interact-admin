@@ -14,7 +14,8 @@ const ACTIVE = ["PENDING", "QUEUED", "TRANSLATING", "PROCESSING", "PARTIALLY_FAI
 async function lockDefinition(tx: Prisma.TransactionClient, definitionId: string): Promise<void> {
   // No unique (definition, source, model) constraint in DB001. This PostgreSQL transaction-scoped
   // advisory lock makes creation and retry idempotent across Admin instances/processes.
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${LOCK_TAG + definitionId}::text, 0::bigint))`;
+  // PostgreSQL returns void; $queryRaw cannot deserialize void, so execute the lock as a statement.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${LOCK_TAG + definitionId}::text, 0::bigint))`;
 }
 
 export function validateTranslationDefinitionId(id: unknown): asserts id is string {

@@ -25,6 +25,7 @@ function fixture() {
   let modelConfigured = true;
   let failAudit = false;
   let nextId = 1;
+  let advisoryLockCalls = 0;
   let current = { definition, runs: [] as any[], audits: [] as any[] };
   let serial = Promise.resolve();
   const transaction = async (fn: (tx: any) => Promise<any>) => {
@@ -34,7 +35,7 @@ function fixture() {
     await predecessor;
     const staged = structuredClone(current);
     const tx = {
-      $queryRaw: async () => [{}],
+      $executeRaw: async () => { advisoryLockCalls += 1; return 1; },
       whatsAppTemplateDefinition: {
         findUnique: async () => staged.definition,
         updateMany: async ({ where, data }: any) => {
@@ -86,6 +87,7 @@ function fixture() {
       current.runs.find((run) => run.definitionId === where.definitionId) ?? null },
   } as unknown as TranslationDatabase;
   return { db, draft, get definition() { return current.definition; }, get runs() { return current.runs; }, get audits() { return current.audits; },
+    get advisoryLockCalls() { return advisoryLockCalls; },
     setModelConfigured: (value: boolean) => { modelConfigured = value; }, setAuditFailure: (value: boolean) => { failAudit = value; },
     setEnglishStatus: (value: string) => { current.definition.locales[0].status = value; },
     corruptHash: () => { current.definition.sourceHash = "f".repeat(64); },
@@ -164,6 +166,7 @@ test("Generate is atomic, concurrent-safe, replay-safe, and emits one audit for 
   assert.deepEqual(f.runs[0].sourceSnapshot.segments.map((s: any) => s.key), ["body.text"]);
   assert.equal(f.runs[0].modelConfigurationVersion, 4);
   assert.equal(f.audits.length, 1);
+  assert.equal(f.advisoryLockCalls, 3);
   assert.equal(f.definition.status, "TRANSLATION_QUEUED");
 });
 
