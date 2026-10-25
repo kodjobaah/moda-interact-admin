@@ -23,7 +23,7 @@ export function useTemplateAuthoringDraft(source?: TemplateDetail | null) {
     return checked.ok
       ? makeExamplePreview(makeImmutableAuthoringRecord(checked.value).prepared)
       : makeDraftExamplePreview(draft);
-  }, [checked]);
+  }, [checked, draft]);
   const updateDraft = (next: TemplateAst) => {
     if (pending.current || savedId) return;
     setDraft(next); setTouched(true); setError("");
