@@ -5,6 +5,9 @@ import { makeTemplateView, parseScope, classify, brandAvailability, equivalentRe
 import { approvedSource } from "../../src/lib/admin/whatsapp-templates/publishing/source.ts";
 import { computePreview, languageComparison } from "../../src/lib/admin/whatsapp-templates/publishing/preview.ts";
 import { definitionFixture, fixtureDatabase, shopFixture, WABA, DEFINITION_ID } from "../fixtures/arch047-publication.fixture.ts";
+import { getConfigurationEnvironment } from "../../src/lib/admin/platform-configuration/environment.ts";
+import { ConfigurationError } from "../../src/lib/admin/platform-configuration/errors.ts";
+import { assignmentAuditOperationId } from "../../src/lib/admin/whatsapp-templates/publishing/audit.ts";
 
 const issueCode = (code: string) => (e: unknown) => e instanceof PublicationError && e.code === code;
 
@@ -149,4 +152,47 @@ test("reviewed translation cannot silently replace or add semantic bindings whil
   locale.contentHash = changedHash; reg.submittedContentHash = changedHash; reg.lastObservedContentHash = changedHash;
   assert.equal(equivalentRegistration(reg, locale), true, "frozen snapshot itself is internally consistent");
   await assert.rejects(approvedSource(fixtureDatabase({ definition }).db as any, DEFINITION_ID, WABA), issueCode("CONTENT"));
+});
+
+// Sender WABA lookup must preserve the platform configuration security contract
+// without importing the Admin-authenticated configuration service.
+test("publication sender environment selection preserves production isolation", () => {
+  const beforeEnvironment = process.env.DEPLOYMENT_ENVIRONMENT_NAME;
+  const beforeNodeEnvironment = process.env.NODE_ENV;
+  // Next/Node typings expose NODE_ENV as readonly; mutate only in this isolated test.
+  const setNodeEnvironment = (value: string | undefined) => value === undefined
+    ? Reflect.deleteProperty(process.env, "NODE_ENV")
+    : Reflect.set(process.env, "NODE_ENV", value);
+  try {
+    setNodeEnvironment("test");
+    process.env.DEPLOYMENT_ENVIRONMENT_NAME = "staging";
+    assert.equal(getConfigurationEnvironment(), "staging");
+    process.env.DEPLOYMENT_ENVIRONMENT_NAME = "unrecognised";
+    assert.throws(() => getConfigurationEnvironment(),
+      (error: unknown) => error instanceof ConfigurationError && error.code === "INVALID_INPUT");
+    setNodeEnvironment("production");
+    process.env.DEPLOYMENT_ENVIRONMENT_NAME = "development";
+    assert.throws(() => getConfigurationEnvironment(),
+      (error: unknown) => error instanceof ConfigurationError && error.code === "FORBIDDEN");
+  } finally {
+    if (beforeEnvironment === undefined) delete process.env.DEPLOYMENT_ENVIRONMENT_NAME;
+    else process.env.DEPLOYMENT_ENVIRONMENT_NAME = beforeEnvironment;
+    setNodeEnvironment(beforeNodeEnvironment);
+  }
+});
+
+
+test("per-shop language audit keys are deterministic and unique to the publication target", () => {
+  const publicationId = "publication_001";
+  const first = assignmentAuditOperationId(publicationId, "shop_0001", "en");
+  assert.equal(first, assignmentAuditOperationId(publicationId, "shop_0001", "en"));
+  assert.match(first, /^arch047-assignment-[a-f0-9]{64}$/);
+  assert.ok(first.length <= 128);
+  assert.notEqual(first, publicationId);
+  assert.equal(new Set([
+    first,
+    assignmentAuditOperationId(publicationId, "shop_0001", "fr"),
+    assignmentAuditOperationId(publicationId, "shop_0002", "en"),
+    assignmentAuditOperationId("publication_002", "shop_0001", "en"),
+  ]).size, 4);
 });

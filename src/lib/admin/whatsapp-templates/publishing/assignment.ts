@@ -8,6 +8,7 @@ import { isValidKey, LANGUAGES, reject, PublicationError } from "./validation";
 import { PROCESS_PAGE_SIZE } from "./types";
 import type { PublicationProgress } from "./types";
 import { configuredSenderWaba } from "./sender";
+import { assignmentAuditOperationId } from "./audit";
 
 /** Each shop's 20 languages are saved in a SINGLE serializable transaction.
  * The transaction-scoped advisory lock serialises overlapping ARCH-047 operations
@@ -30,7 +31,8 @@ async function assignShop(db: PublicationDb, operationId: string, definitionId: 
     if (!shop) return reject("INELIGIBLE", "The originally selected shop no longer exists.");
     const candidate = { id: shop.id, domain: shop.domain, status: shop.status, platform: shop.platform,
       wooStatus: shop.wooCommerceInstallation?.status ?? null };
-    if (eligibleShop(candidate)) return reject("INELIGIBLE", "Shop eligibility changed. A new preview is required.");
+    // `eligibleShop` returns a rejection reason, or null for an eligible shop.
+    if (eligibleShop(candidate) !== null) return reject("INELIGIBLE", "Shop eligibility changed. A new preview is required.");
     const source = await approvedSource(tx, definitionId, snapshot.wabaId);
     if (source.purpose !== snapshot.purpose || source.fingerprint !== snapshot.sourceFingerprint ||
         source.locales.some((l) => snapshot.registrationIds[l.languageTag] !== l.registrationId)) return reject("STALE", "Approval or registration changed. Reconfirm publication.");
@@ -67,7 +69,9 @@ async function assignShop(db: PublicationDb, operationId: string, definitionId: 
         nextId = next.id;
         await tx.commerceAuditEvent.create({ data: {
           actorType: "PLATFORM_ADMIN", actorAdminId: actorId, shopId,
-          action: "ASSIGN_WHATSAPP_TEMPLATE_DEFINITION", operationId: operationId.slice(0, 128), reason: snapshot.reason,
+          action: "ASSIGN_WHATSAPP_TEMPLATE_DEFINITION",
+          operationId: assignmentAuditOperationId(operationId, shopId, locale.languageTag),
+          reason: snapshot.reason,
           metadata: { definitionId, publicationOperationId: operationId, languageTag: locale.languageTag,
             previousVariantId: previous?.id ?? null, newVariantId: nextId, metaRegistrationId: locale.registrationId,
             impact: kind },

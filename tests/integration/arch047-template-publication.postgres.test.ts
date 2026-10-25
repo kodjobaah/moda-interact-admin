@@ -79,10 +79,19 @@ test("100 active shops × 20 approved languages: bounded resume, durable targets
   assert.equal(await db.whatsAppTemplateVariant.count({ where: {
     providerAccountId: WABA, purpose: "INITIAL_NO_OFFER", status: "APPROVED", enabled: true,
   } }), 2000);
-  assert.equal(await db.commerceAuditEvent.count({ where: { operationId: progress.operationId } }), 2001);
+  // CommerceAuditEvent.operationId is globally unique. Count correlated records
+  // through immutable metadata, not by pretending each language reused the ID.
+  const auditWhere: Prisma.CommerceAuditEventWhereInput = {
+    metadata: { path: ["publicationOperationId"], equals: progress.operationId },
+  };
+  const auditRows = await db.commerceAuditEvent.findMany({ where: auditWhere,
+    select: { operationId: true } });
+  assert.equal(auditRows.length, 2001);
+  assert.ok(auditRows.every((row) => row.operationId));
+  assert.equal(new Set(auditRows.map((row) => row.operationId)).size, 2001);
   const retry = await advancePublication(db, progress.operationId);
   assert.equal(retry.status, "COMPLETE");
-  assert.equal(await db.commerceAuditEvent.count({ where: { operationId: progress.operationId } }), 2001);
+  assert.equal(await db.commerceAuditEvent.count({ where: auditWhere }), 2001);
   const target = await db.whatsAppTemplatePublicationTarget.findFirstOrThrow({ where: { operationId: progress.operationId } });
   assert.ok(target.newVariantId); assert.equal(target.previousVariantId, null);
 });
@@ -110,6 +119,7 @@ test("per-shop rollback on forced audit failure, then bounded retry without part
     locale.metaRegistrations[0].id = `new_registration_${index}`;
     locale.metaRegistrations[0].localeId = locale.id;
     locale.metaRegistrations[0].providerTemplateName = next.providerTemplateName;
+    locale.metaRegistrations[0].providerTemplateId = String(2000 + index);
   }
   await persistDefinition(next);
   const one = { mode: "one" as const, shopId: "shop_0001" };
@@ -140,7 +150,10 @@ test("per-shop rollback on forced audit failure, then bounded retry without part
     assert.equal(failed.failedTargets, 20); assert.equal(failed.succeededTargets, 0);
     assert.equal(await db.whatsAppTemplateVariant.count({ where: { shopId: "shop_0001",
       metaRegistrationId: { in: next.locales.map((l) => l.metaRegistrations[0].id) }, enabled: true } }), 0);
-    assert.equal(await db.commerceAuditEvent.count({ where: { operationId: op.operationId, shopId: "shop_0001" } }), 0);
+    assert.equal(await db.commerceAuditEvent.count({ where: { shopId: "shop_0001",
+      action: "ASSIGN_WHATSAPP_TEMPLATE_DEFINITION",
+      metadata: { path: ["publicationOperationId"], equals: op.operationId },
+    } }), 0);
   } finally {
     await db.$executeRawUnsafe(`DROP TRIGGER IF EXISTS arch047_test_fail_audit ON commerce."CommerceAuditEvent"`);
     await db.$executeRawUnsafe(`DROP FUNCTION IF EXISTS commerce.arch047_test_fail_audit()`);
@@ -173,19 +186,27 @@ test("overlapping selected and all-shop publications serialise by shop and canno
     shopId: "shop_0002", providerAccountId: WABA, purpose: "INITIAL_NO_OFFER", enabled: true, status: "APPROVED",
   } }), 20);
   const changed = await db.commerceAuditEvent.count({ where: { shopId: "shop_0002",
-    action: "ASSIGN_WHATSAPP_TEMPLATE_DEFINITION", operationId: { in: [one.operationId, bulk.operationId] },
+    action: "ASSIGN_WHATSAPP_TEMPLATE_DEFINITION",
+    OR: [
+      { metadata: { path: ["publicationOperationId"], equals: one.operationId } },
+      { metadata: { path: ["publicationOperationId"], equals: bulk.operationId } },
+    ],
   } });
   assert.equal(changed, 20, "overlapping operations cannot create duplicate writes/audits");
 });
 
 test("never adopts an unlinked/external identity; conflict rolls back all twenty languages", async () => {
   const nextDefinitionId = `wtdef_${"b".repeat(64)}`;
+  // Earlier overlap tests may already have published the same provider identity
+  // to shop_0003. Use a distinct eligible tenant for this collision fixture.
+  const shop = shopFixture(101);
+  await db.shop.create({ data: { id: shop.id, domain: shop.domain, platform: "SHOPIFY", status: "ACTIVE" } });
   await db.whatsAppTemplateVariant.create({ data: {
-    shopId: "shop_0003", providerAccountId: WABA, purpose: "INITIAL_NO_OFFER", languageTag: "en",
+    shopId: shop.id, providerAccountId: WABA, purpose: "INITIAL_NO_OFFER", languageTag: "en",
     providerTemplateName: "moda_initial_no_offer_new_arch047_fixture", providerLanguageCode: "en",
     providerTemplateId: "unverified_external", metaRegistrationId: null, status: "APPROVED", enabled: false,
   } });
-  const scope = { mode: "one" as const, shopId: "shop_0003" };
+  const scope = { mode: "one" as const, shopId: shop.id };
   const issuedAt = new Date().toISOString();
   const preview = await computePreview(db, nextDefinitionId, scope, WABA, issuedAt);
   const operation = await confirmPublication({ definitionId: nextDefinitionId, scope,
@@ -195,16 +216,22 @@ test("never adopts an unlinked/external identity; conflict rolls back all twenty
   const progress = await advancePublication(db, operation.operationId);
   assert.equal(progress.failedTargets, 20);
   assert.equal(progress.succeededTargets, 0);
-  assert.equal(await db.whatsAppTemplateVariant.count({ where: { shopId: "shop_0003",
+  const targets = await db.whatsAppTemplatePublicationTarget.findMany({
+    where: { operationId: operation.operationId }, select: { status: true, failureCode: true },
+  });
+  assert.equal(targets.length, 20);
+  assert.ok(targets.every((target) => target.status === "FAILED" && target.failureCode === "CONFLICT"));
+  assert.equal(await db.whatsAppTemplateVariant.count({ where: { shopId: shop.id,
     metaRegistrationId: { not: null }, enabled: true,
     providerTemplateName: "moda_initial_no_offer_new_arch047_fixture",
   } }), 0);
-  const unauthorised = await db.whatsAppTemplateVariant.findFirstOrThrow({ where: { shopId: "shop_0003",
+  const unauthorised = await db.whatsAppTemplateVariant.findFirstOrThrow({ where: { shopId: shop.id,
     providerTemplateName: "moda_initial_no_offer_new_arch047_fixture", providerLanguageCode: "en",
   } });
   assert.equal(unauthorised.metaRegistrationId, null);
   assert.equal(unauthorised.enabled, false);
   assert.equal(await db.commerceAuditEvent.count({ where: {
-    operationId: operation.operationId, action: "ASSIGN_WHATSAPP_TEMPLATE_DEFINITION",
+    action: "ASSIGN_WHATSAPP_TEMPLATE_DEFINITION",
+    metadata: { path: ["publicationOperationId"], equals: operation.operationId },
   } }), 0);
 });

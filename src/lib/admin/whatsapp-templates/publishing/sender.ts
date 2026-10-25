@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { getConfigurationEnvironment } from "../../platform-configuration/service";
+import { getConfigurationEnvironment } from "../../platform-configuration/environment";
 import { loadConfigUnsealKeyring, unsealSecret } from "../../platform-configuration/seal";
 import { validateSecretPayload } from "../../platform-configuration/secret-validation";
 import { reject } from "./validation";

@@ -25,8 +25,12 @@ try {
   const port = docker(["port", container, "5432/tcp"]).trim().match(/:(\d+)$/)?.[1];
   assert.ok(port);
   execFileSync(process.execPath, ["scripts/run-arch047-admin-publication-tests.mjs", "postgres"], {
-    env: { ...process.env, DATABASE_URL: `postgresql://postgres:fixture-only@127.0.0.1:${port}/${dbName}?schema=public`,
-      WHATSAPP_BUSINESS_ACCOUNT_ID: "1234567890", ARCH047_PUBLICATION_DISPOSABLE_POSTGRES: "1" },
+    env: {
+      ...process.env,
+      NODE_ENV: "test", DEPLOYMENT_ENVIRONMENT_NAME: "test",
+      DATABASE_URL: `postgresql://postgres:fixture-only@127.0.0.1:${port}/${dbName}?schema=public`,
+      WHATSAPP_BUSINESS_ACCOUNT_ID: "1234567890", ARCH047_PUBLICATION_DISPOSABLE_POSTGRES: "1",
+    },
     stdio: "inherit",
   });
   console.log("PASS ARCH-047 ADMIN-007 disposable PostgreSQL");
