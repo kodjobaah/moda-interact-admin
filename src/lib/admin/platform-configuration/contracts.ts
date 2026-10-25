@@ -10,6 +10,7 @@ export type FieldContract =
 export type ConfigurationContract = Readonly<{
   key: string; title: string; description: string; kind: "policy" | "secret";
   fields: readonly FieldContract[]; defaults?: Readonly<Record<string, unknown>>;
+  defaultsOnRead?: boolean;
   canReset: boolean; requiredRole: "SUPER_ADMIN";
   /** A single, server-owned cross-field predicate. Never serialised for browser execution. */
   refine?: (values: Readonly<Record<string, unknown>>) => string | null;
@@ -101,6 +102,23 @@ export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Objec
     ],
     defaults: { baseUrl: 'https://api.openai.com/v1/moderations', modelId: 'omni-moderation-latest' },
   },
+  {
+    key: "shopBrand.publicMedia", title: "ShopBrand public media", kind: "policy", requiredRole: "SUPER_ADMIN",
+    description: "Public media origin and bucket configuration. These values do not enable or verify media delivery.",
+    canReset: false, defaultsOnRead: true,
+    fields: [
+      { name: "publicOrigin", label: "Public origin", kind: "nullable-https-url", maxLength: 2048,
+        description: "HTTPS origin only; paths, credentials, queries and fragments are not allowed." },
+      { name: "bucketName", label: "Bucket name", kind: "string", maxLength: 63, pattern: "bucket",
+        description: "Lowercase bucket name (3 to 63 characters)." },
+    ],
+    defaults: { publicOrigin: "https://shop-brands.modainteract.com", bucketName: "moda-interact-shop-brands" },
+    refine: (values) => {
+      const origin = values.publicOrigin;
+      if (typeof origin !== "string") return "Public origin is required.";
+      return new URL(origin).pathname === "/" ? null : "Public origin must not include a path.";
+    },
+  },
 ]);
 
 /** Dependency injection here is for isolated tests only; production callers use the closed registry. */
@@ -111,6 +129,7 @@ export function createConfigurationRegistry(definitions: readonly ConfigurationC
       throw new Error("Invalid or duplicate server-owned configuration key");
     }
     if (definition.canReset && !definition.defaults) throw new Error("Reset requires reviewed defaults");
+    if (definition.defaultsOnRead && !definition.defaults) throw new Error("Read defaults require reviewed defaults");
     if (definition.kind === "secret" && definition.defaults) throw new Error("Secret defaults are forbidden");
     if (new Set(definition.fields.map((field) => field.name)).size !== definition.fields.length) {
       throw new Error("Duplicate configuration field");

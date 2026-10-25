@@ -19,7 +19,7 @@ export async function readConfiguration(db: ConfigurationDatabase, environment: 
   const contract = registry.get(key);
   if (!contract || contract.kind !== "policy") throw new ConfigurationError("INVALID_INPUT", "Unsupported policy key.");
   const row = await db.platformConfiguration.findUnique({ where: { environment_key: { environment, key } } });
-  if (!row) return { key, value: null, version: 0, updatedAt: null, updatedBy: null, invalidStoredValue: false };
+  if (!row) return { key, value: contract.defaultsOnRead ? { ...contract.defaults } : null, version: 0, updatedAt: null, updatedBy: null, invalidStoredValue: false };
   const { validateConfiguration } = await import("./contracts");
   const result = validateConfiguration(contract, row.value);
   const safeRecord = row.value && typeof row.value === "object" && !Array.isArray(row.value) &&
