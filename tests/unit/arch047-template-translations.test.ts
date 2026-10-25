@@ -9,6 +9,7 @@ import { projectTranslationProgress } from "../../src/lib/admin/whatsapp-templat
 import { retryWhatsAppTemplateTranslation, startWhatsAppTemplateTranslation } from "../../src/lib/admin/whatsapp-templates/translations/service.ts";
 import type { PlatformAdminPrincipal } from "../../src/lib/auth/platform-admin.ts";
 import type { TranslationDatabase } from "../../src/lib/admin/whatsapp-templates/translations/repository.ts";
+import { loadPolicyModule } from "./helpers/commerce-model-policy-module-harness.mjs";
 
 const actor = { id: "arch047-admin-translation-fixture", role: "SUPER_ADMIN", developmentBypass: false } as PlatformAdminPrincipal;
 const definitionId = `wtdef_${"a".repeat(64)}`;
@@ -220,4 +221,43 @@ test("non-SUPER_ADMIN cannot start translation or inspect cross-shop state", asy
   const f = fixture();
   await assert.rejects(startWhatsAppTemplateTranslation(definitionId, { db: f.db, principal: { ...actor, role: "ADMIN" } as PlatformAdminPrincipal }), /SUPER_ADMIN/);
   assert.equal(f.runs.length, 0);
+});
+
+test("translation Server Actions enforce platform-admin SUPER_ADMIN access before service calls", async () => {
+  let role = "ADMIN";
+  const calls: string[] = [];
+  const paths: string[] = [];
+  const action = loadPolicyModule("src/app/actions/whatsapp-template-translations.ts", {
+    "next/cache": { revalidatePath: (path: string) => paths.push(path) },
+    "@/lib/auth/platform-admin": {
+      requirePlatformAdminMutation: async () => ({ id: "action-admin", role, developmentBypass: false }),
+      requirePlatformAdminRead: async () => ({ id: "action-admin", role, developmentBypass: false }),
+    },
+    "@/lib/auth/development-platform-admin": { ensureDevelopmentPlatformAdmin: async () => {} },
+    "@/lib/prisma": { prisma: {} },
+    "@/lib/admin/whatsapp-templates/translations/service": {
+      startWhatsAppTemplateTranslation: async () => { calls.push("generate"); return { runId: "run-1", reused: false, state: {} }; },
+      retryWhatsAppTemplateTranslation: async () => { calls.push("retry"); return { runId: "run-1", retryRequested: 1, state: {} }; },
+      getWhatsAppTemplateTranslationState: async () => { calls.push("read"); return {}; },
+    },
+  }, { workspaceRoot: process.cwd() }) as {
+    generateWhatsAppTemplateTranslations: (id: string) => Promise<{ ok: boolean }>;
+    retryWhatsAppTemplateTranslations: (id: string) => Promise<{ ok: boolean }>;
+    readWhatsAppTemplateTranslations: (id: string) => Promise<{ ok: boolean }>;
+  };
+
+  await assert.rejects(action.generateWhatsAppTemplateTranslations(definitionId), /SUPER_ADMIN/);
+  await assert.rejects(action.retryWhatsAppTemplateTranslations(definitionId), /SUPER_ADMIN/);
+  await assert.rejects(action.readWhatsAppTemplateTranslations(definitionId), /SUPER_ADMIN/);
+  assert.deepEqual(calls, []);
+
+  role = "SUPER_ADMIN";
+  assert.equal((await action.generateWhatsAppTemplateTranslations(definitionId)).ok, true);
+  assert.equal((await action.retryWhatsAppTemplateTranslations(definitionId)).ok, true);
+  assert.equal((await action.readWhatsAppTemplateTranslations(definitionId)).ok, true);
+  assert.deepEqual(calls, ["generate", "retry", "read"]);
+  assert.deepEqual(paths, [
+    `/system-controls/whatsapp-templates/${definitionId}/translations`,
+    `/system-controls/whatsapp-templates/${definitionId}/translations`,
+  ]);
 });
