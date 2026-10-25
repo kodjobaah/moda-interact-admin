@@ -1,12 +1,16 @@
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-
-const projectRequire = createRequire(new URL('../../../package.json', import.meta.url));
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Execute the actual TS/TSX module with explicitly controlled framework adapters. */
-export function loadPolicyModule(path, mocks, { FormData: FormDataImpl = FormData } = {}) {
+export function loadPolicyModule(path, mocks, {
+  FormData: FormDataImpl = FormData,
+  workspaceRoot = fileURLToPath(new URL('../../../', import.meta.url)),
+} = {}) {
+  const projectRequire = createRequire(resolve(workspaceRoot, 'package.json'));
   const ts = projectRequire('typescript');
-  const source = readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
+  const source = readFileSync(resolve(workspaceRoot, path), 'utf8');
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
