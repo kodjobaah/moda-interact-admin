@@ -21,6 +21,7 @@ export function Sidebar({
     | "platform-policy"
     | "background-runtime"
     | "store-categories"
+    | "whatsapp-templates"
     | "agent-instructions"
     | "embeddings"
     | "translations"
@@ -40,6 +41,7 @@ export function Sidebar({
     active === "platform-policy" ||
     active === "background-runtime" ||
     active === "store-categories" ||
+    active === "whatsapp-templates" ||
     active === "agent-instructions" ||
     active === "embeddings" ||
     active === "translations";
@@ -187,6 +189,13 @@ export function Sidebar({
               >
                 Store Categories
               </Link>
+              {administratorRole === "SUPER_ADMIN" && <Link
+                href="/system-controls/whatsapp-templates"
+                aria-current={active === "whatsapp-templates" ? "page" : undefined}
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "whatsapp-templates" ? selected : idle}`}
+              >
+                WhatsApp Templates
+              </Link>}
               <Link
                 href="/system-controls/agent-instructions"
                 aria-current={
