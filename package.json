@@ -26,6 +26,8 @@
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
     "test:arch047-admin-authoring:unit": "tsx --test tests/unit/arch047-template-authoring-ast.test.ts tests/unit/arch047-template-authoring-service.test.ts tests/unit/arch047-template-authoring-components.test.tsx",
     "test:arch047-admin-authoring:postgres": "node scripts/test-arch047-admin-authoring-postgres.mjs",
+    "test:arch047-admin-translations:unit": "node scripts/test-arch047-admin-translations-esm.mjs tests/unit/arch047-template-translations.test.ts tests/unit/arch047-template-translation-components.test.tsx",
+    "test:arch047-admin-translations:postgres": "npm run prisma:generate && node scripts/test-arch047-admin-translations-postgres.mjs",
     "admin:provision": "node scripts/provision-platform-admin.mjs",
     "admin:seed-promotions": "node scripts/seed-promotion-test-data.mjs",
     "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear",
@@ -40,7 +42,7 @@
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
-    "@modainteract/moda-interact-shared": "2.4.1",
+    "@modainteract/moda-interact-shared": "2.5.0",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "codemirror": "^6.0.2",
@@ -64,6 +66,7 @@
     "prisma": "6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "esbuild": "0.28.2"
   }
 }
