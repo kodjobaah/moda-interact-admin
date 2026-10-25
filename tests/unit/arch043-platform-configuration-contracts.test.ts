@@ -15,14 +15,14 @@ const fixture: ConfigurationContract = {
   ],
 };
 
-test("production allowlist has exactly five canonical policy groups with 22 fields", () => {
-  assert.deepEqual([...registry.keys()], ["woo.couponSync", "speech.transcription", "commerce.preview", "admin.grafana", "omini.moderation"]);
-  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 22);
+test("production allowlist has exactly six canonical policy groups with 24 fields", () => {
+  assert.deepEqual([...registry.keys()], ["woo.couponSync", "speech.transcription", "commerce.preview", "admin.grafana", "omini.moderation", "shopBrand.publicMedia"]);
+  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 24);
   for (const contract of registry.values()) {
     assert.equal(contract.requiredRole, "SUPER_ADMIN");
     assert.equal(contract.kind, "policy");
     assert.equal(new Set(contract.fields.map((field) => field.name)).size, contract.fields.length);
-    assert.equal(contract.canReset, Boolean(contract.defaults));
+    if (contract.canReset) assert.ok(contract.defaults);
     if (contract.defaults) assert.deepEqual(validateConfiguration(contract, contract.defaults), { ok: true, values: contract.defaults });
   }
   assert.equal(registry.has("fixture.sample"), false);
@@ -32,7 +32,7 @@ test("single-source descriptor controls strict types, bounds and unknown fields"
   for (const contract of registry.values()) {
     const input = Object.fromEntries(contract.fields.map((field) => [field.name,
       field.kind === "integer" ? field.min : field.kind === "boolean" ? false :
-      field.kind === "enum" ? field.options[0] : field.kind === "nullable-https-url" ? (field.purpose === "r2" ? "https://abc.r2.cloudflarestorage.com" : null) :
+      field.kind === "enum" ? field.options[0] : field.kind === "nullable-https-url" ? (contract.defaults?.[field.name] ?? (field.purpose === "r2" ? "https://abc.r2.cloudflarestorage.com" : null)) :
       field.kind === "secret" ? "" : field.pattern === "bucket" ? "approved-bucket" : "approved-model"]));
     assert.equal(validateConfiguration(contract, input).ok, true, contract.key);
     for (const field of contract.fields) {
