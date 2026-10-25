@@ -20,6 +20,7 @@ export function TemplateSavedDetail({ detail }: { detail: TemplateDetail }) {
       <div><dt className="text-gray-500">Provider name</dt><dd className="break-all">{detail.providerTemplateName || "Not applicable (internal)"}</dd></div>
       <div className="sm:col-span-2"><dt className="text-gray-500">Source SHA-256</dt><dd className="break-all font-mono text-xs">{detail.sourceHash}</dd></div>
     </dl>
+    {detail.english && <Link className="inline-block rounded border border-blue-700 px-3 py-2 text-sm font-medium text-blue-800" href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/review`}>Review translations</Link>}
     {detail.english ? <TemplateReadOnlyPreview preview={preview} /> : <p role="alert" className="text-sm text-red-700">English locale unavailable. No edits are permitted here.</p>}
   </article>;
 }

@@ -1,10 +1,11 @@
 import type { TemplatePreviewDTO } from "@/lib/admin/whatsapp-templates/authoring/types";
 
 /** Presentation-only example data. No network requests, real customer information or live links. */
-export function TemplateReadOnlyPreview({ preview, title = "Example preview", draftInvalid = false }: {
+export function TemplateReadOnlyPreview({ preview, title = "Example preview", draftInvalid = false, localeLanguageTag = "English" }: {
   preview: TemplatePreviewDTO | null;
   title?: string;
   draftInvalid?: boolean;
+  localeLanguageTag?: string;
 }) {
   return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5" aria-label="Example template preview">
     <div><h2 className="font-semibold text-slate-900">{title}</h2>
@@ -25,6 +26,6 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
     </div>
     {!preview ? <p className="text-xs text-slate-600" role="status">A validated example preview is not available.</p>
       : draftInvalid ? <p className="text-xs text-amber-800" role="status">Draft preview only. Correct validation issues before saving; the displayed message is not a validated Meta projection.</p>
-      : <p className="text-xs text-emerald-800" role="status">Example based on the validated English definition.</p>}
+      : <p className="text-xs text-emerald-800" role="status">Example based on the validated {localeLanguageTag} template.</p>}
   </section>;
 }
