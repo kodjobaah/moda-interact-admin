@@ -9,7 +9,10 @@ export function TemplateSavedDetail({ detail }: { detail: TemplateDetail }) {
     ? makeExamplePreview(detail.english.prepared) : null;
   return <article className="space-y-4 rounded-lg border bg-white p-4" aria-label="Saved immutable template">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Saved definition (read only)</h2>
-      {detail.english && <Link className="rounded bg-blue-800 px-3 py-2 text-sm text-white" href={`/system-controls/whatsapp-templates?clone=${encodeURIComponent(detail.id)}`}>Clone as New</Link>}
+      {detail.english && <div className="flex flex-wrap gap-2">
+        <Link className="rounded border border-blue-800 px-3 py-2 text-sm text-blue-800" href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/translations`}>Translations</Link>
+        <Link className="rounded bg-blue-800 px-3 py-2 text-sm text-white" href={`/system-controls/whatsapp-templates?clone=${encodeURIComponent(detail.id)}`}>Clone as New</Link>
+      </div>}
     </div>
     <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
       <div><dt className="text-gray-500">Identity</dt><dd className="break-all font-mono text-xs">{detail.id}</dd></div>

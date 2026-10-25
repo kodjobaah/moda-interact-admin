@@ -28,6 +28,8 @@
     "test:arch047-admin-authoring:postgres": "node scripts/test-arch047-admin-authoring-postgres.mjs",
     "test:arch047-admin-publication:unit": "node scripts/run-arch047-admin-publication-tests.mjs unit",
     "test:arch047-admin-publication:postgres": "node scripts/test-arch047-admin-publication-postgres.mjs",
+    "test:arch047-admin-translations:unit": "node scripts/test-arch047-admin-translations-esm.mjs tests/unit/arch047-template-translations.test.ts tests/unit/arch047-template-translation-components.test.tsx",
+    "test:arch047-admin-translations:postgres": "npm run prisma:generate && node scripts/test-arch047-admin-translations-postgres.mjs",
     "pretest:arch047-admin-meta:unit": "npm run prisma:generate",
     "test:arch047-admin-meta:unit": "tsx --test tests/unit/arch047-template-meta-snapshots.test.ts tests/unit/arch047-template-meta-service.test.ts && node --test tests/unit/arch047-template-meta-components.test.mjs",
     "pretest:arch047-admin-meta:postgres": "npm run prisma:generate",
@@ -45,7 +47,10 @@
     "shopify-taxonomy:sync": "node scripts/sync-shopify-taxonomy.mjs",
     "test:arch047-admin-compilation:unit": "tsx --test tests/unit/arch047-template-compilation.test.ts tests/unit/arch047-template-compilation-service.test.ts",
     "test:arch047-admin-compilation:postgres": "node scripts/test-arch047-admin-compilation-postgres.mjs",
-    "test:arch047-admin-compilation:components": "tsx --test tests/unit/arch047-template-compilation-components.test.tsx"
+    "test:arch047-admin-compilation:components": "tsx --test tests/unit/arch047-template-compilation-components.test.tsx",
+    "test:arch047-admin-wrappers:unit": "tsx --test tests/unit/arch047-template-wrappers.test.ts tests/unit/arch047-template-wrappers-service.test.ts",
+    "test:arch047-admin-wrappers:components": "tsx --test tests/unit/arch047-template-wrappers-components.test.tsx",
+    "test:arch047-admin-wrappers:postgres": "node scripts/test-arch047-admin-wrappers-postgres.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
