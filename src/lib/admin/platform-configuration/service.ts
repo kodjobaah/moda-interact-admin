@@ -1,21 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { requirePlatformAdminMutation, requirePlatformAdminRead, type PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
-import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
+import { getConfigurationEnvironment } from "./environment";
 import { PLATFORM_POLICY_REGISTRY, publicContracts, type Registry } from "./contracts";
 import { ConfigurationError } from "./errors";
 import { readConfiguration, readConfigurationHistory } from "./repository";
 import { mutateConfigurationWithDependencies } from "./mutate";
 
-const ENVIRONMENTS = new Set(["local", "test", "development", "staging", "production"]);
-export function getConfigurationEnvironment(): string {
-  const environment = resolveDeploymentEnvironmentName();
-  if (!ENVIRONMENTS.has(environment)) throw new ConfigurationError("INVALID_INPUT", "Unknown deployment environment.");
-  // NODE_ENV production always wins over any attempt to impersonate development.
-  if (process.env.NODE_ENV === "production" && environment === "development") {
-    throw new ConfigurationError("FORBIDDEN", "Environment identity is inconsistent.");
-  }
-  return environment;
-}
+export { getConfigurationEnvironment };
+
 export function requireConfigurationSuperAdmin(principal: PlatformAdminPrincipal): void {
   if (principal.role !== "SUPER_ADMIN") throw new ConfigurationError("FORBIDDEN", "SUPER_ADMIN access is required.");
 }

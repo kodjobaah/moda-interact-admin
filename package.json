@@ -26,6 +26,8 @@
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
     "test:arch047-admin-authoring:unit": "tsx --test tests/unit/arch047-template-authoring-ast.test.ts tests/unit/arch047-template-authoring-service.test.ts tests/unit/arch047-template-authoring-components.test.tsx",
     "test:arch047-admin-authoring:postgres": "node scripts/test-arch047-admin-authoring-postgres.mjs",
+    "test:arch047-admin-publication:unit": "node scripts/run-arch047-admin-publication-tests.mjs unit",
+    "test:arch047-admin-publication:postgres": "node scripts/test-arch047-admin-publication-postgres.mjs",
     "test:arch047-admin-translations:unit": "node scripts/test-arch047-admin-translations-esm.mjs tests/unit/arch047-template-translations.test.ts tests/unit/arch047-template-translation-components.test.tsx",
     "test:arch047-admin-translations:postgres": "npm run prisma:generate && node scripts/test-arch047-admin-translations-postgres.mjs",
     "pretest:arch047-admin-meta:unit": "npm run prisma:generate",
@@ -71,12 +73,12 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "eslint-config-prettier": "^10.1.8",
+    "esbuild": "0.28.2",
     "prettier": "3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5",
-    "esbuild": "0.28.2"
+    "typescript": "^5"
   }
 }
