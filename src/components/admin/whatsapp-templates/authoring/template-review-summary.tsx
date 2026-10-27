@@ -15,6 +15,9 @@ export function TemplateReviewSummary({ draft, issues, onStep }: {
       <div><dt className="text-slate-500">Purpose</dt><dd className="mt-1 font-medium">{purpose}</dd></div>
       <div><dt className="text-slate-500">Source language</dt><dd className="mt-1 font-medium">English (en)</dd></div>
     </dl>
+    {draft.family === "META_RECOVERY" && draft.shopBrandMediaRole && <p className="text-sm text-amber-800" role="status">
+      IMAGE header: {draft.shopBrandMediaRole}. This saved binding is merchant-independent; submission to Meta requires an independently acquired, trusted sample handle.
+    </p>}
     <div className="border-t border-slate-100 pt-4">
       <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">Validation</h3>
         <button type="button" onClick={() => onStep("compose")} className="text-sm text-blue-800 underline">Edit content</button></div>

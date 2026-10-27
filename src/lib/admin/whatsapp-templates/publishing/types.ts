@@ -14,10 +14,12 @@ export type CompiledTemplateView = {
   status: string | null;
   category: string | null;
   header: string | null;
+  headerFormat?: "IMAGE";
   body: string | null;
   footer: string | null;
   buttons: Array<{ text: string; url: string; type: string }> | null;
-  bindings: { header: Array<{ position: number; variable: string }>;
+  bindings: { headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
+    header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
     buttons: Array<{ index: number; variable: string }> } | null;
 };

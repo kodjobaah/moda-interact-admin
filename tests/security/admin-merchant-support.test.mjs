@@ -90,7 +90,7 @@ test('bounds protected shop suggestions and aligns search with brand/domain matc
   }]);
   assert.equal(result.queryCalls, 1);
   assert.match(result.sql, /FROM "support"\."MerchantSupportThread"/);
-  assert.match(result.sql, /LEFT JOIN "shopify"\."ShopBrand"/);
+  assert.match(result.sql, /LEFT JOIN "commerce"\."ShopBrand"/);
   assert.match(result.sql, /s\."domain" ILIKE/);
   assert.match(result.sql, /sb\."brandName" ILIKE/);
   assert.ok(result.values.includes(8));

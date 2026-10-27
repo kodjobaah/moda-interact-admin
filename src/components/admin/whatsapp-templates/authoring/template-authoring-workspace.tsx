@@ -9,10 +9,12 @@ import { TemplateSaveControls } from "./template-save-controls";
 import { TemplateEditorSteps, type TemplateEditorStep } from "./template-editor-steps";
 import { TemplateReviewSummary } from "./template-review-summary";
 import { useTemplateAuthoringDraft } from "./use-template-authoring-draft";
+import { useShopBrandMediaRole } from "../media/use-shop-brand-media-role";
 
 /** Layout only: all AST mutations, validation, preview and saving live in the controller or pure services. */
 export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: TemplateDetail | null }) {
   const controller = useTemplateAuthoringDraft(cloneFrom);
+  const media = useShopBrandMediaRole();
   const [step, setStep] = useState<TemplateEditorStep>("setup");
   const issues = controller.checked.ok ? [] : controller.checked.issues;
   const select = (next: TemplateEditorStep) => setStep(next);
@@ -39,13 +41,19 @@ export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: Template
     </div>
     <div id="whatsapp-panel-compose" role="tabpanel" aria-labelledby="whatsapp-tab-compose" hidden={step !== "compose"}
       className={step === "compose" ? "grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.82fr)]" : "hidden"}>
-      <TemplateContentEditor draft={controller.draft} onChange={controller.updateDraft} issues={issues} />
-      <div className="xl:sticky xl:top-0"><TemplateReadOnlyPreview preview={controller.preview} title="Live WhatsApp preview" draftInvalid={issues.length > 0} /></div>
+      <TemplateContentEditor draft={controller.draft} onChange={controller.updateDraft} issues={issues} media={media} />
+      <div className="xl:sticky xl:top-0"><TemplateReadOnlyPreview preview={controller.preview} title="Live WhatsApp preview" draftInvalid={issues.length > 0}
+        verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
+          ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
+        mediaDomain={media.media?.domain} /></div>
     </div>
     <div id="whatsapp-panel-review" role="tabpanel" aria-labelledby="whatsapp-tab-review" hidden={step !== "review"} className={step === "review" ? "space-y-5" : "hidden"}>
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <TemplateReviewSummary draft={controller.draft} issues={issues} onStep={select} />
-        <TemplateReadOnlyPreview preview={controller.preview} title="Final example preview" draftInvalid={issues.length > 0} />
+        <TemplateReadOnlyPreview preview={controller.preview} title="Final example preview" draftInvalid={issues.length > 0}
+          verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
+            ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
+          mediaDomain={media.media?.domain} />
       </div>
       <TemplateSaveControls issues={issues} saving={controller.saving} savedId={controller.savedId}
         error={controller.error} cloneFromId={cloneFrom?.id} showIssues={false} onSave={controller.submit} />
