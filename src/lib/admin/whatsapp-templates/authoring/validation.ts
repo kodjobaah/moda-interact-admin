@@ -24,7 +24,7 @@ export function validateTemplateAst(raw: unknown): { ok: true; value: TemplateAs
   const family = raw.family;
   const meta = family === "META_RECOVERY";
   const common = ["schemaVersion", "family", "sourceLanguageTag", "header", "body", "footer"];
-  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "buttons"] : [...common, "audience", "conditionals"])) fail("root", "Unknown template fields.");
+  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "buttons", "shopBrandMediaRole"] : [...common, "audience", "conditionals"])) fail("root", "Unknown template fields.");
   if (meta) {
     if (!enumMember(raw.stage, ["INITIAL", "FOLLOW_UP"])) fail("stage", "Select a recovery stage.");
     if (!enumMember(raw.offerType, ["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"])) fail("offerType", "Select an offer type.");
@@ -61,6 +61,14 @@ export function validateTemplateAst(raw: unknown): { ok: true; value: TemplateAs
   checkNodes(raw.footer, "footer", meta ? 60 : 1500, meta ? ["text"] : ["text", "variable"]);
   if (!Array.isArray(raw.body) || raw.body.length === 0 || (raw.body as unknown[]).every((n) => object(n) && n.type === "text" && typeof n.value === "string" && !n.value.trim())) fail("body", "Body cannot be empty.");
   if (meta) {
+    if (raw.shopBrandMediaRole !== undefined) {
+      if (!enumMember(raw.shopBrandMediaRole, ["LOGO", "SQUARE_LOGO", "COVER_IMAGE"])) {
+        fail("shopBrandMediaRole", "Choose a supported ShopBrand image role.");
+      }
+      if (!Array.isArray(raw.header) || raw.header.length !== 0) {
+        fail("header", "IMAGE headers cannot also contain text or text variables.");
+      }
+    }
     if (!Array.isArray(raw.buttons) || raw.buttons.length > 1) fail("buttons", "At most one URL button is supported.");
     else for (const [i, b] of raw.buttons.entries()) {
       const key = `buttons.${i}`;

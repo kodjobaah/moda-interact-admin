@@ -19,6 +19,18 @@ const jsonObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 const fail = (code: string, message: string): never => { throw new MetaSubmissionError(code, message); };
 
+/** Frozen projection must be byte-for-byte digest compatible with the Admin compiler.
+ * The IMAGE branch deliberately contains no merchant URL or sample upload handle. */
+export function imageHeaderRegistrationBindings(prepared: MetaPrepared): MetaLocaleSnapshot["bindings"] {
+  const role = prepared.parameterBindings.headerMediaRole;
+  if (!role || prepared.parameterBindings.schemaVersion !== 1 ||
+      (prepared.parameterBindings.header ?? []).length !== 0 ||
+      !prepared.components.some((component) => component.type === "HEADER" && component.format === "IMAGE")) {
+    throw new MetaSubmissionError("BINDINGS_INVALID", "An immutable IMAGE role projection is required.");
+  }
+  return JSON.parse(JSON.stringify(prepared.parameterBindings)) as MetaLocaleSnapshot["bindings"];
+}
+
 /** Verify the saved AST by calling the ONE Admin compiler, never compiling Meta in this module. */
 export function frozenLocaleSnapshot(row: LocaleForMeta, def: DefinitionForMeta): MetaLocaleSnapshot {
   if (row.definitionId !== def.id) fail("INVALID_LOCALE", "Locale is not owned by this definition.");
@@ -56,17 +68,32 @@ export function frozenLocaleSnapshot(row: LocaleForMeta, def: DefinitionForMeta)
   if (row.languageTag === "en" && templateHash(source) !== def.sourceHash) {
     fail("SOURCE_HASH_MISMATCH", "Saved English definition has changed.");
   }
+  // No trusted Media Upload sample producer exists yet. Saving/translating IMAGE
+  // definitions is allowed; provider registration is not. This is never a link.
+  const imageHeader = recompiled.components.find((component) => component.type === "HEADER" && component.format === "IMAGE");
+  if (imageHeader) {
+    const example = imageHeader.example;
+    if (!jsonObject(example) || !Array.isArray(example.header_handle) ||
+        example.header_handle.length !== 1 || typeof example.header_handle[0] !== "string" ||
+        !example.header_handle[0].trim()) {
+      fail("IMAGE_SAMPLE_HANDLE_REQUIRED", "A trusted, server-produced Meta image sample handle is required before IMAGE template submission.");
+    }
+  }
   // JSON copies detach the frozen registration payloads from the mutable Prisma result.
   const prepared = record.prepared as MetaPrepared;
   return {
     localeId: row.id, languageTag: row.languageTag, providerLanguageCode: code, contentHash,
     components: JSON.parse(JSON.stringify(prepared.components)) as Array<Record<string, unknown>>,
-    bindings: {
-      schemaVersion: 1, sourceHash: def.sourceHash, localeContentHash: contentHash,
-      header: JSON.parse(JSON.stringify(prepared.parameterBindings.header ?? [])) as MetaLocaleSnapshot["bindings"]["header"],
-      body: JSON.parse(JSON.stringify(prepared.parameterBindings.body)) as MetaLocaleSnapshot["bindings"]["body"],
-      buttons: JSON.parse(JSON.stringify(prepared.parameterBindings.buttons)) as MetaLocaleSnapshot["bindings"]["buttons"],
-    },
+    bindings: prepared.parameterBindings.headerMediaRole
+      ? imageHeaderRegistrationBindings(prepared)
+      : {
+        // The existing TEXT registration format is retained to avoid rewriting
+        // accepted ARCH-047 records. IMAGE snapshots use the exact new v1 binding.
+        schemaVersion: 1, sourceHash: def.sourceHash, localeContentHash: contentHash,
+        header: JSON.parse(JSON.stringify(prepared.parameterBindings.header ?? [])) as MetaLocaleSnapshot["bindings"]["header"],
+        body: JSON.parse(JSON.stringify(prepared.parameterBindings.body)) as MetaLocaleSnapshot["bindings"]["body"],
+        buttons: JSON.parse(JSON.stringify(prepared.parameterBindings.buttons)) as MetaLocaleSnapshot["bindings"]["buttons"],
+      },
   };
 }
 

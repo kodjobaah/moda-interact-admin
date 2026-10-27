@@ -7,9 +7,8 @@ import { validateTemplateAst } from "./validation";
 
 export type SaveTemplateInput = { submissionId: string; draft: unknown; cloneFromDefinitionId?: string };
 
-export function requireTemplateSuperAdmin(principal: Pick<PlatformAdminPrincipal, "role" | "id">): void {
-  if (principal.role !== "SUPER_ADMIN" || !principal.id) throw new Error("SUPER_ADMIN required for WhatsApp template management.");
-}
+import { requireTemplateSuperAdmin } from "./super-admin";
+export { requireTemplateSuperAdmin } from "./super-admin";
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";

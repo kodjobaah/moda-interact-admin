@@ -35,7 +35,12 @@ export function reasonText(value: unknown): string {
 export function parseBindings(input: unknown): NonNullable<CompiledTemplateView["bindings"]> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return reject("CONTENT", "Missing frozen parameter bindings.");
   const v = input as Record<string, unknown>;
-  if (Object.keys(v).some((k) => !["header", "body", "buttons"].includes(k))) return reject("CONTENT", "Unrecognised frozen parameter bindings.");
+  if (Object.keys(v).some((k) => !["schemaVersion", "headerMediaRole", "header", "body", "buttons"].includes(k)) ||
+      (v.schemaVersion !== undefined && v.schemaVersion !== 1)) return reject("CONTENT", "Unrecognised frozen parameter bindings.");
+  if (v.headerMediaRole !== undefined &&
+      !["LOGO", "SQUARE_LOGO", "COVER_IMAGE"].includes(String(v.headerMediaRole))) {
+    return reject("CONTENT", "Unknown IMAGE media role.");
+  }
   function positions(value: unknown, optional = false): Array<{ position: number; variable: string }> {
     if (optional && value === undefined) return [];
     if (!Array.isArray(value) || value.length > 50) return reject("CONTENT", "Invalid positional bindings.");
@@ -53,13 +58,24 @@ export function parseBindings(input: unknown): NonNullable<CompiledTemplateView[
     return { index: Number(b.index), variable: "checkout.url" };
   });
   if (new Set(buttons.map((b) => b.index)).size !== buttons.length) return reject("CONTENT", "Duplicate URL button binding.");
-  return { header: positions(v.header, true), body: positions(v.body), buttons };
+  const header = positions(v.header, true);
+  if (v.headerMediaRole && (v.schemaVersion !== 1 || header.length > 0)) {
+    return reject("CONTENT", "IMAGE header may not contain text bindings.");
+  }
+  return { header, body: positions(v.body), buttons,
+    ...(v.headerMediaRole ? { headerMediaRole: v.headerMediaRole as "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE" } : {}) };
 }
-export function parseComponents(input: unknown): Pick<CompiledTemplateView, "header" | "body" | "footer" | "buttons"> {
+export function parseComponents(input: unknown): Pick<CompiledTemplateView, "header" | "headerFormat" | "body" | "footer" | "buttons"> {
   if (!Array.isArray(input) || !input.length || input.length > 4) return reject("CONTENT", "Invalid frozen provider components.");
   const components = input as unknown[];
   const part = (type: string) => components.find((v) => v && typeof v === "object" && !Array.isArray(v) && (v as Record<string, unknown>).type === type) as Record<string, unknown> | undefined;
-  if (part("HEADER") && part("HEADER")?.format !== "TEXT") return reject("CONTENT", "Media headers require the separately approved asset readiness contract.");
+  if (part("HEADER") && !["TEXT", "IMAGE"].includes(String(part("HEADER")?.format))) {
+    return reject("CONTENT", "Unsupported Meta header format.");
+  }
+  if (part("HEADER")?.format === "IMAGE" &&
+      (part("HEADER")?.text !== undefined || part("HEADER")?.url !== undefined)) {
+    return reject("CONTENT", "IMAGE headers cannot contain source URLs or text.");
+  }
   if (!part("BODY") || components.some((p) => !p || typeof p !== "object" || !["HEADER", "BODY", "FOOTER", "BUTTONS"].includes(String((p as Record<string, unknown>).type)))) return reject("CONTENT", "Invalid Meta components.");
   if (new Set(components.map((p) => (p as Record<string, unknown>).type)).size !== components.length) return reject("CONTENT", "Duplicate Meta component.");
   const text = (item: Record<string, unknown> | undefined) => item ? typeof item.text === "string" ? item.text : reject("CONTENT", "Invalid text component.") : null;
@@ -69,7 +85,9 @@ export function parseComponents(input: unknown): Pick<CompiledTemplateView, "hea
     if (!b || typeof b !== "object" || typeof b.text !== "string" || typeof b.url !== "string" || b.type !== "URL") return reject("CONTENT", "Invalid Meta button.");
     return { type: "URL", text: String(b.text), url: String(b.url) };
   }) : [];
-  return { header: text(part("HEADER")), body: text(part("BODY")), footer: text(part("FOOTER")), buttons };
+  return { header: part("HEADER")?.format === "IMAGE" ? null : text(part("HEADER")),
+    body: text(part("BODY")), footer: text(part("FOOTER")), buttons,
+    ...(part("HEADER")?.format === "IMAGE" ? { headerFormat: "IMAGE" as const } : {}) };
 }
 export function brandKeys(bindings: NonNullable<CompiledTemplateView["bindings"]>): string[] {
   const present = new Set([...bindings.header, ...bindings.body, ...bindings.buttons].map((b) => b.variable));
@@ -126,6 +144,9 @@ export function equivalentRegistration(record: {
       const matches = [...(text ?? "").matchAll(/\{\{(\d+)\}\}/g)].map((m) => Number(m[1])).sort((a, b) => a - b);
       return stableJson(matches) === stableJson(list.map((b) => b.position).sort((a, b) => a - b));
     };
+    if (pieces.headerFormat === "IMAGE") {
+      if (!mappings.headerMediaRole || mappings.header.length !== 0) return false;
+    } else if (mappings.headerMediaRole) return false;
     if (!exactPlaceholders(pieces.header, mappings.header) || !exactPlaceholders(pieces.body, mappings.body)) return false;
     if (mappings.buttons.some((entry) => entry.index >= (pieces.buttons ?? []).length)) return false;
     for (const [index, button] of (pieces.buttons ?? []).entries()) {

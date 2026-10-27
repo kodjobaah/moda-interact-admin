@@ -38,7 +38,11 @@ export function compileTemplateAst(draft: TemplateAst): PreparedTemplate {
   const components: Array<Record<string, unknown>> = [];
   const header = bodyText(draft.header);
   const footer = draft.footer.map((n) => n.value).join("");
-  if (header.text.trim()) components.push({ type: "HEADER", format: "TEXT", text: header.text,
+  if (draft.shopBrandMediaRole) {
+    // Deliberately no Meta sample handle: this task does not acquire/authorise one.
+    // The Meta submission boundary fails closed with IMAGE_SAMPLE_HANDLE_REQUIRED.
+    components.push({ type: "HEADER", format: "IMAGE" });
+  } else if (header.text.trim()) components.push({ type: "HEADER", format: "TEXT", text: header.text,
     ...(header.examples.length ? { example: { header_text: header.examples } } : {}) });
   const body = bodyText(draft.body);
   components.push({ type: "BODY", text: body.text,
@@ -55,7 +59,10 @@ export function compileTemplateAst(draft: TemplateAst): PreparedTemplate {
     components.push({ type: "BUTTONS", buttons });
   }
   return { schemaVersion: 1, family: "META_RECOVERY", category: "MARKETING", components,
-    parameterBindings: { header: header.bindings, body: body.bindings, buttons: buttonBindings } };
+    parameterBindings: {
+      ...(draft.shopBrandMediaRole ? { schemaVersion: 1 as const, headerMediaRole: draft.shopBrandMediaRole } : {}),
+      header: header.bindings, body: body.bindings, buttons: buttonBindings,
+    } };
 }
 
 export function makeImmutableAuthoringRecord(draft: TemplateAst): ImmutableAuthoringRecord {

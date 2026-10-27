@@ -304,7 +304,7 @@ export async function getPendingMerchantSupportThreads(input: {
       t."lastMerchantMessageAt", ${ownerSelectSql()}
     FROM "support"."MerchantSupportThread" t
     INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
-    LEFT JOIN "shopify"."ShopBrand" sb ON sb."shopId" = s."id"
+    LEFT JOIN "commerce"."ShopBrand" sb ON sb."shopId" = s."id"
     LEFT JOIN "public"."PlatformAdmin" a ON a."id" = t."assignedPlatformAdminId"
     WHERE ${where}
     ORDER BY t."lastMerchantMessageAt" DESC NULLS LAST, t."id" ASC
@@ -314,7 +314,7 @@ export async function getPendingMerchantSupportThreads(input: {
     SELECT COUNT(*)::bigint AS "count"
     FROM "support"."MerchantSupportThread" t
     INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
-    LEFT JOIN "shopify"."ShopBrand" sb ON sb."shopId" = s."id"
+    LEFT JOIN "commerce"."ShopBrand" sb ON sb."shopId" = s."id"
     WHERE ${where}
   `);
   const totalItems = Number(count);
@@ -364,7 +364,7 @@ export async function getMerchantSupportShopSuggestions(input: {
       t."needsAdminResponse"
     FROM "support"."MerchantSupportThread" t
     INNER JOIN "commerce"."Shop" s ON s."id" = t."shopId"
-    LEFT JOIN "shopify"."ShopBrand" sb ON sb."shopId" = s."id"
+    LEFT JOIN "commerce"."ShopBrand" sb ON sb."shopId" = s."id"
     WHERE s."domain" ILIKE ${pattern} OR sb."brandName" ILIKE ${pattern}
     ORDER BY t."needsAdminResponse" DESC,
       t."lastMessageAt" DESC NULLS LAST,

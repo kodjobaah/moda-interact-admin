@@ -50,7 +50,9 @@
     "test:arch047-admin-compilation:components": "tsx --test tests/unit/arch047-template-compilation-components.test.tsx",
     "test:arch047-admin-wrappers:unit": "tsx --test tests/unit/arch047-template-wrappers.test.ts tests/unit/arch047-template-wrappers-service.test.ts",
     "test:arch047-admin-wrappers:components": "tsx --test tests/unit/arch047-template-wrappers-components.test.tsx",
-    "test:arch047-admin-wrappers:postgres": "node scripts/test-arch047-admin-wrappers-postgres.mjs"
+    "test:arch047-admin-wrappers:postgres": "node scripts/test-arch047-admin-wrappers-postgres.mjs",
+    "test:arch049-admin-media:unit": "tsx --test tests/unit/arch049-admin-media-readiness.test.ts tests/unit/arch049-admin-media-reader.test.ts tests/unit/arch049-admin-media-compiler.test.ts tests/unit/arch049-admin-media-projection-vectors.test.ts tests/unit/arch049-admin-media-components.test.tsx && node --test tests/security/arch049-admin-media-sql.test.mjs",
+    "test:arch049-admin-media:postgres": "npm run prisma:generate && node scripts/test-arch049-admin-media-postgres.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",

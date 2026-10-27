@@ -7,8 +7,10 @@ export type MetaLocaleSnapshot = {
   components: Array<Record<string, unknown>>;
   bindings: {
     schemaVersion: 1;
-    sourceHash: string;
-    localeContentHash: string;
+    /** Existing TEXT submissions retain these audit fields; IMAGE role bindings use the frozen v1 five-field projection. */
+    sourceHash?: string;
+    localeContentHash?: string;
+    headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
     header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
     buttons: Array<{ index: number; subType: "url"; variable: string }>;

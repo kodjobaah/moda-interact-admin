@@ -1,11 +1,15 @@
 import type { TemplatePreviewDTO } from "@/lib/admin/whatsapp-templates/authoring/types";
+import type { MediaRoleView } from "@/lib/admin/whatsapp-templates/media/readiness";
+import { ShopBrandMediaPreview } from "../media/shop-brand-media-preview";
 
 /** Presentation-only example data. No network requests, real customer information or live links. */
-export function TemplateReadOnlyPreview({ preview, title = "Example preview", draftInvalid = false, localeLanguageTag = "English" }: {
+export function TemplateReadOnlyPreview({ preview, title = "Example preview", draftInvalid = false, localeLanguageTag = "English", verifiedMedia, mediaDomain }: {
   preview: TemplatePreviewDTO | null;
   title?: string;
   draftInvalid?: boolean;
   localeLanguageTag?: string;
+  verifiedMedia?: MediaRoleView;
+  mediaDomain?: string;
 }) {
   return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5" aria-label="Example template preview">
     <div><h2 className="font-semibold text-slate-900">{title}</h2>
@@ -13,6 +17,13 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
     <div className="rounded-xl border border-slate-200 bg-[#e7f0e8] p-3 sm:p-5" aria-label="WhatsApp-style preview">
       <div className="mx-auto max-w-sm rounded-xl bg-white p-4 shadow-sm" role="region" aria-label="Example message">
         {!preview ? <p className="text-sm text-slate-600">No preview available.</p> : <>
+          {preview.headerMediaRole && <div className="mb-3" aria-label="IMAGE header preview">
+            {verifiedMedia?.status === "READY" && verifiedMedia.role === preview.headerMediaRole && mediaDomain
+              ? <ShopBrandMediaPreview media={verifiedMedia} domain={mediaDomain}/>
+              : <p className="rounded border border-dashed border-slate-300 p-3 text-xs text-slate-600">
+                  {preview.headerMediaRole.replaceAll("_", " ")} IMAGE header — no verified shop preview. This is a role binding, not a sample upload.
+                </p>}
+          </div>}
           {!!preview.header && <p className="mb-2 whitespace-pre-wrap break-words font-semibold text-slate-900">{preview.header}</p>}
           <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{preview.body || "Your message will appear here…"}</p>
           {!!preview.conditional && <p className="mt-2 whitespace-pre-wrap break-words border-l-2 border-blue-200 pl-3 text-sm text-slate-700">{preview.conditional}</p>}

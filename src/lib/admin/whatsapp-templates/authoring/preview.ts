@@ -28,7 +28,9 @@ export function makeExamplePreview(prepared: PreparedTemplate): TemplatePreviewD
   const variableButtonIndexes = new Map(prepared.parameterBindings.buttons.map((binding) => [binding.index, binding.variable]));
   return {
     family: prepared.family,
-    header: renderedHeader, body: renderedBody, footer: String(part("FOOTER")?.text ?? ""),
+    header: renderedHeader,
+    ...(prepared.parameterBindings.headerMediaRole ? { headerMediaRole: prepared.parameterBindings.headerMediaRole } : {}),
+    body: renderedBody, footer: String(part("FOOTER")?.text ?? ""),
     buttons: Array.isArray(buttons) ? buttons.map((b, i) => {
       const button = b as { text: string; url: string };
       const variable = variableButtonIndexes.get(i);
@@ -49,6 +51,7 @@ export function makeDraftExamplePreview(draft: import("./types").TemplateAst): T
   const result: TemplatePreviewDTO = {
     family: draft.family,
     header: sampleNodes(draft.header),
+    ...(draft.family === "META_RECOVERY" && draft.shopBrandMediaRole ? { headerMediaRole: draft.shopBrandMediaRole } : {}),
     body: sampleNodes(draft.body),
     footer: sampleNodes(draft.footer),
     buttons: [],

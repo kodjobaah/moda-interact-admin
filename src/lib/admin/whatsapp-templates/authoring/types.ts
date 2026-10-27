@@ -10,6 +10,7 @@ export type ShopBrandVariable =
   | "shopBrand.squareLogoUrl" | "shopBrand.squareLogoAltText"
   | "shopBrand.coverImageUrl";
 export type SemanticVariable = "customer.firstName" | "shop.name" | "checkout.url" | "offer.code" | "offer.description" | ShopBrandVariable;
+export type ShopBrandMediaRole = "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
 export type TextNode = { type: "text"; value: string };
 export type VariableNode = { type: "variable"; name: SemanticVariable };
 export type ResponseNode = { type: "slot"; name: "response.body" };
@@ -23,6 +24,8 @@ export type MetaTemplateAst = {
   stage: RecoveryStage;
   offerType: OfferType;
   header: ContentNode[];
+  /** Exclusive IMAGE header binding. Merchant-specific URLs are never persisted in the AST. */
+  shopBrandMediaRole?: ShopBrandMediaRole;
   body: ContentNode[];
   footer: TextNode[];
   buttons: UrlButton[];
@@ -46,6 +49,8 @@ export type MetaPrepared = {
   category: "MARKETING";
   components: Array<Record<string, unknown>>;
   parameterBindings: {
+    schemaVersion?: 1; // versioned IMAGE-header projection (TEXT remains backward compatible)
+    headerMediaRole?: ShopBrandMediaRole;
     header?: VariableBinding[]; // legacy saved English projections omitted this field
     body: VariableBinding[];
     buttons: Array<{ index: number; subType: "url"; variable: "checkout.url" }>;
@@ -90,4 +95,5 @@ export type TemplatePreviewDTO = {
   footer: string;
   buttons: Array<{ label: string; url: string }>;
   conditional?: string;
+  headerMediaRole?: ShopBrandMediaRole;
 };
