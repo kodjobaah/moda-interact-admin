@@ -85,6 +85,7 @@ test('preview counts merchant-scoped rows without executing writes', async () =>
   assert.equal(result.commerceAuditEvents, 3);
   assert.equal(result.commerceExternalConnectionAudits, 3);
   assert.equal(result.commerceModelPolicies, 3);
+  assert.equal(result.whatsAppTemplatePublicationTargets, 3);
   assert.deepEqual(calls.find((entry) => entry.model === 'session').where, { shop: shop.domain });
   for (const call of calls.filter((entry) => entry.model !== 'session' && entry.model !== 'conversation' &&
     entry.model !== 'commerceAgentPromptRevision' && entry.model !== 'commerceAuditEvent')) {
@@ -127,9 +128,11 @@ test('deletion is targeted and ordered around restrictive foreign keys', async (
   assert.ok(position('commerceAuditEvent') < position('commerceAgentConfiguration'));
   assert.ok(position('commerceExternalConnectionAudit') < position('commerceExternalCredential'));
   assert.ok(position('commerceModelPolicy') < position('shop'));
+  assert.ok(position('whatsAppTemplatePublicationTarget') < position('shop'));
   assert.ok(position('billingPeriod') < position('shop'));
   assert.ok(position('shop') < position('session'));
   assert.deepEqual(calls.find((call) => call.model === 'shop').where, { id: shop.id });
+  assert.deepEqual(calls.find((call) => call.model === 'whatsAppTemplatePublicationTarget').where, { shopId: shop.id });
   assert.deepEqual(calls.find((call) => call.model === 'session').where, { shop: shop.domain });
   for (const entry of calls) {
     assert.ok(entry.model === 'shop' || entry.model === 'session' || entry.model === 'merchantTranslationReconciliationRequest' ||
@@ -267,6 +270,6 @@ test('schema direct restrictive Shop foreign keys are explicitly handled', () =>
     'CommerceAgentConfiguration', 'CommerceAgentPrompt', 'CommerceAuditEvent',
     'CommerceExternalConnectionAudit', 'CommerceExternalCredential',
     'CommerceModelAvailability', 'CommerceModelPolicy', 'CommerceStudioMerchantAccess',
-    'PromotionCampaign', 'PromotionalCreditGrant',
+    'PromotionCampaign', 'PromotionalCreditGrant', 'WhatsAppTemplatePublicationTarget',
   ].sort());
 });

@@ -238,26 +238,62 @@ const COPY = {
 };
 
 const PLAN_DEFINITIONS = [
-  { handle: "free", name: "Free", credits: 5, price: 0, active: true, featured: false, grant: null },
-  { handle: "starter", name: "Starter", credits: 25, price: 1900, active: true, featured: false, grant: 25 },
-  { handle: "starter-plus", name: "Starter Plus", credits: 40, price: 2900, active: false, featured: false, grant: 25 },
-  { handle: "launch", name: "Launch", credits: 60, price: 3900, active: false, featured: false, grant: 25 },
-  { handle: "growth", name: "Growth", credits: 100, price: 5900, active: true, featured: true, grant: 50 },
-  { handle: "growth-plus", name: "Growth Plus", credits: 150, price: 7900, active: false, featured: false, grant: 50 },
-  { handle: "pro", name: "Pro", credits: 220, price: 9900, active: false, featured: false, grant: 100 },
-  { handle: "pro-plus", name: "Pro Plus", credits: 320, price: 12900, active: true, featured: false, grant: 100 },
-  { handle: "scale", name: "Scale", credits: 450, price: 15900, active: false, featured: false, grant: 200 },
-  { handle: "scale-plus", name: "Scale Plus", credits: 650, price: 19900, active: false, featured: false, grant: 250 },
-  { handle: "business", name: "Business", credits: 900, price: 24900, active: true, featured: true, grant: 300 },
-  { handle: "business-plus", name: "Business Plus", credits: 1200, price: 29900, active: false, featured: false, grant: 400 },
-  { handle: "advanced", name: "Advanced", credits: 1600, price: 34900, active: false, featured: false, grant: 500 },
-  { handle: "premium", name: "Premium", credits: 2100, price: 39900, active: false, featured: false, grant: 700 },
-  { handle: "premium-plus", name: "Premium Plus", credits: 2800, price: 49900, active: false, featured: true, grant: 800 },
-  { handle: "enterprise-lite", name: "Enterprise Lite", credits: 3600, price: 59900, active: false, featured: false, grant: 1200 },
-  { handle: "enterprise", name: "Enterprise", credits: 4800, price: 74900, active: true, featured: true, grant: 1400 },
-  { handle: "enterprise-plus", name: "Enterprise Plus", credits: 6200, price: 89900, active: false, featured: false, grant: 1800 },
-  { handle: "enterprise-max", name: "Enterprise Max", credits: 8000, price: 109900, active: false, featured: false, grant: 2000 },
-  { handle: "ultimate", name: "Ultimate", credits: 10000, price: 129900, active: false, featured: true, grant: 2500 },
+  {
+    handle: "free",
+    name: "Free",
+    credits: 2,
+    price: 0,
+    active: true,
+    featured: false,
+    allowancePeriod: "LIFETIME",
+    topUpBundles: [
+      { handle: "bronze", name: "Bronze", credits: 5, price: 1500 },
+      { handle: "silver", name: "Silver", credits: 10, price: 2600 },
+      { handle: "gold", name: "Gold", credits: 20, price: 4600 },
+    ],
+  },
+  {
+    handle: "starter",
+    name: "Starter",
+    credits: 20,
+    price: 3500,
+    active: true,
+    featured: false,
+    allowancePeriod: "EVERY_30_DAYS",
+    topUpBundles: [
+      { handle: "bronze", name: "Bronze", credits: 5, price: 1400 },
+      { handle: "silver", name: "Silver", credits: 10, price: 2400 },
+      { handle: "gold", name: "Gold", credits: 20, price: 4200 },
+    ],
+  },
+  {
+    handle: "growth",
+    name: "Growth",
+    credits: 50,
+    price: 7500,
+    active: true,
+    featured: true,
+    allowancePeriod: "EVERY_30_DAYS",
+    topUpBundles: [
+      { handle: "bronze", name: "Bronze", credits: 5, price: 1300 },
+      { handle: "silver", name: "Silver", credits: 10, price: 2200 },
+      { handle: "gold", name: "Gold", credits: 20, price: 3800 },
+    ],
+  },
+  {
+    handle: "scale",
+    name: "Scale",
+    credits: 100,
+    price: 14900,
+    active: true,
+    featured: false,
+    allowancePeriod: "EVERY_30_DAYS",
+    topUpBundles: [
+      { handle: "bronze", name: "Bronze", credits: 5, price: 1200 },
+      { handle: "silver", name: "Silver", credits: 10, price: 2000 },
+      { handle: "gold", name: "Gold", credits: 20, price: 3400 },
+    ],
+  },
 ];
 
 function seededHandle(handle) {
@@ -268,51 +304,12 @@ function money(minor) {
   return `$${(minor / 100).toFixed(2)}`;
 }
 
-function requiredTopUpPriceMinor(plans, lowerIndex, minimumUpgradePremiumBps) {
-  const lower = plans[lowerIndex];
-  if (!lower.grant) return null;
-
-  if (lowerIndex === plans.length - 1) return 60_000;
-
-  let required = 100;
-  for (let higherIndex = lowerIndex + 1; higherIndex < plans.length; higherIndex += 1) {
-    const higher = plans[higherIndex];
-    const creditsNeeded = higher.credits - lower.credits;
-    const units = Math.ceil(creditsNeeded / lower.grant);
-    const requiredStayAndTopUp = Math.ceil(
-      (higher.price * (10_000 + minimumUpgradePremiumBps)) / 10_000,
-    );
-    const minimumUnitPrice = Math.ceil(
-      Math.max(0, requiredStayAndTopUp - lower.price) / Math.max(1, units),
-    );
-    required = Math.max(required, minimumUnitPrice);
-  }
-
-  // Add a 10% buffer and round up to whole dollars so the fixture remains
-  // comfortably inside the policy boundary and reads naturally in the UI.
-  return Math.ceil((required * 1.1) / 100) * 100;
-}
-
-function assertEconomics(plans, minimumUpgradePremiumBps) {
-  for (let lowerIndex = 0; lowerIndex < plans.length - 1; lowerIndex += 1) {
-    const lower = plans[lowerIndex];
-    for (let higherIndex = lowerIndex + 1; higherIndex < plans.length; higherIndex += 1) {
-      const higher = plans[higherIndex];
-      if (higher.credits <= lower.credits) {
-        throw new Error(`${higher.name} must include more credits than ${lower.name}.`);
-      }
-      if (!lower.grant) continue;
-
-      const units = Math.ceil((higher.credits - lower.credits) / lower.grant);
-      const stayAndTopUp = lower.price + units * lower.topUpPriceMinor;
-      const required = Math.ceil(
-        (higher.price * (10_000 + minimumUpgradePremiumBps)) / 10_000,
+function assertIncreasingPlanCredits(plans) {
+  for (let index = 1; index < plans.length; index += 1) {
+    if (plans[index].credits <= plans[index - 1].credits) {
+      throw new Error(
+        `${plans[index].name} must include more credits than ${plans[index - 1].name}.`,
       );
-      if (stayAndTopUp < required) {
-        throw new Error(
-          `Seed economics failed for ${lower.name} -> ${higher.name}: ${stayAndTopUp} < ${required}.`,
-        );
-      }
     }
   }
 }
@@ -340,14 +337,16 @@ function highlights(plan) {
     },
   ];
 
-  if (plan.grant) {
+  if (plan.topUpBundles.length) {
     rows.push({
       contentKey: topUpKey,
       position: 1,
       translations: LOCALES.map((locale) => ({
         locale,
         merchantTitle: COPY[locale].topupTitle,
-        merchantDescription: COPY[locale].topupDescription(plan.grant),
+        merchantDescription: COPY[locale].topupDescription(
+          plan.topUpBundles.map((bundle) => bundle.credits).join(", "),
+        ),
       })),
     });
   }
@@ -408,25 +407,10 @@ async function main() {
     console.log(`Removed ${deleted.count} existing MerchantPricing plans.`);
   }
 
-  const policy = await prisma.platformBillingPolicy.findUnique({
-    where: { id: "default" },
-    select: { minimumUpgradePremiumBps: true },
-  });
-  const minimumUpgradePremiumBps = policy?.minimumUpgradePremiumBps ?? 2000;
-
   const plans = PLAN_DEFINITIONS.map((definition) => ({ ...definition }));
-  for (let index = 0; index < plans.length; index += 1) {
-    plans[index].topUpPriceMinor = requiredTopUpPriceMinor(
-      plans,
-      index,
-      minimumUpgradePremiumBps,
-    );
-  }
-  assertEconomics(plans, minimumUpgradePremiumBps);
+  assertIncreasingPlanCredits(plans);
 
-  console.log(
-    `Creating ${plans.length} realistic MerchantPricing plans using a ${minimumUpgradePremiumBps / 100}% minimum upgrade premium.`,
-  );
+  console.log(`Creating ${plans.length} MerchantPricing plans from the 2026 investor pricing proposal.`);
 
   for (const [index, plan] of plans.entries()) {
     const planHighlights = highlights(plan);
@@ -439,7 +423,7 @@ async function main() {
         cataloguePosition: index,
         featured: plan.featured,
         includedRecoveryCredits: plan.credits,
-        allowancePeriod: index === 0 ? "LIFETIME" : "EVERY_30_DAYS",
+        allowancePeriod: plan.allowancePeriod,
         billingPeriod: "EVERY_30_DAYS",
         recurringAmountMinor: plan.price,
         currency: "USD",
@@ -461,22 +445,18 @@ async function main() {
             },
           })),
         },
-        ...(plan.grant
-          ? {
-              usageEvents: {
-                create: {
-                  eventHandle: `${seededHandle(plan.handle)}-top-up`,
-                  adminLabel: `${plan.name} recovery-credit top-up`,
-                  creditsGrantedPerUnit: plan.grant,
-                  position: 0,
-                  pricingMode: "FIXED",
-                  currency: "USD",
-                  fixedUnitAmountMinor: plan.topUpPriceMinor,
-                  maximumUnitsPerBillingPeriod: null,
-                },
-              },
-            }
-          : {}),
+        usageEvents: {
+          create: plan.topUpBundles.map((bundle, position) => ({
+            eventHandle: `${seededHandle(plan.handle)}-${bundle.handle}`,
+            adminLabel: `${plan.name} ${bundle.name} recovery-credit pack`,
+            creditsGrantedPerUnit: bundle.credits,
+            position,
+            pricingMode: "FIXED",
+            currency: "USD",
+            fixedUnitAmountMinor: bundle.price,
+            maximumUnitsPerBillingPeriod: null,
+          })),
+        },
       },
       select: {
         id: true,
@@ -507,7 +487,9 @@ async function main() {
         `${created._count.translations}/20 translations`,
         `${created._count.highlights} highlights`,
         `${created._count.usageEvents} usage events`,
-        plan.topUpPriceMinor ? `top-up ${plan.grant} credits @ ${money(plan.topUpPriceMinor)}` : "no top-up",
+        ...plan.topUpBundles.map(
+          (bundle) => `${bundle.name} ${bundle.credits} @ ${money(bundle.price)}`,
+        ),
       ].join(" | "),
     );
   }
@@ -517,8 +499,8 @@ async function main() {
   console.log("The FREE plan is at catalogue position 0.");
   console.log("All allowances strictly increase with catalogue order.");
   console.log("Each plan has all 20 supported merchant translations.");
-  console.log("Each plan has translated highlights; paid plans also have one fixed top-up event.");
-  console.log("The generated top-up prices are checked against the current minimum-upgrade-premium policy before anything is written.");
+  console.log("Each plan has translated highlights and fixed Bronze, Silver, and Gold pack events.");
+  console.log("Prices are the proposed investor-report amounts and are not verified production catalogue rates.");
 }
 
 main()

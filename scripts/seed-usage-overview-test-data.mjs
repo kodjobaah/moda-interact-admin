@@ -70,6 +70,8 @@ What seed creates:
   - 12 customer groups (11 named customers + 1 guest)
   - 13 checkout recoveries covering every recovery status
   - conversations and messages (SENT / DELIVERED / FAILED)
+  - an available merchant-support system message linked to a sent recovery, with
+    a direct link to its recovery conversation
   - Free plan: up to four lifetime usage events backed by fixture COMMITTED
     reservations and the real lifetime entitlement counter (no current billing period)
   - Optional --with-past-paid-history on a currently Free shop: three synthetic
@@ -349,7 +351,7 @@ function customerFixtures(shopId, shopDomain, now) {
     return {
       id: idFor(shopId, `customer-${String(number).padStart(2, "0")}`),
       shopId,
-      firstName: `${firstName}--${shopDomain}`,
+      firstName: `${firstName} ${shopDomain}`,
       lastName: lastNames[index],
       email: `usage-fixture-${number}@example.invalid`,
       shopifyCustomerId: idFor(shopId, `shopify-customer-${String(number).padStart(2, "0")}`),
@@ -830,6 +832,17 @@ async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = fals
       })
     : { count: 0 };
 
+  const supportMessages = await transaction.merchantSupportMessage.deleteMany({
+    where: { id: idFor(shopId, "support-recovery-message") },
+  });
+  const supportThreads = await transaction.merchantSupportThread.deleteMany({
+    where: {
+      id: idFor(shopId, "support-thread"),
+      shopId,
+      messages: { none: {} },
+    },
+  });
+
   const conversationDelete = await transaction.conversation.deleteMany({
     where: { id: { startsWith: prefix } },
   });
@@ -848,6 +861,8 @@ async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = fals
   return {
     usageEvents: usage.count,
     messages: messages.count,
+    supportMessages: supportMessages.count,
+    supportThreads: supportThreads.count,
     conversations: conversationDelete.count,
     outreachAttempts: outreach.count,
     recoveries: recoveries.count,
@@ -862,7 +877,11 @@ async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = fal
   return prisma.$transaction(async (transaction) => {
     await cleanupDatabase(transaction, shop.id);
 
-    const customers = customerFixtures(shop.id, shop.domain, now);
+    let domain = "woocommerce";
+    if (shop.domain.includes("shopify")) {
+      domain = "shopify";
+    }
+    const customers = customerFixtures(shop.id, domain, now);
     await transaction.customer.createMany({ data: customers });
 
     const recoveries = recoveryFixtures(shop.id, now).map((row, index) => ({
@@ -871,6 +890,37 @@ async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = fal
       ...(humanOptions && humanCase(index) ? { lineItems: basketFixture(row) } : {}),
     }));
     await transaction.checkoutRecovery.createMany({ data: recoveries });
+
+    const supportThread = await transaction.merchantSupportThread.upsert({
+      where: { shopId: shop.id },
+      create: {
+        id: idFor(shop.id, "support-thread"),
+        shopId: shop.id,
+        lastMessageAt: now,
+        updatedAt: now,
+      },
+      update: {},
+      select: { id: true },
+    });
+    const linkedRecovery = recoveries[2];
+    await transaction.merchantSupportMessage.createMany({
+      data: [{
+        id: idFor(shop.id, "support-recovery-message"),
+        threadId: supportThread.id,
+        kind: "SYSTEM",
+        state: "AVAILABLE",
+        originalBody: "Your initial recovery message was sent.",
+        sourceLanguageTag: "en",
+        displayLanguageTag: "en",
+        systemCode: "RECOVERY_INITIAL_OUTREACH_SENT",
+        systemVersion: "1",
+        sourceKey: idFor(shop.id, "support-recovery-notice"),
+        checkoutRecoveryId: linkedRecovery.id,
+        availableAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }],
+    });
 
     const conversations = conversationFixtures(shop.id, recoveries, now, Boolean(humanOptions));
     await transaction.conversation.createMany({ data: conversations });
@@ -956,6 +1006,7 @@ async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = fal
       messages: messages.length,
       ...billingFixture,
       usageProvider: shop.platform,
+      supportNotifications: 1,
       humanHandoverScenarios: humanOptions ? handoverCases.length : 0,
     };
   }, TRANSACTION_OPTIONS);

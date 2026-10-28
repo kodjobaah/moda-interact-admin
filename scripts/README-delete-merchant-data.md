@@ -11,6 +11,7 @@ is preserved. A newly installed merchant would be provisioned afresh.
 ```bash
 cd moda-interact-admin
 npm run admin:delete-merchant-data -- status --shop example.myshopify.com
+npm run admin:delete-merchant-data -- status --shop shop.example.com
 ```
 
 The preview covers selected merchant-owned tables (including customers,
@@ -30,6 +31,22 @@ npm run admin:delete-merchant-data -- delete \
   --confirm-test-data \
   --confirm-workers-stopped
 ```
+
+For WooCommerce, pass the store's canonical domain in the same options:
+
+```bash
+npm run admin:delete-merchant-data -- status --shop shop.example.com
+npm run admin:delete-merchant-data -- delete \\
+  --shop shop.example.com \\
+  --confirm-shop shop.example.com \\
+  --confirm-test-data \\
+  --confirm-workers-stopped
+```
+
+For Shopify, use the shop's `.myshopify.com` domain as shown in the first
+example. The command resolves either provider domain to one `Shop` record and
+removes its shop-owned installation data. Always run `status` first and review
+the platform and preview counts; the confirmation domain must match exactly.
 
 If the database is a verified **remote development/test** instance, also pass
 `--allow-remote-development-db`. The command refuses remote databases otherwise,

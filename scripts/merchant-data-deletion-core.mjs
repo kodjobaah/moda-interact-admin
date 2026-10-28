@@ -120,6 +120,7 @@ export async function merchantInventory(db, shop) {
     commerceStudioMerchantAccess: ['commerceStudioMerchantAccess', scoped],
     merchantKnowledgeSources: ['merchantKnowledgeSource', scoped],
     merchantKnowledgeUploadedAssets: ['merchantKnowledgeUploadedAsset', scoped],
+    whatsAppTemplatePublicationTargets: ['whatsAppTemplatePublicationTarget', scoped],
   };
   const entries = await Promise.all(Object.entries(counters).map(async ([key, [delegate, where]]) => [
     key, await db[delegate].count({ where }),
@@ -190,6 +191,7 @@ export async function deleteMerchantDatabaseRows(tx, shop, {
   await erase('recoveryCreditRefund', byShop(shopId));
   await erase('recoveryCreditPurchase', byShop(shopId));
   await erase('billingPeriod', byShop(shopId));
+  await erase('whatsAppTemplatePublicationTarget', byShop(shopId));
 
   // The database enforces remaining CASCADE / SET NULL / RESTRICT relations.
   // On any unhandled restriction, Prisma rolls the WHOLE transaction back.

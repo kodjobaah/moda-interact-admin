@@ -180,6 +180,8 @@ test("cleanup reverses only fixture Free reservations and their committed counte
     checkoutRecovery: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
     customer: { deleteMany: async () => ({ count: 0 }) },
     billingPeriod: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
+    merchantSupportMessage: { deleteMany: async () => ({ count: 0 }) },
+    merchantSupportThread: { deleteMany: async () => ({ count: 0 }) },
   };
   const result = await api.cleanupDatabase(tx, "shop-1");
   assert.equal(result.usageEvents, 1);
@@ -219,7 +221,7 @@ test("CLI keeps HUMAN audit purge explicit and fixture-scoped", () => {
 });
 
 function seedTransaction(kind) {
-  const writes = { events: [], reservations: [], periods: [], paidCounters: [] };
+  const writes = { events: [], reservations: [], periods: [], paidCounters: [], supportMessages: [], supportThreads: [] };
   const store = shop(kind);
   const now = Date.now();
   const current = {
@@ -250,6 +252,17 @@ function seedTransaction(kind) {
     checkoutRecovery: { createMany: async () => {}, findMany: async () => [], deleteMany: zero },
     conversation: { createMany: async () => {}, findMany: async () => [], deleteMany: zero },
     conversationMessage: { createMany: async () => {}, deleteMany: zero },
+    merchantSupportMessage: {
+      deleteMany: async () => ({ count: writes.supportMessages.splice(0).length }),
+      createMany: async ({ data }) => writes.supportMessages.push(...data),
+    },
+    merchantSupportThread: {
+      deleteMany: async () => ({ count: writes.supportThreads.splice(0).length }),
+      upsert: async ({ create }) => {
+        writes.supportThreads.push(create);
+        return { id: create.id };
+      },
+    },
   };
   return { store, tx, writes };
 }
@@ -264,6 +277,15 @@ test("full Free seed generates lifetime events and no artificial periods", async
   assert.equal(writes.periods.length, 0);
   assert.equal(writes.reservations.length, 4);
   assert.equal(writes.events.length, 4);
+  assert.equal(result.supportNotifications, 1);
+  assert.equal(writes.supportMessages.length, 1);
+  assert.equal(writes.supportMessages[0].threadId, writes.supportThreads[0].id);
+  assert.equal(writes.supportMessages[0].kind, "SYSTEM");
+  assert.equal(writes.supportMessages[0].state, "AVAILABLE");
+  assert.equal(writes.supportMessages[0].systemCode, "RECOVERY_INITIAL_OUTREACH_SENT");
+  assert.equal(writes.supportMessages[0].systemVersion, "1");
+  assert.equal(writes.supportMessages[0].checkoutRecoveryId,
+    "manual-usage-overview-shop-1-recovery-03");
 });
 
 test("full paid seed reuses the real current period and creates three closed past periods", async () => {
@@ -455,6 +477,8 @@ function paidCleanupTransaction(writes) {
     conversation: { findMany: async () => [], deleteMany: zero },
     checkoutRecovery: { findMany: async () => [], deleteMany: zero },
     customer: { deleteMany: zero },
+    merchantSupportMessage: { deleteMany: async () => ({ count: writes.supportMessages?.splice(0).length ?? 0 }) },
+    merchantSupportThread: { deleteMany: async () => ({ count: writes.supportThreads?.splice(0).length ?? 0 }) },
   }};
 }
 
