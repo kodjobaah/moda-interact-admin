@@ -7,12 +7,16 @@ const OTHER = "b".repeat(64);
 const shopId = "shop_alpha";
 const domain = "store.example.org";
 const publicOrigin = "https://shop-brands.modainteract.com";
+const normalizedDomain = (value: string) => {
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) return new URL(value).hostname;
+  return value;
+};
 function role(roleName: string, override: Record<string, unknown> = {}) {
   return { source: { url: "https://merchant.example/original.png", reference: null,
     generation: 3, fingerprint: `sha256:${SHA}`, observedAt: "2026-10-27T00:00:00Z" },
     work: { status: "READY", attempts: 1, retryAfter: null, leaseUntil: null },
     ready: { sourceGeneration: 3, sourceFingerprint: `sha256:${SHA}`,
-      objectKey: `shop-brands/${domain}/${roleName.toLowerCase()}/sha256-${SHA}.jpg`,
+      objectKey: `shop-brands/${normalizedDomain(domain)}/${roleName.toLowerCase()}/sha256-${SHA}.jpg`,
       contentType: "image/jpeg", width: 1125, height: 600, sizeBytes: 180000,
       contentSha256: SHA, verifiedAt: "2026-10-27T00:00:00Z" }, ...override };
 }
@@ -29,7 +33,7 @@ test("all three READY roles project real derivative metadata from immutable shop
     const result = check(media(), name);
     assert.equal(result.status, "READY");
     if (result.status !== "READY") continue;
-    assert.equal(result.url, `${publicOrigin}/shop-brands/${domain}/${name.toLowerCase()}/sha256-${SHA}.jpg`);
+    assert.equal(result.url, `${publicOrigin}/shop-brands/${normalizedDomain(domain)}/${name.toLowerCase()}/sha256-${SHA}.jpg`);
     assert.equal(result.contentType, "image/jpeg");
     assert.equal(result.width, 1125);
     assert.ok(!JSON.stringify(result).includes("merchant.example"));
@@ -37,6 +41,21 @@ test("all three READY roles project real derivative metadata from immutable shop
   const view = projectShopBrandMedia({ media: media(), shopId, domain, publicOrigin });
   assert.equal(view.domain, domain);
   assert.deepEqual(Object.keys(view.roles), [...SHOP_BRAND_MEDIA_ROLES]);
+});
+
+test("uses readable hostname normalization for the shared ShopBrand key contract", () => {
+  for (const [input, expected] of [["https://example.com", "example.com"], ["example.com", "example.com"],
+    ["example", "example"]] as const) {
+    assert.equal(normalizedDomain(input), expected);
+    const projection = check(media({ LOGO: role("LOGO", { ready: { ...role("LOGO").ready as object,
+      objectKey: `shop-brands/${expected}/logo/sha256-${SHA}.jpg` } }) }), "LOGO", publicOrigin, input);
+    assert.equal(projection.status, "READY", input);
+    if (projection.status === "READY") assert.equal(projection.url,
+      `${publicOrigin}/shop-brands/${expected}/logo/sha256-${SHA}.jpg`);
+  }
+  assert.equal(normalizedDomain("https://User:secret@EXAMPLE.com:8443/path?q=1#top"), "example.com");
+  assert.equal(normalizedDomain("https://cross-profiles-accurate-relying.trycloudflare.com"),
+    "cross-profiles-accurate-relying.trycloudflare.com");
 });
 
 test("missing, pending, processing and failed roles are not exposed as ready", () => {
@@ -83,14 +102,17 @@ test("unsafe unconfigured public origins cannot create a browser/media URL", () 
   }
 });
 
-test("legacy shopId keys and unsafe Shop.domain values remain non-READY", () => {
+test("legacy keys and unsafe bare domains remain stale", () => {
   const legacy = media({ LOGO: role("LOGO", { ready: { ...role("LOGO").ready as object,
     objectKey: `shop-brands/${shopId}/logo/sha256-${SHA}.jpg` } }) });
   assert.equal(check(legacy).status, "STALE");
-  for (const unsafe of ["Store.example.org", "store.example.org/path", "user@store.example.org",
-    "store.example.org:443", "store..example.org", "store.example.org.", "store.example.org\n"]) {
+  for (const unsafe of ["store.example.org/path", "user@store.example.org", "store.example.org:443",
+    "store.example.org?x=1", "store.example.org#top", "..", "store.example.org\n", "店.example", ""]) {
     const result = check(media(), "LOGO", publicOrigin, unsafe);
     assert.equal(result.status, "STALE", unsafe);
     assert.ok(!("url" in result));
   }
+  const oldRawKey = media({ LOGO: role("LOGO", { ready: { ...role("LOGO").ready as object,
+    objectKey: `shop-brands/${domain}/logo/sha256-${SHA}.jpg` } }) });
+  assert.equal(check(oldRawKey).status, "READY");
 });

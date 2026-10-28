@@ -1,5 +1,4 @@
 import type { ShopBrandMediaRole } from "../authoring/types";
-import { isIP } from "node:net";
 
 export const SHOP_BRAND_MEDIA_ROLES = ["LOGO", "SQUARE_LOGO", "COVER_IMAGE"] as const;
 export type MediaReadiness = "MISSING" | "PENDING" | "PROCESSING" | "FAILED" | "STALE" | "READY";
@@ -26,11 +25,25 @@ const object = (v: unknown): v is Record<string, unknown> => v !== null && typeo
 const digest = /^[0-9a-f]{64}$/;
 const fingerprint = /^sha256:[0-9a-f]{64}$/;
 const shopIdPattern = /^[A-Za-z0-9_-]{1,191}$/;
-function isCanonicalShopDomain(domain: string): boolean {
-  if (domain.length > 253 || domain !== domain.toLowerCase() || !domain.includes(".") ||
-      domain.endsWith(".") || isIP(domain) !== 0) return false;
-  return domain.split(".").every((label) => label.length >= 1 && label.length <= 63 &&
-    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label));
+const domainSegmentPattern = /^[A-Za-z0-9._-]+$/;
+const absoluteUrlPattern = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
+
+function normalizeShopBrandDomain(domain: string): string | null {
+  if (typeof domain !== "string" || !domain || [...domain].some((character) => {
+    const code = character.codePointAt(0)!;
+    return code <= 0x1f || code === 0x7f;
+  })) return null;
+  let segment = domain;
+  if (absoluteUrlPattern.test(domain)) {
+    try {
+      segment = new URL(domain).hostname;
+    } catch {
+      return null;
+    }
+  }
+  if (!segment || segment.length > 253 || segment === "." || segment === ".." ||
+      !domainSegmentPattern.test(segment)) return null;
+  return segment;
 }
 
 /** A media URL is derived solely from configured public origin + an immutable R2 key. */
@@ -68,8 +81,9 @@ export function verifiedRoleMedia(input: {
     return { role, status: "STALE" };
   }
   const ext = ready.contentType === "image/jpeg" ? "jpg" : "png";
-  if (!isCanonicalShopDomain(domain)) return { role, status: "STALE" };
-  const key = `shop-brands/${domain}/${role.toLowerCase()}/sha256-${ready.contentSha256}.${ext}`;
+  const domainSegment = normalizeShopBrandDomain(domain);
+  if (domainSegment === null) return { role, status: "STALE" };
+  const key = `shop-brands/${domainSegment}/${role.toLowerCase()}/sha256-${ready.contentSha256}.${ext}`;
   if (ready.objectKey !== key) return { role, status: "STALE" };
   try {
     const origin = new URL(publicOrigin);
