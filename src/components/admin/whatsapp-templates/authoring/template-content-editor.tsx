@@ -22,14 +22,13 @@ export function TemplateContentEditor({ draft, onChange, issues = [], media }: {
         <p className="text-sm font-semibold">Header format</p>
         <label className="flex items-center gap-2 text-sm"><input type="radio" name="metaHeaderFormat"
           checked={!draft.shopBrandMediaRole} onChange={() => onChange({ ...draft, shopBrandMediaRole: undefined })} />Text or no header</label>
-        <p className="text-xs text-slate-600">To use an IMAGE header, load a reference shop and select one verified role below.</p>
+        <p className="text-xs text-slate-600">Choose an IMAGE header role below. Seeded images are examples only; delivery uses the merchant's own media.</p>
       </div>
       {!draft.shopBrandMediaRole && <TemplateHeaderEditor nodes={draft.header} issues={forField("header")} variables={eligibleHeaderVariables(draft)}
         helpText="Meta text headers allow one short text variable (including brand names), with a maximum of 60 characters."
         onChange={(header) => onChange({ ...draft, header: header.filter((node): node is ContentNode => node.type !== "slot") })} />}
       {media && <ShopBrandMediaHeaderSection controller={media} selectedRole={draft.shopBrandMediaRole}
-        onSelect={(shopBrandMediaRole) => onChange({ ...draft, header: [], shopBrandMediaRole })}
-        onClear={() => onChange({ ...draft, shopBrandMediaRole: undefined })} />}
+        onSelect={(shopBrandMediaRole) => onChange({ ...draft, header: [], shopBrandMediaRole })} />}
       {forField("header").length > 0 && draft.shopBrandMediaRole &&
         <p role="alert" className="text-sm text-amber-800">{forField("header").map((issue) => issue.message).join("; ")}</p>}
       <TemplateBodyEditor nodes={draft.body} issues={forField("body")} variables={eligibleVariables(draft)}

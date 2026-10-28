@@ -1,43 +1,33 @@
 "use client";
-import { useState, useRef } from "react";
-import { loadVerifiedShopBrandMedia } from "@/app/actions/shop-brand-media-preview";
-import type { ShopBrandMediaView } from "@/lib/admin/whatsapp-templates/media/readiness";
+import { useEffect, useRef, useState } from "react";
+import { loadTemplateSampleMedia } from "@/app/actions/template-sample-media";
+import type { TemplateSampleMediaView } from "@/lib/admin/whatsapp-templates/media/template-samples";
 
-const errors = {
-  INVALID_SHOP: "Enter a valid Shop ID.",
-  NOT_FOUND: "That shop could not be found.",
-  CONFIG_UNAVAILABLE: "The verified public media origin is not configured correctly.",
-  READ_FAILED: "Shop media could not be loaded. Retry later.",
-} as const;
-
-/** Preview state only; no image URLs or shop IDs are persisted in the AST. */
+/** Automatic sample preview only. No sample identity, R2 URL or shop ID enters the saved template AST. */
 export function useShopBrandMediaRole() {
-  const [shopId, setShopId] = useState("");
-  const [media, setMedia] = useState<ShopBrandMediaView | null>(null);
+  const [media, setMedia] = useState<TemplateSampleMediaView | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const request = useRef(0);
-  const changeShop = (value: string) => {
-    request.current++;
-    setShopId(value);
-    setMedia(null);
-    setMessage("");
-    setPending(false);
-  };
+  const sequence = useRef(0);
   const load = async () => {
-    const current = ++request.current;
-    setPending(true); setMessage(""); setMedia(null);
+    const request = ++sequence.current;
+    setPending(true);
+    setMessage("");
     try {
-      const result = await loadVerifiedShopBrandMedia(shopId.trim());
-      if (request.current !== current) return;
+      const result = await loadTemplateSampleMedia();
+      if (sequence.current !== request) return;
       if (result.ok) setMedia(result.media);
-      else setMessage(errors[result.code]);
+      else setMessage(result.code === "CONFIG_UNAVAILABLE" ? "Public sample media is not configured." : "Could not load sample images.");
     } catch {
-      if (request.current === current) setMessage(errors.READ_FAILED);
-    } finally {
-      if (request.current === current) setPending(false);
-    }
+      if (sequence.current === request) setMessage("Could not load sample images.");
+    } finally { if (sequence.current === request) setPending(false); }
   };
-  return { shopId, changeShop, media, pending, message, load };
+  useEffect(() => {
+    void load();
+    return () => { sequence.current++; };
+    // One initial load. The Refresh button calls load explicitly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return { media, pending, message, load };
 }
 export type ShopBrandMediaController = ReturnType<typeof useShopBrandMediaRole>;

@@ -3,30 +3,22 @@ import type { ShopBrandMediaRole } from "@/lib/admin/whatsapp-templates/authorin
 import type { ShopBrandMediaController } from "./use-shop-brand-media-role";
 import { ShopBrandMediaRolePicker } from "./shop-brand-media-role-picker";
 
-export function ShopBrandMediaHeaderSection({ controller, selectedRole, onSelect, onClear }: {
+export function ShopBrandMediaHeaderSection({ controller, selectedRole, onSelect }: {
   controller: ShopBrandMediaController;
   selectedRole?: ShopBrandMediaRole;
   onSelect: (role: ShopBrandMediaRole) => void;
-  onClear: () => void;
 }) {
-  return <section className="space-y-3 rounded-lg border border-slate-200 p-3 sm:p-4" aria-label="Verified IMAGE header selector">
+  return <section className="space-y-3 rounded-lg border border-slate-200 p-3 sm:p-4" aria-label="ShopBrand IMAGE header selector">
     <div><h3 className="text-sm font-semibold">ShopBrand image header</h3>
-      <p className="mt-1 text-xs text-slate-600">Select a reference shop for a real R2 image preview. Only the semantic media role is saved; delivery verifies the destination shop again.</p>
+      <p className="mt-1 text-xs text-slate-600">Choose the merchant image role for this platform template. Images shown here are seeded Moda examples only; each merchant's own READY media is checked again when sending.</p>
     </div>
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="min-w-0 flex-1 sm:min-w-48">
-        <label htmlFor="template-brand-shop-id" className="mb-1 block text-xs font-semibold">Reference Shop ID</label>
-        <input id="template-brand-shop-id" type="text" autoComplete="off" value={controller.shopId}
-          onChange={(event) => { onClear(); controller.changeShop(event.target.value); }}
-          placeholder="Shop ID" className="w-full rounded border border-slate-300 px-3 py-2 text-sm"/>
-      </div>
-      <button type="button" onClick={() => { onClear(); void controller.load(); }} disabled={controller.pending || !controller.shopId.trim()}
-        className="rounded bg-blue-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
-        {controller.pending ? "Checking…" : "Load verified media"}</button>
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-slate-600">{controller.pending ? "Loading sample images…" : "Template example images"}</span>
+      <button type="button" onClick={() => void controller.load()} disabled={controller.pending}
+        className="rounded border border-slate-300 px-3 py-1.5 text-xs font-semibold disabled:opacity-50">Refresh examples</button>
     </div>
     {controller.message && <p role="alert" className="text-sm text-amber-800">{controller.message}</p>}
-    {controller.media && <p className="break-all text-xs text-slate-600">Reference shop: {controller.media.domain}</p>}
     <ShopBrandMediaRolePicker media={controller.media} selectedRole={selectedRole} onSelect={onSelect}/>
-    {selectedRole && <p className="text-xs text-amber-800">IMAGE header bound to {selectedRole.replaceAll("_", " ")}. Meta provider submission requires a separate trusted sample upload handle; no source URL is used as a sample.</p>}
+    {selectedRole && <p className="text-xs text-amber-800">IMAGE header bound to {selectedRole.replaceAll("_", " ")}. Only the media role is saved. Meta registration still requires a separate trusted sample upload handle.</p>}
   </section>;
 }

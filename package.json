@@ -35,6 +35,7 @@
     "pretest:arch047-admin-meta:postgres": "npm run prisma:generate",
     "test:arch047-admin-meta:postgres": "node scripts/test-arch047-admin-meta-postgres.mjs",
     "admin:provision": "node scripts/provision-platform-admin.mjs",
+    "admin:seed-template-media": "node --import tsx scripts/seed-template-example-media.mjs",
     "admin:seed-promotions": "node scripts/seed-promotion-test-data.mjs",
     "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear",
     "admin:seed-merchant-pricing": "node scripts/seed-manual-merchant-pricing.mjs",
@@ -51,7 +52,8 @@
     "test:arch047-admin-wrappers:unit": "tsx --test tests/unit/arch047-template-wrappers.test.ts tests/unit/arch047-template-wrappers-service.test.ts",
     "test:arch047-admin-wrappers:components": "tsx --test tests/unit/arch047-template-wrappers-components.test.tsx",
     "test:arch047-admin-wrappers:postgres": "node scripts/test-arch047-admin-wrappers-postgres.mjs",
-    "test:arch049-admin-media:unit": "tsx --test tests/unit/arch049-admin-media-readiness.test.ts tests/unit/arch049-admin-media-reader.test.ts tests/unit/arch049-admin-media-compiler.test.ts tests/unit/arch049-admin-media-projection-vectors.test.ts tests/unit/arch049-admin-media-components.test.tsx && node --test tests/security/arch049-admin-media-sql.test.mjs",
+    "test:template-sample-seed:unit": "node --test tests/unit/template-sample-seed.test.mjs",
+    "test:arch049-admin-media:unit": "tsx --test tests/unit/arch049-admin-template-samples.test.ts tests/unit/arch049-admin-media-readiness.test.ts tests/unit/arch049-admin-media-reader.test.ts tests/unit/arch049-admin-media-compiler.test.ts tests/unit/arch049-admin-media-projection-vectors.test.ts tests/unit/arch049-admin-media-components.test.tsx && node --test tests/security/arch049-admin-media-sql.test.mjs",
     "test:arch049-admin-media:postgres": "npm run prisma:generate && node scripts/test-arch049-admin-media-postgres.mjs"
   },
   "dependencies": {

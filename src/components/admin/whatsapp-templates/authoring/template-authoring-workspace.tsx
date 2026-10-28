@@ -45,7 +45,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: Template
       <div className="xl:sticky xl:top-0"><TemplateReadOnlyPreview preview={controller.preview} title="Live WhatsApp preview" draftInvalid={issues.length > 0}
         verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
           ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
-        mediaDomain={media.media?.domain} /></div>
+        mediaDomain={media.media?.label} /></div>
     </div>
     <div id="whatsapp-panel-review" role="tabpanel" aria-labelledby="whatsapp-tab-review" hidden={step !== "review"} className={step === "review" ? "space-y-5" : "hidden"}>
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
@@ -53,7 +53,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: Template
         <TemplateReadOnlyPreview preview={controller.preview} title="Final example preview" draftInvalid={issues.length > 0}
           verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
             ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
-          mediaDomain={media.media?.domain} />
+          mediaDomain={media.media?.label} />
       </div>
       <TemplateSaveControls issues={issues} saving={controller.saving} savedId={controller.savedId}
         error={controller.error} cloneFromId={cloneFrom?.id} showIssues={false} onSave={controller.submit} />

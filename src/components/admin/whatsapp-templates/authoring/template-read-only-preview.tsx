@@ -21,7 +21,7 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
             {verifiedMedia?.status === "READY" && verifiedMedia.role === preview.headerMediaRole && mediaDomain
               ? <ShopBrandMediaPreview media={verifiedMedia} domain={mediaDomain}/>
               : <p className="rounded border border-dashed border-slate-300 p-3 text-xs text-slate-600">
-                  {preview.headerMediaRole.replaceAll("_", " ")} IMAGE header — no verified shop preview. This is a role binding, not a sample upload.
+                  {preview.headerMediaRole.replaceAll("_", " ")} IMAGE header — no seeded example. The image role is still saved, not an example URL.
                 </p>}
           </div>}
           {!!preview.header && <p className="mb-2 whitespace-pre-wrap break-words font-semibold text-slate-900">{preview.header}</p>}
