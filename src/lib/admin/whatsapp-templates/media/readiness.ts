@@ -1,4 +1,5 @@
 import type { ShopBrandMediaRole } from "../authoring/types";
+import { isIP } from "node:net";
 
 export const SHOP_BRAND_MEDIA_ROLES = ["LOGO", "SQUARE_LOGO", "COVER_IMAGE"] as const;
 export type MediaReadiness = "MISSING" | "PENDING" | "PROCESSING" | "FAILED" | "STALE" | "READY";
@@ -25,12 +26,18 @@ const object = (v: unknown): v is Record<string, unknown> => v !== null && typeo
 const digest = /^[0-9a-f]{64}$/;
 const fingerprint = /^sha256:[0-9a-f]{64}$/;
 const shopIdPattern = /^[A-Za-z0-9_-]{1,191}$/;
+function isCanonicalShopDomain(domain: string): boolean {
+  if (domain.length > 253 || domain !== domain.toLowerCase() || !domain.includes(".") ||
+      domain.endsWith(".") || isIP(domain) !== 0) return false;
+  return domain.split(".").every((label) => label.length >= 1 && label.length <= 63 &&
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label));
+}
 
 /** A media URL is derived solely from configured public origin + an immutable R2 key. */
 export function verifiedRoleMedia(input: {
-  media: unknown; shopId: string; role: ShopBrandMediaRole; publicOrigin: string;
+  media: unknown; shopId: string; domain: string; role: ShopBrandMediaRole; publicOrigin: string;
 }): MediaRoleView {
-  const { media, shopId, role, publicOrigin } = input;
+  const { media, shopId, domain, role, publicOrigin } = input;
   const missing: MediaRoleView = { role, status: "MISSING" };
   if (!object(media) || media.schemaVersion !== 1 || !object(media.roles)) return missing;
   const entry = media.roles[role];
@@ -61,7 +68,8 @@ export function verifiedRoleMedia(input: {
     return { role, status: "STALE" };
   }
   const ext = ready.contentType === "image/jpeg" ? "jpg" : "png";
-  const key = `shop-brands/${shopId}/${role.toLowerCase()}/sha256-${ready.contentSha256}.${ext}`;
+  if (!isCanonicalShopDomain(domain)) return { role, status: "STALE" };
+  const key = `shop-brands/${domain}/${role.toLowerCase()}/sha256-${ready.contentSha256}.${ext}`;
   if (ready.objectKey !== key) return { role, status: "STALE" };
   try {
     const origin = new URL(publicOrigin);
