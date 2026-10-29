@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { generateTemplateSamples, inspectPng } from "./template-sample-images.mjs";
+import { deriveTemplateSamplesFromSource } from "./template-sample-source-image.mjs";
 import { r2Request } from "./template-sample-r2.mjs";
 
 const KEY = "whatsapp.templateSamples";
@@ -22,25 +23,29 @@ export function parseArguments(args) {
   for (let i = 0; i < args.length; i++) {
     const key = args[i];
     if (key === "--confirm") { if (input.confirm) throw Error("Duplicate --confirm"); input.confirm = true; continue; }
-    if (!["--environment", "--logo", "--square-logo", "--cover-image"].includes(key) ||
+    if (!["--environment", "--logo", "--square-logo", "--cover-image", "--source-image"].includes(key) ||
         typeof args[i + 1] !== "string" || args[i + 1].startsWith("--") || input[key]) {
-      throw Error("Usage: --environment test|development --confirm [--logo FILE.png --square-logo FILE.png --cover-image FILE.png]");
+      throw Error("Usage: --environment test|development --confirm [--source-image FILE | --logo FILE.png --square-logo FILE.png --cover-image FILE.png]");
     }
     input[key] = args[++i];
   }
   if (!["test", "development"].includes(input["--environment"]) || !input.confirm) {
     throw Error("Explicit --environment test|development and --confirm are required; production is not supported.");
   }
-  return { environment: input["--environment"], paths: {
+  if (input["--source-image"] && (input["--logo"] || input["--square-logo"] || input["--cover-image"])) {
+    throw Error("--source-image cannot be combined with --logo, --square-logo, or --cover-image.");
+  }
+  return { environment: input["--environment"], sourceImage: input["--source-image"], paths: {
     LOGO: input["--logo"], SQUARE_LOGO: input["--square-logo"], COVER_IMAGE: input["--cover-image"],
   } };
 }
 
-export async function loadSampleBytes(paths) {
-  const generated = generateTemplateSamples();
+export async function loadSampleBytes(paths, sourceImage) {
+  const derived = sourceImage ? await deriveTemplateSamplesFromSource(await readFile(sourceImage)) : null;
+  const generated = derived ? null : generateTemplateSamples();
   const output = {};
   for (const role of ROLES) {
-    const bytes = paths[role] ? await readFile(paths[role]) : generated[role].bytes;
+    const bytes = derived?.[role]?.bytes ?? (paths[role] ? await readFile(paths[role]) : generated[role].bytes);
     const { width, height } = inspectPng(bytes);
     output[role] = { bytes, width, height, sha256: sha(bytes) };
   }
@@ -77,8 +82,9 @@ export function matchingAssets(previous, next) {
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   if (options.help) {
-    console.log("Usage: npm run admin:seed-template-media -- --environment test --confirm [--logo FILE.png --square-logo FILE.png --cover-image FILE.png]");
-    console.log("Omitted images are generated deterministically. Requires DATABASE_URL and MODA_CONFIG_UNSEAL_KEY in the process environment.");
+    console.log("Usage: npm run admin:seed-template-media -- --environment test --confirm [--source-image FILE | --logo FILE.png --square-logo FILE.png --cover-image FILE.png]");
+    console.log("--source-image generates a logo preview, a square crop and a cover from one PNG/JPEG/WebP image. Omitted per-role images use deterministic defaults.");
+    console.log("Requires DATABASE_URL and MODA_CONFIG_UNSEAL_KEY in the process environment.");
     return;
   }
   const databaseUrl = process.env.DATABASE_URL;
@@ -110,7 +116,7 @@ async function main() {
     if (![endpoint, accessKeyId, secretAccessKey].every((v) => typeof v === "string" && !!v)) {
       throw Error("Database R2 credential configuration is incomplete.");
     }
-    const samples = await loadSampleBytes(options.paths);
+    const samples = await loadSampleBytes(options.paths, options.sourceImage);
     const assets = {};
     for (const role of ROLES) {
       const asset = samples[role];

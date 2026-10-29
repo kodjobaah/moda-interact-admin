@@ -53,8 +53,28 @@ node --env-file=.env --import tsx scripts/seed-template-example-media.mjs \
   --environment test --confirm
 ```
 
-To use your own images instead of the built-in abstract examples (PNG only;
-8-bit RGB or RGBA, under 4 MiB, total pixels at most 40 million):
+To derive **all three** sample images from one image (PNG, JPEG or WebP;
+20 MiB maximum input, 40 million pixels maximum), run:
+
+```sh
+npm run admin:seed-template-media -- --environment test --confirm \
+  --source-image "$HOME/Downloads/AI-Checkout-Recovery-for-Shopify-listing.png"
+```
+
+The script generates three **distinct PNG outputs** from that source:
+
+- `LOGO`: 1200 × 630, entire image fitted inside the frame with padding where needed.
+- `SQUARE_LOGO`: 512 × 512, cropped from the top-left to retain the branding
+  position in the supplied marketing image.
+- `COVER_IMAGE`: 1200 × 630, centre-cropped to fill the frame.
+
+It then uploads, verifies and publishes all three through the same existing R2
+and PostgreSQL flow. The source file itself is not saved in PostgreSQL, and no
+merchant media is changed. A single-source seed is repeatable: unchanged
+images produce unchanged R2 object keys and a no-op manifest update.
+
+Alternatively, to use individually supplied images (PNG only; 8-bit RGB or
+RGBA, under 4 MiB each, total pixels at most 40 million):
 
 ```sh
 npm run admin:seed-template-media -- --environment test --confirm \
@@ -63,7 +83,8 @@ npm run admin:seed-template-media -- --environment test --confirm \
   --cover-image ./assets/example-cover.png
 ```
 
-You may override one image and use the generated defaults for the others.
+The `--source-image` option cannot be combined with the per-role flags.
+You may override one image with a per-role flag and use the generated defaults for the others.
 The script validates each PNG, verifies the R2 object upload, then verifies the
 public URL's bytes before publishing a database reference. If an upload or public
 read fails, **no new database manifest is published**; previously uploaded

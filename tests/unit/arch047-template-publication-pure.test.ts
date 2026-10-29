@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { makeTemplateView, parseScope, classify, brandAvailability, equivalentRegistration,
-  LANGUAGES, PublicationError } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
+  LANGUAGES, PublicationError, parseBindings } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
 import { approvedSource } from "../../src/lib/admin/whatsapp-templates/publishing/source.ts";
 import { computePreview, languageComparison } from "../../src/lib/admin/whatsapp-templates/publishing/preview.ts";
 import { definitionFixture, fixtureDatabase, shopFixture, WABA, DEFINITION_ID } from "../fixtures/arch047-publication.fixture.ts";
@@ -195,4 +195,12 @@ test("per-shop language audit keys are deterministic and unique to the publicati
     assignmentAuditOperationId(publicationId, "shop_0002", "en"),
     assignmentAuditOperationId("publication_002", "shop_0001", "en"),
   ]).size, 4);
+});
+
+
+test("publication accepts the compiled taxonomy category parameter binding but refuses unknown keys", () => {
+  const base = { schemaVersion: 1, header: [],
+    body: [{ position: 1, variable: "shop.categoryName" }], buttons: [] };
+  assert.deepEqual(parseBindings(base).body, base.body);
+  assert.throws(() => parseBindings({ ...base, body: [{ position: 1, variable: "shop.categoryDescription" }] }), issueCode("CONTENT"));
 });

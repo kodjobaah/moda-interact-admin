@@ -35,7 +35,7 @@
     "pretest:arch047-admin-meta:postgres": "npm run prisma:generate",
     "test:arch047-admin-meta:postgres": "node scripts/test-arch047-admin-meta-postgres.mjs",
     "admin:provision": "node scripts/provision-platform-admin.mjs",
-    "admin:seed-template-media": "node --import tsx scripts/seed-template-example-media.mjs",
+    "admin:seed-template-media": "node --conditions=import --import tsx scripts/seed-template-example-media.mjs",
     "admin:seed-promotions": "node scripts/seed-promotion-test-data.mjs",
     "admin:clear-promotions": "node scripts/seed-promotion-test-data.mjs --clear",
     "admin:seed-merchant-pricing": "node scripts/seed-manual-merchant-pricing.mjs",
@@ -58,7 +58,7 @@
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
-    "@modainteract/moda-interact-shared": "2.5.0",
+    "@modainteract/moda-interact-shared": "2.5.1",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "codemirror": "^6.0.2",
@@ -67,7 +67,8 @@
     "next": "16.3.3",
     "next-auth": "5.0.0-beta.32",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "sharp": "0.35.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

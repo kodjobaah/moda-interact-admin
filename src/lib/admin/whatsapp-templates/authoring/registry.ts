@@ -15,6 +15,7 @@ export const SHOP_BRAND_VARIABLES = [
 export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
   "customer.firstName": { label: "Customer's first name", sample: "Alex" },
   "shop.name": { label: "Shop name", sample: "Example Shop" },
+  "shop.categoryName": { label: "What the shop sells (active store category)", sample: "outdoor clothing and accessories", sourceField: "CommerceShopProfile.activeCategory.displayName" },
   "checkout.url": { label: "Checkout link", sample: "https://www.example.com/checkout/demo" },
   "offer.code": { label: "Verified offer code", sample: "SAMPLE10" },
   "offer.description": { label: "Verified offer description", sample: "an example discount" },
@@ -29,7 +30,10 @@ export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
 };
 
 export function eligibleVariables(draft: TemplateAst): SemanticVariable[] {
-  const base: SemanticVariable[] = ["customer.firstName", "shop.name", "checkout.url", ...SHOP_BRAND_VARIABLES];
+  // Taxonomy-backed store category is a Meta recovery-body binding only.
+  // It requires an active category for the destination shop when the message is prepared.
+  const base: SemanticVariable[] = ["customer.firstName", "shop.name", "checkout.url",
+    ...(draft.family === "META_RECOVERY" ? ["shop.categoryName" as const] : []), ...SHOP_BRAND_VARIABLES];
   if (draft.family === "MODA_CONVERSATION_WRAPPER" || draft.offerType === "NO_OFFER") return base;
   if (draft.offerType === "AUTOMATIC_OFFER") return [...base, "offer.description"];
   return [...base, "offer.code", "offer.description"];

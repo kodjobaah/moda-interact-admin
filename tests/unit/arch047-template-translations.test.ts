@@ -261,3 +261,16 @@ test("translation Server Actions enforce platform-admin SUPER_ADMIN access befor
     `/system-controls/whatsapp-templates/${definitionId}/translations`,
   ]);
 });
+
+
+test("taxonomy category binding survives protected translation segmentation", () => {
+  const draft = newMetaDraft();
+  draft.body = [
+    { type: "text", value: "We sell " },
+    { type: "variable", name: "shop.categoryName" },
+    { type: "text", value: "." },
+  ];
+  const segments = extractTranslationSegments("definition-test", draft);
+  assert.equal(segments.length > 0, true);
+  assert.deepEqual(segments.flatMap((segment) => segment.protectedTokens.map((token) => token.variable)), ["shop.categoryName"]);
+});

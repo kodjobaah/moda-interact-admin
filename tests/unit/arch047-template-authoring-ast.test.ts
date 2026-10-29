@@ -209,3 +209,32 @@ test("pre-existing saved Meta projections without header bindings remain preview
   } };
   assert.match(makeExamplePreview(oldProjection).body, /Alex/);
 });
+
+
+test("taxonomy-backed shop category is a typed Meta body binding, never a shop-specific literal", () => {
+  const draft = newMetaDraft();
+  assert.ok(eligibleVariables(draft).includes("shop.categoryName"));
+  assert.ok(!eligibleVariables(newWrapperDraft()).includes("shop.categoryName"));
+  draft.body = [
+    { type: "text", value: "We offer " },
+    { type: "variable", name: "shop.categoryName" },
+    { type: "text", value: ". Visit " },
+    { type: "variable", name: "shop.name" },
+    { type: "text", value: " again." },
+  ];
+  assert.equal(validateTemplateAst(draft).ok, true);
+  const result = compileTemplateAst(draft);
+  assert.equal(result.family, "META_RECOVERY");
+  if (result.family !== "META_RECOVERY") return;
+  assert.deepEqual(result.parameterBindings.body, [
+    { position: 1, variable: "shop.categoryName" },
+    { position: 2, variable: "shop.name" },
+  ]);
+  assert.equal((result.components[0] as { text: string }).text, "We offer {{1}}. Visit {{2}} again.");
+  assert.match(makeExamplePreview(result).body, /outdoor clothing and accessories/);
+  assert.equal(result.components[0].example && typeof result.components[0].example === "object", true);
+  assert.equal(VARIABLE_REGISTRY["shop.categoryName"].sourceField, "CommerceShopProfile.activeCategory.displayName");
+  invalid({ ...draft, header: [{ type: "variable", name: "shop.categoryName" }] }, "header");
+  invalid({ ...newWrapperDraft(), body: [{ type: "slot", name: "response.body" },
+    { type: "variable", name: "shop.categoryName" }] }, "body");
+});

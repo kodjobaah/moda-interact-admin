@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { generateTemplateSamples, inspectPng } from "../../scripts/template-sample-images.mjs";
 import { signR2Request, validateR2Endpoint } from "../../scripts/template-sample-r2.mjs";
 import { parseArguments, loadSampleBytes, matchingAssets } from "../../scripts/seed-template-example-media.mjs";
@@ -18,10 +21,17 @@ test("all three sample images are deterministic, valid RGB PNGs with supported d
 });
 test("seed CLI requires explicit non-production environment and confirmation", () => {
   for (const args of [[], ["--environment", "production", "--confirm"], ["--environment", "test"],
-    ["--environment", "test", "--confirm", "--unexpected"], ["--environment", "test", "--confirm", "--confirm"]]) {
+    ["--environment", "test", "--confirm", "--unexpected"], ["--environment", "test", "--confirm", "--confirm"],
+    ["--environment", "test", "--confirm", "--source-image", "source.png", "--logo", "logo.png"],
+    ["--environment", "test", "--confirm", "--source-image", "source.png", "--cover-image", "cover.png"]]) {
     assert.throws(() => parseArguments(args));
   }
   assert.equal(parseArguments(["--environment", "test", "--confirm"]).environment, "test");
+  const single = parseArguments(["--environment", "test", "--confirm", "--source-image", "sample.jpeg"]);
+  assert.equal(single.sourceImage, "sample.jpeg");
+  assert.equal(single.paths.LOGO, undefined);
+  assert.equal(single.paths.SQUARE_LOGO, undefined);
+  assert.equal(single.paths.COVER_IMAGE, undefined);
 });
 test("R2 V4 signature is stable and rejects wrong hosts or keys", () => {
   const args = { method: "PUT", endpoint: `https://${"a".repeat(32)}.r2.cloudflarestorage.com`, bucket: "moda-interact-shop-brands",
@@ -41,4 +51,28 @@ test("identical object hashes are idempotent even when verification timestamps d
   ) };
   assert.equal(matchingAssets({ ...now, assets: Object.fromEntries(Object.entries(now.assets).map(([role, value]) => [role, { ...value, verifiedAt: "old" }])) }, now), true);
   assert.equal(matchingAssets({ ...now, environment: "development" }, now), false);
+});
+
+
+test("one source image derives valid, reproducible PNGs with role-specific dimensions", async () => {
+  const folder = await mkdtemp(join(tmpdir(), "moda-template-samples-"));
+  const sourceFile = join(folder, "example.png");
+  try {
+    await writeFile(sourceFile, generateTemplateSamples().LOGO.bytes);
+    const first = await loadSampleBytes({}, sourceFile);
+    const second = await loadSampleBytes({}, sourceFile);
+    assert.deepEqual(inspectPng(first.LOGO.bytes), { width: 1200, height: 630 });
+    assert.deepEqual(inspectPng(first.SQUARE_LOGO.bytes), { width: 512, height: 512 });
+    assert.deepEqual(inspectPng(first.COVER_IMAGE.bytes), { width: 1200, height: 630 });
+    for (const role of ["LOGO", "SQUARE_LOGO", "COVER_IMAGE"]) {
+      assert.equal(first[role].sha256, digest(first[role].bytes));
+      assert.equal(first[role].sha256, second[role].sha256);
+      assert.ok(first[role].bytes.length > 0 && first[role].bytes.length < 4 * 1024 * 1024);
+    }
+    assert.notEqual(first.LOGO.sha256, first.SQUARE_LOGO.sha256);
+    await writeFile(sourceFile, Buffer.from("not an image"));
+    await assert.rejects(loadSampleBytes({}, sourceFile), /decode --source-image/);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });

@@ -31,6 +31,9 @@ export function TemplateContentEditor({ draft, onChange, issues = [], media }: {
         onSelect={(shopBrandMediaRole) => onChange({ ...draft, header: [], shopBrandMediaRole })} />}
       {forField("header").length > 0 && draft.shopBrandMediaRole &&
         <p role="alert" className="text-sm text-amber-800">{forField("header").map((issue) => issue.message).join("; ")}</p>}
+      <p className="text-xs text-slate-600">To describe what a merchant sells, insert “What the shop sells (active store category)” in the body.
+        The value comes from that shop’s active Moda taxonomy category at send time. Stores without an active category or
+        an approved translation for the message language cannot use a template requiring this variable; keep a generic template available.</p>
       <TemplateBodyEditor nodes={draft.body} issues={forField("body")} variables={eligibleVariables(draft)}
         onChange={(body) => onChange({ ...draft, body: body.filter((node): node is ContentNode => node.type !== "slot") })} />
       <TemplateFooterEditor nodes={draft.footer} issues={forField("footer")}

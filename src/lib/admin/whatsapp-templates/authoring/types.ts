@@ -9,7 +9,7 @@ export type ShopBrandVariable =
   | "shopBrand.logoWidth" | "shopBrand.logoHeight"
   | "shopBrand.squareLogoUrl" | "shopBrand.squareLogoAltText"
   | "shopBrand.coverImageUrl";
-export type SemanticVariable = "customer.firstName" | "shop.name" | "checkout.url" | "offer.code" | "offer.description" | ShopBrandVariable;
+export type SemanticVariable = "customer.firstName" | "shop.name" | "shop.categoryName" | "checkout.url" | "offer.code" | "offer.description" | ShopBrandVariable;
 export type ShopBrandMediaRole = "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
 export type TextNode = { type: "text"; value: string };
 export type VariableNode = { type: "variable"; name: SemanticVariable };
