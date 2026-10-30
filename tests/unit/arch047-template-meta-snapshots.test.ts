@@ -18,6 +18,43 @@ test("exactly twenty provider languages, including sanctioned Chinese and Portug
   assert.equal(plan.category, "MARKETING");
 });
 
+test("CHECKOUT_PRODUCT IMAGE plans are immutable, handle-free, and reject locale role drift", () => {
+  const f = fixture();
+  const image = newMetaDraft("INITIAL", "CODE_OFFER");
+  image.promotionTarget = "CHECKOUT";
+  image.shopBrandMediaRole = "CHECKOUT_PRODUCT";
+  image.body = [{ type: "variable", name: "checkout.itemsSummary" },
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+  image.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  f.definition.offerType = "CODE_OFFER";
+  f.definition.providerTemplateName = "moda_initial_code_offer_checkout_image";
+  f.definition.sourceHash = templateHash(image);
+  for (const locale of f.locales) {
+    const prepared = compileTemplateAst(image);
+    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(image), prepared };
+    locale.contentHash = templateHash(prepared);
+  }
+
+  const plan = f.plan();
+  assert.deepEqual(f.plan(), plan);
+  assert.equal(plan.locales.length, 20);
+  assert.ok(plan.locales.every((locale) => locale.bindings.headerMediaRole === "CHECKOUT_PRODUCT" &&
+    locale.bindings.promotionTarget === "CHECKOUT"));
+  assert.ok(plan.locales.every((locale) => {
+    const header = locale.components.find((component) => component.type === "HEADER");
+    return header?.format === "IMAGE" && !("example" in header) && !JSON.stringify(header).includes("https://");
+  }));
+  assert.ok(!JSON.stringify(plan).includes("header_handle"));
+  assert.ok(!JSON.stringify(plan).includes("whatsup-sample.jpeg"));
+
+  const french = f.locales.find((locale) => locale.languageTag === "fr")!;
+  const drifted = { ...structuredClone(image), shopBrandMediaRole: "LOGO" as const };
+  const driftedPrepared = compileTemplateAst(drifted);
+  french.localeAst = { schemaVersion: 1, authoring: drifted, prepared: driftedPrepared };
+  french.contentHash = templateHash(driftedPrepared);
+  assert.throws(() => f.plan(), /header format or media role/);
+});
+
 test("the immutable header, translated body positions and URL binding are preserved", () => {
   const plan = fixture().plan();
   const english = plan.locales.find((l) => l.languageTag === "en")!;

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { compileTemplateAst } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
+import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
+import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { confirmMetaSubmission } from "../../src/lib/admin/whatsapp-templates/meta/submission.ts";
 import { requestMetaReconciliation } from "../../src/lib/admin/whatsapp-templates/meta/reconcile.ts";
 import { requestMetaTechnicalRetry } from "../../src/lib/admin/whatsapp-templates/meta/technical-retry.ts";
@@ -106,6 +109,40 @@ test("confirmation inserts twenty immutable rows once; repeat and simultaneous c
   assert.equal(f.registrations[0].submittedContentHash, f.registrations[0].parameterBindingsSnapshot.localeContentHash);
   assert.deepEqual(f.registrations[0].parameterBindingsSnapshot.header, [{ position: 1, variable: "shopBrand.brandName" }]);
   assert.equal(f.events.length, 0);
+});
+
+test("IMAGE confirmation persists handle-free READY_TO_SUBMIT intent and replays idempotently", async () => {
+  const f = mockedDb();
+  const image = newMetaDraft("INITIAL", "CODE_OFFER");
+  image.promotionTarget = "CHECKOUT";
+  image.shopBrandMediaRole = "CHECKOUT_PRODUCT";
+  image.body = [{ type: "variable", name: "checkout.itemsSummary" },
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+  image.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  f.f.definition.offerType = "CODE_OFFER";
+  f.f.definition.providerTemplateName = "moda_initial_code_offer_checkout_image";
+  f.f.definition.sourceHash = templateHash(image);
+  for (const locale of f.f.locales) {
+    const prepared = compileTemplateAst(image);
+    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(image), prepared };
+    locale.contentHash = templateHash(prepared);
+  }
+
+  const [first, replay] = await Promise.all([
+    confirmMetaSubmission(confirmation(f.f), deps(f)),
+    confirmMetaSubmission(confirmation(f.f), deps(f)),
+  ]);
+  assert.equal([first, replay].filter((result) => !result.replay).length, 1);
+  assert.equal(f.registrations.length, 20);
+  assert.equal(f.audits.length, 1);
+  assert.equal(f.events.length, 0);
+  assert.ok(f.registrations.every((row) => row.submissionState === "READY_TO_SUBMIT"));
+  assert.ok(f.registrations.every((row) => row.parameterBindingsSnapshot.headerMediaRole === "CHECKOUT_PRODUCT" &&
+    row.parameterBindingsSnapshot.promotionTarget === "CHECKOUT"));
+  assert.ok(f.registrations.every((row) => row.componentsSnapshot[0].format === "IMAGE" &&
+    !("example" in row.componentsSnapshot[0]) && !JSON.stringify(row.componentsSnapshot[0]).includes("https://")));
+  assert.ok(!JSON.stringify(f.registrations).includes("header_handle"));
+  assert.ok(!JSON.stringify(f.registrations).includes("whatsup-sample.jpeg"));
 });
 
 test("audit failure rolls back every registration; explicit confirmation and SUPER_ADMIN required", async () => {
