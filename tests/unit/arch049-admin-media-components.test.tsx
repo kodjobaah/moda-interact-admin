@@ -68,7 +68,7 @@ test("product IMAGE authoring selects no seeded asset and requires an explicit o
   eligible.promotionTarget = "CHECKOUT";
   const markup = renderToStaticMarkup(<TemplateContentEditor draft={eligible} onChange={() => {}} media={mediaController} />);
   assert.match(markup, /Verified checkout product/);
-  assert.match(markup, /exact selected product image as fresh verified proof/);
+  assert.match(markup, /Background resolves the image for the exact selected product and variant/);
   assert.ok(!markup.includes("<img"));
   assert.match(markup, /value="CHECKOUT_PRODUCT"/);
 

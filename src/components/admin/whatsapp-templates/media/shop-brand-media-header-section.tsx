@@ -29,8 +29,8 @@ export function ShopBrandMediaHeaderSection({ controller, selectedRole, onSelect
           onChange={() => onSelect("CHECKOUT_PRODUCT")} aria-label="Verified checkout product IMAGE header" />
         Verified checkout product
       </span>
-      <span className="mt-2 block text-xs text-slate-600">At send time, recovery preparation must provide the exact selected product image as fresh verified proof. No product URL or image source is saved here.</span>
+      <span className="mt-2 block text-xs text-slate-600">At send time, Background resolves the image for the exact selected product and variant. No product URL or image source is saved here.</span>
     </label>
-    {selectedRole && <p className="text-xs text-amber-800">IMAGE header bound to {selectedRole.replaceAll("_", " ")}. Only the media role is saved. Meta registration still requires its trusted sample upload handle.</p>}
+    {selectedRole && <p className="text-xs text-amber-800">IMAGE header bound to {selectedRole.replaceAll("_", " ")}. Only the media role is saved. Admin queues a handle-free intent; Background supplies the provider sample handle during Meta submission.</p>}
   </section>;
 }
