@@ -46,6 +46,27 @@ test("IMAGE headers reject mixed text/variables, invented roles and wrapper chan
   if (text.family === "META_RECOVERY") assert.equal(text.components[0].format, "TEXT");
 });
 
+test("CHECKOUT_PRODUCT IMAGE headers compile only for a promotion target and freeze their role", () => {
+  const draft = newMetaDraft("INITIAL", "CODE_OFFER");
+  draft.promotionTarget = "CHECKOUT";
+  draft.shopBrandMediaRole = "CHECKOUT_PRODUCT";
+  draft.body = [{ type: "variable", name: "checkout.itemsSummary" },
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+  draft.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+
+  assert.equal(validateTemplateAst(draft).ok, true);
+  const prepared = compileTemplateAst(draft);
+  assert.equal(prepared.family, "META_RECOVERY");
+  if (prepared.family !== "META_RECOVERY") return;
+  assert.deepEqual(prepared.components[0], { type: "HEADER", format: "IMAGE" });
+  assert.equal(prepared.parameterBindings.headerMediaRole, "CHECKOUT_PRODUCT");
+  assert.equal(makeExamplePreview(prepared).headerMediaRole, "CHECKOUT_PRODUCT");
+  assert.deepEqual(prepared.components[0], { type: "HEADER", format: "IMAGE" });
+  assert.ok(!JSON.stringify(prepared.components[0]).includes("header_handle"));
+  assert.ok(!JSON.stringify(prepared.components[0]).includes("url"));
+  assert.equal(validateTemplateAst({ ...draft, promotionTarget: undefined }).ok, false);
+});
+
 test("content hash captures role, and frozen Meta submission fails closed without sample handle", () => {
   const digests = new Set<string>();
   for (const shopBrandMediaRole of SHOP_BRAND_MEDIA_ROLES) {

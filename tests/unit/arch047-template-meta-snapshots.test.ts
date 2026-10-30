@@ -61,7 +61,7 @@ test("promotion target is frozen in every locale approval and locale target drif
   const alternativePrepared = compileTemplateAst(alternative);
   french.localeAst = { schemaVersion: 1, authoring: alternative, prepared: alternativePrepared };
   french.contentHash = templateHash(alternativePrepared);
-  assert.throws(() => f.plan(), /target or header format/);
+  assert.throws(() => f.plan(), /promotion target, header format or media role/);
 });
 
 test("registration snapshots preserve both independently indexed alternative CTA bindings", () => {

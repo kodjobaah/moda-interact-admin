@@ -13,6 +13,7 @@ export type ShopBrandVariable =
   | "shopBrand.coverImageUrl";
 export type SemanticVariable = RecoveryTemplateSemanticKey;
 export type PromotionTarget = RecoveryPromotionTarget;
+export type HeaderMediaRole = RecoveryTemplateHeaderMediaRole;
 export type ShopBrandMediaRole = "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
 export type TextNode = { type: "text"; value: string };
 export type VariableNode = { type: "variable"; name: SemanticVariable };
@@ -29,7 +30,7 @@ export type MetaTemplateAst = {
   promotionTarget?: PromotionTarget;
   header: ContentNode[];
   /** Exclusive IMAGE header binding. Merchant-specific URLs are never persisted in the AST. */
-  shopBrandMediaRole?: ShopBrandMediaRole;
+  shopBrandMediaRole?: HeaderMediaRole;
   body: ContentNode[];
   footer: TextNode[];
   buttons: UrlButton[];

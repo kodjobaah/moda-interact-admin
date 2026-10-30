@@ -129,8 +129,9 @@ export function makeMetaSubmissionPlan(input: {
   };
   if (!englishSnapshot || snapshots.some((locale) =>
     locale.bindings.promotionTarget !== englishSnapshot.bindings.promotionTarget ||
-    headerKind(locale.components) !== headerKind(englishSnapshot.components))) {
-    fail("INVALID_LOCALE", "Reviewed locale changes the approved promotion target or header format.");
+    headerKind(locale.components) !== headerKind(englishSnapshot.components) ||
+    locale.bindings.headerMediaRole !== englishSnapshot.bindings.headerMediaRole)) {
+    fail("INVALID_LOCALE", "Reviewed locale changes the approved promotion target, header format or media role.");
   }
   const identity = { definitionId: def.id, sourceHash: def.sourceHash, providerTemplateName,
     category: "MARKETING" as const, wabaId: trustedWabaId };
