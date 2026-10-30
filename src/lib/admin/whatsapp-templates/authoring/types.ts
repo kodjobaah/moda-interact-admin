@@ -19,7 +19,7 @@ export type VariableNode = { type: "variable"; name: SemanticVariable };
 export type ResponseNode = { type: "slot"; name: "response.body" };
 export type ContentNode = TextNode | VariableNode;
 export type WrapperNode = ContentNode | ResponseNode;
-export type UrlButton = { type: "url"; label: string; urlPrefix: string; variable?: "checkout.url" };
+export type UrlButton = { type: "url"; label: string; urlPrefix: string; variable?: "checkout.url" | "promotion.productUrl" };
 export type MetaTemplateAst = {
   schemaVersion: 1;
   family: "META_RECOVERY";

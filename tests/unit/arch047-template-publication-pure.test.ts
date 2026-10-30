@@ -237,3 +237,14 @@ test("publication accepts the compiled taxonomy category parameter binding but r
   assert.deepEqual(parseBindings(base).body, base.body);
   assert.throws(() => parseBindings({ ...base, body: [{ position: 1, variable: "shop.categoryDescription" }] }), issueCode("CONTENT"));
 });
+
+test("publication parses both frozen URL bindings at their approved component indexes", () => {
+  const bindings = parseBindings({ schemaVersion: 1, promotionTarget: "ALTERNATIVE_PRODUCT", header: [], body: [], buttons: [
+    { index: 0, subType: "url", variable: "checkout.url" },
+    { index: 1, subType: "url", variable: "promotion.productUrl" },
+  ] });
+  assert.deepEqual(bindings.buttons, [
+    { index: 0, variable: "checkout.url" },
+    { index: 1, variable: "promotion.productUrl" },
+  ]);
+});

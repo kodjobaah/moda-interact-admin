@@ -152,6 +152,31 @@ test("restrict Meta dynamic buttons to one supported checkout URL binding", () =
   invalid({ ...draft, buttons: [{ ...draft.buttons[0], variable: "offer.code" }] }, "buttons");
   invalid({ ...draft, buttons: [{ ...draft.buttons[0], urlPrefix: "http://bad.example/" }] }, "buttons");
 });
+test("alternative product templates freeze both approved dynamic CTA indexes and semantic bindings", () => {
+  const draft = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  draft.promotionTarget = "ALTERNATIVE_PRODUCT";
+  draft.body = [
+    { type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: ". This offer does not apply to your abandoned basket. " },
+    { type: "variable", name: "promotion.productUrl" },
+  ];
+  draft.buttons = [
+    { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
+    { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
+  ];
+  const record = makeImmutableAuthoringRecord(draft);
+  if (record.prepared.family !== "META_RECOVERY") throw new Error("Expected a Meta prepared snapshot.");
+  assert.deepEqual(record.prepared.parameterBindings.buttons, [
+    { index: 0, subType: "url", variable: "checkout.url" },
+    { index: 1, subType: "url", variable: "promotion.productUrl" },
+  ]);
+  assert.deepEqual((record.prepared.components.find((component) => component.type === "BUTTONS") as any).buttons.map((button: any) => button.text),
+    ["Resume checkout", "View offer"]);
+  assert.match(JSON.stringify(record.prepared.components), /trail-running-jacket/);
+  invalid({ ...draft, buttons: [draft.buttons[0], { ...draft.buttons[1], variable: "checkout.url" }] }, "buttons");
+  invalid({ ...draft, promotionTarget: "CHECKOUT" }, "buttons");
+});
 test("canonical hash ignores JSON object key insertion order", () => {
   assert.equal(stableJson({ b: 2, a: { z: 9, c: 4 } }), stableJson({ a: { c: 4, z: 9 }, b: 2 }));
   assert.equal(templateHash({ b: 2, a: 1 }), templateHash({ a: 1, b: 2 }));

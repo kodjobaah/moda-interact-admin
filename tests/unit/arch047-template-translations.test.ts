@@ -124,6 +124,22 @@ test("Meta keyed header/body/footer/button labels: stable keys, repeated indepen
   assert.deepEqual(extractTranslationSegments(definitionId, draft), rows);
 });
 
+test("alternative-product proof variables and both CTA labels survive the translation source snapshot", () => {
+  const draft = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  draft.promotionTarget = "ALTERNATIVE_PRODUCT";
+  draft.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" }];
+  draft.buttons = [
+    { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
+    { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
+  ];
+  const rows = extractTranslationSegments(definitionId, draft);
+  assert.deepEqual(rows.map((row) => row.key), ["body.text", "buttons.0.text", "buttons.1.text"]);
+  assert.deepEqual(rows[0].protectedTokens.map((token) => token.variable),
+    ["promotion.productName", "promotion.offerDescription", "promotion.productUrl"]);
+});
+
 test("all eight ShopBrand identifiers remain opaque; Meta footer variables are refused by authoring", () => {
   const draft = newMetaDraft();
   const eight = ["brandName", "logoUrl", "logoAltText", "logoWidth", "logoHeight", "squareLogoUrl", "squareLogoAltText", "coverImageUrl"] as const;

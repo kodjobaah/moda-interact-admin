@@ -21,6 +21,15 @@ test("composed Meta editor exposes section fields, offer chooser, and English so
   assert.match(html, /sm:grid-cols-2/);
   assert.match(html, /response.body|No header content|Header text/i);
 });
+test("alternative-product editor exposes a second indexed CTA with the product URL binding", () => {
+  const draft = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  draft.promotionTarget = "ALTERNATIVE_PRODUCT";
+  draft.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" }];
+  const html = renderToStaticMarkup(<TemplateContentEditor draft={draft} onChange={() => {}} />);
+  assert.match(html, /Add link button/);
+  assert.match(html, /promotion\.productUrl/);
+  assert.match(html, /Button 1 dynamic URL binding/);
+});
 test("wrapper structure presents required slot, checkout conditional and audience selection", () => {
   const draft = newWrapperDraft();
   const html = renderToStaticMarkup(<>

@@ -64,6 +64,36 @@ test("promotion target is frozen in every locale approval and locale target drif
   assert.throws(() => f.plan(), /target or header format/);
 });
 
+test("registration snapshots preserve both independently indexed alternative CTA bindings", () => {
+  const f = fixture();
+  const alternative = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  alternative.promotionTarget = "ALTERNATIVE_PRODUCT";
+  alternative.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" }];
+  alternative.buttons = [
+    { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
+    { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
+  ];
+  f.definition.offerType = "AUTOMATIC_OFFER";
+  f.definition.sourceHash = templateHash(alternative);
+  for (const locale of f.locales) {
+    const prepared = compileTemplateAst(alternative);
+    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(alternative), prepared };
+    locale.contentHash = templateHash(prepared);
+  }
+  const plan = f.plan();
+  for (const locale of plan.locales) {
+    assert.deepEqual(locale.bindings.buttons, [
+      { index: 0, subType: "url", variable: "checkout.url" },
+      { index: 1, subType: "url", variable: "promotion.productUrl" },
+    ]);
+    const componentButtons = (locale.components.find((component) => component.type === "BUTTONS") as any).buttons;
+    assert.equal(componentButtons[0].text, "Resume checkout");
+    assert.equal(componentButtons[1].text, "View offer");
+  }
+});
+
 test("partial, unreviewed, duplicate, forged and unsupported provider locale records fail closed", () => {
   const f = fixture(); f.locales.pop();
   assert.throws(() => f.plan(), /All 20 reviewed/);

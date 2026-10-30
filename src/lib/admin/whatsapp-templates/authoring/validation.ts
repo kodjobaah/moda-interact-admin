@@ -71,14 +71,25 @@ export function validateTemplateAst(raw: unknown): { ok: true; value: TemplateAs
         fail("header", "IMAGE headers cannot also contain text or text variables.");
       }
     }
-    if (!Array.isArray(raw.buttons) || raw.buttons.length > 1) fail("buttons", "At most one URL button is supported.");
+    const maxButtons = raw.promotionTarget === "ALTERNATIVE_PRODUCT" ? 2 : 1;
+    if (!Array.isArray(raw.buttons) || raw.buttons.length > maxButtons) fail("buttons", `At most ${maxButtons} URL button${maxButtons === 1 ? "" : "s"} supported for this target.`);
     else for (const [i, b] of raw.buttons.entries()) {
       const key = `buttons.${i}`;
       if (!object(b) || !ownKeys(b, ["type", "label", "urlPrefix", "variable"]) || b.type !== "url" || typeof b.label !== "string" || !b.label.trim() || b.label.length > 25) { fail(key, "Unsupported URL button or invalid label (max 25). "); continue; }
       if (typeof b.urlPrefix !== "string" || b.urlPrefix.length > 1900 || TOKEN_PATTERN.test(b.urlPrefix)) { fail(key, "Invalid URL prefix."); continue; }
       try { const url = new URL(b.urlPrefix); if (url.protocol !== "https:" || url.username || url.password || url.hostname.endsWith(".invalid") || !url.hostname.includes(".")) fail(key, "URL requires a genuine HTTPS host."); } catch { fail(key, "URL requires a valid HTTPS prefix."); }
-      if (b.variable !== undefined && b.variable !== "checkout.url") fail(key, "Only the checkout.url dynamic URL parameter is supported.");
+      if (b.variable !== undefined && b.variable !== "checkout.url" && b.variable !== "promotion.productUrl") fail(key, "Unsupported dynamic URL parameter.");
+      if (b.variable === "promotion.productUrl" && raw.promotionTarget !== "ALTERNATIVE_PRODUCT") fail(key, "Product URL buttons require an alternative-product target.");
       if (b.variable && !/[/?=&]$/.test(b.urlPrefix)) fail(key, "Dynamic URL prefix must end at a path or query parameter boundary.");
+    }
+    if (Array.isArray(raw.buttons)) {
+      const dynamicVariables = raw.buttons.filter((button): button is Record<string, unknown> => object(button) && typeof button.variable === "string")
+        .map((button) => button.variable);
+      if (new Set(dynamicVariables).size !== dynamicVariables.length) fail("buttons", "Each dynamic URL binding may be used only once.");
+      if (raw.buttons.length === 2 && (raw.promotionTarget !== "ALTERNATIVE_PRODUCT" ||
+          !dynamicVariables.includes("checkout.url") || !dynamicVariables.includes("promotion.productUrl"))) {
+        fail("buttons", "Two URL buttons require an alternative-product target with distinct checkout and product URL bindings.");
+      }
     }
     const headerNodes = Array.isArray(raw.header) ? raw.header : [];
     if (headerNodes.filter((n) => object(n) && n.type === "variable").length > 1) {

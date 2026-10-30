@@ -22,7 +22,7 @@ export function TemplateContentEditor({ draft, onChange, issues = [], media }: {
         <p className="text-sm font-semibold">Header format</p>
         <label className="flex items-center gap-2 text-sm"><input type="radio" name="metaHeaderFormat"
           checked={!draft.shopBrandMediaRole} onChange={() => onChange({ ...draft, shopBrandMediaRole: undefined })} />Text or no header</label>
-        <p className="text-xs text-slate-600">Choose an IMAGE header role below. Seeded images are examples only; delivery uses the merchant's own media.</p>
+        <p className="text-xs text-slate-600">Choose an IMAGE header role below. Seeded images are examples only; delivery uses the merchant&apos;s own media.</p>
       </div>
       {!draft.shopBrandMediaRole && <TemplateHeaderEditor nodes={draft.header} issues={forField("header")} variables={eligibleHeaderVariables(draft)}
         helpText="Meta text headers allow one short text variable (including brand names), with a maximum of 60 characters."
@@ -39,7 +39,7 @@ export function TemplateContentEditor({ draft, onChange, issues = [], media }: {
       <TemplateFooterEditor nodes={draft.footer} issues={forField("footer")}
         helpText="Meta footers must be static: brand variables are supported in the header or body. Conversation wrapper footers may contain variables."
         onChange={(footer) => onChange({ ...draft, footer: footer.filter((node): node is TextNode => node.type === "text") })} />
-      <TemplateButtonsEditor buttons={draft.buttons} issues={forField("buttons")}
+      <TemplateButtonsEditor buttons={draft.buttons} allowProductUrl={draft.promotionTarget === "ALTERNATIVE_PRODUCT"} issues={forField("buttons")}
         onChange={(buttons) => onChange({ ...draft, buttons })} />
     </> : <WrapperStructureEditor draft={draft} issues={issues} onChange={onChange} />}
   </section>;

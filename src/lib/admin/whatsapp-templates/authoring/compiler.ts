@@ -48,7 +48,7 @@ export function compileTemplateAst(draft: TemplateAst): PreparedTemplate {
   components.push({ type: "BODY", text: body.text,
     ...(body.examples.length ? { example: { body_text: [body.examples] } } : {}) });
   if (footer.trim()) components.push({ type: "FOOTER", text: footer });
-  const buttonBindings: Array<{ index: number; subType: "url"; variable: "checkout.url" }> = [];
+  const buttonBindings: Array<{ index: number; subType: "url"; variable: "checkout.url" | "promotion.productUrl" }> = [];
   if (draft.buttons.length) {
     const buttons = draft.buttons.map((button, index) => {
       if (!button.variable) return { type: "URL", text: button.label, url: button.urlPrefix };
