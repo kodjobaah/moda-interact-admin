@@ -2,13 +2,14 @@ import { createHash } from "node:crypto";
 import { MODA_SUPPORTED_LANGUAGE_TAGS } from "@modainteract/moda-interact-shared/internationalization";
 import { stableJson } from "../authoring/canonical";
 import { SHOP_BRAND_VARIABLES } from "../authoring/registry";
+import { RecoveryTemplateFrozenBindingsSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
 import { templateHash } from "../authoring/identifiers";
 import type { BrandIndicator, CompiledTemplateView, ImpactKind, PublicationScope } from "./types";
 import { MAX_SELECTED_SHOPS } from "./types";
 
 export const LANGUAGES = [...MODA_SUPPORTED_LANGUAGE_TAGS];
 const ID = /^[a-zA-Z0-9_-]{1,191}$/;
-const BINDING = /^(?:customer\.firstName|shop\.(?:name|categoryName)|checkout\.url|offer\.(?:code|description)|shopBrand\.(?:brandName|logoUrl|logoAltText|logoWidth|logoHeight|squareLogoUrl|squareLogoAltText|coverImageUrl))$/;
+const BINDING = /^(?:customer\.firstName|shop\.(?:name|categoryName)|checkout\.(?:url|itemsSummary)|offer\.(?:code|description)|promotion\.(?:productName|productUrl|offerDescription|code)|shopBrand\.(?:brandName|logoUrl|logoAltText|logoWidth|logoHeight|squareLogoUrl|squareLogoAltText|coverImageUrl))$/;
 
 export class PublicationError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "PublicationError"; }
@@ -33,12 +34,12 @@ export function reasonText(value: unknown): string {
   return value.trim();
 }
 export function parseBindings(input: unknown): NonNullable<CompiledTemplateView["bindings"]> {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return reject("CONTENT", "Missing frozen parameter bindings.");
+  const parsed = RecoveryTemplateFrozenBindingsSchema.safeParse(input);
+  if (!parsed.success) return reject("CONTENT", "Missing or invalid frozen parameter bindings.");
   const v = input as Record<string, unknown>;
-  if (Object.keys(v).some((k) => !["schemaVersion", "headerMediaRole", "header", "body", "buttons"].includes(k)) ||
-      (v.schemaVersion !== undefined && v.schemaVersion !== 1)) return reject("CONTENT", "Unrecognised frozen parameter bindings.");
+  if (v.promotionTarget !== undefined && !["CHECKOUT", "ALTERNATIVE_PRODUCT"].includes(String(v.promotionTarget))) return reject("CONTENT", "Unknown promotion target.");
   if (v.headerMediaRole !== undefined &&
-      !["LOGO", "SQUARE_LOGO", "COVER_IMAGE"].includes(String(v.headerMediaRole))) {
+      !["LOGO", "SQUARE_LOGO", "COVER_IMAGE", "CHECKOUT_PRODUCT"].includes(String(v.headerMediaRole))) {
     return reject("CONTENT", "Unknown IMAGE media role.");
   }
   function positions(value: unknown, optional = false): Array<{ position: number; variable: string }> {
@@ -54,8 +55,8 @@ export function parseBindings(input: unknown): NonNullable<CompiledTemplateView[
   const buttons = v.buttons.map((p) => {
     if (!p || typeof p !== "object" || Array.isArray(p)) return reject("CONTENT", "Invalid button binding.");
     const b = p as Record<string, unknown>;
-    if (typeof b.index !== "number" || !Number.isInteger(b.index) || b.index < 0 || b.index > 9 || b.subType !== "url" || b.variable !== "checkout.url") return reject("CONTENT", "Invalid URL button binding.");
-    return { index: Number(b.index), variable: "checkout.url" };
+      if (typeof b.index !== "number" || !Number.isInteger(b.index) || b.index < 0 || b.index > 9 || b.subType !== "url" || !["checkout.url", "promotion.productUrl"].includes(String(b.variable))) return reject("CONTENT", "Invalid URL button binding.");
+    return { index: Number(b.index), variable: b.variable as "checkout.url" | "promotion.productUrl" };
   });
   if (new Set(buttons.map((b) => b.index)).size !== buttons.length) return reject("CONTENT", "Duplicate URL button binding.");
   const header = positions(v.header, true);
@@ -63,7 +64,8 @@ export function parseBindings(input: unknown): NonNullable<CompiledTemplateView[
     return reject("CONTENT", "IMAGE header may not contain text bindings.");
   }
   return { header, body: positions(v.body), buttons,
-    ...(v.headerMediaRole ? { headerMediaRole: v.headerMediaRole as "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE" } : {}) };
+    ...(v.headerMediaRole ? { headerMediaRole: v.headerMediaRole as "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE" | "CHECKOUT_PRODUCT" } : {}),
+    ...(v.promotionTarget ? { promotionTarget: v.promotionTarget as "CHECKOUT" | "ALTERNATIVE_PRODUCT" } : {}) };
 }
 export function parseComponents(input: unknown): Pick<CompiledTemplateView, "header" | "headerFormat" | "body" | "footer" | "buttons"> {
   if (!Array.isArray(input) || !input.length || input.length > 4) return reject("CONTENT", "Invalid frozen provider components.");

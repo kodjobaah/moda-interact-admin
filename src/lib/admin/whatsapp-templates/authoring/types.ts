@@ -1,3 +1,5 @@
+import type { RecoveryPromotionTarget, RecoveryTemplateFrozenBindings, RecoveryTemplateHeaderMediaRole, RecoveryTemplateSemanticKey } from "@modainteract/moda-interact-shared/recovery-template-bindings";
+
 /** Versioned Admin-owned source contract. No provider/DB/React dependencies. */
 export const TEMPLATE_AST_VERSION = 1 as const;
 export type TemplateFamily = "META_RECOVERY" | "MODA_CONVERSATION_WRAPPER";
@@ -9,7 +11,8 @@ export type ShopBrandVariable =
   | "shopBrand.logoWidth" | "shopBrand.logoHeight"
   | "shopBrand.squareLogoUrl" | "shopBrand.squareLogoAltText"
   | "shopBrand.coverImageUrl";
-export type SemanticVariable = "customer.firstName" | "shop.name" | "shop.categoryName" | "checkout.url" | "offer.code" | "offer.description" | ShopBrandVariable;
+export type SemanticVariable = RecoveryTemplateSemanticKey;
+export type PromotionTarget = RecoveryPromotionTarget;
 export type ShopBrandMediaRole = "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
 export type TextNode = { type: "text"; value: string };
 export type VariableNode = { type: "variable"; name: SemanticVariable };
@@ -23,6 +26,7 @@ export type MetaTemplateAst = {
   sourceLanguageTag: "en";
   stage: RecoveryStage;
   offerType: OfferType;
+  promotionTarget?: PromotionTarget;
   header: ContentNode[];
   /** Exclusive IMAGE header binding. Merchant-specific URLs are never persisted in the AST. */
   shopBrandMediaRole?: ShopBrandMediaRole;
@@ -48,13 +52,7 @@ export type MetaPrepared = {
   family: "META_RECOVERY";
   category: "MARKETING";
   components: Array<Record<string, unknown>>;
-  parameterBindings: {
-    schemaVersion?: 1; // versioned IMAGE-header projection (TEXT remains backward compatible)
-    headerMediaRole?: ShopBrandMediaRole;
-    header?: VariableBinding[]; // legacy saved English projections omitted this field
-    body: VariableBinding[];
-    buttons: Array<{ index: number; subType: "url"; variable: "checkout.url" }>;
-  };
+  parameterBindings: RecoveryTemplateFrozenBindings;
 };
 export type RuntimeToken = { kind: "text"; value: string } | { kind: "variable"; name: SemanticVariable } | { kind: "responseSlot"; name: "response.body" };
 export type WrapperPrepared = {
@@ -95,5 +93,5 @@ export type TemplatePreviewDTO = {
   footer: string;
   buttons: Array<{ label: string; url: string }>;
   conditional?: string;
-  headerMediaRole?: ShopBrandMediaRole;
+  headerMediaRole?: RecoveryTemplateHeaderMediaRole;
 };

@@ -61,6 +61,7 @@ export function compileTemplateAst(draft: TemplateAst): PreparedTemplate {
   return { schemaVersion: 1, family: "META_RECOVERY", category: "MARKETING", components,
     parameterBindings: {
       ...(draft.shopBrandMediaRole ? { schemaVersion: 1 as const, headerMediaRole: draft.shopBrandMediaRole } : {}),
+      ...(draft.promotionTarget ? { promotionTarget: draft.promotionTarget } : {}),
       header: header.bindings, body: body.bindings, buttons: buttonBindings,
     } };
 }

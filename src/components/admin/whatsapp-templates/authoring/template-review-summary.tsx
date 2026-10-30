@@ -5,7 +5,9 @@ import type { TemplateEditorStep } from "./template-editor-steps";
 export function TemplateReviewSummary({ draft, issues, onStep }: {
   draft: TemplateAst; issues: AuthoringIssue[]; onStep: (step: TemplateEditorStep) => void;
 }) {
-  const purpose = draft.family === "META_RECOVERY" ? `${draft.stage.replace("_", " ")} · ${draft.offerType.replace(/_/g, " ")}` : `${draft.audience} response`;
+  const purpose = draft.family === "META_RECOVERY"
+    ? `${draft.stage.replace("_", " ")} · ${draft.offerType.replace(/_/g, " ")}${draft.promotionTarget ? ` · ${draft.promotionTarget.replace(/_/g, " ")}` : ""}`
+    : `${draft.audience} response`;
   const fixStep = (issue: AuthoringIssue): TemplateEditorStep => /^(family|stage|offerType|audience|sourceLanguageTag|schemaVersion)/.test(issue.path) ? "setup" : "compose";
   return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-6" aria-label="Review source definition">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-base font-semibold">English source summary</h2>

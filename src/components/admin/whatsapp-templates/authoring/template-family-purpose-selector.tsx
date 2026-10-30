@@ -1,7 +1,7 @@
 "use client";
 
 import { MERCHANT_PRICING_LOCALES, MERCHANT_PRICING_LOCALE_LABELS } from "@/lib/admin/merchant-pricing-locales";
-import type { TemplateAst, RecoveryStage, OfferType, WrapperAudience } from "@/lib/admin/whatsapp-templates/authoring/types";
+import type { TemplateAst, RecoveryStage, OfferType, PromotionTarget, WrapperAudience } from "@/lib/admin/whatsapp-templates/authoring/types";
 
 const selectStyle = "w-full rounded-md border border-gray-300 bg-white p-2 text-sm";
 export function TemplateFamilyPurposeSelector({ draft, onChange, onFamilyChange }: {
@@ -24,10 +24,19 @@ export function TemplateFamilyPurposeSelector({ draft, onChange, onFamilyChange 
         </select>
       </label>
       <label className="block text-sm">Offer variant
-        <select aria-label="Offer variant" className={selectStyle} value={draft.offerType} onChange={(e) => onChange({ ...draft, offerType: e.target.value as OfferType })}>
+        <select aria-label="Offer variant" className={selectStyle} value={draft.offerType} onChange={(e) => {
+          const offerType = e.target.value as OfferType;
+          onChange({ ...draft, offerType, promotionTarget: offerType === "NO_OFFER" ? undefined : draft.promotionTarget ?? "CHECKOUT" });
+        }}>
           <option value="NO_OFFER">No offer</option><option value="CODE_OFFER">Verified code offer</option><option value="AUTOMATIC_OFFER">Verified automatic offer</option>
         </select>
       </label>
+      {draft.offerType !== "NO_OFFER" && <label className="block text-sm">Promotion target
+        <select aria-label="Promotion target" className={selectStyle} value={draft.promotionTarget ?? "CHECKOUT"}
+          onChange={(e) => onChange({ ...draft, promotionTarget: e.target.value as PromotionTarget })}>
+          <option value="CHECKOUT">Abandoned checkout</option><option value="ALTERNATIVE_PRODUCT">Different product</option>
+        </select>
+      </label>}
     </div> : <label className="block text-sm">Wrapper audience
       <select aria-label="Wrapper audience" className={selectStyle} value={draft.audience} onChange={(e) => onChange({ ...draft, audience: e.target.value as WrapperAudience })}>
         <option value="SHARED">Shared fallback</option><option value="AI">AI response</option><option value="HUMAN">Human response</option>

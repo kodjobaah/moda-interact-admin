@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compileTemplateAst } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
+import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { makeMetaSubmissionPlan } from "../../src/lib/admin/whatsapp-templates/meta/snapshot.ts";
 import { META_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/meta/languages.ts";
@@ -28,6 +29,39 @@ test("the immutable header, translated body positions and URL binding are preser
   assert.equal((french.components.find((c) => c.type === "HEADER") as any).text, "Welcome {{1}}");
   assert.match(JSON.stringify(french.components), /avant/);
   assert.ok(!JSON.stringify(french.bindings).includes("Example Brand"));
+});
+
+test("promotion target is frozen in every locale approval and locale target drift is rejected", () => {
+  const f = fixture();
+  const checkout = newMetaDraft("INITIAL", "CODE_OFFER");
+  checkout.promotionTarget = "CHECKOUT";
+  checkout.body = [{ type: "variable", name: "checkout.itemsSummary" },
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+  checkout.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  f.definition.offerType = "CODE_OFFER";
+  f.definition.providerTemplateName = "moda_initial_code_offer_target_test";
+  f.definition.sourceHash = templateHash(checkout);
+  for (const locale of f.locales) {
+    const prepared = compileTemplateAst(checkout);
+    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(checkout), prepared };
+    locale.contentHash = templateHash(prepared);
+  }
+  const plan = f.plan();
+  assert.ok(plan.locales.every((locale) => locale.bindings.promotionTarget === "CHECKOUT"));
+
+  const french = f.locales.find((locale) => locale.languageTag === "fr")!;
+  const alternative = newMetaDraft("INITIAL", "CODE_OFFER");
+  alternative.promotionTarget = "ALTERNATIVE_PRODUCT";
+  alternative.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: " with " }, { type: "variable", name: "promotion.code" },
+    { type: "text", value: ". This offer does not apply to your abandoned basket. " },
+    { type: "variable", name: "promotion.productUrl" }];
+  alternative.buttons = checkout.buttons;
+  const alternativePrepared = compileTemplateAst(alternative);
+  french.localeAst = { schemaVersion: 1, authoring: alternative, prepared: alternativePrepared };
+  french.contentHash = templateHash(alternativePrepared);
+  assert.throws(() => f.plan(), /target or header format/);
 });
 
 test("partial, unreviewed, duplicate, forged and unsupported provider locale records fail closed", () => {

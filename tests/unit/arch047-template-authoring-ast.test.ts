@@ -26,6 +26,71 @@ test("all six Meta purposes are valid and typed variables are specific to offer 
     }
   }
 });
+test("checkout and alternative-product targets freeze distinct proof-backed bindings and previews", () => {
+  const checkout = newMetaDraft("INITIAL", "CODE_OFFER");
+  checkout.promotionTarget = "CHECKOUT";
+  checkout.body = [
+    { type: "text", value: "Hi " }, { type: "variable", name: "customer.firstName" },
+    { type: "text", value: ", your basket " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " qualifies for " }, { type: "variable", name: "offer.description" },
+    { type: "text", value: " with code " }, { type: "variable", name: "offer.code" },
+  ];
+  checkout.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  assert.equal(validateTemplateAst(checkout).ok, true);
+  const checkoutPrepared = compileTemplateAst(checkout);
+  assert.equal(checkoutPrepared.family, "META_RECOVERY");
+  if (checkoutPrepared.family !== "META_RECOVERY") return;
+  assert.equal(checkoutPrepared.parameterBindings.promotionTarget, "CHECKOUT");
+  assert.deepEqual(checkoutPrepared.parameterBindings.body.map((binding) => binding.variable),
+    ["customer.firstName", "checkout.itemsSummary", "offer.description", "offer.code"]);
+  assert.match(makeExamplePreview(checkoutPrepared).body, /Trail Jacket.*example discount.*SAMPLE10/);
+
+  const alternative = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  alternative.promotionTarget = "ALTERNATIVE_PRODUCT";
+  alternative.body = [
+    { type: "text", value: "A different product: " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: ". This offer does not apply to your abandoned basket. See " },
+    { type: "variable", name: "promotion.productUrl" },
+  ];
+  alternative.buttons = checkout.buttons;
+  assert.equal(validateTemplateAst(alternative).ok, true);
+  const alternativePrepared = compileTemplateAst(alternative);
+  assert.equal(alternativePrepared.family, "META_RECOVERY");
+  if (alternativePrepared.family !== "META_RECOVERY") return;
+  assert.equal(alternativePrepared.parameterBindings.promotionTarget, "ALTERNATIVE_PRODUCT");
+  assert.deepEqual(alternativePrepared.parameterBindings.body.map((binding) => binding.variable),
+    ["promotion.productName", "promotion.offerDescription", "promotion.productUrl"]);
+  assert.doesNotMatch(alternativePrepared.parameterBindings.body.map((binding) => binding.variable).join(), /offer\.code|checkout\.itemsSummary/);
+  assert.match(makeExamplePreview(alternativePrepared).body, /different product.*Trail Running Jacket.*current sale price/);
+  assert.equal(alternativePrepared.parameterBindings.buttons[0].variable, "checkout.url");
+
+  const ambiguous = { ...alternative, promotionTarget: "CHECKOUT" as const };
+  invalid(ambiguous, "body");
+  invalid({ ...alternative, body: alternative.body.filter((node) => node.type !== "variable" || node.name !== "promotion.productUrl") }, "body");
+  invalid({ ...alternative, buttons: [] }, "buttons");
+  invalid({ ...alternative, body: alternative.body.filter((node) => node.type !== "text" || !node.value.includes("does not apply")) }, "body");
+});
+test("automatic targets reject coupon bindings and code alternatives require a verified code", () => {
+  const automatic = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  automatic.promotionTarget = "CHECKOUT";
+  automatic.body = [{ type: "variable", name: "checkout.itemsSummary" }, { type: "variable", name: "offer.description" }];
+  invalid({ ...automatic, body: [...automatic.body, { type: "variable", name: "offer.code" }] }, "body");
+
+  const codeAlternative = newMetaDraft("INITIAL", "CODE_OFFER");
+  codeAlternative.promotionTarget = "ALTERNATIVE_PRODUCT";
+  codeAlternative.body = [
+    { type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: " with code " }, { type: "variable", name: "promotion.code" },
+    { type: "text", value: ". This offer does not apply to your abandoned basket. " },
+    { type: "variable", name: "promotion.productUrl" },
+  ];
+  codeAlternative.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  assert.equal(validateTemplateAst(codeAlternative).ok, true);
+  invalid({ ...codeAlternative, body: codeAlternative.body.filter((node) => node.type !== "variable" || node.name !== "promotion.code") }, "body");
+  invalid({ ...codeAlternative, body: [...codeAlternative.body, { type: "variable", name: "offer.code" }] }, "body");
+});
 test("three wrapper audiences each require exactly one response slot", () => {
   for (const audience of ["SHARED", "AI", "HUMAN"] as const) {
     const draft = newWrapperDraft(audience);
