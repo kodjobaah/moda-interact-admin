@@ -61,23 +61,22 @@ export function frozenLocaleSnapshot(row: LocaleForMeta, def: DefinitionForMeta)
     try { return compileTemplateAst(source as MetaTemplateAst) as MetaPrepared; }
     catch { throw new MetaSubmissionError("INVALID_LOCALE", `Stored Meta projection is invalid for ${row.languageTag}.`); }
   })();
+  const imageHeader = recompiled.components.find((component) => component.type === "HEADER" && component.format === "IMAGE");
+  if (imageHeader) {
+    const storedPrepared = record.prepared as unknown as { components?: unknown };
+    const storedComponents = Array.isArray(storedPrepared.components) ? storedPrepared.components : [];
+    const storedImageHeader = storedComponents.find((component) => jsonObject(component) &&
+      component.type === "HEADER" && component.format === "IMAGE");
+    if (JSON.stringify(storedImageHeader) !== JSON.stringify(imageHeader)) {
+      fail("IMAGE_SAMPLE_UNTRUSTED", "IMAGE registration intents cannot include caller-supplied sample media.");
+    }
+  }
   if (templateHash(recompiled) !== contentHash || record.prepared.family !== "META_RECOVERY" ||
       record.prepared.category !== "MARKETING") {
     fail("BINDING_HASH_MISMATCH", `Component/variable mapping differs for ${row.languageTag}.`);
   }
   if (row.languageTag === "en" && templateHash(source) !== def.sourceHash) {
     fail("SOURCE_HASH_MISMATCH", "Saved English definition has changed.");
-  }
-  // No trusted Media Upload sample producer exists yet. Saving/translating IMAGE
-  // definitions is allowed; provider registration is not. This is never a link.
-  const imageHeader = recompiled.components.find((component) => component.type === "HEADER" && component.format === "IMAGE");
-  if (imageHeader) {
-    const example = imageHeader.example;
-    if (!jsonObject(example) || !Array.isArray(example.header_handle) ||
-        example.header_handle.length !== 1 || typeof example.header_handle[0] !== "string" ||
-        !example.header_handle[0].trim()) {
-      fail("IMAGE_SAMPLE_HANDLE_REQUIRED", "A trusted, server-produced Meta image sample handle is required before IMAGE template submission.");
-    }
   }
   // JSON copies detach the frozen registration payloads from the mutable Prisma result.
   const prepared = record.prepared as MetaPrepared;
@@ -129,8 +128,9 @@ export function makeMetaSubmissionPlan(input: {
   };
   if (!englishSnapshot || snapshots.some((locale) =>
     locale.bindings.promotionTarget !== englishSnapshot.bindings.promotionTarget ||
-    headerKind(locale.components) !== headerKind(englishSnapshot.components))) {
-    fail("INVALID_LOCALE", "Reviewed locale changes the approved promotion target or header format.");
+    headerKind(locale.components) !== headerKind(englishSnapshot.components) ||
+    locale.bindings.headerMediaRole !== englishSnapshot.bindings.headerMediaRole)) {
+    fail("INVALID_LOCALE", "Reviewed locale changes the approved promotion target, header format or media role.");
   }
   const identity = { definitionId: def.id, sourceHash: def.sourceHash, providerTemplateName,
     category: "MARKETING" as const, wabaId: trustedWabaId };

@@ -44,6 +44,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: Template
       <TemplateContentEditor draft={controller.draft} onChange={controller.updateDraft} issues={issues} media={media} />
       <div className="xl:sticky xl:top-0"><TemplateReadOnlyPreview preview={controller.preview} title="Live WhatsApp preview" draftInvalid={issues.length > 0}
         verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
+          && controller.draft.shopBrandMediaRole !== "CHECKOUT_PRODUCT"
           ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
         mediaDomain={media.media?.label} /></div>
     </div>
@@ -52,6 +53,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: Template
         <TemplateReviewSummary draft={controller.draft} issues={issues} onStep={select} />
         <TemplateReadOnlyPreview preview={controller.preview} title="Final example preview" draftInvalid={issues.length > 0}
           verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
+            && controller.draft.shopBrandMediaRole !== "CHECKOUT_PRODUCT"
             ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
           mediaDomain={media.media?.label} />
       </div>

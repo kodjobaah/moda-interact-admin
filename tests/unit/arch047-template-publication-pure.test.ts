@@ -126,7 +126,8 @@ test("same-purpose assignments are selected by immutable target and header kind,
     metaRegistration: {
       providerTemplateName: id, providerLanguageCode: "en", category: "MARKETING", providerStatus: "APPROVED",
       componentsSnapshot: [{ type: "HEADER", format: headerKind }, { type: "BODY", text: "variant" }],
-      parameterBindingsSnapshot: { schemaVersion: 1, promotionTarget, header: [], body: [], buttons: [] },
+      parameterBindingsSnapshot: { schemaVersion: 1, promotionTarget,
+        ...(headerKind === "IMAGE" ? { headerMediaRole: "CHECKOUT_PRODUCT" } : {}), header: [], body: [], buttons: [] },
     },
   });
   const checkout = variant("checkout_text", "CHECKOUT", "TEXT");
@@ -141,6 +142,7 @@ test("same-purpose assignments are selected by immutable target and header kind,
   const impact = (await readShopImpacts(oneMatch.db as any, source, [candidate], false))[0];
   assert.equal(impact.public.counts.replaced, 1);
   assert.equal(impact.public.counts.conflict, 0);
+  assert.equal(impact.variantsByLanguage.get("en")?.[0]?.id, "alternative_text");
 
   const duplicateMatch = fixtureDatabase({ variants: [checkout, alternativeImage, alternativeText,
     variant("alternative_text_duplicate", "ALTERNATIVE_PRODUCT", "TEXT")] });

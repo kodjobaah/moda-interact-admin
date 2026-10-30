@@ -5,6 +5,7 @@ import { compileTemplateAst } from "../../src/lib/admin/whatsapp-templates/autho
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { imageHeaderRegistrationBindings } from "../../src/lib/admin/whatsapp-templates/meta/snapshot.ts";
 import { sourceLocations } from "../../src/lib/admin/whatsapp-templates/compilation/locations.ts";
+import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import type { MetaTemplateAst } from "../../src/lib/admin/whatsapp-templates/authoring/types.ts";
 
 const fixture = JSON.parse(readFileSync("tests/fixtures/arch049-admin-media-header-projection.json", "utf8"));
@@ -33,4 +34,22 @@ test("IMAGE role identity survives translation source extraction without a trans
   assert.notEqual(templateHash({ schemaVersion: 1, family: "META_RECOVERY", category: "MARKETING",
     components: fixture.componentsSnapshot,
     parameterBindings: { ...fixture.parameterBindingsSnapshot, headerMediaRole: "SQUARE_LOGO" } }), fixture.submittedContentHash);
+});
+
+test("CHECKOUT_PRODUCT role stays in the immutable source while translation handles text segments only", () => {
+  const draft = newMetaDraft("INITIAL", "CODE_OFFER");
+  draft.promotionTarget = "CHECKOUT";
+  draft.shopBrandMediaRole = "CHECKOUT_PRODUCT";
+  draft.body = [{ type: "variable", name: "checkout.itemsSummary" },
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+  draft.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+
+  const keys = sourceLocations(draft).map((segment) => segment.key);
+  const prepared = compileTemplateAst(draft);
+  assert.deepEqual(keys, ["body", "buttons.0.label"]);
+  assert.equal(prepared.family, "META_RECOVERY");
+  if (prepared.family !== "META_RECOVERY") return;
+  assert.equal(prepared.parameterBindings.headerMediaRole, "CHECKOUT_PRODUCT");
+  assert.notEqual(templateHash(prepared), templateHash({ ...prepared,
+    parameterBindings: { ...prepared.parameterBindings, headerMediaRole: "LOGO" } }));
 });

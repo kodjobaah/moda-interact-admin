@@ -61,6 +61,7 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
   // checks the 20 language projections against the authoritative English source.
   const bindingsSignature = (view: CompiledTemplateView): string => stableJson({
     promotionTarget: view.bindings?.promotionTarget,
+    headerMediaRole: view.bindings?.headerMediaRole,
     header: (view.bindings?.header ?? []).map((binding) => binding.variable).sort(),
     body: (view.bindings?.body ?? []).map((binding) => binding.variable).sort(),
     buttons: (view.bindings?.buttons ?? []).map((binding) => [binding.index, binding.variable])

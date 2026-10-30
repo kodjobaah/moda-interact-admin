@@ -1,4 +1,5 @@
 import { eligibleHeaderVariables, eligibleVariables } from "./registry";
+import { RecoveryTemplateHeaderMediaRoleSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
 import type { AuthoringIssue, TemplateAst } from "./types";
 
 const MAX_JSON_BYTES = 32_768;
@@ -64,11 +65,15 @@ export function validateTemplateAst(raw: unknown): { ok: true; value: TemplateAs
   if (!Array.isArray(raw.body) || raw.body.length === 0 || (raw.body as unknown[]).every((n) => object(n) && n.type === "text" && typeof n.value === "string" && !n.value.trim())) fail("body", "Body cannot be empty.");
   if (meta) {
     if (raw.shopBrandMediaRole !== undefined) {
-      if (!enumMember(raw.shopBrandMediaRole, ["LOGO", "SQUARE_LOGO", "COVER_IMAGE"])) {
-        fail("shopBrandMediaRole", "Choose a supported ShopBrand image role.");
+      if (!RecoveryTemplateHeaderMediaRoleSchema.safeParse(raw.shopBrandMediaRole).success) {
+        fail("shopBrandMediaRole", "Choose a supported IMAGE header role.");
       }
       if (!Array.isArray(raw.header) || raw.header.length !== 0) {
         fail("header", "IMAGE headers cannot also contain text or text variables.");
+      }
+      if (raw.shopBrandMediaRole === "CHECKOUT_PRODUCT" &&
+          (raw.offerType === "NO_OFFER" || !enumMember(raw.promotionTarget, ["CHECKOUT", "ALTERNATIVE_PRODUCT"]))) {
+        fail("promotionTarget", "Product IMAGE headers require an offer and an explicit checkout or alternative-product target.");
       }
     }
     const maxButtons = raw.promotionTarget === "ALTERNATIVE_PRODUCT" ? 2 : 1;

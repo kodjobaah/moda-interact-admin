@@ -1,3 +1,5 @@
+import type { RecoveryTemplateHeaderMediaRole } from "@modainteract/moda-interact-shared/recovery-template-bindings";
+
 /** Safe values crossing the Admin Server Component/action boundary (no sender secrets). */
 export type MetaLocaleSnapshot = {
   localeId: string;
@@ -11,7 +13,7 @@ export type MetaLocaleSnapshot = {
     sourceHash?: string;
     localeContentHash?: string;
     promotionTarget?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
-    headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE" | "CHECKOUT_PRODUCT";
+    headerMediaRole?: RecoveryTemplateHeaderMediaRole;
     header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
     buttons: Array<{ index: number; subType: "url"; variable: "checkout.url" | "promotion.productUrl" }>;

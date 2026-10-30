@@ -1,3 +1,5 @@
+import type { RecoveryTemplateHeaderMediaRole } from "@modainteract/moda-interact-shared/recovery-template-bindings";
+
 /** Client-safe ARCH-047 publication contracts. No database records or credentials. */
 export type PublicationScope =
   | { mode: "one"; shopId: string }
@@ -19,7 +21,7 @@ export type CompiledTemplateView = {
   footer: string | null;
   buttons: Array<{ text: string; url: string; type: string }> | null;
   bindings: { promotionTarget?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
-    headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE" | "CHECKOUT_PRODUCT";
+    headerMediaRole?: RecoveryTemplateHeaderMediaRole;
     header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
     buttons: Array<{ index: number; variable: string }> } | null;

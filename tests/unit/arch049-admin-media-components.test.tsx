@@ -62,6 +62,20 @@ test("Meta text variable palette remains separate from actual media-image bindin
   assert.ok(!markup.includes('name="shopBrandMediaRole"'));
 });
 
+test("product IMAGE authoring selects no seeded asset and requires an explicit offer target", () => {
+  const mediaController = { media: null, pending: false, message: "", load: async () => {} } as any;
+  const eligible = newMetaDraft("INITIAL", "CODE_OFFER");
+  eligible.promotionTarget = "CHECKOUT";
+  const markup = renderToStaticMarkup(<TemplateContentEditor draft={eligible} onChange={() => {}} media={mediaController} />);
+  assert.match(markup, /Verified checkout product/);
+  assert.match(markup, /Background resolves the image for the exact selected product and variant/);
+  assert.ok(!markup.includes("<img"));
+  assert.match(markup, /value="CHECKOUT_PRODUCT"/);
+
+  const ineligible = renderToStaticMarkup(<TemplateContentEditor draft={newMetaDraft()} onChange={() => {}} media={mediaController} />);
+  assert.match(ineligible, /type="radio" disabled="" aria-label="Verified checkout product IMAGE header" name="shopBrandMediaRole" value="CHECKOUT_PRODUCT"/);
+});
+
 test("media image component metadata and alt labels are accessible", () => {
   const markup = renderToStaticMarkup(<ShopBrandMediaPreview media={roleMedia("COVER_IMAGE")} domain="shop.example.com"/>);
   assert.match(markup, /<figure/); assert.match(markup, /<figcaption/);
