@@ -90,6 +90,7 @@ export function frozenLocaleSnapshot(row: LocaleForMeta, def: DefinitionForMeta)
         // The existing TEXT registration format is retained to avoid rewriting
         // accepted ARCH-047 records. IMAGE snapshots use the exact new v1 binding.
         schemaVersion: 1, sourceHash: def.sourceHash, localeContentHash: contentHash,
+        ...(prepared.parameterBindings.promotionTarget ? { promotionTarget: prepared.parameterBindings.promotionTarget } : {}),
         header: JSON.parse(JSON.stringify(prepared.parameterBindings.header ?? [])) as MetaLocaleSnapshot["bindings"]["header"],
         body: JSON.parse(JSON.stringify(prepared.parameterBindings.body)) as MetaLocaleSnapshot["bindings"]["body"],
         buttons: JSON.parse(JSON.stringify(prepared.parameterBindings.buttons)) as MetaLocaleSnapshot["bindings"]["buttons"],
@@ -121,6 +122,16 @@ export function makeMetaSubmissionPlan(input: {
     if (!locale) throw new MetaSubmissionError("INCOMPLETE_LOCALES", `Missing reviewed language ${tag}.`);
     return frozenLocaleSnapshot(locale, def);
   });
+  const englishSnapshot = snapshots.find((locale) => locale.languageTag === "en");
+  const headerKind = (components: Array<Record<string, unknown>>) => {
+    const header = components.find((component) => component.type === "HEADER");
+    return header?.format === "IMAGE" ? "IMAGE" : header?.format === "TEXT" ? "TEXT" : "NONE";
+  };
+  if (!englishSnapshot || snapshots.some((locale) =>
+    locale.bindings.promotionTarget !== englishSnapshot.bindings.promotionTarget ||
+    headerKind(locale.components) !== headerKind(englishSnapshot.components))) {
+    fail("INVALID_LOCALE", "Reviewed locale changes the approved promotion target or header format.");
+  }
   const identity = { definitionId: def.id, sourceHash: def.sourceHash, providerTemplateName,
     category: "MARKETING" as const, wabaId: trustedWabaId };
   return { ...identity, digest: templateHash({ ...identity, locales: snapshots }), locales: snapshots };

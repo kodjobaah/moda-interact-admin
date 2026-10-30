@@ -132,6 +132,34 @@ test("Meta footers never accept placeholders, and URL/button actions are protect
   assert.equal(candidate.record.authoring.buttons[0].variable, "checkout.url");
 });
 
+test("translation preserves both alternative-product CTA indexes and semantic bindings", () => {
+  const english = recoveryFixture();
+  english.offerType = "AUTOMATIC_OFFER";
+  english.promotionTarget = "ALTERNATIVE_PRODUCT";
+  english.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" }];
+  english.buttons = [
+    { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
+    { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
+  ];
+  const f = compilationFixture(english);
+  const translated = { ...f.translated, segments: f.translated.segments.map((segment) =>
+    segment.key === "buttons.0.label" ? { ...segment, text: "Reprendre" }
+      : segment.key === "buttons.1.label" ? { ...segment, text: "Voir l’offre" } : segment) };
+  const candidate = f.run("fr", translated);
+  if (candidate.record.prepared.family !== "META_RECOVERY" || candidate.record.authoring.family !== "META_RECOVERY") {
+    throw new Error("Expected a Meta recovery translation snapshot.");
+  }
+  assert.deepEqual(candidate.record.prepared.parameterBindings.buttons, [
+    { index: 0, subType: "url", variable: "checkout.url" },
+    { index: 1, subType: "url", variable: "promotion.productUrl" },
+  ]);
+  assert.deepEqual(candidate.record.authoring.buttons.map((button) => button.label), ["Reprendre", "Voir l’offre"]);
+  assert.deepEqual((candidate.record.prepared.components.find((component) => component.type === "BUTTONS") as any).buttons.map((button: any) => button.text),
+    ["Reprendre", "Voir l’offre"]);
+});
+
 test("translated provider limits, ineligible header/checkout placements and unsafe script controls are refused", () => {
   const ast = recoveryFixture(); const f = compilationFixture(ast);
   assert.throws(() => f.run("fr", replaced(f.translated, "header", "X".repeat(100) + " {{1}}")), /limits/i);

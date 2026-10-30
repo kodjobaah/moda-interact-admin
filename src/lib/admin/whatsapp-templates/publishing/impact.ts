@@ -27,6 +27,19 @@ export function impactKind(current: Variant[], locale: ApprovedSource["locales"]
     variant.providerTemplateId === locale.providerTemplateId ? "unchanged" : "conflict";
 }
 
+function matchesSelectedVariant(variant: Variant, source: ApprovedSource): boolean {
+  const registration = variant.metaRegistration;
+  if (!registration) return true;
+  const bindings = registration.parameterBindingsSnapshot && typeof registration.parameterBindingsSnapshot === "object"
+    ? registration.parameterBindingsSnapshot as Record<string, unknown> : {};
+  const registeredTarget = bindings.promotionTarget ?? (source.offerType === "NO_OFFER" ? undefined : "CHECKOUT");
+  if (registeredTarget !== source.promotionTarget) return false;
+  const components = Array.isArray(registration.componentsSnapshot) ? registration.componentsSnapshot as Array<Record<string, unknown>> : [];
+  const header = components.find((component) => component.type === "HEADER");
+  const headerKind = header?.format === "IMAGE" ? "IMAGE" : header?.format === "TEXT" ? "TEXT" : "NONE";
+  return headerKind === source.headerKind;
+}
+
 function brandState(keys: string[], row: Record<string, unknown> | null, verified: boolean): BrandIndicator[] {
   return brandAvailability(keys, row, verified);
 }
@@ -55,7 +68,8 @@ export async function readShopImpacts(db: ImpactReader, source: ApprovedSource, 
     } catch { brandReadSucceeded = false; }
   }
   return shops.map((shop) => {
-    const byLanguage = new Map<string, Variant[]>(source.locales.map((l) => [l.languageTag, variants.filter((v) => v.shopId === shop.id && v.languageTag === l.languageTag)]));
+    const byLanguage = new Map<string, Variant[]>(source.locales.map((l) => [l.languageTag, variants.filter((v) =>
+      v.shopId === shop.id && v.languageTag === l.languageTag && matchesSelectedVariant(v, source))]));
     const counts = emptyCounts();
     for (const locale of source.locales) counts[impactKind(byLanguage.get(locale.languageTag) ?? [], locale)]++;
     const brand = brandState(source.brandFields, brands.find((b) => b.shopId === shop.id) ?? null, brandReadSucceeded && includeBrand);

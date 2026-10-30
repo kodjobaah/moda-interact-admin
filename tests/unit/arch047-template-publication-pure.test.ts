@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { makeTemplateView, parseScope, classify, brandAvailability, equivalentRegistration,
   LANGUAGES, PublicationError, parseBindings } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
 import { approvedSource } from "../../src/lib/admin/whatsapp-templates/publishing/source.ts";
+import { readShopImpacts } from "../../src/lib/admin/whatsapp-templates/publishing/impact.ts";
 import { computePreview, languageComparison } from "../../src/lib/admin/whatsapp-templates/publishing/preview.ts";
 import { definitionFixture, fixtureDatabase, shopFixture, WABA, DEFINITION_ID } from "../fixtures/arch047-publication.fixture.ts";
 import { getConfigurationEnvironment } from "../../src/lib/admin/platform-configuration/environment.ts";
@@ -116,6 +117,38 @@ test("two approved selectable variants for one purpose/language force an explici
   assert.equal(impact.impactCounts.conflict, 1);
 });
 
+test("same-purpose assignments are selected by immutable target and header kind, and duplicate matches conflict", async () => {
+  const purpose = "INITIAL_CODE_OFFER";
+  const variant = (id: string, promotionTarget: string, headerKind: string) => ({
+    id, shopId: "shop_0001", providerAccountId: WABA, purpose, languageTag: "en",
+    providerTemplateName: id, providerLanguageCode: "en", providerTemplateId: id,
+    status: "APPROVED", enabled: true, metaRegistrationId: id, updatedAt: new Date(),
+    metaRegistration: {
+      providerTemplateName: id, providerLanguageCode: "en", category: "MARKETING", providerStatus: "APPROVED",
+      componentsSnapshot: [{ type: "HEADER", format: headerKind }, { type: "BODY", text: "variant" }],
+      parameterBindingsSnapshot: { schemaVersion: 1, promotionTarget, header: [], body: [], buttons: [] },
+    },
+  });
+  const checkout = variant("checkout_text", "CHECKOUT", "TEXT");
+  const alternativeImage = variant("alternative_image", "ALTERNATIVE_PRODUCT", "IMAGE");
+  const alternativeText = variant("alternative_text", "ALTERNATIVE_PRODUCT", "TEXT");
+  const source = {
+    purpose, offerType: "CODE_OFFER", promotionTarget: "ALTERNATIVE_PRODUCT", headerKind: "TEXT",
+    wabaId: WABA, locales: [{ languageTag: "en", registrationId: "new", view: {}, brandFields: [] }], brandFields: [],
+  } as any;
+  const candidate = { ...shopFixture(1), wooStatus: null };
+  const oneMatch = fixtureDatabase({ variants: [checkout, alternativeImage, alternativeText] });
+  const impact = (await readShopImpacts(oneMatch.db as any, source, [candidate], false))[0];
+  assert.equal(impact.public.counts.replaced, 1);
+  assert.equal(impact.public.counts.conflict, 0);
+
+  const duplicateMatch = fixtureDatabase({ variants: [checkout, alternativeImage, alternativeText,
+    variant("alternative_text_duplicate", "ALTERNATIVE_PRODUCT", "TEXT")] });
+  const ambiguous = (await readShopImpacts(duplicateMatch.db as any, source, [candidate], false))[0];
+  assert.equal(ambiguous.variantsByLanguage.get("en")?.length, 2);
+  assert.equal(ambiguous.public.counts.conflict, 1);
+});
+
 test("a linked registration with wrong persisted Meta identity is not treated as an unchanged assignment", async () => {
   const fixture = fixtureDatabase({ variants: [{
     id: "invalid_identity", shopId: "shop_0001", providerAccountId: WABA, purpose: "INITIAL_NO_OFFER",
@@ -203,4 +236,15 @@ test("publication accepts the compiled taxonomy category parameter binding but r
     body: [{ position: 1, variable: "shop.categoryName" }], buttons: [] };
   assert.deepEqual(parseBindings(base).body, base.body);
   assert.throws(() => parseBindings({ ...base, body: [{ position: 1, variable: "shop.categoryDescription" }] }), issueCode("CONTENT"));
+});
+
+test("publication parses both frozen URL bindings at their approved component indexes", () => {
+  const bindings = parseBindings({ schemaVersion: 1, promotionTarget: "ALTERNATIVE_PRODUCT", header: [], body: [], buttons: [
+    { index: 0, subType: "url", variable: "checkout.url" },
+    { index: 1, subType: "url", variable: "promotion.productUrl" },
+  ] });
+  assert.deepEqual(bindings.buttons, [
+    { index: 0, variable: "checkout.url" },
+    { index: 1, variable: "promotion.productUrl" },
+  ]);
 });

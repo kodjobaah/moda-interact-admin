@@ -17,8 +17,13 @@ export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
   "shop.name": { label: "Shop name", sample: "Example Shop" },
   "shop.categoryName": { label: "What the shop sells (active store category)", sample: "outdoor clothing and accessories", sourceField: "CommerceShopProfile.activeCategory.displayName" },
   "checkout.url": { label: "Checkout link", sample: "https://www.example.com/checkout/demo" },
+  "checkout.itemsSummary": { label: "Abandoned basket summary", sample: "1 Trail Jacket, 2 Water Bottles", sourceField: "CheckoutRecovery.itemsSummary" },
   "offer.code": { label: "Verified offer code", sample: "SAMPLE10" },
   "offer.description": { label: "Verified offer description", sample: "an example discount" },
+  "promotion.productName": { label: "Verified alternative product", sample: "Trail Running Jacket", sourceField: "promotion.productName" },
+  "promotion.productUrl": { label: "Verified alternative product link", sample: "https://www.example.com/products/trail-running-jacket", sourceField: "promotion.productUrl" },
+  "promotion.offerDescription": { label: "Verified alternative-product offer", sample: "a current sale price", sourceField: "promotion.offerDescription" },
+  "promotion.code": { label: "Verified alternative-product code", sample: "TRAIL15", sourceField: "promotion.code" },
   "shopBrand.brandName": { label: "Brand name", sample: "Example Brand", sourceField: "ShopBrand.brandName" },
   "shopBrand.logoUrl": { label: "Logo URL (text)", sample: "https://example.com/brand/logo.png", sourceField: "ShopBrand.logoUrl" },
   "shopBrand.logoAltText": { label: "Logo alt text", sample: "Example Brand logo", sourceField: "ShopBrand.logoAltText" },
@@ -35,8 +40,12 @@ export function eligibleVariables(draft: TemplateAst): SemanticVariable[] {
   const base: SemanticVariable[] = ["customer.firstName", "shop.name", "checkout.url",
     ...(draft.family === "META_RECOVERY" ? ["shop.categoryName" as const] : []), ...SHOP_BRAND_VARIABLES];
   if (draft.family === "MODA_CONVERSATION_WRAPPER" || draft.offerType === "NO_OFFER") return base;
-  if (draft.offerType === "AUTOMATIC_OFFER") return [...base, "offer.description"];
-  return [...base, "offer.code", "offer.description"];
+  if (draft.promotionTarget === "ALTERNATIVE_PRODUCT") return [
+    ...base, "promotion.productName", "promotion.productUrl", "promotion.offerDescription",
+    ...(draft.offerType === "CODE_OFFER" ? ["promotion.code" as const] : []),
+  ];
+  return [...base, ...(draft.promotionTarget ? ["checkout.itemsSummary" as const] : []),
+    ...(draft.offerType === "AUTOMATIC_OFFER" ? [] : ["offer.code" as const]), "offer.description"];
 }
 
 /** Meta permits at most one text header parameter, but not dynamic footer parameters.

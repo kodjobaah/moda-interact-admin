@@ -10,10 +10,11 @@ export type MetaLocaleSnapshot = {
     /** Existing TEXT submissions retain these audit fields; IMAGE role bindings use the frozen v1 five-field projection. */
     sourceHash?: string;
     localeContentHash?: string;
-    headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
+    promotionTarget?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
+    headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE" | "CHECKOUT_PRODUCT";
     header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
-    buttons: Array<{ index: number; subType: "url"; variable: string }>;
+    buttons: Array<{ index: number; subType: "url"; variable: "checkout.url" | "promotion.productUrl" }>;
   };
 };
 

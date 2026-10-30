@@ -18,7 +18,8 @@ export type CompiledTemplateView = {
   body: string | null;
   footer: string | null;
   buttons: Array<{ text: string; url: string; type: string }> | null;
-  bindings: { headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE";
+  bindings: { promotionTarget?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
+    headerMediaRole?: "LOGO" | "SQUARE_LOGO" | "COVER_IMAGE" | "CHECKOUT_PRODUCT";
     header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
     buttons: Array<{ index: number; variable: string }> } | null;
