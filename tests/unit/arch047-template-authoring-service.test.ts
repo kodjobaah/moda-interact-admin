@@ -50,6 +50,41 @@ test("atomic English Meta definition, prepared locale, exact audit, and safe rep
   assert.equal(fixture.definitions.length, 1); assert.equal(fixture.audits.length, 1);
   await assert.rejects(saveEnglishTemplate({ submissionId, draft: newWrapperDraft() }, { db: fixture.db, principal: admin }), /already used/);
 });
+test("initial checkout multi-code revision saves as a distinct immutable approved-candidate identity", async () => {
+  const fixture = makeFixture();
+  const draft = newMetaDraft("INITIAL", "CODE_OFFER");
+  draft.promotionTarget = "CHECKOUT";
+  draft.body = [
+    { type: "text", value: "Your basket " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " may qualify for " }, { type: "variable", name: "offer.description" },
+    { type: "text", value: ". Possible codes " }, { type: "variable", name: "offer.codes" },
+    { type: "text", value: ", subject to checkout eligibility.\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+  ];
+  const result = await saveEnglishTemplate({ submissionId: randomUUID(), draft }, { db: fixture.db, principal: admin });
+  assert.equal(result.replay, false);
+  assert.deepEqual(fixture.locales[0].localeAst.prepared.parameterBindings.body.map((binding: any) => binding.variable),
+    ["checkout.itemsSummary", "offer.description", "offer.codes", "shop.name"]);
+  assert.ok(fixture.locales[0].localeAst.prepared.components.find((component: any) => component.type === "BODY").text.includes("{{3}}"));
+});
+
+test("new initial revisions reject missing merchant identity or a generic chat reply", async () => {
+  for (const mutate of [
+    (draft: ReturnType<typeof newMetaDraft>) => {
+      draft.body = draft.body.filter((node) => node.type !== "variable" || node.name !== "shop.name");
+    },
+    (draft: ReturnType<typeof newMetaDraft>) => {
+      draft.body = draft.body.map((node) => node.type === "text"
+        ? { ...node, value: node.value.replace("Reply option on this message", "message this number") } : node);
+    },
+  ]) {
+    const fixture = makeFixture(); const draft = newMetaDraft(); mutate(draft);
+    await assert.rejects(saveEnglishTemplate({ submissionId: randomUUID(), draft }, { db: fixture.db, principal: admin }), /body/);
+    assert.equal(fixture.definitions.length, 0);
+    assert.equal(fixture.locales.length, 0);
+  }
+});
+
 test("Clone as New yields independent identity and provider template name without source edits", async () => {
   const fixture = makeFixture(); const a = await saveEnglishTemplate({ submissionId: randomUUID(), draft: newMetaDraft() }, { db: fixture.db, principal: admin });
   const cloned = await saveEnglishTemplate({ submissionId: randomUUID(), draft: newMetaDraft("FOLLOW_UP") , cloneFromDefinitionId: a.id }, { db: fixture.db, principal: admin });

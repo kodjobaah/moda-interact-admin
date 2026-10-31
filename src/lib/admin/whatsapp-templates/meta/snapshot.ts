@@ -1,4 +1,5 @@
 import { compileTemplateAst } from "../authoring/compiler";
+import { validateTemplateAst } from "../authoring/validation";
 import { templateHash } from "../authoring/identifiers";
 import type { ImmutableAuthoringRecord, MetaPrepared, MetaTemplateAst } from "../authoring/types";
 import { DIGEST, MetaSubmissionError, type MetaLocaleSnapshot, type MetaSubmissionPlan } from "./contracts";
@@ -46,10 +47,17 @@ export function frozenLocaleSnapshot(row: LocaleForMeta, def: DefinitionForMeta)
     fail("INVALID_LOCALE", `No immutable compiled Meta projection for ${row.languageTag}.`);
   }
   const record = row.localeAst as unknown as ImmutableAuthoringRecord;
-  const source = record.authoring;
-  if (source.family !== "META_RECOVERY" || source.schemaVersion !== 1 ||
-      source.stage !== def.purpose || source.offerType !== def.offerType || source.sourceLanguageTag !== "en") {
-    fail("INVALID_LOCALE", `Inconsistent template kind or purpose for ${row.languageTag}.`);
+  const source = record.authoring as MetaTemplateAst;
+  if (source.family !== "META_RECOVERY") {
+    fail("INVALID_LOCALE", `Inconsistent template kind for ${row.languageTag}.`);
+  }
+  if (source.schemaVersion !== 1 || source.stage !== def.purpose ||
+      source.offerType !== def.offerType || source.sourceLanguageTag !== "en") {
+    fail("INVALID_LOCALE", `Inconsistent template purpose for ${row.languageTag}.`);
+  }
+  if (source.stage === "INITIAL") {
+    const compliant = validateTemplateAst(source, { requireInitialReply: true, contentLanguageTag: row.languageTag });
+    if (!compliant.ok) fail("INVALID_LOCALE", `Initial recovery semantics are incomplete for ${row.languageTag}.`);
   }
   const contentHash = row.contentHash;
   if (!contentHash || !DIGEST.test(contentHash) || templateHash(record.prepared) !== contentHash) {

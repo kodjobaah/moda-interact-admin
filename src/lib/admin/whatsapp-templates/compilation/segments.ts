@@ -22,7 +22,7 @@ function text(value: unknown, label: string): string {
 function requireUniqueKeys(segments: Array<{ key: string }>, name: string): void {
   const seen = new Set<string>();
   for (const segment of segments) {
-    if (!/^(header|body|footer|buttons\.\d+\.label|conditionals\.\d+\.nodes)$/.test(segment.key) || seen.has(segment.key)) {
+    if (!/^(header|body|body\.replyInstruction|footer|buttons\.\d+\.label|conditionals\.\d+\.nodes)$/.test(segment.key) || seen.has(segment.key)) {
       throw new Error(`${name}: duplicate or invalid segment key ${segment.key.slice(0, 80)}.`);
     }
     seen.add(segment.key);

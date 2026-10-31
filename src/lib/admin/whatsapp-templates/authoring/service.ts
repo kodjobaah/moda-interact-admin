@@ -24,7 +24,7 @@ export async function saveEnglishTemplate(input: SaveTemplateInput, dependencies
   if (!input || typeof input !== "object" || Object.keys(input).some((key) => !["submissionId", "draft", "cloneFromDefinitionId"].includes(key))) {
     throw new Error("Unexpected template request fields.");
   }
-  const validated = validateTemplateAst(input.draft);
+  const validated = validateTemplateAst(input.draft, { requireInitialReply: true, contentLanguageTag: "en" });
   if (!validated.ok) throw new Error(validated.issues.map((i) => `${i.path}: ${i.message}`).join("; "));
   const draft = validated.value;
   const cloneId = input.cloneFromDefinitionId;

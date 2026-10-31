@@ -38,8 +38,8 @@ export function reconstructAndCompile(input: ReconstructionInput): CompilationCa
     throw new Error("Translation output digest does not match the persisted result.");
   }
   verifyTranslatedKeysAndMarkers(source, output);
-  const ast = reconstructLocaleAst(input.english, source, output);
-  const validated = validateTemplateAst(ast);
+  const ast = reconstructLocaleAst(input.english, source, output, input.languageTag);
+  const validated = validateTemplateAst(ast, { requireInitialReply: true, contentLanguageTag: input.languageTag });
   if (!validated.ok) throw new Error(`Translation violates provider/component limits: ${validated.issues[0].path}: ${validated.issues[0].message}`);
   return ast.family === "META_RECOVERY" ? compileMetaLocale(ast) : compileWrapperLocale(ast);
 }

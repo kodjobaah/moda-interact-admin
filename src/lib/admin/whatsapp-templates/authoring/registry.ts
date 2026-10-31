@@ -19,6 +19,7 @@ export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
   "checkout.url": { label: "Checkout link", sample: "https://www.example.com/checkout/demo" },
   "checkout.itemsSummary": { label: "Abandoned basket summary", sample: "1 Trail Jacket, 2 Water Bottles", sourceField: "CheckoutRecovery.itemsSummary" },
   "offer.code": { label: "Verified offer code", sample: "SAMPLE10" },
+  "offer.codes": { label: "Verified possible checkout codes (up to three)", sample: "SAVE10, SHIPFREE" },
   "offer.description": { label: "Verified offer description", sample: "an example discount" },
   "promotion.productName": { label: "Verified alternative product", sample: "Trail Running Jacket", sourceField: "promotion.productName" },
   "promotion.productUrl": { label: "Verified alternative product link", sample: "https://www.example.com/products/trail-running-jacket", sourceField: "promotion.productUrl" },
@@ -45,7 +46,8 @@ export function eligibleVariables(draft: TemplateAst): SemanticVariable[] {
     ...(draft.offerType === "CODE_OFFER" ? ["promotion.code" as const] : []),
   ];
   return [...base, ...(draft.promotionTarget ? ["checkout.itemsSummary" as const] : []),
-    ...(draft.offerType === "AUTOMATIC_OFFER" ? [] : ["offer.code" as const]), "offer.description"];
+    ...(draft.offerType === "AUTOMATIC_OFFER" ? [] : ["offer.code" as const,
+      ...(draft.stage === "INITIAL" && draft.promotionTarget === "CHECKOUT" ? ["offer.codes" as const] : [])]), "offer.description"];
 }
 
 /** Meta permits at most one text header parameter, but not dynamic footer parameters.

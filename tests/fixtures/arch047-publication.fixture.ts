@@ -1,6 +1,7 @@
 import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import { makeImmutableAuthoringRecord } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
+import { localizedInitialReplyNodes } from "../../src/lib/admin/whatsapp-templates/authoring/initial-reply-instructions.ts";
 import { LANGUAGES } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
 
 export const DEFINITION_ID = `wtdef_${"a".repeat(64)}`;
@@ -16,28 +17,50 @@ export function definitionFixture(withBrand = true) {
   const prepared = record.prepared;
   if (prepared.family !== "META_RECOVERY") throw new Error("Expected Meta fixture");
   const hash = templateHash(prepared);
+  const localizedRecord = (languageTag: string) => {
+    const authoring = structuredClone(draft);
+    if (languageTag !== "en") {
+      const tail = authoring.body.slice(-3);
+      const first = tail[0]?.type === "text" ? tail[0].value : "";
+      const fromIndex = first.lastIndexOf("From ");
+      if (fromIndex < 0) throw new Error(`Fixture initial copy is missing its Reply instruction for ${languageTag}.`);
+      const prefix = first.slice(0, fromIndex);
+      authoring.body = [
+        ...authoring.body.slice(0, -3),
+        ...(prefix ? [{ type: "text" as const, value: prefix }] : []),
+        ...localizedInitialReplyNodes(languageTag, authoring.promotionTarget),
+      ];
+    }
+    return makeImmutableAuthoringRecord(authoring);
+  };
   const definition = {
     id: DEFINITION_ID, kind: "META_RECOVERY", purpose: "INITIAL", offerType: "NO_OFFER",
     audience: null, providerTemplateName: PROVIDER_NAME, category: "MARKETING",
     sourceLanguageTag: "en", astSchemaVersion: 1, status: "SAVED", sourceHash: templateHash(draft),
     retiredAt: null, publishedAt: null,
-    locales: LANGUAGES.map((languageTag, index) => ({
-      id: `locale_${index}`, definitionId: DEFINITION_ID, languageTag,
-      providerLanguageCode: languageTag, localeAst: structuredClone(record), contentHash: hash,
-      status: languageTag === "en" ? "SOURCE_SAVED" : "REVIEWED",
-      reviewedAt: languageTag === "en" ? null : new Date("2026-10-25T10:00:00Z"),
-      reviewedByAdminId: languageTag === "en" ? null : ACTOR_ID,
-      metaRegistrations: [{
-        id: `registration_${index}`, localeId: `locale_${index}`, wabaId: WABA,
-        providerTemplateName: PROVIDER_NAME, providerLanguageCode: languageTag,
-        category: "MARKETING", providerTemplateId: String(1000 + index),
-        componentsSnapshot: structuredClone(prepared.components),
-        parameterBindingsSnapshot: structuredClone(prepared.parameterBindings),
-        submittedContentHash: hash, providerStatus: "APPROVED", submissionState: "APPROVED",
-        driftDetectedAt: null, lastObservedContentHash: hash, lastObservedCategory: "MARKETING",
-        failureCode: null,
-      }],
-    })),
+    locales: LANGUAGES.map((languageTag, index) => {
+      const localeRecord = localizedRecord(languageTag);
+      const localePrepared = localeRecord.prepared;
+      if (localePrepared.family !== "META_RECOVERY") throw new Error("Expected localized Meta projection.");
+      const contentHash = templateHash(localePrepared);
+      return {
+        id: `locale_${index}`, definitionId: DEFINITION_ID, languageTag,
+        providerLanguageCode: languageTag, localeAst: localeRecord, contentHash,
+        status: languageTag === "en" ? "SOURCE_SAVED" : "REVIEWED",
+        reviewedAt: languageTag === "en" ? null : new Date("2026-10-25T10:00:00Z"),
+        reviewedByAdminId: languageTag === "en" ? null : ACTOR_ID,
+        metaRegistrations: [{
+          id: `registration_${index}`, localeId: `locale_${index}`, wabaId: WABA,
+          providerTemplateName: PROVIDER_NAME, providerLanguageCode: languageTag,
+          category: "MARKETING", providerTemplateId: String(1000 + index),
+          componentsSnapshot: structuredClone(localePrepared.components),
+          parameterBindingsSnapshot: structuredClone(localePrepared.parameterBindings),
+          submittedContentHash: contentHash, providerStatus: "APPROVED", submissionState: "APPROVED",
+          driftDetectedAt: null, lastObservedContentHash: contentHash, lastObservedCategory: "MARKETING",
+          failureCode: null,
+        }],
+      };
+    }),
   };
   return definition;
 }

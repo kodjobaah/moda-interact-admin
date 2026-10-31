@@ -1,5 +1,6 @@
 import type { ContentNode, SemanticVariable, TemplateAst } from "../authoring/types";
 import { sourceLocations } from "./locations";
+import { localizedInitialReplyNodes } from "../authoring/initial-reply-instructions";
 import type { SourceSegment, TranslationSegmentResult, TranslationSourceSnapshot } from "./contracts";
 
 /** Never interpret a translator string as an authoring expression; only certified markers become variable nodes. */
@@ -27,10 +28,12 @@ export function restoreProtectedNodes(output: string, segment: SourceSegment): C
 
 /** English structure is the anchor; URLs, checkout actions and response slots are never translated. */
 export function reconstructLocaleAst(english: TemplateAst, source: TranslationSourceSnapshot,
-  translated: TranslationSegmentResult): TemplateAst {
+  translated: TranslationSegmentResult, languageTag?: string): TemplateAst {
   const reconstructed = structuredClone(english);
   const outputs = new Map(translated.segments.map(({ key, text }) => [key, text]));
   const sources = new Map(source.segments.map((segment) => [segment.key, segment]));
+  const hasLocalizedReply = sources.has("body.replyInstruction");
+  if (hasLocalizedReply && reconstructed.family === "META_RECOVERY") reconstructed.body = [];
   for (const { key, buttonIndex } of sourceLocations(english)) {
     const value = outputs.get(key);
     const origin = sources.get(key);
@@ -41,7 +44,9 @@ export function reconstructLocaleAst(english: TemplateAst, source: TranslationSo
       continue;
     }
     const nodes = restoreProtectedNodes(value, origin);
-    if (key === "header") reconstructed.header = nodes;
+    if (key === "body.replyInstruction" && reconstructed.family === "META_RECOVERY") {
+      reconstructed.body.push(...localizedInitialReplyNodes(languageTag ?? "en", reconstructed.promotionTarget));
+    } else if (key === "header") reconstructed.header = nodes;
     else if (key === "footer") reconstructed.footer = nodes as typeof reconstructed.footer;
     else if (key === "body" && reconstructed.family === "META_RECOVERY") reconstructed.body = nodes;
     else if (key.startsWith("conditionals.") && reconstructed.family === "MODA_CONVERSATION_WRAPPER") {
