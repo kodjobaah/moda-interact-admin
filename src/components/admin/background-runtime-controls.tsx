@@ -73,7 +73,7 @@ function FieldRow({
             className={inputClass}
             type="number"
             min={field.min / (field.displayMultiplier ?? 1)}
-            max={field.max / (field.displayMultiplier ?? 1)}
+            max={field.max === null ? undefined : field.max / (field.displayMultiplier ?? 1)}
             step={runtimeFieldInputStep(field)}
             value={value}
             onChange={(event) => onChange(event.target.value)}
@@ -203,7 +203,7 @@ function TabForm({
           draft={draft}
           canMutate={canMutate}
           onChange={updateDraft}
-          intro={title === "Worker throughput" ? "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap." : title === "Recovery" ? "Checkout recovery lifetime is a platform-wide control, defaults to 21 days, and changes the cutoff used by the next expiry scans. Expiry retains recovery, conversation, and message history; later checkout activity can start a new recovery generation." : undefined}
+          intro={title === "Worker throughput" ? "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap." : title === "Recovery" ? "Checkout recovery lifetime is a platform-wide control, defaults to 21 days, and changes the cutoff used by the next expiry scans. Zero expires eligible recoveries immediately and may prevent recovery outreach. Expiry retains recovery, conversation, and message history; later checkout activity can start a new recovery generation." : undefined}
         />
       ))}
       {section === "OPERATIONAL" ? (

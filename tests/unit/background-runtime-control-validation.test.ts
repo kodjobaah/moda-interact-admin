@@ -3,9 +3,14 @@ import { test } from "node:test";
 import {
   ALL_RUNTIME_FIELDS,
   parseRuntimeControlsForm,
+  runtimeFieldDisplayRange,
   runtimeControlsSuccessMessage,
   validateRuntimeConfig,
 } from "../../src/lib/admin/background-runtime-control-validation.ts";
+import { readFileSync } from "node:fs";
+
+const componentSource = readFileSync(new URL("../../src/components/admin/background-runtime-controls.tsx", import.meta.url), "utf8");
+const actionSource = readFileSync(new URL("../../src/app/actions/background-runtime-controls.ts", import.meta.url), "utf8");
 
 test("covers every DATABASE-004 editable field exactly once", () => {
   const keys = ALL_RUNTIME_FIELDS.map((field) => field.key);
@@ -37,8 +42,9 @@ test("describes billing reconciliation as including expired promotion cleanup", 
   });
 });
 
-test("validates checkout recovery lifetime as whole days from 1 through 90", () => {
+test("validates non-negative whole-day checkout recovery lifetimes without a policy maximum", () => {
   const current = Object.fromEntries(ALL_RUNTIME_FIELDS.map((field) => [field.key, field.defaultValue]));
+  const original = { ...current };
   const form = new FormData();
   for (const field of ALL_RUNTIME_FIELDS) {
     const displayValue = field.displayMultiplier ? current[field.key] / field.displayMultiplier : current[field.key];
@@ -46,14 +52,58 @@ test("validates checkout recovery lifetime as whole days from 1 through 90", () 
   }
 
   assert.equal(current.checkoutRecoveryLifetimeDays, 21);
-  for (const value of ["1", "90"]) {
+  const lifetime = ALL_RUNTIME_FIELDS.find((field) => field.key === "checkoutRecoveryLifetimeDays");
+  assert.deepEqual(lifetime && { min: lifetime.min, max: lifetime.max, defaultValue: lifetime.defaultValue }, {
+    min: 0,
+    max: null,
+    defaultValue: 21,
+  });
+  assert.equal(
+    lifetime?.guidance,
+    "Expire an active checkout recovery after this many days without checkout/customer activity. Zero expires eligible recoveries immediately; expired history remains. Choose a non-negative whole number of days.",
+  );
+  assert.equal(runtimeFieldDisplayRange(lifetime!), "0 or more whole days");
+
+  for (const value of ["0", "1", "21", "90", "91", "180", "365", "2147483647"]) {
     form.set("checkoutRecoveryLifetimeDays", value);
     assert.equal(parseRuntimeControlsForm(form, "OPERATIONAL", current).checkoutRecoveryLifetimeDays, Number(value));
   }
-  for (const value of ["0", "91", "1.5", "21.0"]) {
+  for (const value of ["-1", "1.5", "21.0", "", "1e2", "Infinity", "NaN", "9007199254740992"]) {
     form.set("checkoutRecoveryLifetimeDays", value);
     assert.throws(() => parseRuntimeControlsForm(form, "OPERATIONAL", current));
+    assert.deepEqual(current, original);
   }
+});
+
+test("keeps existing bounds and renders an unbounded HTML input only for recovery lifetime", () => {
+  const fields = new Map(ALL_RUNTIME_FIELDS.map((field) => [field.key, field]));
+  assert.deepEqual(
+    ["checkoutRecoveryLifetimeDays", "recoveryResumeBatchSize", "translationMaxAutoRetries"].map((key) => {
+      const field = fields.get(key)!;
+      return [field.key, field.min, field.max];
+    }),
+    [
+      ["checkoutRecoveryLifetimeDays", 0, null],
+      ["recoveryResumeBatchSize", 1, 100],
+      ["translationMaxAutoRetries", 0, 10],
+    ],
+  );
+  assert.match(componentSource, /type="number"[\s\S]*?min=\{field\.min \/ \(field\.displayMultiplier \?\? 1\)\}[\s\S]*?max=\{field\.max === null \? undefined : field\.max \/ \(field\.displayMultiplier \?\? 1\)\}[\s\S]*?step=\{runtimeFieldInputStep\(field\)\}/);
+  assert.match(componentSource, /Zero expires eligible recoveries immediately and may prevent recovery outreach\./);
+});
+
+test("validates before mutation and retains optimistic audited update fields", () => {
+  const validationIndex = actionSource.indexOf("const prospective = parseRuntimeControlsForm(");
+  const mutationIndex = actionSource.indexOf("transaction.backgroundRuntimeConfig.updateMany(");
+  const auditIndex = actionSource.indexOf("transaction.backgroundRuntimeConfigAuditEvent.create(");
+  assert.ok(validationIndex >= 0 && validationIndex < mutationIndex);
+  assert.ok(mutationIndex < auditIndex);
+  assert.match(actionSource, /where: \{ id: "default", version: expectedVersion \}/);
+  assert.match(actionSource, /expectedVersion,/);
+  assert.match(actionSource, /reason,/);
+  assert.match(actionSource, /beforeValue: runtimeSnapshot\(before\)/);
+  assert.match(actionSource, /afterValue: runtimeSnapshot\(after\)/);
+  assert.doesNotMatch(actionSource, /checkoutRecoveryLifetimeDays[\s\S]{0,80}(?:90|90-day)/);
 });
 
 test("converts human seconds to exact milliseconds and enforces ranges", () => {

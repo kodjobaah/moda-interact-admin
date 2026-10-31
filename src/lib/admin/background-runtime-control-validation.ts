@@ -21,7 +21,7 @@ export type RuntimeField = {
   guidance: string;
   unit: string;
   min: number;
-  max: number;
+  max: number | null;
   defaultValue: number;
   displayMultiplier?: number;
   displayStep?: string;
@@ -37,7 +37,7 @@ const integerField = (
   guidance: string,
   unit: string,
   min: number,
-  max: number,
+  max: number | null,
   defaultValue: number,
 ): RuntimeField => ({ key, label, guidance, unit, min, max, defaultValue });
 
@@ -87,7 +87,7 @@ export const RUNTIME_FIELDS: Record<RuntimeSection, RuntimeField[]> = {
     secondsField("recoveryRepairIntervalSeconds", "Repair interval", "How often Moda looks for recoveries blocked because recovery capacity was unavailable.", 30, 3600, 300, "5 min"),
     integerField("recoveryRepairShopBatchSize", "Shops per repair", "Maximum shops inspected during one recovery-capacity repair pass.", "shops", 1, 500, 100),
     integerField("recoveryResumeBatchSize", "Recoveries per resume job", "Maximum blocked baskets resumed by one job before Moda schedules continuation work.", "recoveries", 1, 100, 25),
-    integerField("checkoutRecoveryLifetimeDays", "Checkout recovery lifetime", "Expire an active checkout recovery after this many days without checkout/customer activity. Expired history is retained; later checkout activity can start a new recovery generation.", "days", 1, 90, 21),
+    integerField("checkoutRecoveryLifetimeDays", "Checkout recovery lifetime", "Expire an active checkout recovery after this many days without checkout/customer activity. Zero expires eligible recoveries immediately; expired history remains. Choose a non-negative whole number of days.", "days", 0, null, 21),
     secondsField("translationReconciliationIntervalSeconds", "Translation reconciliation interval", "How often Moda repairs missing or stale translation jobs. Lower values recover work sooner but increase database and queue activity.", 30, 3600, 300, "5 min"),
     integerField("translationBatchMaxRequests", "Translations per provider batch", "Maximum translation requests grouped into one provider batch. Larger batches reduce submission overhead but increase the size of each provider operation.", "requests", 1, 500, 100),
     millisecondsField("conversationQuietWindowMs", "Wait after customer message", "Moda waits this long after the most recent customer message before responding, so rapid follow-up messages can be handled as one turn.", 250, 10000, 3000),
@@ -168,6 +168,7 @@ export function runtimeFieldDisplayDefault(field: RuntimeField): string {
 
 export function runtimeFieldDisplayRange(field: RuntimeField): string {
   const min = field.displayMin ?? runtimeFieldDisplayValue(field, field.min);
+  if (field.max === null) return `${min} or more whole ${field.displayUnit ?? field.unit}`;
   const max = field.displayMax ?? runtimeFieldDisplayValue(field, field.max);
   return `${min}–${max} ${field.displayUnit ?? field.unit}`;
 }
@@ -200,10 +201,11 @@ function parseDisplayValue(field: RuntimeField, value: unknown): number {
 export function validateRuntimeConfig(values: Record<string, number>): void {
   for (const field of ALL_RUNTIME_FIELDS) {
     const value = values[field.key];
-    if (!Number.isSafeInteger(value) || value < field.min || value > field.max) {
+    if (!Number.isSafeInteger(value) || value < field.min || (field.max !== null && value > field.max)) {
       const min = field.displayMin ?? runtimeFieldDisplayValue(field, field.min);
-      const max = field.displayMax ?? runtimeFieldDisplayValue(field, field.max);
       const unit = field.displayUnit ?? field.unit;
+      if (field.max === null) throw new Error(`${field.label} must be at least ${min} ${unit}.`);
+      const max = field.displayMax ?? runtimeFieldDisplayValue(field, field.max);
       throw new Error(`${field.label} must be between ${min} and ${max} ${unit}.`);
     }
   }

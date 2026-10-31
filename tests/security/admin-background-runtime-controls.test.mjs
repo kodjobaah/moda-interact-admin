@@ -53,7 +53,8 @@ test("abuse windows are copy, not editable fields", () => {
 test("checkout recovery lifetime is an audited operational control", () => {
   assert.match(validation, /checkoutRecoveryLifetimeDays/);
   assert.match(validation, /Checkout recovery lifetime/);
-  assert.match(validation, /days.*1, 90, 21/);
+  assert.match(validation, /"days", 0, null, 21/);
+  assert.match(validation, /Zero expires eligible recoveries immediately; expired history remains\. Choose a non-negative whole number of days\./);
   assert.match(action, /"checkoutRecoveryLifetimeDays"/);
   assert.match(action, /expectedVersion/);
   assert.match(action, /reason/);
@@ -61,6 +62,8 @@ test("checkout recovery lifetime is an audited operational control", () => {
   assert.match(action, /afterValue/);
   assert.doesNotMatch(action, /checkoutRecovery\.(update|updateMany|delete|deleteMany)/);
   assert.match(component, /defaults to 21 days/);
+  assert.match(component, /max=\{field\.max === null \? undefined : field\.max/);
+  assert.match(component, /Zero expires eligible recoveries immediately and may prevent recovery outreach\./);
   assert.match(component, /platform-wide control/);
   assert.match(component, /retains recovery, conversation, and message history/);
 });
