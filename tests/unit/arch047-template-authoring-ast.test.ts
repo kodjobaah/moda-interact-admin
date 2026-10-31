@@ -98,7 +98,7 @@ test("automatic checkout templates require plural eligibility wording without a 
   assert.equal(checked.ok, true, checked.ok ? "" : JSON.stringify(checked.issues));
   assert.ok(!eligibleVariables(draft).includes("offer.codes"));
   const singular = { ...draft, body: draft.body.map((node) => node.type === "text"
-    ? { ...node, value: node.value.replace("multiple possible automatic offers", "an automatic offer") } : node) };
+    ? { ...node, value: node.value.replace("multiple possible automatic offers", "a possible automatic offer") } : node) };
   const result = validateTemplateAst(singular, { requireInitialReply: true, contentLanguageTag: "en" });
   assert.equal(result.ok, false);
 });

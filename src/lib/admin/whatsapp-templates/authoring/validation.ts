@@ -156,7 +156,8 @@ export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?
           fail("body", "Multi-code checkout copy must describe possible codes and state that they are subject to checkout eligibility.");
         }
         if (raw.offerType === "AUTOMATIC_OFFER" && raw.promotionTarget === "CHECKOUT" &&
-            (!/(?:multiple|several|possible|available|choose from)/.test(copy) || !/subject to checkout eligibility/.test(copy))) {
+            (!/\b(?:multiple|several)\b[^.!?]{0,80}\b(?:offers|discounts)\b|\b(?:possible|available|eligible)\s+(?:automatic\s+)?(?:offers|discounts)\b|\bchoose from\b[^.!?]{0,80}\b(?:offers|discounts)\b/.test(copy) ||
+             !/subject to checkout eligibility/.test(copy))) {
           fail("body", "Automatic checkout copy must describe multiple possible offers subject to checkout eligibility.");
         }
       }
