@@ -13,7 +13,7 @@ export type TemplateTranslationSourceSnapshot = {
   segments: TranslationSegment[];
 };
 
-const SEGMENT_KEY = /^(header|body|footer)\.(text|\d+\.text)$|^buttons\.\d+\.text$|^conditionals\.\d+\.nodes\.text$/;
+const SEGMENT_KEY = /^(header|body|body\.replyInstruction|footer)\.(text|\d+\.text)$|^buttons\.\d+\.text$|^conditionals\.\d+\.nodes\.text$/;
 const VARIABLE_MARKER = /⟦moda_[a-f0-9]{24}⟧/g;
 
 /** Tokens are deterministic for each node occurrence but never expose a merchant or customer value. */
@@ -46,7 +46,23 @@ export function extractTranslationSegments(definitionId: string, ast: TemplateAs
   };
   addNodes("header.text", ast.header);
   if (ast.family === "META_RECOVERY") {
-    addNodes("body.text", ast.body);
+    const compliantInitial = ast.stage === "INITIAL" &&
+      validateTemplateAst(ast, { requireInitialReply: true, contentLanguageTag: "en" }).ok;
+    const tail = ast.body.slice(-3);
+    const replyStart = compliantInitial && tail[0]?.type === "text" &&
+      tail[1]?.type === "variable" && tail[1].name === "shop.name" && tail[2]?.type === "text"
+      ? tail[0].value.lastIndexOf("From ") : -1;
+    if (replyStart >= 0) {
+      const bodyPrefix = ast.body.slice(0, -3);
+      const precedingText = tail[0].type === "text" ? tail[0].value.slice(0, replyStart) : "";
+      if (precedingText) bodyPrefix.push({ type: "text", value: precedingText });
+      addNodes("body.text", bodyPrefix);
+      addNodes("body.replyInstruction.text", [
+        { type: "text", value: "From " }, tail[1], tail[2],
+      ]);
+    } else {
+      addNodes("body.text", ast.body);
+    }
     addNodes("footer.text", ast.footer);
     ast.buttons.forEach((button, index) => {
       if (button.label.trim()) segments.push({ key: `buttons.${index}.text`, text: button.label, protectedTokens: [] });

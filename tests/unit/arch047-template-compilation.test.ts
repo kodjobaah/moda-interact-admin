@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { newMetaDraft, newWrapperDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { SHOP_BRAND_VARIABLES } from "../../src/lib/admin/whatsapp-templates/authoring/registry.ts";
+import { INITIAL_REPLY_INSTRUCTIONS } from "../../src/lib/admin/whatsapp-templates/authoring/initial-reply-instructions.ts";
 import type { ContentNode, TemplateAst } from "../../src/lib/admin/whatsapp-templates/authoring/types.ts";
 import { reconstructAndCompile } from "../../src/lib/admin/whatsapp-templates/compilation/reconstruction.ts";
 import { providerLanguageCode, REVIEW_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/compilation/language-codes.ts";
@@ -18,7 +19,9 @@ function recoveryFixture() {
   ast.body = [{ type: "text", value: "Hi " }, { type: "variable", name: "customer.firstName" },
     { type: "text", value: ", your " }, { type: "variable", name: "shopBrand.brandName" },
     { type: "text", value: " cart has code " }, { type: "variable", name: "offer.code" },
-    { type: "text", value: ". Brand again " }, { type: "variable", name: "shopBrand.brandName" }];
+    { type: "text", value: ". Brand again " }, { type: "variable", name: "shopBrand.brandName" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   ast.footer = [{ type: "text", value: "No reply needed" }];
   ast.buttons = [{ type: "url", label: "Finish checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
   return ast;
@@ -26,6 +29,37 @@ function recoveryFixture() {
 
 const replaced = (result: TranslationSegmentResult, key: string, text: string): TranslationSegmentResult => ({
   schemaVersion: 1, segments: result.segments.map((item) => item.key === key ? { key, text } : item),
+});
+
+
+test("initial contextual Reply merchant binding survives every supported locale compilation", () => {
+  const english = newMetaDraft("INITIAL", "NO_OFFER");
+  english.body = [
+    { type: "text", value: "From " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+  ];
+  const f = compilationFixture(english);
+  assert.equal(REVIEW_LANGUAGES.length, 20);
+  assert.deepEqual(new Set(Object.keys(INITIAL_REPLY_INSTRUCTIONS)), new Set(REVIEW_LANGUAGES));
+  assert.deepEqual(english.body.slice(-3), [
+    { type: "text", value: INITIAL_REPLY_INSTRUCTIONS.en.from },
+    { type: "variable", name: "shop.name" },
+    { type: "text", value: INITIAL_REPLY_INSTRUCTIONS.en.checkout },
+  ]);
+  for (const languageTag of REVIEW_LANGUAGES.filter((tag) => tag !== "en")) {
+    const compiled = f.run(languageTag, f.translated);
+    if (compiled.record.prepared.family !== "META_RECOVERY") throw new Error("Expected Meta template.");
+    assert.ok(compiled.record.prepared.parameterBindings.body.some((binding) => binding.variable === "shop.name"), languageTag);
+    assert.deepEqual(compiled.record.authoring.family === "META_RECOVERY" ? compiled.record.authoring.body.slice(-3) : [], [
+      { type: "text", value: INITIAL_REPLY_INSTRUCTIONS[languageTag as keyof typeof INITIAL_REPLY_INSTRUCTIONS].from },
+      { type: "variable", name: "shop.name" },
+      { type: "text", value: INITIAL_REPLY_INSTRUCTIONS[languageTag as keyof typeof INITIAL_REPLY_INSTRUCTIONS].checkout },
+    ], languageTag);
+    const tampered = { schemaVersion: 1 as const, segments: f.translated.segments.map((segment) =>
+      segment.key === "body.replyInstruction" ? { ...segment, text: "Use a generic chat message {{1}}" } : segment) };
+    const guarded = f.run(languageTag, tampered);
+    assert.ok(!JSON.stringify(guarded.record.authoring).includes("generic chat message"), languageTag);
+  }
 });
 
 test("English/French/German/Japanese: reordered semantic tokens keep correct Meta binding positions", () => {
@@ -39,7 +73,7 @@ test("English/French/German/Japanese: reordered semantic tokens keep correct Met
     if (candidate.record.prepared.family !== "META_RECOVERY") return;
     assert.deepEqual(candidate.record.prepared.parameterBindings.header, [{ position: 1, variable: "shopBrand.brandName" }]);
     assert.deepEqual(candidate.record.prepared.parameterBindings.body.map((b) => b.variable),
-      ["offer.code", "customer.firstName", "shopBrand.brandName", "shopBrand.brandName"]);
+      ["offer.code", "customer.firstName", "shopBrand.brandName", "shopBrand.brandName", "shop.name"]);
     assert.deepEqual(candidate.record.prepared.parameterBindings.buttons, [{ index: 0, subType: "url", variable: "checkout.url" }]);
     assert.equal(candidate.record.authoring.family, "META_RECOVERY");
     if (candidate.record.authoring.family !== "META_RECOVERY") throw new Error("Expected Meta authoring AST.");
@@ -61,7 +95,7 @@ test("all 20 supported language/provider identities stay canonical", () => {
 });
 
 test("all eight canonical shopBrand fields remain semantic identifiers, not sample values", () => {
-  const ast = newMetaDraft();
+  const ast = newMetaDraft("FOLLOW_UP");
   ast.body = SHOP_BRAND_VARIABLES.flatMap((name): ContentNode[] => [{ type: "variable", name }, { type: "text", value: "," }]);
   const f = compilationFixture(ast);
   const candidate = f.run();
@@ -138,7 +172,9 @@ test("translation preserves both alternative-product CTA indexes and semantic bi
   english.promotionTarget = "ALTERNATIVE_PRODUCT";
   english.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
-    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" }];
+    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this offer or your basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   english.buttons = [
     { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
     { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
@@ -164,7 +200,7 @@ test("translated provider limits, ineligible header/checkout placements and unsa
   const ast = recoveryFixture(); const f = compilationFixture(ast);
   assert.throws(() => f.run("fr", replaced(f.translated, "header", "X".repeat(100) + " {{1}}")), /limits/i);
   assert.throws(() => f.run("fr", replaced(f.translated, "body", "<script>\u202E")), /unsafe/i);
-  const forbidden = newMetaDraft(); forbidden.header = [{ type: "variable", name: "shopBrand.logoUrl" }];
+  const forbidden = newMetaDraft("FOLLOW_UP"); forbidden.header = [{ type: "variable", name: "shopBrand.logoUrl" }];
   const g = compilationFixture(forbidden);
   assert.throws(() => g.run(), /English authoring AST invalid/);
 });

@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { LANGUAGES, equivalentRegistration, isValidDefinitionId, makeTemplateView, brandKeys, digest, reject } from "./validation";
 import { stableJson } from "../authoring/canonical";
 import { templateHash } from "../authoring/identifiers";
+import { validateTemplateAst } from "../authoring/validation";
 import type { CompiledTemplateView } from "./types";
 
 type SourceReader = Pick<Prisma.TransactionClient, "whatsAppTemplateDefinition">;
@@ -30,6 +31,10 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
       !("authoring" in english) || templateHash((english as Record<string, unknown>).authoring) !== definition.sourceHash) return reject("CONTENT", "English immutable source hash mismatch.");
   const authoring = (english as { authoring: Record<string, unknown> }).authoring;
   const prepared = (english as { prepared: Record<string, unknown> }).prepared;
+  if (definition.purpose === "INITIAL") {
+    const compliant = validateTemplateAst(authoring, { requireInitialReply: true, contentLanguageTag: "en" });
+    if (!compliant.ok) return reject("CONTENT", "Initial outreach requires the current merchant-name and contextual Reply revision.");
+  }
   const bindings = prepared?.parameterBindings as Record<string, unknown> | undefined;
   const promotionTarget = authoring.promotionTarget === "CHECKOUT" || authoring.promotionTarget === "ALTERNATIVE_PRODUCT"
     ? authoring.promotionTarget : definition.offerType === "NO_OFFER" ? undefined : "CHECKOUT";
@@ -47,6 +52,13 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
     if (!locale || !["SOURCE_SAVED", "REVIEWED", "APPROVED", "READY"].includes(locale.status) ||
         locale.metaRegistrations.length !== 1) return reject("NOT_READY", `No approved registration for ${tag}.`);
     const reg = locale.metaRegistrations[0];
+    if (definition.purpose === "INITIAL") {
+      const localeRecord = locale.localeAst;
+      const localeAuthoring = localeRecord && typeof localeRecord === "object" && !Array.isArray(localeRecord) &&
+        "authoring" in localeRecord ? (localeRecord as { authoring: unknown }).authoring : null;
+      const compliant = validateTemplateAst(localeAuthoring, { requireInitialReply: true, contentLanguageTag: tag });
+      if (!compliant.ok) return reject("CONTENT", `Initial recovery semantics are incomplete for ${tag}.`);
+    }
     if (!locale.providerLanguageCode || reg.wabaId !== wabaId || reg.submissionState !== "APPROVED" ||
         reg.providerLanguageCode !== locale.providerLanguageCode ||
         reg.providerTemplateName !== definition.providerTemplateName || reg.category !== definition.category ||

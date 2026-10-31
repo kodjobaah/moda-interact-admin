@@ -5,7 +5,7 @@ import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/d
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { makeMetaSubmissionPlan } from "../../src/lib/admin/whatsapp-templates/meta/snapshot.ts";
 import { META_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/meta/languages.ts";
-import { fixture } from "../helpers/arch047-template-meta-fixture.ts";
+import { fixture, localizedInitialCopy } from "../helpers/arch047-template-meta-fixture.ts";
 
 test("exactly twenty provider languages, including sanctioned Chinese and Portuguese variants", () => {
   const f = fixture(); const plan = f.plan();
@@ -24,14 +24,17 @@ test("CHECKOUT_PRODUCT IMAGE plans are immutable, handle-free, and reject locale
   image.promotionTarget = "CHECKOUT";
   image.shopBrandMediaRole = "CHECKOUT_PRODUCT";
   image.body = [{ type: "variable", name: "checkout.itemsSummary" },
-    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   image.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
   f.definition.offerType = "CODE_OFFER";
   f.definition.providerTemplateName = "moda_initial_code_offer_checkout_image";
   f.definition.sourceHash = templateHash(image);
   for (const locale of f.locales) {
-    const prepared = compileTemplateAst(image);
-    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(image), prepared };
+    const authoring = localizedInitialCopy(image, locale.languageTag);
+    const prepared = compileTemplateAst(authoring);
+    locale.localeAst = { schemaVersion: 1, authoring, prepared };
     locale.contentHash = templateHash(prepared);
   }
 
@@ -48,11 +51,52 @@ test("CHECKOUT_PRODUCT IMAGE plans are immutable, handle-free, and reject locale
   assert.ok(!JSON.stringify(plan).includes("whatsup-sample.jpeg"));
 
   const french = f.locales.find((locale) => locale.languageTag === "fr")!;
-  const drifted = { ...structuredClone(image), shopBrandMediaRole: "LOGO" as const };
+  const drifted = localizedInitialCopy({ ...structuredClone(image), shopBrandMediaRole: "LOGO" as const }, "fr");
   const driftedPrepared = compileTemplateAst(drifted);
   french.localeAst = { schemaVersion: 1, authoring: drifted, prepared: driftedPrepared };
   french.contentHash = templateHash(driftedPrepared);
   assert.throws(() => f.plan(), /header format or media role/);
+});
+
+test("offer.codes freezes as one bounded body parameter and changes immutable approval identity", () => {
+  const f = fixture();
+  const single = newMetaDraft("INITIAL", "CODE_OFFER");
+  single.promotionTarget = "CHECKOUT";
+  single.body = [
+    { type: "text", value: "Your basket " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " may qualify for " }, { type: "variable", name: "offer.description" },
+    { type: "text", value: " with code " }, { type: "variable", name: "offer.code" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+  ];
+  const multi = structuredClone(single);
+  multi.body = multi.body.map((node) => node.type === "variable" && node.name === "offer.code"
+    ? { ...node, name: "offer.codes" as const } : node);
+  multi.body = multi.body.map((node) => node.type === "text" && node.value.includes(" with code ")
+    ? { ...node, value: ". Possible codes " } : node);
+  multi.body = multi.body.map((node) => node.type === "text" && node.value === ".\n\nFrom "
+    ? { ...node, value: ", subject to checkout eligibility.\n\nFrom " } : node);
+  const singlePrepared = compileTemplateAst(single);
+  const multiPrepared = compileTemplateAst(multi);
+  assert.notEqual(templateHash(single), templateHash(multi));
+  assert.notEqual(templateHash(singlePrepared), templateHash(multiPrepared));
+  if (multiPrepared.family !== "META_RECOVERY") throw new Error("Expected Meta projection.");
+  assert.deepEqual(multiPrepared.parameterBindings.body.map(({ variable }) => variable),
+    ["checkout.itemsSummary", "offer.description", "offer.codes", "shop.name"]);
+  const multiPlan = makeMetaSubmissionPlan({
+    definition: { id: f.definition.id, kind: "META_RECOVERY", purpose: "INITIAL", offerType: "CODE_OFFER",
+      providerTemplateName: "moda_initial_code_offer_multi_codes", category: "MARKETING",
+      sourceHash: templateHash(multi), sourceLanguageTag: "en", status: "SAVED" },
+    locales: f.locales.map((locale) => {
+      const authoring = localizedInitialCopy(multi, locale.languageTag);
+      const prepared = compileTemplateAst(authoring);
+      return { ...locale, localeAst: { schemaVersion: 1, authoring, prepared }, contentHash: templateHash(prepared) };
+    }), trustedWabaId: "123456789012",
+  });
+  assert.ok(multiPlan.digest);
+  assert.ok(multiPlan.locales.every((locale) => locale.bindings.body.some((binding) => binding.variable === "offer.codes")));
+  assert.ok(multiPlan.locales.every((locale) => locale.components.some((component) => component.type === "BODY" &&
+    String(component.text).includes("{{3}}"))));
 });
 
 test("the immutable header, translated body positions and URL binding are preserved", () => {
@@ -60,8 +104,10 @@ test("the immutable header, translated body positions and URL binding are preser
   const english = plan.locales.find((l) => l.languageTag === "en")!;
   const french = plan.locales.find((l) => l.languageTag === "fr")!;
   assert.deepEqual(english.bindings.header, [{ position: 1, variable: "shopBrand.brandName" }]);
-  assert.deepEqual(english.bindings.body, [{ position: 1, variable: "customer.firstName" }, { position: 2, variable: "shopBrand.logoAltText" }]);
-  assert.deepEqual(french.bindings.body, [{ position: 1, variable: "shopBrand.logoAltText" }, { position: 2, variable: "customer.firstName" }]);
+  assert.deepEqual(english.bindings.body, [{ position: 1, variable: "customer.firstName" },
+    { position: 2, variable: "shopBrand.logoAltText" }, { position: 3, variable: "shop.name" }]);
+  assert.deepEqual(french.bindings.body, [{ position: 1, variable: "shopBrand.logoAltText" },
+    { position: 2, variable: "customer.firstName" }, { position: 3, variable: "shop.name" }]);
   assert.deepEqual(french.bindings.buttons, [{ index: 0, subType: "url", variable: "checkout.url" }]);
   assert.equal((french.components.find((c) => c.type === "HEADER") as any).text, "Welcome {{1}}");
   assert.match(JSON.stringify(french.components), /avant/);
@@ -73,14 +119,17 @@ test("promotion target is frozen in every locale approval and locale target drif
   const checkout = newMetaDraft("INITIAL", "CODE_OFFER");
   checkout.promotionTarget = "CHECKOUT";
   checkout.body = [{ type: "variable", name: "checkout.itemsSummary" },
-    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   checkout.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
   f.definition.offerType = "CODE_OFFER";
   f.definition.providerTemplateName = "moda_initial_code_offer_target_test";
   f.definition.sourceHash = templateHash(checkout);
   for (const locale of f.locales) {
-    const prepared = compileTemplateAst(checkout);
-    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(checkout), prepared };
+    const authoring = localizedInitialCopy(checkout, locale.languageTag);
+    const prepared = compileTemplateAst(authoring);
+    locale.localeAst = { schemaVersion: 1, authoring, prepared };
     locale.contentHash = templateHash(prepared);
   }
   const plan = f.plan();
@@ -92,11 +141,14 @@ test("promotion target is frozen in every locale approval and locale target drif
   alternative.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
     { type: "text", value: " with " }, { type: "variable", name: "promotion.code" },
-    { type: "text", value: ". This offer does not apply to your abandoned basket. " },
-    { type: "variable", name: "promotion.productUrl" }];
+    { type: "text", value: ". This offer does not apply to your abandoned basket: " },
+    { type: "variable", name: "promotion.productUrl" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this offer or your basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   alternative.buttons = checkout.buttons;
-  const alternativePrepared = compileTemplateAst(alternative);
-  french.localeAst = { schemaVersion: 1, authoring: alternative, prepared: alternativePrepared };
+  const localizedAlternative = localizedInitialCopy(alternative, "fr");
+  const alternativePrepared = compileTemplateAst(localizedAlternative);
+  french.localeAst = { schemaVersion: 1, authoring: localizedAlternative, prepared: alternativePrepared };
   french.contentHash = templateHash(alternativePrepared);
   assert.throws(() => f.plan(), /promotion target, header format or media role/);
 });
@@ -107,7 +159,9 @@ test("registration snapshots preserve both independently indexed alternative CTA
   alternative.promotionTarget = "ALTERNATIVE_PRODUCT";
   alternative.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
-    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" }];
+    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this offer or your basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   alternative.buttons = [
     { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
     { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
@@ -115,8 +169,9 @@ test("registration snapshots preserve both independently indexed alternative CTA
   f.definition.offerType = "AUTOMATIC_OFFER";
   f.definition.sourceHash = templateHash(alternative);
   for (const locale of f.locales) {
-    const prepared = compileTemplateAst(alternative);
-    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(alternative), prepared };
+    const authoring = localizedInitialCopy(alternative, locale.languageTag);
+    const prepared = compileTemplateAst(authoring);
+    locale.localeAst = { schemaVersion: 1, authoring, prepared };
     locale.contentHash = templateHash(prepared);
   }
   const plan = f.plan();
@@ -129,6 +184,17 @@ test("registration snapshots preserve both independently indexed alternative CTA
     assert.equal(componentButtons[0].text, "Resume checkout");
     assert.equal(componentButtons[1].text, "View offer");
   }
+});
+
+
+test("localized initial Reply copy must match the reviewed locale and promotion target", () => {
+  const f = fixture();
+  const french = f.locales.find((locale) => locale.languageTag === "fr")!;
+  const record = french.localeAst as any;
+  record.authoring.body[record.authoring.body.length - 1].value = ". Envoyez-nous un message pour obtenir de l’aide.";
+  record.prepared = compileTemplateAst(record.authoring);
+  french.contentHash = templateHash(record.prepared);
+  assert.throws(() => f.plan(), /Initial recovery semantics are incomplete for fr/);
 });
 
 test("partial, unreviewed, duplicate, forged and unsupported provider locale records fail closed", () => {

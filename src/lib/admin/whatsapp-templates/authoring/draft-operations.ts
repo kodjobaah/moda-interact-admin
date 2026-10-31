@@ -4,8 +4,13 @@ export function newMetaDraft(stage: MetaTemplateAst["stage"] = "INITIAL", offerT
   return {
     schemaVersion: 1, family: "META_RECOVERY", sourceLanguageTag: "en", stage, offerType,
     header: [], body: [{ type: "text", value: "Hello " }, { type: "variable", name: "customer.firstName" },
-      { type: "text", value: ", your checkout at " }, { type: "variable", name: "shop.name" },
-      { type: "text", value: " is waiting for you." }], footer: [], buttons: [],
+      ...(stage === "INITIAL" ? [
+        { type: "text" as const, value: ", your checkout is waiting for you.\n\nFrom " }, { type: "variable" as const, name: "shop.name" as const },
+        { type: "text" as const, value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+      ] : [
+        { type: "text" as const, value: ", your checkout at " }, { type: "variable" as const, name: "shop.name" as const },
+        { type: "text" as const, value: " is waiting for you." },
+      ])], footer: [], buttons: [],
   };
 }
 export function newWrapperDraft(audience: WrapperTemplateAst["audience"] = "SHARED"): WrapperTemplateAst {

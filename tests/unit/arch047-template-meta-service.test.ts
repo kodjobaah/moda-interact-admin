@@ -7,7 +7,7 @@ import { confirmMetaSubmission } from "../../src/lib/admin/whatsapp-templates/me
 import { requestMetaReconciliation } from "../../src/lib/admin/whatsapp-templates/meta/reconcile.ts";
 import { requestMetaTechnicalRetry } from "../../src/lib/admin/whatsapp-templates/meta/technical-retry.ts";
 import { readMetaStatus } from "../../src/lib/admin/whatsapp-templates/meta/status.ts";
-import { fixture } from "../helpers/arch047-template-meta-fixture.ts";
+import { fixture, localizedInitialCopy } from "../helpers/arch047-template-meta-fixture.ts";
 
 const principal = { id: "admin-123", role: "SUPER_ADMIN", developmentBypass: false } as const;
 function mockedDb() {
@@ -117,14 +117,17 @@ test("IMAGE confirmation persists handle-free READY_TO_SUBMIT intent and replays
   image.promotionTarget = "CHECKOUT";
   image.shopBrandMediaRole = "CHECKOUT_PRODUCT";
   image.body = [{ type: "variable", name: "checkout.itemsSummary" },
-    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" },
+    { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   image.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
   f.f.definition.offerType = "CODE_OFFER";
   f.f.definition.providerTemplateName = "moda_initial_code_offer_checkout_image";
   f.f.definition.sourceHash = templateHash(image);
   for (const locale of f.f.locales) {
-    const prepared = compileTemplateAst(image);
-    locale.localeAst = { schemaVersion: 1, authoring: structuredClone(image), prepared };
+    const authoring = localizedInitialCopy(image, locale.languageTag);
+    const prepared = compileTemplateAst(authoring);
+    locale.localeAst = { schemaVersion: 1, authoring, prepared };
     locale.contentHash = templateHash(prepared);
   }
 

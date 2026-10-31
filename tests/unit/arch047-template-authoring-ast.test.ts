@@ -26,6 +26,83 @@ test("all six Meta purposes are valid and typed variables are specific to offer 
     }
   }
 });
+
+test("initial checkout code templates support one immutable multi-code text binding", () => {
+  const draft = newMetaDraft("INITIAL", "CODE_OFFER");
+  draft.promotionTarget = "CHECKOUT";
+  draft.body = [
+    { type: "text", value: "Your basket " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " may qualify for " }, { type: "variable", name: "offer.description" },
+    { type: "text", value: ". Possible codes " }, { type: "variable", name: "offer.codes" },
+    { type: "text", value: ", subject to checkout eligibility.\n\nFrom " }, { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+  ];
+  assert.ok(eligibleVariables(draft).includes("offer.codes"));
+  const checked = validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" });
+  assert.equal(checked.ok, true, checked.ok ? "" : JSON.stringify(checked.issues));
+  const prepared = compileTemplateAst(draft);
+  if (prepared.family !== "META_RECOVERY") throw new Error("Expected Meta template.");
+  assert.deepEqual(prepared.parameterBindings.body.map(({ variable }) => variable),
+    ["checkout.itemsSummary", "offer.description", "offer.codes", "shop.name"]);
+  assert.match(makeExamplePreview(prepared).body, /SAVE10, SHIPFREE/);
+
+  const conflicting = { ...draft, body: [...draft.body, { type: "variable" as const, name: "offer.code" as const }] };
+  invalid(conflicting, "body");
+  const repeated = { ...draft, body: [...draft.body, { type: "variable" as const, name: "offer.codes" as const }] };
+  invalid(repeated, "body");
+  const alternative = { ...draft, promotionTarget: "ALTERNATIVE_PRODUCT" as const,
+    body: [...draft.body, { type: "variable" as const, name: "offer.codes" as const }] };
+  assert.ok(!eligibleVariables(alternative).includes("offer.codes"));
+  invalid(alternative, "body");
+});
+
+test("new initial copy requires trusted shop identity and the specific-message Reply instruction", () => {
+  const draft = newMetaDraft();
+  assert.equal(validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" }).ok, true);
+  const missingShop = { ...draft, body: draft.body.filter((node) => node.type !== "variable" || node.name !== "shop.name") };
+  const missingShopResult = validateTemplateAst(missingShop, { requireInitialReply: true, contentLanguageTag: "en" });
+  assert.equal(missingShopResult.ok, false);
+  if (!missingShopResult.ok) assert.ok(missingShopResult.issues.some((issue) => issue.path === "body"));
+  const wrongReply = { ...draft, body: draft.body.map((node) => node.type === "text"
+    ? { ...node, value: node.value.replace("Reply option on this message", "message us") } : node) };
+  const result = validateTemplateAst(wrongReply, { requireInitialReply: true, contentLanguageTag: "en" });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.ok(result.issues.some((issue) => issue.path === "body"));
+  const alt = { ...draft, promotionTarget: "ALTERNATIVE_PRODUCT" as const,
+    body: draft.body.map((node) => node.type === "text" ? { ...node, value: node.value.replace("this basket?", "this offer or your basket?") } : node) };
+  const alternativeResult = validateTemplateAst(alt, { requireInitialReply: true, contentLanguageTag: "en" });
+  assert.equal(alternativeResult.ok, false, "alternative target still needs its product proof bindings");
+});
+
+test("new initial multi-offer wording does not alter follow-up template validation", () => {
+  const followUp = newMetaDraft("FOLLOW_UP", "AUTOMATIC_OFFER");
+  followUp.promotionTarget = "CHECKOUT";
+  followUp.body = [
+    { type: "variable", name: "checkout.itemsSummary" },
+    { type: "variable", name: "offer.description" },
+  ];
+  assert.equal(validateTemplateAst(followUp).ok, true);
+});
+
+test("automatic checkout templates require plural eligibility wording without a code binding", () => {
+  const draft = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  draft.promotionTarget = "CHECKOUT";
+  draft.body = [
+    { type: "text", value: "Your basket " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " may qualify for multiple possible automatic offers, subject to checkout eligibility: " },
+    { type: "variable", name: "offer.description" }, { type: "text", value: ".\n\nFrom " },
+    { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+  ];
+  const checked = validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" });
+  assert.equal(checked.ok, true, checked.ok ? "" : JSON.stringify(checked.issues));
+  assert.ok(!eligibleVariables(draft).includes("offer.codes"));
+  const singular = { ...draft, body: draft.body.map((node) => node.type === "text"
+    ? { ...node, value: node.value.replace("multiple possible automatic offers", "an automatic offer") } : node) };
+  const result = validateTemplateAst(singular, { requireInitialReply: true, contentLanguageTag: "en" });
+  assert.equal(result.ok, false);
+});
+
 test("checkout and alternative-product targets freeze distinct proof-backed bindings and previews", () => {
   const checkout = newMetaDraft("INITIAL", "CODE_OFFER");
   checkout.promotionTarget = "CHECKOUT";
@@ -211,7 +288,7 @@ test("draft preview remains visible while a button is invalid without creating a
   draft.buttons = [{ type: "url", label: "Return to checkout", urlPrefix: "https://" }];
   assert.equal(validateTemplateAst(draft).ok, false);
   const preview = makeDraftExamplePreview(draft);
-  assert.match(preview.body, /Alex.*Example Shop/);
+  assert.match(preview.body, /Alex[\s\S]*Example Shop/);
   assert.match(preview.buttons[0].url, /valid HTTPS/);
   assert.equal(preview.buttons[0].label, "Return to checkout");
 });

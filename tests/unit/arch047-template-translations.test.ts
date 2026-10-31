@@ -180,7 +180,7 @@ test("Generate is atomic, concurrent-safe, replay-safe, and emits one audit for 
   assert.equal(f.runs.length, 1);
   assert.equal(f.runs[0].items.length, 19);
   assert.equal(f.runs[0].sourceHash, templateHash(f.draft));
-  assert.deepEqual(f.runs[0].sourceSnapshot.segments.map((s: any) => s.key), ["body.text"]);
+  assert.deepEqual(f.runs[0].sourceSnapshot.segments.map((s: any) => s.key), ["body.text", "body.replyInstruction.text"]);
   assert.equal(f.runs[0].modelConfigurationVersion, 4);
   assert.equal(f.audits.length, 1);
   assert.equal(f.advisoryLockCalls, 3);

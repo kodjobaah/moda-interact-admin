@@ -1,4 +1,5 @@
 import { eligibleHeaderVariables, eligibleVariables } from "./registry";
+import { INITIAL_REPLY_INSTRUCTIONS } from "./initial-reply-instructions";
 import { RecoveryTemplateHeaderMediaRoleSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
 import type { AuthoringIssue, TemplateAst } from "./types";
 
@@ -9,7 +10,7 @@ const ownKeys = (o: Record<string, unknown>, keys: string[]) => Object.keys(o).e
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const enumMember = (v: unknown, choices: readonly string[]): v is string => typeof v === "string" && choices.includes(v);
 
-export function validateTemplateAst(raw: unknown): { ok: true; value: TemplateAst } | { ok: false; issues: AuthoringIssue[] } {
+export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {}): { ok: true; value: TemplateAst } | { ok: false; issues: AuthoringIssue[] } {
   const issues: AuthoringIssue[] = [];
   const fail = (path: string, message: string) => issues.push({ path, message });
   if (!object(raw)) return { ok: false, issues: [{ path: "root", message: "Expected a template object." }] };
@@ -102,13 +103,64 @@ export function validateTemplateAst(raw: unknown): { ok: true; value: TemplateAs
     }
     const bodyNodes = Array.isArray(raw.body) ? raw.body : [];
     if (bodyNodes.filter((n) => object(n) && n.type === "variable").length > 10) fail("body", "Meta supports at most 10 body variables in this editor.");
+    const bodyVariables = bodyNodes.filter((n): n is Record<string, unknown> => object(n) && n.type === "variable").map((n) => n.name);
+    if (raw.stage === "INITIAL" && options.requireInitialReply) {
+      if (!bodyVariables.includes("shop.name")) fail("body", "Initial recovery copy must identify the merchant with the trusted shop.name binding in its visible body.");
+      if (options.requireInitialReply) {
+        const tail = bodyNodes.slice(-3);
+        const replyLocale = options.contentLanguageTag ?? "en";
+        const localizedFrom = INITIAL_REPLY_INSTRUCTIONS[replyLocale as keyof typeof INITIAL_REPLY_INSTRUCTIONS]?.from;
+        const structuredInstruction = tail.length === 3 && object(tail[0]) && tail[0].type === "text" &&
+          typeof tail[0].value === "string" && typeof localizedFrom === "string" && tail[0].value.endsWith(localizedFrom) &&
+          object(tail[1]) && tail[1].type === "variable" && tail[1].name === "shop.name" &&
+          object(tail[2]) && tail[2].type === "text" && typeof tail[2].value === "string" && tail[2].value.trim().length > 0;
+        if (!structuredInstruction) fail("body", "Initial copy must end with a separate shop.name-bound contextual Reply instruction so each locale can use its reviewed wording.");
+        if ((options.contentLanguageTag === undefined || options.contentLanguageTag === "en") && structuredInstruction) {
+          const targetPhrase = raw.promotionTarget === "ALTERNATIVE_PRODUCT" ? "this offer or your basket" : "this basket";
+          const expected = `From {{shop.name}}. Need help with ${targetPhrase}? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes).`;
+          const actual = `From {{shop.name}}${String(tail[2].value)}`;
+          if (actual !== expected) fail("body", "English initial copy must preserve the specific-message Reply action, text or voice note, and two-minute limit.");
+        } else if (options.contentLanguageTag && options.contentLanguageTag !== "en" && structuredInstruction) {
+          const copy = INITIAL_REPLY_INSTRUCTIONS[options.contentLanguageTag as keyof typeof INITIAL_REPLY_INSTRUCTIONS];
+          const expected = raw.promotionTarget === "ALTERNATIVE_PRODUCT" ? copy?.alternativeProduct : copy?.checkout;
+          if (!expected || tail[2].value !== expected) {
+            fail("body", "Localized initial copy must preserve the reviewed specific-message Reply action, text or voice note, and two-minute limit.");
+          }
+        }
+      }
+    }
     if (raw.offerType !== "NO_OFFER" && raw.promotionTarget !== undefined) {
-      const bodyVariables = bodyNodes.filter((n): n is Record<string, unknown> => object(n) && n.type === "variable").map((n) => n.name);
       const required = raw.promotionTarget === "ALTERNATIVE_PRODUCT"
         ? ["promotion.productName", "promotion.productUrl", "promotion.offerDescription", ...(raw.offerType === "CODE_OFFER" ? ["promotion.code"] : [])]
-        : ["checkout.itemsSummary", "offer.description", ...(raw.offerType === "CODE_OFFER" ? ["offer.code"] : [])];
+        : ["checkout.itemsSummary", "offer.description"];
       for (const variable of required) if (!bodyVariables.includes(variable)) fail("body", `This variant requires the ${variable} proof-backed binding.`);
-      if (raw.offerType === "AUTOMATIC_OFFER" && bodyVariables.some((variable) => variable === "offer.code" || variable === "promotion.code")) {
+      if (raw.offerType === "CODE_OFFER" && raw.promotionTarget === "CHECKOUT") {
+        const codeBindings = bodyVariables.filter((variable) => variable === "offer.code" || variable === "offer.codes");
+        if (codeBindings.length === 0) fail("body", "Checkout code offers require one verified offer.code or offer.codes binding.");
+        if (codeBindings.length > 1 || (bodyVariables.includes("offer.code") && bodyVariables.includes("offer.codes"))) {
+          fail("body", "Choose one immutable single-code or multi-code binding per approved template revision.");
+        }
+        if (bodyVariables.includes("offer.codes") && bodyVariables.filter((variable) => variable === "offer.codes").length !== 1) {
+          fail("body", "A multi-code template may bind offer.codes only once.");
+        }
+      }
+      if (raw.offerType === "AUTOMATIC_OFFER" && raw.promotionTarget === "CHECKOUT" &&
+          (bodyVariables.includes("offer.code") || bodyVariables.includes("offer.codes") || bodyVariables.includes("promotion.code"))) {
+        fail("body", "Automatic offers do not use coupon-code bindings.");
+      }
+      if (raw.stage === "INITIAL" && options.requireInitialReply &&
+          (options.contentLanguageTag === undefined || options.contentLanguageTag === "en")) {
+        const copy = bodyNodes.filter((n) => object(n) && n.type === "text").map((n) => String(n.value)).join(" ").toLowerCase();
+        if (raw.offerType === "CODE_OFFER" && raw.promotionTarget === "CHECKOUT" && bodyVariables.includes("offer.codes") &&
+            (!/(?:possible|available)\s+codes?/.test(copy) || !/subject to (?:checkout )?eligibility/.test(copy))) {
+          fail("body", "Multi-code checkout copy must describe possible codes and state that they are subject to checkout eligibility.");
+        }
+        if (raw.offerType === "AUTOMATIC_OFFER" && raw.promotionTarget === "CHECKOUT" &&
+            (!/(?:multiple|several|possible|available|choose from)/.test(copy) || !/subject to checkout eligibility/.test(copy))) {
+          fail("body", "Automatic checkout copy must describe multiple possible offers subject to checkout eligibility.");
+        }
+      }
+      if (raw.offerType === "AUTOMATIC_OFFER" && bodyVariables.some((variable) => variable === "offer.code" || variable === "offer.codes" || variable === "promotion.code")) {
         fail("body", "Automatic offers do not use coupon-code bindings.");
       }
       if (raw.promotionTarget === "ALTERNATIVE_PRODUCT" &&
