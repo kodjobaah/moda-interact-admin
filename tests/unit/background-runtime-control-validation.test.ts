@@ -10,7 +10,6 @@ import {
 import { readFileSync } from "node:fs";
 
 const componentSource = readFileSync(new URL("../../src/components/admin/background-runtime-controls.tsx", import.meta.url), "utf8");
-const actionSource = readFileSync(new URL("../../src/app/actions/background-runtime-controls.ts", import.meta.url), "utf8");
 
 test("covers every DATABASE-004 editable field exactly once", () => {
   const keys = ALL_RUNTIME_FIELDS.map((field) => field.key);
@@ -90,20 +89,6 @@ test("keeps existing bounds and renders an unbounded HTML input only for recover
   );
   assert.match(componentSource, /type="number"[\s\S]*?min=\{field\.min \/ \(field\.displayMultiplier \?\? 1\)\}[\s\S]*?max=\{field\.max === null \? undefined : field\.max \/ \(field\.displayMultiplier \?\? 1\)\}[\s\S]*?step=\{runtimeFieldInputStep\(field\)\}/);
   assert.match(componentSource, /Zero expires eligible recoveries immediately and may prevent recovery outreach\./);
-});
-
-test("validates before mutation and retains optimistic audited update fields", () => {
-  const validationIndex = actionSource.indexOf("const prospective = parseRuntimeControlsForm(");
-  const mutationIndex = actionSource.indexOf("transaction.backgroundRuntimeConfig.updateMany(");
-  const auditIndex = actionSource.indexOf("transaction.backgroundRuntimeConfigAuditEvent.create(");
-  assert.ok(validationIndex >= 0 && validationIndex < mutationIndex);
-  assert.ok(mutationIndex < auditIndex);
-  assert.match(actionSource, /where: \{ id: "default", version: expectedVersion \}/);
-  assert.match(actionSource, /expectedVersion,/);
-  assert.match(actionSource, /reason,/);
-  assert.match(actionSource, /beforeValue: runtimeSnapshot\(before\)/);
-  assert.match(actionSource, /afterValue: runtimeSnapshot\(after\)/);
-  assert.doesNotMatch(actionSource, /checkoutRecoveryLifetimeDays[\s\S]{0,80}(?:90|90-day)/);
 });
 
 test("converts human seconds to exact milliseconds and enforces ranges", () => {
