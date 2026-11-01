@@ -39,13 +39,15 @@ export function eligibleVariables(draft: TemplateAst): SemanticVariable[] {
   // Taxonomy-backed store category is a Meta recovery-body binding only.
   // It requires an active category for the destination shop when the message is prepared.
   const base: SemanticVariable[] = ["customer.firstName", "shop.name", "checkout.url",
-    ...(draft.family === "META_RECOVERY" ? ["shop.categoryName" as const] : []), ...SHOP_BRAND_VARIABLES];
+    ...(draft.family === "META_RECOVERY" ? ["shop.categoryName" as const] : []),
+    ...(draft.family === "META_RECOVERY" && draft.stage === "INITIAL" ? ["checkout.itemsSummary" as const] : []),
+    ...SHOP_BRAND_VARIABLES];
   if (draft.family === "MODA_CONVERSATION_WRAPPER" || draft.offerType === "NO_OFFER") return base;
   if (draft.promotionTarget === "ALTERNATIVE_PRODUCT") return [
     ...base, "promotion.productName", "promotion.productUrl", "promotion.offerDescription",
     ...(draft.offerType === "CODE_OFFER" ? ["promotion.code" as const] : []),
   ];
-  return [...base, ...(draft.promotionTarget ? ["checkout.itemsSummary" as const] : []),
+  return [...base, ...(draft.promotionTarget && draft.stage !== "INITIAL" ? ["checkout.itemsSummary" as const] : []),
     ...(draft.offerType === "AUTOMATIC_OFFER" ? [] : ["offer.code" as const,
       ...(draft.stage === "INITIAL" && draft.promotionTarget === "CHECKOUT" ? ["offer.codes" as const] : [])]), "offer.description"];
 }

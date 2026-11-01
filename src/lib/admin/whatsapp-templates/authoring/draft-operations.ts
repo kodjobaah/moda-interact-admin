@@ -5,13 +5,56 @@ export function newMetaDraft(stage: MetaTemplateAst["stage"] = "INITIAL", offerT
     schemaVersion: 1, family: "META_RECOVERY", sourceLanguageTag: "en", stage, offerType,
     header: [], body: [{ type: "text", value: "Hello " }, { type: "variable", name: "customer.firstName" },
       ...(stage === "INITIAL" ? [
-        { type: "text" as const, value: ", your checkout is waiting for you.\n\nFrom " }, { type: "variable" as const, name: "shop.name" as const },
+        { type: "text" as const, value: ", your checkout is waiting for you.\n\nOriginal abandoned basket: " },
+        { type: "variable" as const, name: "checkout.itemsSummary" as const },
+        { type: "text" as const, value: ".\n\nFrom " }, { type: "variable" as const, name: "shop.name" as const },
         { type: "text" as const, value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
       ] : [
         { type: "text" as const, value: ", your checkout at " }, { type: "variable" as const, name: "shop.name" as const },
         { type: "text" as const, value: " is waiting for you." },
       ])], footer: [], buttons: [],
   };
+}
+export function ensureInitialBasketSummary(nodes: ContentNode[]): ContentNode[] {
+  const result = nodes.map((node) => ({ ...node }));
+  const firstIndex = result.findIndex((node) => node.type === "variable" && node.name === "checkout.itemsSummary");
+  if (firstIndex < 0) {
+    const tail = result.slice(-3);
+    const hasReplyTail = tail.length === 3 && tail[0]?.type === "text" && tail[0].value.endsWith("From ") &&
+      tail[1]?.type === "variable" && tail[1].name === "shop.name" && tail[2]?.type === "text";
+    const insertionIndex = hasReplyTail ? result.length - 3 : 0;
+    result.splice(insertionIndex, 0,
+      { type: "text", value: "Original abandoned basket: " },
+      { type: "variable", name: "checkout.itemsSummary" },
+      { type: "text", value: ". " });
+  } else {
+    for (let index = result.length - 1; index > firstIndex; index -= 1) {
+      const node = result[index];
+      if (node.type === "variable" && node.name === "checkout.itemsSummary") result.splice(index, 1);
+    }
+    const preceding = result[firstIndex - 1];
+    if (preceding?.type !== "text" || !/Original abandoned basket:\s*$/.test(preceding.value)) {
+      result.splice(firstIndex, 0, { type: "text", value: "Original abandoned basket: " });
+    }
+  }
+  return result;
+}
+
+export function removeInitialBasketSummary(nodes: ContentNode[]): ContentNode[] {
+  const result = nodes.map((node) => ({ ...node }));
+  for (let index = result.length - 1; index >= 0; index -= 1) {
+    const node = result[index];
+    if (node.type !== "variable" || node.name !== "checkout.itemsSummary") continue;
+    result.splice(index, 1);
+    const preceding = result[index - 1];
+    if (preceding?.type === "text") {
+      preceding.value = preceding.value.replace(/Original abandoned basket:\s*$/, "");
+      if (!preceding.value) result.splice(index - 1, 1);
+    }
+    const following = result[index];
+    if (following?.type === "text") following.value = following.value.replace(/^\.\s*/, "");
+  }
+  return result;
 }
 export function newWrapperDraft(audience: WrapperTemplateAst["audience"] = "SHARED"): WrapperTemplateAst {
   return {

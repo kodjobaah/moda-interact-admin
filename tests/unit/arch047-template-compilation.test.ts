@@ -18,7 +18,8 @@ function recoveryFixture() {
   ast.header = [{ type: "text", value: "Greetings from " }, { type: "variable", name: "shopBrand.brandName" }];
   ast.body = [{ type: "text", value: "Hi " }, { type: "variable", name: "customer.firstName" },
     { type: "text", value: ", your " }, { type: "variable", name: "shopBrand.brandName" },
-    { type: "text", value: " cart has code " }, { type: "variable", name: "offer.code" },
+    { type: "text", value: " original abandoned basket: " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: ". Your cart has code " }, { type: "variable", name: "offer.code" },
     { type: "text", value: ". Brand again " }, { type: "variable", name: "shopBrand.brandName" },
     { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
     { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
@@ -35,6 +36,8 @@ const replaced = (result: TranslationSegmentResult, key: string, text: string): 
 test("initial contextual Reply merchant binding survives every supported locale compilation", () => {
   const english = newMetaDraft("INITIAL", "NO_OFFER");
   english.body = [
+    { type: "text", value: "Original abandoned basket: " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: ".\n\n" },
     { type: "text", value: "From " }, { type: "variable", name: "shop.name" },
     { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
   ];
@@ -56,7 +59,7 @@ test("initial contextual Reply merchant binding survives every supported locale 
       { type: "text", value: INITIAL_REPLY_INSTRUCTIONS[languageTag as keyof typeof INITIAL_REPLY_INSTRUCTIONS].checkout },
     ], languageTag);
     const tampered = { schemaVersion: 1 as const, segments: f.translated.segments.map((segment) =>
-      segment.key === "body.replyInstruction" ? { ...segment, text: "Use a generic chat message {{1}}" } : segment) };
+      segment.key === "body.replyInstruction" ? { ...segment, text: "Use a generic chat message {{2}}" } : segment) };
     const guarded = f.run(languageTag, tampered);
     assert.ok(!JSON.stringify(guarded.record.authoring).includes("generic chat message"), languageTag);
   }
@@ -65,7 +68,7 @@ test("initial contextual Reply merchant binding survives every supported locale 
 test("English/French/German/Japanese: reordered semantic tokens keep correct Meta binding positions", () => {
   const english = recoveryFixture(); const f = compilationFixture(english);
   const original = JSON.stringify(english);
-  const translated = replaced(f.translated, "body", "{{4}} und {{2}} / {{3}} et {{5}}");
+  const translated = replaced(f.translated, "body", "{{5}} und {{2}} / {{3}} {{4}} et {{6}}");
   for (const language of ["fr", "de", "ja", "zh-Hans"]) {
     const candidate = f.run(language, translated);
     assert.equal(candidate.record.authoring.sourceLanguageTag, "en");
@@ -73,7 +76,7 @@ test("English/French/German/Japanese: reordered semantic tokens keep correct Met
     if (candidate.record.prepared.family !== "META_RECOVERY") return;
     assert.deepEqual(candidate.record.prepared.parameterBindings.header, [{ position: 1, variable: "shopBrand.brandName" }]);
     assert.deepEqual(candidate.record.prepared.parameterBindings.body.map((b) => b.variable),
-      ["offer.code", "customer.firstName", "shopBrand.brandName", "shopBrand.brandName", "shop.name"]);
+      ["offer.code", "customer.firstName", "shopBrand.brandName", "checkout.itemsSummary", "shopBrand.brandName", "shop.name"]);
     assert.deepEqual(candidate.record.prepared.parameterBindings.buttons, [{ index: 0, subType: "url", variable: "checkout.url" }]);
     assert.equal(candidate.record.authoring.family, "META_RECOVERY");
     if (candidate.record.authoring.family !== "META_RECOVERY") throw new Error("Expected Meta authoring AST.");
@@ -171,6 +174,7 @@ test("translation preserves both alternative-product CTA indexes and semantic bi
   english.offerType = "AUTOMATIC_OFFER";
   english.promotionTarget = "ALTERNATIVE_PRODUCT";
   english.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+    { type: "text", value: ". Original abandoned basket: " }, { type: "variable", name: "checkout.itemsSummary" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
     { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" },
     { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },

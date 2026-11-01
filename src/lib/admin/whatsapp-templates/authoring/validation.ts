@@ -105,6 +105,9 @@ export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?
     if (bodyNodes.filter((n) => object(n) && n.type === "variable").length > 10) fail("body", "Meta supports at most 10 body variables in this editor.");
     const bodyVariables = bodyNodes.filter((n): n is Record<string, unknown> => object(n) && n.type === "variable").map((n) => n.name);
     if (raw.stage === "INITIAL" && options.requireInitialReply) {
+      if (bodyVariables.filter((variable) => variable === "checkout.itemsSummary").length !== 1) {
+        fail("body", "Initial recovery copy must include exactly one checkout.itemsSummary binding in its visible body.");
+      }
       if (!bodyVariables.includes("shop.name")) fail("body", "Initial recovery copy must identify the merchant with the trusted shop.name binding in its visible body.");
       if (options.requireInitialReply) {
         const tail = bodyNodes.slice(-3);

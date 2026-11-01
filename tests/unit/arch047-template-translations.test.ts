@@ -107,7 +107,7 @@ test("all 20 supported locales map to one English source and 19 unique targets",
 });
 
 test("Meta keyed header/body/footer/button labels: stable keys, repeated independent brand token markers", () => {
-  const draft = newMetaDraft();
+  const draft = newMetaDraft("FOLLOW_UP");
   draft.header = [{ type: "text", value: "From " }, { type: "variable", name: "shopBrand.brandName" }];
   draft.body = [{ type: "text", value: "Hello " }, { type: "variable", name: "shopBrand.brandName" },
     { type: "text", value: " — " }, { type: "variable", name: "shopBrand.brandName" },
@@ -125,7 +125,7 @@ test("Meta keyed header/body/footer/button labels: stable keys, repeated indepen
 });
 
 test("alternative-product proof variables and both CTA labels survive the translation source snapshot", () => {
-  const draft = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
+  const draft = newMetaDraft("FOLLOW_UP", "AUTOMATIC_OFFER");
   draft.promotionTarget = "ALTERNATIVE_PRODUCT";
   draft.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
@@ -141,7 +141,7 @@ test("alternative-product proof variables and both CTA labels survive the transl
 });
 
 test("all eight ShopBrand identifiers remain opaque; Meta footer variables are refused by authoring", () => {
-  const draft = newMetaDraft();
+  const draft = newMetaDraft("FOLLOW_UP");
   const eight = ["brandName", "logoUrl", "logoAltText", "logoWidth", "logoHeight", "squareLogoUrl", "squareLogoAltText", "coverImageUrl"] as const;
   draft.body = eight.flatMap((name) => [{ type: "variable" as const, name: `shopBrand.${name}` as const }, { type: "text" as const, value: " " }]);
   const row = extractTranslationSegments(definitionId, draft).find((item) => item.key === "body.text");
@@ -181,6 +181,8 @@ test("Generate is atomic, concurrent-safe, replay-safe, and emits one audit for 
   assert.equal(f.runs[0].items.length, 19);
   assert.equal(f.runs[0].sourceHash, templateHash(f.draft));
   assert.deepEqual(f.runs[0].sourceSnapshot.segments.map((s: any) => s.key), ["body.text", "body.replyInstruction.text"]);
+  assert.deepEqual(f.runs[0].sourceSnapshot.segments[0].protectedTokens.map((token: any) => token.variable),
+    ["customer.firstName", "checkout.itemsSummary"]);
   assert.equal(f.runs[0].modelConfigurationVersion, 4);
   assert.equal(f.audits.length, 1);
   assert.equal(f.advisoryLockCalls, 3);
@@ -280,7 +282,7 @@ test("translation Server Actions enforce platform-admin SUPER_ADMIN access befor
 
 
 test("taxonomy category binding survives protected translation segmentation", () => {
-  const draft = newMetaDraft();
+  const draft = newMetaDraft("FOLLOW_UP");
   draft.body = [
     { type: "text", value: "We sell " },
     { type: "variable", name: "shop.categoryName" },

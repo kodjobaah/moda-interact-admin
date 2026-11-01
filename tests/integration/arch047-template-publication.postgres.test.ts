@@ -6,7 +6,7 @@ import { definitionFixture, shopFixture, WABA, ACTOR_ID, DEFINITION_ID } from ".
 import { computePreview } from "../../src/lib/admin/whatsapp-templates/publishing/preview.ts";
 import { confirmPublication } from "../../src/lib/admin/whatsapp-templates/publishing/operation.ts";
 import { advancePublication } from "../../src/lib/admin/whatsapp-templates/publishing/assignment.ts";
-import { PublicationError } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
+import { LANGUAGES, PublicationError } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
 
 if (process.env.ARCH047_PUBLICATION_DISPOSABLE_POSTGRES !== "1") throw new Error("Refusing non-disposable publication integration execution.");
 if (process.env.WHATSAPP_BUSINESS_ACCOUNT_ID !== WABA) throw new Error("Test must resolve the exact disposable WABA.");
@@ -73,7 +73,30 @@ test("100 active shops × 20 approved languages: bounded resume, durable targets
   assert.equal(first.pendingTargets, 1900);
   // Resume after an interrupted request; cursor remains a stable shop index.
   first = await finish(progress.operationId);
-  assert.equal(first.status, "COMPLETE"); assert.equal(first.succeededShops, 100);
+  let failedTargets = await db.whatsAppTemplatePublicationTarget.findMany({
+    where: { operationId: progress.operationId, status: "FAILED" },
+    select: { shopId: true, languageTag: true, failureCode: true, retryCount: true },
+    orderBy: [{ shopId: "asc" }, { languageTag: "asc" }],
+  });
+  const transientCodes = new Set(["SERIALIZATION_CONFLICT", "TRANSACTION_TIMEOUT"]);
+  assert.ok(failedTargets.every((target) => transientCodes.has(target.failureCode ?? "")),
+    `Unexpected publication failures: ${JSON.stringify(failedTargets)}`);
+  for (const shopId of new Set(failedTargets.map((target) => target.shopId))) {
+    assert.equal(failedTargets.filter((target) => target.shopId === shopId).length, LANGUAGES.length,
+      `Publication failure must roll back every locale for ${shopId}`);
+  }
+  // The supported retry is bounded to five shops and three attempts per target.
+  // Exercise that recovery path for transient serializable transactions.
+  for (let retry = 0; failedTargets.length && retry < 60; retry++) {
+    first = await advancePublication(db, progress.operationId, true);
+    failedTargets = await db.whatsAppTemplatePublicationTarget.findMany({
+      where: { operationId: progress.operationId, status: "FAILED" },
+      select: { shopId: true, languageTag: true, failureCode: true, retryCount: true },
+      orderBy: [{ shopId: "asc" }, { languageTag: "asc" }],
+    });
+  }
+  assert.equal(first.status, "COMPLETE", `Failed publication targets: ${JSON.stringify(failedTargets)}`);
+  assert.equal(first.succeededShops, 100);
   assert.equal(first.succeededTargets, 2000); assert.equal(first.failedTargets, 0);
   assert.equal(await db.whatsAppTemplatePublicationTarget.count({ where: { operationId: progress.operationId } }), 2000);
   assert.equal(await db.whatsAppTemplateVariant.count({ where: {
