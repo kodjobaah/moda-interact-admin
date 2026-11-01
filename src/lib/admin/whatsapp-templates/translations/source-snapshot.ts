@@ -20,6 +20,10 @@ const VARIABLE_MARKER = /⟦moda_[a-f0-9]{24}⟧/g;
 export function extractTranslationSegments(definitionId: string, ast: TemplateAst): TranslationSegment[] {
   const verified = validateTemplateAst(ast);
   if (!verified.ok) throw new Error(`Saved English template is invalid: ${verified.issues[0]?.path ?? "root"}`);
+  if (ast.family === "META_RECOVERY" && ast.stage === "INITIAL") {
+    const compliant = validateTemplateAst(ast, { requireInitialReply: true, contentLanguageTag: "en" });
+    if (!compliant.ok) throw new Error(`Saved English template is invalid: ${compliant.issues[0]?.path ?? "body"}`);
+  }
   const segments: TranslationSegment[] = [];
   const usedMarkers = new Set<string>();
   const addNodes = (key: string, nodes: readonly (ContentNode | WrapperNode)[]) => {
@@ -95,7 +99,7 @@ export function validateSegments(segments: TranslationSegment[]): void {
     for (const token of segment.protectedTokens) {
       if (!/^⟦moda_[a-f0-9]{24}⟧$/.test(token.marker) || markers.has(token.marker) ||
           segment.text.split(token.marker).length !== 2) throw new Error("Invalid, missing, or duplicated protected marker.");
-      if (!/^(customer\.firstName|shop\.(name|categoryName)|checkout\.url|offer\.(code|description)|promotion\.(productName|productUrl|offerDescription|code)|shopBrand\.(brandName|logoUrl|logoAltText|logoWidth|logoHeight|squareLogoUrl|squareLogoAltText|coverImageUrl))$/.test(token.variable)) {
+      if (!/^(customer\.firstName|shop\.(name|categoryName)|checkout\.(url|itemsSummary)|offer\.(code|description)|promotion\.(productName|productUrl|offerDescription|code)|shopBrand\.(brandName|logoUrl|logoAltText|logoWidth|logoHeight|squareLogoUrl|squareLogoAltText|coverImageUrl))$/.test(token.variable)) {
         throw new Error("Unknown protected semantic variable.");
       }
       markers.add(token.marker);

@@ -7,9 +7,36 @@ import { META_LANGUAGES, expectedProviderLanguageCode } from "../../src/lib/admi
 import type { DefinitionForMeta, LocaleForMeta } from "../../src/lib/admin/whatsapp-templates/meta/snapshot.ts";
 
 const ID = `wtdef_${"a".repeat(64)}`;
+const ORIGINAL_BASKET_LABELS: Record<string, string> = {
+  cs: "Původní opuštěný košík",
+  da: "Oprindelige varer i din forladte kurv",
+  nl: "Oorspronkelijke artikelen in je achtergelaten winkelmandje",
+  fi: "Alkuperäisen hylätyn ostoskorin tuotteet",
+  fr: "Articles du panier abandonné d’origine",
+  de: "Ursprüngliche Artikel im abgebrochenen Warenkorb",
+  it: "Articoli originali del carrello abbandonato",
+  ja: "放棄されたカートの元の商品",
+  ko: "원래 장바구니에 담긴 상품",
+  nb: "Varene i den opprinnelige forlatte handlekurven",
+  pl: "Oryginalne produkty z porzuconego koszyka",
+  "pt-BR": "Itens originais do carrinho abandonado",
+  "pt-PT": "Artigos originais do carrinho abandonado",
+  es: "Artículos originales de la cesta abandonada",
+  sv: "Ursprungliga varor i din övergivna varukorg",
+  th: "สินค้าในตะกร้าเดิมที่ถูกละทิ้ง",
+  tr: "Terk edilmiş orijinal sepetinizdeki ürünler",
+  "zh-Hans": "原购物车中的商品",
+  "zh-Hant": "原購物車中的商品",
+};
+
 export function localizedInitialCopy(ast: ReturnType<typeof newMetaDraft>, languageTag: string) {
   const localized = structuredClone(ast);
   if (languageTag === "en") return localized;
+  const basketLabel = ORIGINAL_BASKET_LABELS[languageTag];
+  if (!basketLabel) throw new Error(`Fixture is missing reviewed basket wording for ${languageTag}.`);
+  localized.body = localized.body.map((node) => node.type === "text"
+    ? { ...node, value: node.value.replace("Original abandoned basket", basketLabel) }
+    : node);
   const replyTail = localized.body.slice(-3);
   const intro = replyTail[0]?.type === "text" ? replyTail[0].value : "";
   const fromIndex = intro.lastIndexOf("From ");
@@ -30,6 +57,7 @@ export function fixture() {
   english.header = [{ type: "text", value: "Welcome " }, { type: "variable", name: "shopBrand.brandName" }];
   english.body = [{ type: "text", value: "Customer " }, { type: "variable", name: "customer.firstName" },
     { type: "text", value: " sees " }, { type: "variable", name: "shopBrand.logoAltText" },
+    { type: "text", value: ".\n\nOriginal abandoned basket: " }, { type: "variable", name: "checkout.itemsSummary" },
     { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
     { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
   english.buttons = [{ type: "url", label: "Return to checkout", urlPrefix: "https://shop.example.org/checkout/", variable: "checkout.url" }];
@@ -41,7 +69,9 @@ export function fixture() {
     if (tag === "fr") {
       authoring.body = [{ type: "variable", name: "shopBrand.logoAltText" },
         { type: "text", value: " avant " }, { type: "variable", name: "customer.firstName" },
-        { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
+        { type: "text", value: ".\n\nArticles du panier abandonné d’origine : " },
+        { type: "variable", name: "checkout.itemsSummary" }, { type: "text", value: ".\n\nFrom " },
+        { type: "variable", name: "shop.name" },
         { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
     }
     const localizedAuthoring = localizedInitialCopy(authoring, tag);

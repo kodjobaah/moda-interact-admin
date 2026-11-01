@@ -16,6 +16,15 @@ test("exactly twenty provider languages, including sanctioned Chinese and Portug
   assert.equal(plan.locales.find((l) => l.languageTag === "pt-BR")?.providerLanguageCode, "pt_BR");
   assert.equal(plan.wabaId, "123456789012");
   assert.equal(plan.category, "MARKETING");
+  for (const locale of plan.locales) {
+    const basketBindings = locale.bindings.body.filter((binding) => binding.variable === "checkout.itemsSummary");
+    assert.equal(basketBindings.length, 1, locale.languageTag);
+    const body = locale.components.find((component) => component.type === "BODY");
+    assert.ok(body && body.type === "BODY", locale.languageTag);
+    const token = `{{${basketBindings[0].position}}}`;
+    assert.equal(String(body.text).split(token).length - 1, 1, locale.languageTag);
+    assert.match(String(body.text).slice(0, String(body.text).indexOf(token)).trimEnd(), /[^\s]$/, locale.languageTag);
+  }
 });
 
 test("CHECKOUT_PRODUCT IMAGE plans are immutable, handle-free, and reject locale role drift", () => {
@@ -105,9 +114,11 @@ test("the immutable header, translated body positions and URL binding are preser
   const french = plan.locales.find((l) => l.languageTag === "fr")!;
   assert.deepEqual(english.bindings.header, [{ position: 1, variable: "shopBrand.brandName" }]);
   assert.deepEqual(english.bindings.body, [{ position: 1, variable: "customer.firstName" },
-    { position: 2, variable: "shopBrand.logoAltText" }, { position: 3, variable: "shop.name" }]);
+    { position: 2, variable: "shopBrand.logoAltText" }, { position: 3, variable: "checkout.itemsSummary" },
+    { position: 4, variable: "shop.name" }]);
   assert.deepEqual(french.bindings.body, [{ position: 1, variable: "shopBrand.logoAltText" },
-    { position: 2, variable: "customer.firstName" }, { position: 3, variable: "shop.name" }]);
+    { position: 2, variable: "customer.firstName" }, { position: 3, variable: "checkout.itemsSummary" },
+    { position: 4, variable: "shop.name" }]);
   assert.deepEqual(french.bindings.buttons, [{ index: 0, subType: "url", variable: "checkout.url" }]);
   assert.equal((french.components.find((c) => c.type === "HEADER") as any).text, "Welcome {{1}}");
   assert.match(JSON.stringify(french.components), /avant/);
@@ -138,7 +149,8 @@ test("promotion target is frozen in every locale approval and locale target drif
   const french = f.locales.find((locale) => locale.languageTag === "fr")!;
   const alternative = newMetaDraft("INITIAL", "CODE_OFFER");
   alternative.promotionTarget = "ALTERNATIVE_PRODUCT";
-  alternative.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+  alternative.body = [{ type: "text", value: "Original abandoned basket: " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: ". A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
     { type: "text", value: " with " }, { type: "variable", name: "promotion.code" },
     { type: "text", value: ". This offer does not apply to your abandoned basket: " },
@@ -157,7 +169,8 @@ test("registration snapshots preserve both independently indexed alternative CTA
   const f = fixture();
   const alternative = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
   alternative.promotionTarget = "ALTERNATIVE_PRODUCT";
-  alternative.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
+  alternative.body = [{ type: "text", value: "Original abandoned basket: " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: ". A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
     { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" },
     { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
