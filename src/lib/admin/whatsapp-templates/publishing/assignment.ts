@@ -97,8 +97,10 @@ async function ensurePageTargets(db: PublicationDb, operationId: string,
 
 function failureCode(error: unknown): string {
   if (error instanceof PublicationError) return error.code;
-  if (error && typeof error === "object" && "code" in error &&
-      (error.code === "P2034" || error.code === "P2028")) return "RETRYABLE_TRANSACTION";
+  if (error && typeof error === "object" && "code" in error) {
+    if (error.code === "P2034") return "SERIALIZATION_CONFLICT";
+    if (error.code === "P2028") return "TRANSACTION_TIMEOUT";
+  }
   // No credential, customer text or provider/SQL error string persisted.
   return "PUBLICATION_FAILED";
 }
@@ -120,7 +122,8 @@ export async function advancePublication(db: PublicationDb, operationId: string,
     if (cursor < snapshot.shopIds.length) return reject("INPUT", "Finish processing pending shops before retrying failures.");
     // A stale / conflicting slot requires NEW confirmation, never blind retry.
     const retryable = await db.whatsAppTemplatePublicationTarget.findMany({ where: {
-      operationId, status: "FAILED", failureCode: { in: ["PUBLICATION_FAILED", "RETRYABLE_TRANSACTION"] }, retryCount: { lt: 3 },
+      operationId, status: "FAILED", failureCode: { in: ["PUBLICATION_FAILED", "RETRYABLE_TRANSACTION",
+        "SERIALIZATION_CONFLICT", "TRANSACTION_TIMEOUT"] }, retryCount: { lt: 3 },
     }, select: { shopId: true }, distinct: ["shopId"], orderBy: [{ retryCount: "asc" }, { shopId: "asc" }], take: PROCESS_PAGE_SIZE });
     shopIds = retryable.map((t) => t.shopId);
   } else {
