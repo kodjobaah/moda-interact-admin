@@ -24,8 +24,8 @@ export function TenantRow({
       <tr
         className={`transition-colors hover:bg-gray-50 ${selected ? 'bg-[var(--brand-50)]' : ''}`}
       >
-        <td className="px-6 py-4 whitespace-nowrap">
-          <Link href={href} className="flex items-center">
+        <td className="px-3 py-4 sm:px-6">
+          <Link href={href} className="flex min-w-0 items-center">
             <Icon
               name={selected ? 'chevron-down' : 'chevron-right'}
               className={`mr-4 h-4 w-4 ${selected ? 'text-[var(--brand-500)]' : 'text-gray-400'}`}
@@ -33,9 +33,13 @@ export function TenantRow({
             <div className="flex h-10 w-10 items-center justify-center rounded bg-[var(--brand-100)] font-bold text-[var(--brand-800)]">
               {initials(name)}
             </div>
-            <div className="ml-4">
-              <div className="text-sm font-bold text-gray-900">{name}</div>
-              <div className="text-sm text-gray-500">{tenant.domain}</div>
+            <div className="ml-4 min-w-0">
+              <div className="break-words text-sm font-bold text-gray-900">
+                {name}
+              </div>
+              <div className="break-all text-sm text-gray-500">
+                {tenant.domain}
+              </div>
             </div>
           </Link>
         </td>
