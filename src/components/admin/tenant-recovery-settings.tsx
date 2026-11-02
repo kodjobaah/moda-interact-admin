@@ -77,6 +77,8 @@ export function TenantRecoverySettings({
         ? "Expired admin override"
         : "Admin override"
       : "Merchant configuration";
+  const providerName =
+    tenant.platform === "WOOCOMMERCE" ? "WooCommerce" : "Shopify";
 
   return (
     <div className="space-y-5">
@@ -89,12 +91,13 @@ export function TenantRecoverySettings({
         </p>
       ) : null}
 
-      {discountSyncRequested ? (
+      {discountSyncRequested && tenant.platform === "SHOPIFY" ? (
         <p
           role="status"
           className="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-900"
         >
-          Shopify discount catalogue sync queued. The recovery worker will refresh this tenant asynchronously.
+          {providerName} discount catalogue sync queued. The recovery worker
+          will refresh this tenant asynchronously.
         </p>
       ) : null}
 
@@ -141,7 +144,9 @@ export function TenantRecoverySettings({
         </div>
         {policy.overrideReason ? (
           <p className="mt-4 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <span className="font-semibold text-gray-800">Current override reason:</span>{" "}
+            <span className="font-semibold text-gray-800">
+              Current override reason:
+            </span>{" "}
             {policy.overrideReason}
           </p>
         ) : null}
@@ -166,18 +171,23 @@ export function TenantRecoverySettings({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-gray-950">
-              Shopify discount catalogue
+              {providerName} discount catalogue
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-gray-600">
               This catalogue is refreshed asynchronously by the recovery worker.
-              Manual sync requests enqueue the canonical Shopify discount reconciliation job; Admin never calls Shopify directly.
+              {" "}
+              {
+                "Manual sync requests enqueue the provider's canonical discount reconciliation job; Admin never calls the commerce provider directly."
+              }
             </p>
           </div>
-          <TenantDiscountCatalogueSyncForm
-            shopId={tenant.id}
-            returnTo={returnTo}
-            retry={policy.catalogue.status === "ERROR"}
-          />
+          {tenant.platform === "SHOPIFY" ? (
+            <TenantDiscountCatalogueSyncForm
+              shopId={tenant.id}
+              returnTo={returnTo}
+              retry={policy.catalogue.status === "ERROR"}
+            />
+          ) : null}
         </div>
 
         <dl className="mt-5 grid gap-4 border-t border-gray-100 pt-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
@@ -215,6 +225,85 @@ export function TenantRecoverySettings({
             }
           />
         </dl>
+
+        <div className="mt-5 overflow-x-auto border-t border-gray-100 pt-4">
+          <table className="w-full min-w-[42rem] text-left text-sm">
+            <thead className="text-xs uppercase text-gray-500">
+              <tr>
+                <th scope="col" className="py-2 pr-4">
+                  Discount
+                </th>
+                <th scope="col" className="py-2 pr-4">
+                  Provider status
+                </th>
+                <th scope="col" className="py-2 pr-4">
+                  Merchant selection
+                </th>
+                <th scope="col" className="py-2 pr-4">
+                  Catalogue eligibility
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {policy.catalogue.discounts.map((discount) => {
+                const stale =
+                  policy.catalogue.status !== "CURRENT" ||
+                  discount.unavailableAt !== null ||
+                  discount.lastSeenSyncGeneration !==
+                    policy.catalogue.syncGeneration;
+                const expired =
+                  discount.endsAt !== null && discount.endsAt <= new Date();
+                const notStarted =
+                  discount.startsAt !== null && discount.startsAt > new Date();
+                const eligibility =
+                  discount.providerStatus === "REMOVED"
+                    ? "Removed"
+                    : discount.providerStatus === "REVOKED"
+                      ? "Revoked"
+                      : expired
+                        ? "Expired"
+                        : stale
+                          ? "Stale or unavailable catalogue"
+                          : discount.providerStatus !== "ACTIVE"
+                            ? discount.providerStatus
+                            : notStarted
+                              ? "Not started"
+                              : discount.assignable
+                                ? "Assignable"
+                                : "Not selectable";
+                return (
+                  <tr key={discount.id}>
+                    <th
+                      scope="row"
+                      className="py-2 pr-4 font-medium text-gray-900"
+                    >
+                      {discount.title}
+                    </th>
+                    <td className="py-2 pr-4">{discount.providerStatus}</td>
+                    <td className="py-2 pr-4">
+                      {discount.isAvailable ? "Selected" : "Not selected"}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <span className="inline-flex rounded-full border border-gray-200 px-2 py-0.5 text-xs font-medium">
+                        {eligibility}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {policy.catalogue.discounts.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="py-3 text-gray-500"
+                  >
+                    No discount rows are available.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
           <p className="text-xs leading-5 text-gray-500">
@@ -268,18 +357,25 @@ export function TenantRecoverySettings({
               </select>
             </label>
             <label className="text-sm font-medium text-gray-700">
-              Fixed Shopify discount
+              Fixed {providerName} discount
               <select
                 className="mt-1 w-full rounded-md border border-gray-300 p-2"
                 name="fixedShopifyDiscountId"
                 defaultValue={policy.effective.fixedShopifyDiscountId ?? ""}
               >
                 <option value="">None</option>
-                {policy.catalogue.selectableDiscounts.map((discount) => (
-                  <option key={discount.id} value={discount.id}>
-                    {discount.title}
-                  </option>
-                ))}
+                {policy.catalogue.discounts
+                  .filter((discount) => discount.assignable)
+                  .map((discount) => (
+                    <option key={discount.id} value={discount.id}>
+                      {discount.title} · {discount.providerStatus}
+                      {tenant.platform === "WOOCOMMERCE"
+                        ? discount.isAvailable
+                          ? " · Selected"
+                          : " · Not selected"
+                        : " · Provider available"}
+                    </option>
+                  ))}
               </select>
             </label>
             <label className="text-sm font-medium text-gray-700">

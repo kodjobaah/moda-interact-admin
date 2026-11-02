@@ -263,6 +263,7 @@ export type TenantListItem = {
 };
 
 export type TenantDetail = TenantListItem & {
+  platform: "SHOPIFY" | "WOOCOMMERCE";
   uninstalledAt: Date | null;
   recoveryDelayMinutes: number | null;
   recoveryPolicy: TenantRecoveryPolicy;
@@ -297,10 +298,23 @@ export type TenantRecoveryPolicy = {
     lastSuccessfulSyncAt: Date | null;
     lastErrorAt: Date | null;
     lastErrorCode: string | null;
+    syncGeneration: number;
     knownDiscountCount: number;
     runningDiscountCount: number;
     fixedSelectableCount: number;
-    selectableDiscounts: Array<{ id: string; title: string }>;
+    discounts: Array<{
+      id: string;
+      title: string;
+      providerType: string;
+      providerStatus: string;
+      isAvailable: boolean;
+      fixedSelectable: boolean;
+      startsAt: Date | null;
+      endsAt: Date | null;
+      unavailableAt: Date | null;
+      lastSeenSyncGeneration: number;
+      assignable: boolean;
+    }>;
   };
 };
 

@@ -20,6 +20,7 @@ import { customerName } from "./format";
 import { getTenantBillingControls } from "./billing-controls";
 import { effectiveRecoveryPolicy } from "./recovery-policy";
 import { readTenantOnboardingCompleted } from "./tenant-onboarding";
+import { readAdminDiscountCatalogue } from "./discount-catalogue";
 
 const ACTIVE_RECOVERY_STATUSES: CheckoutRecoveryStatus[] = [
   CheckoutRecoveryStatus.DETECTED,
@@ -200,9 +201,7 @@ export async function getTenantDirectory(input: {
     CheckoutRecoveryStatus.DETECTED,
     CheckoutRecoveryStatus.MESSAGE_SENT,
   );
-  const recoveredCheckouts = countRecoveries(
-    CheckoutRecoveryStatus.COMPLETED,
-  );
+  const recoveredCheckouts = countRecoveries(CheckoutRecoveryStatus.COMPLETED);
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(page, totalPages);
   const rows = await prisma.shop.findMany({
@@ -263,6 +262,7 @@ export async function getTenantDetail(
     select: {
       id: true,
       domain: true,
+      platform: true,
       status: true,
       installedAt: true,
       uninstalledAt: true,
@@ -293,6 +293,7 @@ export async function getTenantDetail(
       discountCatalogue: {
         select: {
           status: true,
+          syncGeneration: true,
           syncRequestedAt: true,
           syncStartedAt: true,
           lastSuccessfulSyncAt: true,
@@ -334,39 +335,20 @@ export async function getTenantDetail(
     ? {
         recoveryDelayMinutes: row.recoveryPolicyOverride.recoveryDelayMinutes,
         recoveryOfferMode: row.recoveryPolicyOverride.recoveryOfferMode,
-        fixedShopifyDiscountId: row.recoveryPolicyOverride.fixedShopifyDiscountId,
+        fixedShopifyDiscountId:
+          row.recoveryPolicyOverride.fixedShopifyDiscountId,
         followUpEnabled: row.recoveryPolicyOverride.followUpEnabled,
         followUpDelayMinutes: row.recoveryPolicyOverride.followUpDelayMinutes,
       }
     : null;
-  const catalogueCurrent = row.discountCatalogue?.status === "CURRENT";
-  const runningDiscountWhere = catalogueCurrent
-    ? {
-        shopId,
-        isAvailable: true,
-        providerStatus: "ACTIVE",
-        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
-      }
-    : { id: "__no_current_catalogue__" };
-  const fixedSelectableWhere = catalogueCurrent
-    ? { ...runningDiscountWhere, fixedSelectable: true }
-    : { id: "__no_current_catalogue__" };
-  const [
-    knownDiscountCount,
-    runningDiscountCount,
-    fixedSelectableCount,
-    selectableDiscounts,
-  ] = await Promise.all([
-    prisma.shopifyDiscount.count({ where: { shopId } }),
-    prisma.shopifyDiscount.count({ where: runningDiscountWhere }),
-    prisma.shopifyDiscount.count({ where: fixedSelectableWhere }),
-    prisma.shopifyDiscount.findMany({
-      where: fixedSelectableWhere,
-      orderBy: { title: "asc" },
-      select: { id: true, title: true },
-    }),
-  ]);
+  const currentGeneration = row.discountCatalogue?.syncGeneration ?? -1;
+  const discountCatalogue = await readAdminDiscountCatalogue(prisma, {
+    shopId,
+    platform: row.platform,
+    catalogueStatus: row.discountCatalogue?.status ?? "UNAVAILABLE",
+    catalogueGeneration: currentGeneration,
+    now,
+  });
   const effective = effectiveRecoveryPolicy(
     merchant,
     override,
@@ -377,6 +359,7 @@ export async function getTenantDetail(
   return {
     id: row.id,
     domain: row.domain,
+    platform: row.platform,
     status: row.status,
     installedAt: row.installedAt,
     uninstalledAt: row.uninstalledAt,
@@ -406,13 +389,12 @@ export async function getTenantDetail(
         status: row.discountCatalogue?.status ?? "UNAVAILABLE",
         syncRequestedAt: row.discountCatalogue?.syncRequestedAt ?? null,
         syncStartedAt: row.discountCatalogue?.syncStartedAt ?? null,
-        lastSuccessfulSyncAt: row.discountCatalogue?.lastSuccessfulSyncAt ?? null,
+        lastSuccessfulSyncAt:
+          row.discountCatalogue?.lastSuccessfulSyncAt ?? null,
         lastErrorAt: row.discountCatalogue?.lastErrorAt ?? null,
         lastErrorCode: row.discountCatalogue?.lastErrorCode ?? null,
-        knownDiscountCount,
-        runningDiscountCount,
-        fixedSelectableCount,
-        selectableDiscounts,
+        syncGeneration: currentGeneration,
+        ...discountCatalogue,
       },
     },
     onboardingCompleted: readTenantOnboardingCompleted(row),

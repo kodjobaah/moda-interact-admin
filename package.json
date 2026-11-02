@@ -18,6 +18,7 @@
     "test:arch043-admin-config:unit": "tsx --test tests/unit/arch043-platform-configuration-contracts.test.ts tests/unit/arch043-platform-configuration-ui.test.mjs tests/unit/arch043-platform-secret-reveal-ui.test.mjs",
     "test:arch043-admin-config:components": "tsx --test tests/unit/arch043-platform-configuration-components.test.tsx",
     "test:arch043-admin-config:postgres": "node scripts/test-arch043-admin-configuration-postgres.mjs",
+    "test:arch036-admin-recovery-policy:postgres": "node scripts/test-arch036-admin-recovery-policy-postgres.mjs",
     "update_platform": "node --conditions=import --import tsx scripts/update_platform.mjs",
     "test:arch040-admin-human-messaging:unit": "node --experimental-strip-types --test tests/unit/arch040-human-messaging-contract.test.ts && node --test tests/security/admin-human-messaging.test.mjs",
     "test:arch040-admin-human-messaging:postgres": "node scripts/test-arch040-admin-human-messaging-postgres.mjs",
