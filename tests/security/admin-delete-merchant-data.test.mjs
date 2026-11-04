@@ -5,6 +5,7 @@ import { deleteImmutableShopPrompts } from '../../scripts/merchant-prompt-cleanu
 import { deleteImmutableShopAudits } from '../../scripts/merchant-audit-cleanup.mjs';
 import {
   deleteMerchantDatabaseRows,
+  deleteImmutableWooConsentEvidence,
   merchantInventory,
   parseOptions,
   validateDeletion,
@@ -20,6 +21,7 @@ const allowed = {
   allowRemoteDevelopmentDb: false,
   confirmImmutablePromptPurge: false,
   confirmImmutableAuditPurge: false,
+  confirmImmutableConsentPurge: false,
 };
 
 test('parses a merchant-specific preview and explicit deletion request', () => {
@@ -66,6 +68,46 @@ test('requires separate authorization for immutable commerce audit cleanup', () 
   assert.equal(parseOptions(['delete', '--shop', shop.id, '--confirm-immutable-audit-purge']).confirmImmutableAuditPurge, true);
 });
 
+test('requires explicit authorization for immutable Woo consent evidence cleanup', () => {
+  assert.throws(() => validateDeletion(allowed, shop, { whatsAppConsentEvidence: 1 }, env), /--confirm-immutable-consent-purge/);
+  assert.doesNotThrow(() => validateDeletion({ ...allowed, confirmImmutableConsentPurge: true }, shop, {
+    whatsAppConsentEvidence: 1,
+  }, env));
+  assert.equal(parseOptions(['delete', '--shop', shop.id, '--confirm-immutable-consent-purge']).confirmImmutableConsentPurge, true);
+});
+
+test('consent evidence purge verifies, suspends and restores only its append-only guard', async () => {
+  const events = [];
+  const tx = {
+    whatsAppConsentEvidence: { count: async ({ where }) => {
+      assert.deepEqual(where, { shopId: shop.id });
+      return 1;
+    } },
+    $queryRaw: async () => [{
+      tableName: 'WhatsAppConsentEvidence',
+      triggerName: 'arch045_woo_evidence_guard',
+      enabledState: 'O',
+      internal: false,
+    }],
+    $executeRaw: async (parts) => { events.push(parts.join('')); },
+    $executeRawUnsafe: async (sql) => { events.push(sql); },
+  };
+  const erase = async (name, args) => { events.push({ name, args }); };
+
+  await assert.rejects(
+    deleteImmutableWooConsentEvidence(tx, shop.id, erase, false),
+    /--confirm-immutable-consent-purge/,
+  );
+  await deleteImmutableWooConsentEvidence(tx, shop.id, erase, true);
+  assert.deepEqual(events.map((event) => typeof event === 'string' ? event : event.name), [
+    "SET LOCAL lock_timeout = '5s'",
+    'ALTER TABLE commerce."WhatsAppConsentEvidence" DISABLE TRIGGER arch045_woo_evidence_guard',
+    'whatsAppConsentEvidence',
+    'ALTER TABLE commerce."WhatsAppConsentEvidence" ENABLE TRIGGER arch045_woo_evidence_guard',
+  ]);
+  assert.deepEqual(events[2].args, { where: { shopId: shop.id } });
+});
+
 test('requires separate acknowledgement for uploaded assets not erased from R2', () => {
   assert.throws(() => validateDeletion(allowed, shop, { merchantKnowledgeUploadedAssets: 1 }, env), /R2/);
   assert.doesNotThrow(() => validateDeletion({ ...allowed, externalAssetsHandled: true }, shop, { merchantKnowledgeUploadedAssets: 1 }, env));
@@ -82,6 +124,7 @@ test('preview counts merchant-scoped rows without executing writes', async () =>
   assert.equal(result.commerceAgentPrompts, 3);
   assert.equal(result.commerceAgentPromptRevisions, 3);
   assert.equal(result.merchantKnowledgeUploadedAssets, 3);
+  assert.equal(result.whatsAppConsentEvidence, 3);
   assert.equal(result.commerceAuditEvents, 3);
   assert.equal(result.commerceExternalConnectionAudits, 3);
   assert.equal(result.commerceModelPolicies, 3);
@@ -116,7 +159,10 @@ test('deletion is targeted and ordered around restrictive foreign keys', async (
   const result = await deleteMerchantDatabaseRows(tx, shop);
   const position = (model) => calls.findIndex((call) => call.model === model);
   assert.equal(result.shop, 1);
+  assert.equal(result.customer, 1);
   assert.equal(result.merchantTranslationReconciliationRequest, 2);
+  assert.ok(position('whatsAppConsentEvidence') < position('customer'));
+  assert.ok(position('customer') < position('shop'));
   assert.ok(position('usageReservation') < position('promotionalCreditGrant'));
   assert.ok(position('merchantPromotionSelection') < position('promotionalCreditGrant'));
   assert.ok(position('recoveryCreditRefund') < position('recoveryCreditPurchase'));
@@ -132,6 +178,7 @@ test('deletion is targeted and ordered around restrictive foreign keys', async (
   assert.ok(position('billingPeriod') < position('shop'));
   assert.ok(position('shop') < position('session'));
   assert.deepEqual(calls.find((call) => call.model === 'shop').where, { id: shop.id });
+  assert.deepEqual(calls.find((call) => call.model === 'customer').where, { shopId: shop.id });
   assert.deepEqual(calls.find((call) => call.model === 'whatsAppTemplatePublicationTarget').where, { shopId: shop.id });
   assert.deepEqual(calls.find((call) => call.model === 'session').where, { shop: shop.domain });
   for (const entry of calls) {

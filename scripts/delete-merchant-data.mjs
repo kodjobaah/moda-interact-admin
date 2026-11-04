@@ -27,8 +27,10 @@ records, also pass --confirm-immutable-prompt-purge to authorise temporarily
 suspending the two prompt immutability guards inside the rollback-safe transaction.
 If the preview shows immutable commerce audit records, pass
 --confirm-immutable-audit-purge to authorise suspending only their two application
-immutability guards in the same transaction. Both options need table-owner
-privileges; foreign-key triggers are never disabled.
+immutability guards in the same transaction. If it shows Woo WhatsApp consent
+evidence, pass --confirm-immutable-consent-purge to suspend only its append-only
+application guard during deletion. These options need table-owner privileges;
+foreign-key triggers are never disabled.
 
 IMPORTANT: This removes the merchant's Shop, billing history, recoveries,
 conversations and associated relational data. It is irreversible. It never
@@ -78,6 +80,7 @@ async function main() {
       return deleteMerchantDatabaseRows(tx, current, {
         confirmImmutablePromptPurge: options.confirmImmutablePromptPurge,
         confirmImmutableAuditPurge: options.confirmImmutableAuditPurge,
+        confirmImmutableConsentPurge: options.confirmImmutableConsentPurge,
       });
     }, { maxWait: 15_000, timeout: 120_000 });
     console.log(JSON.stringify({

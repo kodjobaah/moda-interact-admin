@@ -21,6 +21,7 @@ export function parseOptions(argv) {
     '--external-assets-handled', '--allow-remote-development-db',
     '--confirm-immutable-prompt-purge',
     '--confirm-immutable-audit-purge',
+    '--confirm-immutable-consent-purge',
   ]);
   for (let index = 0; index < rest.length; index += 1) {
     const entry = rest[index];
@@ -49,6 +50,7 @@ export function parseOptions(argv) {
     allowRemoteDevelopmentDb: Boolean(values.get('--allow-remote-development-db')),
     confirmImmutablePromptPurge: Boolean(values.get('--confirm-immutable-prompt-purge')),
     confirmImmutableAuditPurge: Boolean(values.get('--confirm-immutable-audit-purge')),
+    confirmImmutableConsentPurge: Boolean(values.get('--confirm-immutable-consent-purge')),
   };
 }
 
@@ -87,6 +89,9 @@ export function validateDeletion(options, shop, inventory, env) {
   if ((inventory.commerceAuditEvents > 0 || inventory.commerceExternalConnectionAudits > 0) && !options.confirmImmutableAuditPurge) {
     throw new Error('Merchant has immutable commerce audit records. Inspect the preview, then pass --confirm-immutable-audit-purge to remove them from a disposable development/test database.');
   }
+  if (inventory.whatsAppConsentEvidence > 0 && !options.confirmImmutableConsentPurge) {
+    throw new Error('Merchant has immutable Woo WhatsApp consent evidence. Inspect the preview, then pass --confirm-immutable-consent-purge to remove it from a disposable development/test database.');
+  }
   if (inventory.merchantKnowledgeUploadedAssets > 0 && !options.externalAssetsHandled) {
     throw new Error('Merchant has uploaded knowledge assets. Delete/retain the R2 objects deliberately, then pass --external-assets-handled.');
   }
@@ -99,6 +104,7 @@ export async function merchantInventory(db, shop) {
   const counters = {
     sessions: ['session', { shop: shop.domain }],
     customers: ['customer', scoped],
+    whatsAppConsentEvidence: ['whatsAppConsentEvidence', scoped],
     checkoutRecoveries: ['checkoutRecovery', scoped],
     conversations: ['conversation', { OR: [scoped, { checkoutRecovery: { is: scoped } }] }],
     billingPeriods: ['billingPeriod', scoped],
@@ -130,10 +136,47 @@ export async function merchantInventory(db, shop) {
 
 const byShop = (shopId) => ({ where: { shopId } });
 
+const WOO_CONSENT_GUARD = 'ALTER TABLE commerce."WhatsAppConsentEvidence" DISABLE TRIGGER arch045_woo_evidence_guard';
+const RESTORE_WOO_CONSENT_GUARD = 'ALTER TABLE commerce."WhatsAppConsentEvidence" ENABLE TRIGGER arch045_woo_evidence_guard';
+
+export async function deleteImmutableWooConsentEvidence(tx, shopId, erase, confirmed) {
+  const where = byShop(shopId);
+  const count = await tx.whatsAppConsentEvidence.count(where);
+  if (count > 0 && !confirmed) {
+    throw new Error('Woo WhatsApp consent evidence purge not confirmed: pass --confirm-immutable-consent-purge.');
+  }
+
+  if (count > 0) {
+    const guards = await tx.$queryRaw`
+      SELECT c.relname AS "tableName", t.tgname AS "triggerName",
+             t.tgenabled AS "enabledState", t.tgisinternal AS "internal"
+      FROM pg_catalog.pg_trigger AS t
+      JOIN pg_catalog.pg_class AS c ON c.oid = t.tgrelid
+      JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'commerce' AND c.relname = 'WhatsAppConsentEvidence'
+        AND t.tgname = 'arch045_woo_evidence_guard'
+    `;
+    if (!Array.isArray(guards) || guards.length !== 1 ||
+        guards[0].enabledState !== 'O' || guards[0].internal !== false) {
+      throw new Error('Woo consent evidence trigger differs from its expected enabled state; merchant deletion refused.');
+    }
+
+    await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
+    await tx.$executeRawUnsafe(WOO_CONSENT_GUARD);
+  }
+
+  await erase('whatsAppConsentEvidence', where);
+
+  if (count > 0) {
+    await tx.$executeRawUnsafe(RESTORE_WOO_CONSENT_GUARD);
+  }
+}
+
 /** Only shop-owned rows are explicitly removed. Global catalogue rows survive. */
 export async function deleteMerchantDatabaseRows(tx, shop, {
   confirmImmutablePromptPurge = false,
   confirmImmutableAuditPurge = false,
+  confirmImmutableConsentPurge = false,
 } = {}) {
   const shopId = shop.id;
   const removed = {};
@@ -147,6 +190,7 @@ export async function deleteMerchantDatabaseRows(tx, shop, {
   await erase('wooCommerceBillingWebhookReceipt', {
     where: { billingOperation: { is: { shopId } } },
   });
+  await deleteImmutableWooConsentEvidence(tx, shopId, erase, confirmImmutableConsentPurge);
   await erase('billingAuditEvent', byShop(shopId));
 
   await deleteImmutableShopAudits(tx, shopId, erase, confirmImmutableAuditPurge);
@@ -192,6 +236,7 @@ export async function deleteMerchantDatabaseRows(tx, shop, {
   await erase('recoveryCreditPurchase', byShop(shopId));
   await erase('billingPeriod', byShop(shopId));
   await erase('whatsAppTemplatePublicationTarget', byShop(shopId));
+  await erase('customer', byShop(shopId));
 
   // The database enforces remaining CASCADE / SET NULL / RESTRICT relations.
   // On any unhandled restriction, Prisma rolls the WHOLE transaction back.

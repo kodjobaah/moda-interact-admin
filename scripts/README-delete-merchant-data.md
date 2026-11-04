@@ -78,6 +78,16 @@ the transaction. This permanently removes that merchant's audit history and is
 appropriate only for explicitly disposable development/test data. It is not a
 way to erase retained production audit records.
 
+If the preview reports `whatsAppConsentEvidence > 0`, deletion requires
+`--confirm-immutable-consent-purge`. This authorises suspension of only the
+`arch045_woo_evidence_guard` append-only trigger on
+`WhatsAppConsentEvidence` inside the same transaction. The script verifies the
+trigger name and enabled state, uses a short lock timeout, and restores the
+trigger before commit. Foreign-key triggers remain enabled; any failure rolls
+back both the consent-history deletion and trigger changes. This permanently
+removes the selected shop's consent evidence and is only for disposable
+development/test data.
+
 If the preview shows uploaded Merchant Knowledge assets, delete/retain their
 R2 objects deliberately before deleting the database records and pass
 `--external-assets-handled`. The tool deliberately does not contain storage
