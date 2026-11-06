@@ -303,7 +303,6 @@ def ensure_dashboard_access(cur, shop: dict[str, Any], prefix: str, now: datetim
                         "checkout_recovery": True,
                         "product_search": True,
                         "ai_conversations": True,
-                        "order_support": True,
                     }
                 ),
                 json.dumps(

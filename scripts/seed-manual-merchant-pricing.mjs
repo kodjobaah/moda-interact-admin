@@ -34,14 +34,6 @@ const FEATURE_DEFINITIONS = [
     active: true,
   },
   {
-    key: "order_support",
-    displayName: "Order Support",
-    description: "Support order-related customer conversations.",
-    activationMode: "MERCHANT_OPT_IN",
-    systemRequired: false,
-    active: true,
-  },
-  {
     key: "product_search",
     displayName: "Product Search",
     description: "Search merchant products during customer conversations.",
