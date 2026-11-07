@@ -1,3 +1,4 @@
+import { PreviewStorageControls } from "@/components/admin/platform-configuration/preview-storage-controls";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { ConfigurationEditor } from "@/components/admin/platform-configuration/configuration-editor";
@@ -34,6 +35,7 @@ export default async function PlatformConfigurationPage({ searchParams }: {
         <ConfigurationNavigation contracts={contracts} selectedKey={key}/>
         {isSecret ? <SecretConfigurationEditor key={`${key}:${"status" in data ? data.status.version : 0}`} contract={selected} status={"status" in data ? data.status : { key, version: 0, configured: false, updatedAt: null, updatedBy: null }} />
           : "snapshot" in data ? <ConfigurationEditor key={`${key}:${data.snapshot.version}`} contract={selected} snapshot={data.snapshot} /> : null}
+        {key === "commerce.previewStorage" && <PreviewStorageControls environment={data.environment} />}
         <ConfigurationHistoryPanel history={data.history} keyName={key} secret={isSecret}/>
       </div>
     </div>

@@ -72,6 +72,18 @@ export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Objec
     defaults: { provider: "groq", groqModelId: "whisper-large-v3-turbo", openaiModelId: "gpt-4o-mini-transcribe" },
   },
   {
+    key: "commerce.previewStorage", title: "Commerce Studio preview storage", kind: "policy", requiredRole: "SUPER_ADMIN",
+    description: "Storage and retention for Studio previews in this deployment. Each conversation and run has its own record. Changes apply on the next storage operation; expiry is measured from creation.",
+    canReset: true,
+    fields: [
+      integer("retentionHours", "Preview retention", 1, 168, "hours"),
+      integer("maxRecordBytes", "Maximum bytes per preview record", 262144, 4194304, "bytes"),
+      integer("maxConversations", "Maximum retained conversations", 1, 512),
+      integer("maxRuns", "Maximum retained runs and tool tests", 1, 4096),
+    ],
+    defaults: { retentionHours: 24, maxRecordBytes: 1048576, maxConversations: 128, maxRuns: 1024 },
+  },
+  {
     key: "commerce.preview", title: "Commerce Studio preview", kind: "policy", requiredRole: "SUPER_ADMIN",
     description: "Studio-only execution budget; does not change production conversations.",
     canReset: true,
