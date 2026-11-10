@@ -20,7 +20,7 @@ export class WrapperInitializationError extends Error {
 }
 export type InitializeWrapperInput = {
   environment: "test" | "production";
-  actorAdminId: string;
+  actorAdminEmail: string;
   reason: string;
   mode?: "DRY_RUN" | "APPLY";
 };
@@ -46,10 +46,10 @@ export function canonicalConversationWrapper(): WrapperTemplateAst {
 
 function validateInput(input: InitializeWrapperInput): void {
   if (!input || typeof input !== "object" || Array.isArray(input) ||
-      Object.keys(input).some((key) => !["environment", "actorAdminId", "reason", "mode"].includes(key)) ||
+      Object.keys(input).some((key) => !["environment", "actorAdminEmail", "reason", "mode"].includes(key)) ||
       !["test", "production"].includes(input.environment) ||
-      typeof input.actorAdminId !== "string" || !input.actorAdminId.trim() || input.actorAdminId.length > 256 ||
-      /[\u0000-\u001f\u007f]/.test(input.actorAdminId) ||
+      typeof input.actorAdminEmail !== "string" || !/^\S+@\S+\.\S+$/.test(input.actorAdminEmail.trim()) || input.actorAdminEmail.length > 320 ||
+      /[\u0000-\u001f\u007f]/.test(input.actorAdminEmail) ||
       typeof input.reason !== "string" || input.reason.trim().length < 10 || input.reason.length > 500 ||
       (input.mode !== undefined && !["DRY_RUN", "APPLY"].includes(input.mode))) {
     throw new WrapperInitializationError("INVALID_ARGUMENT");
@@ -69,7 +69,6 @@ export async function initializeConversationWrapper(input: InitializeWrapperInpu
   const record = makeImmutableAuthoringRecord(ast);
   const sourceHash = templateHash(ast);
   const contentHash = templateHash(record.prepared);
-  const plannedDefinitionId = definitionIdForSubmit(input.actorAdminId, INITIALIZER_SUBMISSION_ID);
   const canonical = (definition: WrapperDefinitionRow | null): boolean => {
     if (!definition || !checkWrapperEligibility(definition, "AI").eligible) return false;
     return definition.locales.every((locale) => {
@@ -79,8 +78,9 @@ export async function initializeConversationWrapper(input: InitializeWrapperInpu
   };
   try {
     return await deps.db.$transaction(async (tx) => {
-      const actor = await tx.platformAdmin.findUnique({ where: { id: input.actorAdminId }, select: { id: true, role: true, active: true } });
+      const actor = await tx.platformAdmin.findUnique({ where: { email: input.actorAdminEmail.trim().toLowerCase() }, select: { id: true, role: true, active: true } });
       if (!actor || !actor.active || actor.role !== "SUPER_ADMIN") throw new WrapperInitializationError("ACTOR_DENIED");
+      const plannedDefinitionId = definitionIdForSubmit(actor.id, INITIALIZER_SUBMISSION_ID);
       const own = await tx.whatsAppTemplateDefinition.findUnique({ where: { id: plannedDefinitionId }, include: { locales: true } });
       if (own && (!canonical(own) || own.createdByAdminId !== actor.id || own.sourceHash !== sourceHash ||
           own.providerTemplateName !== null || own.category !== null || own.purpose !== null || own.offerType !== null ||

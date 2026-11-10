@@ -16,15 +16,15 @@ export function parseArguments(args) {
     }
     const split = arg.indexOf("=");
     const name = arg.slice(0, split);
-    if (split < 0 || !["--environment", "--actor-admin-id", "--reason"].includes(name) || values.has(name)) invalid();
+    if (split < 0 || !["--environment", "--actor-admin-email", "--reason"].includes(name) || values.has(name)) invalid();
     values.set(name, arg.slice(split + 1));
   }
   const environment = values.get("--environment");
-  const actorAdminId = values.get("--actor-admin-id");
+  const actorAdminEmail = values.get("--actor-admin-email");
   const reason = values.get("--reason");
-  if (!["test", "production"].includes(environment) || typeof actorAdminId !== "string" || !actorAdminId.trim() || actorAdminId.length > 256 ||
-      /[\u0000-\u001f\u007f]/.test(actorAdminId) || typeof reason !== "string" || reason.trim().length < 10 || reason.length > 500) invalid();
-  return { environment, actorAdminId, reason, mode: values.get("mode") ?? "DRY_RUN" };
+  if (!["test", "production"].includes(environment) || typeof actorAdminEmail !== "string" || !/^\S+@\S+\.\S+$/.test(actorAdminEmail.trim()) || actorAdminEmail.length > 320 ||
+      /[\u0000-\u001f\u007f]/.test(actorAdminEmail) || typeof reason !== "string" || reason.trim().length < 10 || reason.length > 500) invalid();
+  return { environment, actorAdminEmail: actorAdminEmail.trim().toLowerCase(), reason, mode: values.get("mode") ?? "DRY_RUN" };
 }
 
 export async function main(args = process.argv.slice(2)) {

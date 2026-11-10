@@ -15,7 +15,7 @@ if (process.env.ARCH068_DISPOSABLE_POSTGRES !== "1" || !["127.0.0.1", "localhost
 const db = new PrismaClient();
 const reason = "Operator approval of the structural conversation wrapper";
 const code = (expected: string) => (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === expected;
-const input = (actorAdminId: string, mode: "APPLY" | "DRY_RUN" = "APPLY") => ({ environment: "test" as const, actorAdminId, reason, mode });
+const input = (actorAdminId: string, mode: "APPLY" | "DRY_RUN" = "APPLY") => ({ environment: "test" as const, actorAdminEmail: `${actorAdminId}@example.invalid`, reason, mode });
 async function actor(role: "SUPER_ADMIN" | "ADMIN" = "SUPER_ADMIN", active = true) {
   const id = `initializer-${randomUUID()}`;
   await db.platformAdmin.create({ data: { id, email: `${id}@example.invalid`, provider: "disposable-fixture", role, active } }); return id;
@@ -186,7 +186,7 @@ test("two simultaneous empty-slot initializations commit one winner and no orpha
 });
 
 test("actual CLI defaults dry-run, applies only to disposable fixture, repeats safely, and checks trusted environment", async () => {
-  const id = await actor(); const args = ["--environment=test", `--actor-admin-id=${id}`, `--reason=${reason}`];
+  const id = await actor(); const args = ["--environment=test", `--actor-admin-email=${id}@example.invalid`, `--reason=${reason}`];
   const execute = (more: string[] = [], deployment = "test") => spawnSync(process.execPath, ["scripts/initialize-conversation-wrapper.mjs", ...args, ...more], { cwd: process.cwd(), encoding: "utf8", env: { ...process.env, DEPLOYMENT_ENVIRONMENT_NAME: deployment } });
   const before = await snapshot(); const dry = execute(); assert.equal(dry.status, 0, dry.stderr); assert.equal(JSON.parse(dry.stdout).status, "DRY_RUN"); assert.equal(await snapshot(), before);
   const mismatch = execute(["--apply"], "development"); assert.equal(mismatch.status, 1); assert.equal(JSON.parse(mismatch.stderr).code, "ENVIRONMENT_MISMATCH"); assert.equal(await snapshot(), before);

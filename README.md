@@ -234,17 +234,23 @@ product image above the response. It uses the existing compiler, immutable hashe
 locale eligibility, versioned activation and audit services. It creates no Meta
 registration, translation run, model call or send.
 
-The command defaults to **dry-run**. Supply an existing, active `SUPER_ADMIN` ID
+Before running locally, run `npm ci` and `npm run prisma:generate` so the installed
+Shared package and generated database client match this checkout. A stale Shared
+installation can lack the required `commerce/presentation` export.
+
+The command defaults to **dry-run**. Supply an existing, active `SUPER_ADMIN` email
 and an audit reason of 10–500 characters. The requested environment must exactly
 match the Admin's existing trusted runtime environment selection
 (`DEPLOYMENT_ENVIRONMENT_NAME`, otherwise `NODE_ENV`); the command never sets it
-from `--environment`. Use the deployment's existing database configuration.
+from `--environment`. Use the deployment's existing database configuration. The email is trimmed and
+lowercased, then resolved to the existing administrator ID inside the transaction;
+that ID remains the audit actor and definition identity. No administrator is created.
 Only `test` and `production` are supported; missing, duplicate and unknown arguments
 are refused. `--dry-run` and `--apply` are mutually exclusive.
 
 ```bash
 npm run whatsapp:initialize-conversation-wrapper -- \
-  --environment=test --actor-admin-id=EXISTING_SUPER_ADMIN_ID \
+  --environment=test --actor-admin-email=admin@example.com \
   --dry-run --reason="Review structural AI conversation wrapper initialization"
 ```
 
@@ -263,7 +269,7 @@ has no deployment API and cannot verify this operator prerequisite.
 
 ```bash
 npm run whatsapp:initialize-conversation-wrapper -- \
-  --environment=test --actor-admin-id=EXISTING_SUPER_ADMIN_ID \
+  --environment=test --actor-admin-email=admin@example.com \
   --apply --reason="Approve structural wrapper after deployed consumer checks"
 ```
 

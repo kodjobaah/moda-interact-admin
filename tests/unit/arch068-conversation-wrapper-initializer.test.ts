@@ -8,12 +8,15 @@ import { compileTemplateAst } from "../../src/lib/admin/whatsapp-templates/autho
 import { definitionIdForSubmit, templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { REVIEW_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/compilation/language-codes.ts";
 const { parseArguments } = await import(pathToFileURL(path.resolve("scripts/initialize-conversation-wrapper.mjs")).href);
-const args = ["--environment=test", "--actor-admin-id=existing-admin", "--reason=Approve structural conversation wrapper"];
-const input = { environment: "test" as const, actorAdminId: "existing-admin", reason: "Approve structural conversation wrapper" };
+const args = ["--environment=test", "--actor-admin-email=admin@example.com", "--reason=Approve structural conversation wrapper"];
+const input = { environment: "test" as const, actorAdminEmail: "admin@example.com", reason: "Approve structural conversation wrapper" };
 const code = (expected: string) => (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === expected;
 
 test("CLI defaults to dry-run and accepts only exact, unique flags with bounded required values", () => {
   assert.equal(parseArguments(args).mode, "DRY_RUN");
+  assert.equal(parseArguments([args[0], "--actor-admin-email= Admin@Example.COM ", args[2]]).actorAdminEmail, "admin@example.com");
+  assert.throws(() => parseArguments([args[0], "--actor-admin-email=not-an-email", args[2]]), code("INVALID_ARGUMENT"));
+  assert.throws(() => parseArguments([args[0], "--actor-admin-id=existing-admin", args[2]]), code("INVALID_ARGUMENT"));
   assert.equal(parseArguments([...args, "--apply"]).mode, "APPLY");
   assert.equal(parseArguments([...args, "--dry-run"]).mode, "DRY_RUN");
   // Parsing the supported production spelling does not run initialization in that environment.
@@ -48,7 +51,7 @@ test("dry-run uses SERIALIZABLE read-only intent and reports stable planned iden
   let writes = 0; let options: unknown;
   const forbidden = () => { writes++; throw new Error("dry-run write"); };
   const tx = {
-    platformAdmin: { findUnique: async () => ({ id: input.actorAdminId, role: "SUPER_ADMIN", active: true }), create: forbidden, update: forbidden },
+    platformAdmin: { findUnique: async (query: unknown) => { assert.deepEqual(query, { where: { email: "admin@example.com" }, select: { id: true, role: true, active: true } }); return { id: "existing-admin", role: "SUPER_ADMIN", active: true }; }, create: forbidden, update: forbidden },
     whatsAppTemplateDefinition: { findUnique: async () => null, create: forbidden },
     whatsAppConversationWrapperActiveSlot: { findUnique: async () => null, create: forbidden },
     whatsAppTemplateLocale: { create: forbidden }, commerceAuditEvent: { create: forbidden },
@@ -56,7 +59,7 @@ test("dry-run uses SERIALIZABLE read-only intent and reports stable planned iden
   const db = { $transaction: async (run: (tx: unknown) => Promise<unknown>, config: unknown) => { options = config; return run(tx); } };
   const result = await initializeConversationWrapper(input, { db, resolveEnvironment: () => "test" } as never);
   assert.equal(result.status, "DRY_RUN"); assert.equal(result.action, "CREATED_AND_ACTIVATED");
-  assert.equal(result.plannedDefinitionId, definitionIdForSubmit(input.actorAdminId, INITIALIZER_SUBMISSION_ID));
+  assert.equal(result.plannedDefinitionId, definitionIdForSubmit("existing-admin", INITIALIZER_SUBMISSION_ID));
   assert.equal(result.sourceHash, templateHash(canonicalConversationWrapper()));
   assert.equal(result.contentHash, templateHash(compileTemplateAst(canonicalConversationWrapper())));
   assert.equal(result.currentPointer, null); assert.equal(result.localeCount, REVIEW_LANGUAGES.length);
@@ -64,7 +67,7 @@ test("dry-run uses SERIALIZABLE read-only intent and reports stable planned iden
 });
 
 test("actor must already exist, be active, and have SUPER_ADMIN role", async () => {
-  for (const actor of [null, { id: input.actorAdminId, role: "ADMIN", active: true }, { id: input.actorAdminId, role: "SUPER_ADMIN", active: false }]) {
+  for (const actor of [null, { id: "existing-admin", role: "ADMIN", active: true }, { id: "existing-admin", role: "SUPER_ADMIN", active: false }]) {
     const db = { $transaction: async (run: (tx: unknown) => Promise<unknown>) => run({ platformAdmin: { findUnique: async () => actor } }) };
     await assert.rejects(initializeConversationWrapper(input, { db, resolveEnvironment: () => "test" } as never), code("ACTOR_DENIED"));
   }
