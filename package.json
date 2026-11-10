@@ -55,11 +55,12 @@
     "test:arch047-admin-wrappers:postgres": "node scripts/test-arch047-admin-wrappers-postgres.mjs",
     "test:template-sample-seed:unit": "node --test tests/unit/template-sample-seed.test.mjs",
     "test:arch049-admin-media:unit": "node --conditions=import --import tsx --test tests/unit/arch049-admin-template-samples.test.ts tests/unit/arch049-admin-media-readiness.test.ts tests/unit/arch049-admin-media-reader.test.ts tests/unit/arch049-admin-media-compiler.test.ts tests/unit/arch049-admin-media-projection-vectors.test.ts tests/unit/arch049-admin-media-components.test.tsx && node --test tests/security/arch049-admin-media-sql.test.mjs",
-    "test:arch049-admin-media:postgres": "npm run prisma:generate && node scripts/test-arch049-admin-media-postgres.mjs"
+    "test:arch049-admin-media:postgres": "npm run prisma:generate && node scripts/test-arch049-admin-media-postgres.mjs",
+    "test:arch068-admin-authoring": "node scripts/test-arch068-admin-authoring.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
-    "@modainteract/moda-interact-shared": "3.0.0",
+    "@modainteract/moda-interact-shared": "5.12.0",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "codemirror": "^6.0.2",

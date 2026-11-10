@@ -32,6 +32,38 @@ export function reconstructLocaleAst(english: TemplateAst, source: TranslationSo
   const reconstructed = structuredClone(english);
   const outputs = new Map(translated.segments.map(({ key, text }) => [key, text]));
   const sources = new Map(source.segments.map((segment) => [segment.key, segment]));
+  if (source.segments.some((segment) => segment.key.endsWith(".text"))) {
+    // Restore the exact segments emitted by the real translation source extractor.
+    // Response slots and image binding stay anchored to immutable English.
+    const bodyRegions: Array<{ start: number; nodes: ContentNode[] }> = [];
+    const localizedReply = sources.has("body.replyInstruction.text");
+    if (localizedReply && reconstructed.family === "META_RECOVERY") reconstructed.body = [];
+    for (const segment of source.segments) {
+      const value = outputs.get(segment.key);
+      if (value === undefined) throw new Error(`${segment.key}: missing translation content.`);
+      const nodes = restoreProtectedNodes(value, segment);
+      const body = /^body\.(\d+)\.text$/.exec(segment.key);
+      const conditional = /^conditionals\.(\d+)\.nodes\.text$/.exec(segment.key);
+      const button = /^buttons\.(\d+)\.text$/.exec(segment.key);
+      if (segment.key === "header.text") reconstructed.header = nodes;
+      else if (segment.key === "footer.text") reconstructed.footer = nodes as typeof reconstructed.footer;
+      else if (body && reconstructed.family === "MODA_CONVERSATION_WRAPPER") bodyRegions.push({ start: Number(body[1]), nodes });
+      else if (conditional && reconstructed.family === "MODA_CONVERSATION_WRAPPER") reconstructed.conditionals[Number(conditional[1])].nodes = nodes;
+      else if (button && reconstructed.family === "META_RECOVERY") reconstructed.buttons[Number(button[1])].label = value;
+      else if (segment.key === "body.text" && reconstructed.family === "META_RECOVERY") reconstructed.body = nodes;
+      else if (segment.key === "body.replyInstruction.text" && reconstructed.family === "META_RECOVERY") {
+        reconstructed.body.push(...localizedInitialReplyNodes(languageTag ?? "en", reconstructed.promotionTarget));
+      } else throw new Error(`${segment.key}: unsupported translated component.`);
+    }
+    if (reconstructed.family === "MODA_CONVERSATION_WRAPPER") {
+      for (const { start, nodes } of bodyRegions.sort((a, b) => b.start - a.start)) {
+        let count = 0;
+        while (reconstructed.body[start + count] && reconstructed.body[start + count].type !== "slot") count++;
+        reconstructed.body.splice(start, count, ...nodes);
+      }
+    }
+    return reconstructed;
+  }
   const hasLocalizedReply = sources.has("body.replyInstruction");
   if (hasLocalizedReply && reconstructed.family === "META_RECOVERY") reconstructed.body = [];
   for (const { key, buttonIndex } of sourceLocations(english)) {

@@ -1,8 +1,10 @@
+import { stableJson } from "../authoring/canonical";
 import { VARIABLE_REGISTRY } from "../authoring/registry";
 import { validateTemplateAst } from "../authoring/validation";
 import type { TemplateAst } from "../authoring/types";
 import type { SourceSegment, TranslationSegmentResult, TranslationSourceSnapshot } from "./contracts";
 import { isRecord } from "./contracts";
+import { extractTranslationSegments } from "../translations/source-snapshot";
 import { sourceLocations } from "./locations";
 
 const MAX_SEGMENT = 8192;
@@ -22,7 +24,9 @@ function text(value: unknown, label: string): string {
 function requireUniqueKeys(segments: Array<{ key: string }>, name: string): void {
   const seen = new Set<string>();
   for (const segment of segments) {
-    if (!/^(header|body|body\.replyInstruction|footer|buttons\.\d+\.label|conditionals\.\d+\.nodes)$/.test(segment.key) || seen.has(segment.key)) {
+    const known = /^(header|body|body\.replyInstruction|footer|buttons\.\d+\.label|conditionals\.\d+\.nodes)$/.test(segment.key) ||
+      /^(header|body|body\.replyInstruction|footer)\.(text|\d+\.text)$|^buttons\.\d+\.text$|^conditionals\.\d+\.nodes\.text$/.test(segment.key);
+    if (!known || seen.has(segment.key)) {
       throw new Error(`${name}: duplicate or invalid segment key ${segment.key.slice(0, 80)}.`);
     }
     seen.add(segment.key);
@@ -36,6 +40,7 @@ export function parseSourceSnapshot(value: unknown): TranslationSourceSnapshot {
       typeof value.sourceHash !== "string" || !/^[a-f0-9]{64}$/.test(value.sourceHash) ||
       !Array.isArray(value.segments) || value.segments.length > 32 ||
       JSON.stringify(value).length > MAX_SNAPSHOT) throw new Error("Invalid keyed source snapshot or version.");
+  if (Object.hasOwn(value, "productImage")) throw new Error("Product image binding must not enter translation text transport.");
   const segments: SourceSegment[] = value.segments.map((entry: unknown, i) => {
     if (!isRecord(entry) || typeof entry.key !== "string" || !Array.isArray(entry.protectedTokens) ||
         entry.protectedTokens.length > 80) throw new Error(`Source segment ${i}: invalid structure.`);
@@ -60,6 +65,7 @@ export function parseTranslatedSegments(value: unknown): TranslationSegmentResul
       value.segments.length > 32 || JSON.stringify(value).length > MAX_SNAPSHOT) {
     throw new Error("Unsupported or malformed translated-segment response.");
   }
+  if (Object.hasOwn(value, "productImage")) throw new Error("Translated text cannot supply a product image binding.");
   const segments = value.segments.map((entry: unknown, i) => {
     if (!isRecord(entry) || typeof entry.key !== "string") throw new Error(`Translated segment ${i}: malformed.`);
     return { key: entry.key, text: text(entry.text, entry.key) };
@@ -72,6 +78,14 @@ export function parseTranslatedSegments(value: unknown): TranslationSegmentResul
 export function verifySourceAgainstAst(source: TranslationSourceSnapshot, ast: TemplateAst): void {
   const checked = validateTemplateAst(ast);
   if (!checked.ok) throw new Error(`English authoring AST invalid: ${checked.issues[0].message}`);
+  // The persisted extractor uses .text keys and occurrence markers. Retain the
+  // older component-key format for historical review records.
+  if (source.segments.some((segment) => segment.key.endsWith(".text"))) {
+    if (stableJson(source.segments) !== stableJson(extractTranslationSegments(source.definitionId, ast))) {
+      throw new Error("Source snapshot text or protected bindings differ from immutable English.");
+    }
+    return;
+  }
   const expected = sourceLocations(ast);
   if (source.segments.length !== expected.length) throw new Error("Source snapshot has missing or unexpected components.");
   for (const location of expected) {

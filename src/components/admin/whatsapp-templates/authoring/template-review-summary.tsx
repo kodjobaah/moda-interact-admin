@@ -20,6 +20,9 @@ export function TemplateReviewSummary({ draft, issues, onStep }: {
     {draft.family === "META_RECOVERY" && draft.shopBrandMediaRole && <p className="text-sm text-amber-800" role="status">
       IMAGE header: {draft.shopBrandMediaRole}. Admin queues a handle-free registration intent; Background supplies the trusted sample handle when submitting the template to Meta.
     </p>}
+    {draft.family === "MODA_CONVERSATION_WRAPPER" && draft.productImage && <p className="text-sm text-slate-700">
+      Optional product image: one verified product image above the complete response, omitted when unavailable.
+    </p>}
     <div className="border-t border-slate-100 pt-4">
       <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">Validation</h3>
         <button type="button" onClick={() => onStep("compose")} className="text-sm text-blue-800 underline">Edit content</button></div>

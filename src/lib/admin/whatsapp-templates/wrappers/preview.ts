@@ -14,6 +14,7 @@ export type WrapperPreviewContext =
 
 export type VariableDisclosure = { name: SemanticVariable; label: string; placement: string; availability: string };
 export type RenderedWrapperPreview = {
+  productImage?: WrapperPrepared["productImage"];
   header: string;
   body: string;
   footer: string;
@@ -68,6 +69,7 @@ export function renderWrapperPreview(prepared: WrapperPrepared, options: {
     ? prepared.conditionals.map((section, i) => tokens(section.tokens, `checkout conditional ${i + 1}`)).join("\n")
     : null;
   return {
+    ...(prepared.productImage ? { productImage: prepared.productImage } : {}),
     header: tokens(prepared.header, "header"),
     body: tokens(prepared.body, "body"),
     footer: tokens(prepared.footer, "footer"),

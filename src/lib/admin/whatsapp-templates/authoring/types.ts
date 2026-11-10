@@ -1,5 +1,7 @@
 import type { RecoveryPromotionTarget, RecoveryTemplateFrozenBindings, RecoveryTemplateHeaderMediaRole, RecoveryTemplateSemanticKey } from "@modainteract/moda-interact-shared/recovery-template-bindings";
 
+import type { ConversationProductImageBinding } from "@modainteract/moda-interact-shared/commerce/presentation";
+
 /** Versioned Admin-owned source contract. No provider/DB/React dependencies. */
 export const TEMPLATE_AST_VERSION = 1 as const;
 export type TemplateFamily = "META_RECOVERY" | "MODA_CONVERSATION_WRAPPER";
@@ -40,6 +42,7 @@ export type WrapperTemplateAst = {
   family: "MODA_CONVERSATION_WRAPPER";
   sourceLanguageTag: "en";
   audience: WrapperAudience;
+  productImage?: ConversationProductImageBinding;
   header: ContentNode[];
   body: WrapperNode[];
   footer: ContentNode[];
@@ -64,6 +67,7 @@ export type WrapperPrepared = {
   footer: RuntimeToken[];
   conditionals: Array<{ when: "checkout.available"; tokens: RuntimeToken[] }>;
   responseSlot: "response.body";
+  productImage?: ConversationProductImageBinding;
 };
 export type PreparedTemplate = MetaPrepared | WrapperPrepared;
 export type ImmutableAuthoringRecord = {
@@ -94,5 +98,6 @@ export type TemplatePreviewDTO = {
   footer: string;
   buttons: Array<{ label: string; url: string }>;
   conditional?: string;
+  productImage?: ConversationProductImageBinding;
   headerMediaRole?: RecoveryTemplateHeaderMediaRole;
 };

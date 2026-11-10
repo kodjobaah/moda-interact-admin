@@ -1,3 +1,4 @@
+import { ConversationProductImageExample } from "../authoring/conversation-product-image-example";
 import { renderWrapperPreview, EXAMPLE_RESPONSES } from "@/lib/admin/whatsapp-templates/wrappers/preview";
 import type { Audience, WrapperPreviewDefinition } from "@/lib/admin/whatsapp-templates/wrappers/contracts";
 
@@ -20,6 +21,7 @@ function FullWrapperCard({ definition, languageTag, checkoutAvailable, audience,
       Fictional example only — brand, customer and checkout values below are not merchant data.
     </p>
     <div className="space-y-2 text-sm">
+      {result.productImage && <ConversationProductImageExample />}
       <div><strong>Header</strong><p className="whitespace-pre-wrap break-words">{result.header || "(none)"}</p></div>
       <div><strong>Response (illustrative insertion, not stored)</strong><p className="whitespace-pre-wrap break-words">{result.body}</p></div>
       <div><strong>Footer</strong><p className="whitespace-pre-wrap break-words">{result.footer || "(none)"}</p></div>

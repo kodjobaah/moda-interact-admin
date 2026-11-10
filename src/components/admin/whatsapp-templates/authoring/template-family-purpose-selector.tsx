@@ -2,7 +2,7 @@
 
 import { MERCHANT_PRICING_LOCALES, MERCHANT_PRICING_LOCALE_LABELS } from "@/lib/admin/merchant-pricing-locales";
 import { eligibleVariables } from "@/lib/admin/whatsapp-templates/authoring/registry";
-import { ensureInitialBasketSummary, removeInitialBasketSummary } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
+import { ensureInitialBasketSummary, removeInitialBasketSummary, setWrapperAudience } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
 import type { TemplateAst, RecoveryStage, OfferType, PromotionTarget, WrapperAudience } from "@/lib/admin/whatsapp-templates/authoring/types";
 
 const selectStyle = "w-full rounded-md border border-gray-300 bg-white p-2 text-sm";
@@ -48,7 +48,7 @@ export function TemplateFamilyPurposeSelector({ draft, onChange, onFamilyChange 
         </select>
       </label>}
     </div> : <label className="block text-sm">Wrapper audience
-      <select aria-label="Wrapper audience" className={selectStyle} value={draft.audience} onChange={(e) => onChange({ ...draft, audience: e.target.value as WrapperAudience })}>
+      <select aria-label="Wrapper audience" className={selectStyle} value={draft.audience} onChange={(e) => onChange(setWrapperAudience(draft, e.target.value as WrapperAudience))}>
         <option value="SHARED">Shared fallback</option><option value="AI">AI response</option><option value="HUMAN">Human response</option>
       </select>
     </label>}
