@@ -1,3 +1,4 @@
+import { ConversationProductImageBindingSchema } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { eligibleHeaderVariables, eligibleVariables } from "./registry";
 import { INITIAL_REPLY_INSTRUCTIONS } from "./initial-reply-instructions";
 import { RecoveryTemplateHeaderMediaRoleSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
@@ -26,13 +27,20 @@ export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?
   const family = raw.family;
   const meta = family === "META_RECOVERY";
   const common = ["schemaVersion", "family", "sourceLanguageTag", "header", "body", "footer"];
-  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "promotionTarget", "buttons", "shopBrandMediaRole"] : [...common, "audience", "conditionals"])) fail("root", "Unknown template fields.");
+  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "promotionTarget", "buttons", "shopBrandMediaRole"] : [...common, "audience", "conditionals", "productImage"])) fail("root", "Unknown template fields.");
   if (meta) {
     if (!enumMember(raw.stage, ["INITIAL", "FOLLOW_UP"])) fail("stage", "Select a recovery stage.");
     if (!enumMember(raw.offerType, ["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"])) fail("offerType", "Select an offer type.");
     if (raw.promotionTarget !== undefined && !enumMember(raw.promotionTarget, ["CHECKOUT", "ALTERNATIVE_PRODUCT"])) fail("promotionTarget", "Select a supported promotion target.");
     if (raw.offerType === "NO_OFFER" && raw.promotionTarget !== undefined) fail("promotionTarget", "No-offer templates cannot select a promotion target.");
   } else if (!enumMember(raw.audience, ["SHARED", "AI", "HUMAN"])) fail("audience", "Select a wrapper audience.");
+
+  if (!meta && Object.hasOwn(raw, "productImage")) {
+    if (raw.audience !== "AI") fail("productImage", "Optional product images are supported only for AI response wrappers.");
+    if (!ConversationProductImageBindingSchema.safeParse(raw.productImage).success) {
+      fail("productImage", "Use the optional verified product image above the response; URLs and other image bindings are not supported.");
+    }
+  }
 
   const checkNodes = (input: unknown, path: string, maxChars: number, allowed: Array<"text" | "variable" | "slot">) => {
     if (!Array.isArray(input) || input.length > MAX_NODES) { fail(path, "Expected up to 80 content nodes."); return; }

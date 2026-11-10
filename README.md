@@ -193,3 +193,35 @@ Search is server-side as well (`q` for tenants and `customerSearch` for customer
 Google authentication is restricted to active, pre-provisioned `PlatformAdmin`
 records. Full page and privileged mutation coverage remains part of the
 follow-up `ADMIN-005` and `ADMIN-006` tasks.
+
+
+## Optional conversation product image (ARCH-068)
+
+The conversation wrapper editor offers **Optional product image** for AI response
+wrappers only, disabled by default. Enabling it stores the Shared structured
+`response.productImage` binding with `BEFORE_BODY` placement and `optional: true`.
+The image appears above the entire wrapped response. If a verified image is
+unavailable, or the full response exceeds the 1024-code-point image-caption limit,
+the complete reply is text-only. Existing text URL variables keep their meaning.
+Meta recovery, HUMAN and SHARED wrappers do not accept this binding.
+
+Authoring, locale review and before/after previews use a local SVG illustration;
+they do not fetch merchant products/images or read R2 credentials. Compilation,
+cloning and translation preserve the binding and include it in immutable source
+and prepared digests. All canonical reviewed languages must have the same binding
+as English. Existing wrappers that omit it retain their old prepared shapes and
+hashes.
+
+The Admin pins published `@modainteract/moda-interact-shared@5.12.0`; its lockfile
+records the accepted registry integrity. Browser authoring imports only
+`/commerce/presentation`, never the Node media preparation entrypoint.
+
+Before activating a wrapper with this binding, verify that deployed Commerce and
+Background both support it and have passed their binding fixtures. Saving or
+reviewing an Admin definition does not establish consumer deployment readiness.
+The separate ADMIN-002 initializer remains an explicit operator workflow; this
+change does not run it or activate a wrapper.
+
+Run `npm run test:arch068-admin-authoring` for the deterministic contract and
+component checks. The runner bundles repository test modules to ESM while leaving
+npm packages external, so Shared is consumed via its published import exports.

@@ -1,4 +1,5 @@
 "use client";
+import { setWrapperProductImage } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
 import { eligibleVariables } from "@/lib/admin/whatsapp-templates/authoring/registry";
 import { TemplateHeaderEditor } from "./template-header-editor";
 import { TemplateBodyEditor } from "./template-body-editor";
@@ -13,6 +14,14 @@ export function WrapperStructureEditor({ draft, onChange, issues = [] }: {
   const normalVariables = eligibleVariables(draft).filter((name) => name !== "checkout.url");
   const forField = (path: string) => issues.filter((issue) => issue.path === path || issue.path.startsWith(`${path}.`));
   return <div className="space-y-5">
+    {draft.audience === "AI" && <div className="rounded-lg border border-slate-200 p-4">
+      <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox"
+        checked={!!draft.productImage} aria-describedby="optional-product-image-help"
+        onChange={(event) => onChange(setWrapperProductImage(draft, event.target.checked))} />Optional product image</label>
+      <p id="optional-product-image-help" className="mt-1 text-xs text-slate-600">One verified product image above the response; omitted when unavailable.</p>
+      <p className="mt-1 text-xs text-slate-600">If the complete reply exceeds the image caption limit, the full reply is sent as text.</p>
+      {!!forField("productImage").length && <p role="alert" className="mt-2 text-xs text-amber-800">{forField("productImage").map((issue) => issue.message).join("; ")}</p>}
+    </div>}
     <TemplateHeaderEditor nodes={draft.header} issues={forField("header")} variables={normalVariables}
       onChange={(header) => onChange({ ...draft, header: header.filter((node): node is ContentNode => node.type !== "slot") })} />
     <TemplateBodyEditor nodes={draft.body} issues={forField("body")} variables={normalVariables} allowResponseSlot

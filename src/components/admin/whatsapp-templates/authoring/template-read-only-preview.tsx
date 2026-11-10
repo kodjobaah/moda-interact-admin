@@ -1,3 +1,4 @@
+import { ConversationProductImageExample } from "./conversation-product-image-example";
 import type { TemplatePreviewDTO } from "@/lib/admin/whatsapp-templates/authoring/types";
 import type { MediaRoleView } from "@/lib/admin/whatsapp-templates/media/readiness";
 import { ShopBrandMediaPreview } from "../media/shop-brand-media-preview";
@@ -17,6 +18,7 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
     <div className="rounded-xl border border-slate-200 bg-[#e7f0e8] p-3 sm:p-5" aria-label="WhatsApp-style preview">
       <div className="mx-auto max-w-sm rounded-xl bg-white p-4 shadow-sm" role="region" aria-label="Example message">
         {!preview ? <p className="text-sm text-slate-600">No preview available.</p> : <>
+          {preview.family === "MODA_CONVERSATION_WRAPPER" && preview.productImage && <ConversationProductImageExample />}
           {preview.headerMediaRole && <div className="mb-3" aria-label="IMAGE header preview">
             {verifiedMedia?.status === "READY" && verifiedMedia.role === preview.headerMediaRole && mediaDomain
               ? <ShopBrandMediaPreview media={verifiedMedia} domain={mediaDomain}/>

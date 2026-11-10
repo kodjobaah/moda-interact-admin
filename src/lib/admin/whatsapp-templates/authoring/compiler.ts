@@ -33,6 +33,7 @@ export function compileTemplateAst(draft: TemplateAst): PreparedTemplate {
   if (draft.family === "MODA_CONVERSATION_WRAPPER") return {
     schemaVersion: 1, family: "MODA_CONVERSATION_WRAPPER", responseSlot: "response.body",
     header: asRuntime(draft.header), body: asRuntime(draft.body), footer: asRuntime(draft.footer),
+    ...(draft.productImage ? { productImage: { ...draft.productImage } } : {}),
     conditionals: draft.conditionals.map((c) => ({ when: c.when, tokens: asRuntime(c.nodes) })),
   };
   const components: Array<Record<string, unknown>> = [];

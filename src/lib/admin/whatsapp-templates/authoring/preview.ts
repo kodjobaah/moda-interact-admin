@@ -10,6 +10,7 @@ function renderTokens(tokens: RuntimeToken[]): string {
 export function makeExamplePreview(prepared: PreparedTemplate): TemplatePreviewDTO {
   if (prepared.family === "MODA_CONVERSATION_WRAPPER") return {
     family: prepared.family, header: renderTokens(prepared.header), body: renderTokens(prepared.body), footer: renderTokens(prepared.footer),
+    ...(prepared.productImage ? { productImage: prepared.productImage } : {}),
     buttons: [], conditional: prepared.conditionals.map((c) => renderTokens(c.tokens)).join("\n"),
   };
   const components = prepared.components;
@@ -57,6 +58,7 @@ export function makeDraftExamplePreview(draft: import("./types").TemplateAst): T
     buttons: [],
   };
   if (draft.family === "MODA_CONVERSATION_WRAPPER") {
+    if (draft.audience === "AI" && draft.productImage) result.productImage = draft.productImage;
     result.conditional = draft.conditionals.map((conditional) => sampleNodes(conditional.nodes)).join("\n");
   } else {
     result.buttons = draft.buttons.map((button) => ({

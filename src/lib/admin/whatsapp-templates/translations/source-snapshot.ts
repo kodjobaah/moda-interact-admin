@@ -1,3 +1,4 @@
+import { compileTemplateAst } from "../authoring/compiler";
 import { createHash } from "node:crypto";
 import { templateHash } from "../authoring/identifiers";
 import { validateTemplateAst } from "../authoring/validation";
@@ -123,6 +124,11 @@ export function makeTranslationSourceSnapshot(input: {
       !/^[a-f0-9]{64}$/.test(input.sourceHash) || templateHash(record.authoring) !== input.sourceHash ||
       templateHash(record.prepared) !== input.englishContentHash) {
     throw new Error("Saved immutable English locale or source hash is missing or has changed.");
+  }
+  // Structural bindings stay in immutable English; only text enters the strict worker transport.
+  if (record.authoring.family === "MODA_CONVERSATION_WRAPPER" && record.authoring.productImage !== undefined &&
+      templateHash(compileTemplateAst(record.authoring)) !== input.englishContentHash) {
+    throw new Error("Saved prepared projection differs from immutable English source or bindings.");
   }
   const segments = extractTranslationSegments(input.definitionId, record.authoring);
   if (!segments.length) throw new Error("English template has no translatable text.");

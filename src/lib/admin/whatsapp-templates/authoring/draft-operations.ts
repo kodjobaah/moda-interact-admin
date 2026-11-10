@@ -1,3 +1,4 @@
+import { ConversationProductImageBindingSchema } from "@modainteract/moda-interact-shared/commerce/presentation";
 import type { ContentNode, MetaTemplateAst, TemplateAst, WrapperNode, WrapperTemplateAst, SemanticVariable } from "./types";
 
 export function newMetaDraft(stage: MetaTemplateAst["stage"] = "INITIAL", offerType: MetaTemplateAst["offerType"] = "NO_OFFER"): MetaTemplateAst {
@@ -114,4 +115,18 @@ export function insertEditorToken(value: string, name: SemanticVariable | "respo
   const right = Math.min(value.length, Math.max(left, Math.max(start, end)));
   const token = `{{${name}}}`;
   return { text: value.slice(0, left) + token + value.slice(right), caret: left + token.length };
+}
+
+/** Toggle a structured binding; omission preserves legacy hashes. */
+export function setWrapperProductImage(draft: WrapperTemplateAst, enabled: boolean): WrapperTemplateAst {
+  const next = { ...draft };
+  delete next.productImage;
+  if (enabled && draft.audience === "AI") next.productImage = ConversationProductImageBindingSchema.parse({
+    variable: "response.productImage", placement: "BEFORE_BODY", optional: true,
+  });
+  return next;
+}
+export function setWrapperAudience(draft: WrapperTemplateAst, audience: WrapperTemplateAst["audience"]): WrapperTemplateAst {
+  const next = { ...draft, audience };
+  return audience === "AI" ? next : setWrapperProductImage(next, false);
 }
