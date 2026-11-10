@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { REVIEW_LANGUAGES } from "../compilation/language-codes";
 import type { Audience } from "./contracts";
 
 export type WrapperRepository = Pick<PrismaClient, "$transaction">;
@@ -53,14 +54,15 @@ export async function recordWrapperActivation(tx: Prisma.TransactionClient, inpu
   editVersion: number;
   actorId: string;
   reason: string;
+  metadata?: Prisma.InputJsonObject;
 }): Promise<void> {
   await tx.commerceAuditEvent.create({ data: {
     actorType: "PLATFORM_ADMIN", actorAdminId: input.actorId,
     action: "ACTIVATE_WHATSAPP_CONVERSATION_WRAPPER",
     operationId: `wrapper:${input.audience}:${input.editVersion}:${input.definitionId.slice(-20)}`,
     reason: input.reason,
-    metadata: { audience: input.audience, previousDefinitionId: input.previousDefinitionId,
+    metadata: { ...input.metadata, audience: input.audience, previousDefinitionId: input.previousDefinitionId,
       newDefinitionId: input.definitionId, editVersion: input.editVersion, sourceHash: input.sourceHash,
-      reviewedLanguageCount: 20 },
+      reviewedLanguageCount: REVIEW_LANGUAGES.length },
   } });
 }

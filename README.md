@@ -225,3 +225,87 @@ change does not run it or activate a wrapper.
 Run `npm run test:arch068-admin-authoring` for the deterministic contract and
 component checks. The runner bundles repository test modules to ESM while leaving
 npm packages external, so Shared is consumed via its published import exports.
+
+## Initialize the structural AI conversation wrapper (ARCH-068)
+
+`whatsapp:initialize-conversation-wrapper` prepares the canonical AI-only wrapper:
+empty header/footer, the complete `response.body` slot, and the optional verified
+product image above the response. It uses the existing compiler, immutable hashes,
+locale eligibility, versioned activation and audit services. It creates no Meta
+registration, translation run, model call or send.
+
+The command defaults to **dry-run**. Supply an existing, active `SUPER_ADMIN` ID
+and an audit reason of 10–500 characters. The requested environment must exactly
+match the Admin's existing trusted runtime environment selection
+(`DEPLOYMENT_ENVIRONMENT_NAME`, otherwise `NODE_ENV`); the command never sets it
+from `--environment`. Use the deployment's existing database configuration.
+Only `test` and `production` are supported; missing, duplicate and unknown arguments
+are refused. `--dry-run` and `--apply` are mutually exclusive.
+
+```bash
+npm run whatsapp:initialize-conversation-wrapper -- \
+  --environment=test --actor-admin-id=EXISTING_SUPER_ADMIN_ID \
+  --dry-run --reason="Review structural AI conversation wrapper initialization"
+```
+
+Dry-run writes nothing to the database. It reports the stable planned definition ID, source and
+prepared hashes, canonical locale count and the observed current AI pointer.
+`action` states whether apply would create/activate or be unchanged. The stable
+submission UUID is `e14e7967-05bb-4a5c-bacf-0663b42b37d5`; the normal authoring
+identity helper derives the definition ID from the operator ID and that UUID.
+
+Before applying, record **deployed Commerce and Background commit/package
+versions and successful binding fixture smoke for the target environment**.
+Both deployed consumers must support the optional binding, with the required
+message-field migration deployed before Background uses it. Accepted local source
+or Admin authoring completion does not prove deployed compatibility. The script
+has no deployment API and cannot verify this operator prerequisite.
+
+```bash
+npm run whatsapp:initialize-conversation-wrapper -- \
+  --environment=test --actor-admin-id=EXISTING_SUPER_ADMIN_ID \
+  --apply --reason="Approve structural wrapper after deployed consumer checks"
+```
+
+Production uses the same explicit syntax with `--environment=production`, only
+in its matching configured runtime and after the same deployment checks. No
+initializer command is run automatically on deployment or by the application.
+
+Apply creates the immutable definition, all languages from `REVIEW_LANGUAGES`,
+the AI pointer and audits in **one SERIALIZABLE transaction**. English is
+`SOURCE_SAVED`; every other locale is `REVIEWED` by the supplied operator at one
+transaction timestamp, with identical structural source/prepared content and no
+provider language code. This is explicit operator approval of language-invariant
+structure, not a fabricated translation review. Audit metadata identifies the
+script/version, structural locales, hashes and previous slot; output excludes
+credentials and customer data.
+
+An empty slot returns `CREATED_AND_ACTIVATED`. An eligible occupied slot with the
+identical canonical prepared binding returns `UNCHANGED`, including when it was
+created by another operator, without writes. Same-operator repeats verify the
+immutable source and prepared content. Different content or incomplete/invalid
+records are never repaired, overwritten or forced. A race rolls back the losing
+transaction without a partial definition, locales, pointer or audit. There is no
+automatic retry.
+
+Failures return a bounded code: `INVALID_ARGUMENT`, `ENVIRONMENT_MISMATCH`,
+`ACTOR_DENIED`, `IMMUTABLE_CONFLICT`, `SLOT_OCCUPIED` or
+`CONCURRENT_STATE_CHANGE`. Database text, stack traces and supplied argument
+values are not printed. `currentPointer` describes the snapshot observed before
+any apply.
+
+```bash
+npm run test:arch068-admin-initializer:unit
+npm run test:arch068-admin-initializer:postgres
+```
+
+The PostgreSQL command creates a fresh loopback-only Docker fixture, applies the
+repository's recorded migrations, validates the real CLI and atomic failure/race
+paths, then removes the container. It refuses external database overrides and
+never initializes a deployed test/production environment. Production initialization
+is not executed by these tests.
+
+The CLI uses the existing esbuild tool to load the server core as native ESM,
+leaving installed npm dependencies external through their public exports. It
+removes its temporary local-code artifact on exit; no package-wide module-mode
+change or global Node import-condition override is required.

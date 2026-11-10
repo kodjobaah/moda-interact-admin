@@ -28,6 +28,38 @@ function checkInput(value: ActivateWrapperInput): void {
   }
 }
 
+/** Caller owns the transaction; never nests a transaction or bypasses eligibility/CAS/audit. */
+export async function activateConversationWrapperInTransaction(input: ActivateWrapperInput, deps: {
+  principal: Pick<PlatformAdminPrincipal, "id" | "role">;
+  tx: Prisma.TransactionClient;
+  now?: Date;
+  auditMetadata?: Prisma.InputJsonObject;
+}): Promise<ActivateWrapperResult> {
+  requireTemplateSuperAdmin(deps.principal);
+  checkInput(input);
+  const tx = deps.tx;
+  const definition = await tx.whatsAppTemplateDefinition.findUnique({
+    where: { id: input.definitionId }, include: { locales: true },
+  });
+  if (!definition) throw new WrapperRequestError("Wrapper definition not found.");
+  const eligibility = checkWrapperEligibility(definition, input.audience);
+  if (!eligibility.eligible) throw new WrapperRequestError(eligibility.reason);
+  const result = await replaceWrapperSlot(tx, { ...input, actorId: deps.principal.id });
+  if (result.replay) return { replay: true, editVersion: result.editVersion };
+  // This is only a lifecycle marker. Locale JSONB/source hashes are never revised.
+  await tx.whatsAppTemplateDefinition.updateMany({
+    where: { id: input.definitionId, publishedAt: null },
+    data: { publishedAt: deps.now ?? new Date(), status: "PUBLISHED" },
+  });
+  await recordWrapperActivation(tx, {
+    audience: input.audience, previousDefinitionId: result.previousDefinitionId,
+    definitionId: input.definitionId, sourceHash: definition.sourceHash,
+    editVersion: result.editVersion, actorId: deps.principal.id, reason: input.reason.trim(),
+    metadata: deps.auditMetadata,
+  });
+  return { replay: false, editVersion: result.editVersion };
+}
+
 /** A single durable transaction for semantic eligibility, versioned CAS, first publication and audit. */
 export async function activateConversationWrapper(input: ActivateWrapperInput, deps: WrapperActivationDependencies): Promise<ActivateWrapperResult> {
   requireTemplateSuperAdmin(deps.principal);
@@ -35,25 +67,7 @@ export async function activateConversationWrapper(input: ActivateWrapperInput, d
   try {
     return await deps.db.$transaction(async (tx) => {
       await deps.ensureActor?.(tx);
-      const definition = await tx.whatsAppTemplateDefinition.findUnique({
-        where: { id: input.definitionId }, include: { locales: true },
-      });
-      if (!definition) throw new WrapperRequestError("Wrapper definition not found.");
-      const eligibility = checkWrapperEligibility(definition, input.audience);
-      if (!eligibility.eligible) throw new WrapperRequestError(eligibility.reason);
-      const result = await replaceWrapperSlot(tx, { ...input, actorId: deps.principal.id });
-      if (result.replay) return { replay: true, editVersion: result.editVersion };
-      // This is only a lifecycle marker. Locale JSONB/source hashes are never revised.
-      await tx.whatsAppTemplateDefinition.updateMany({
-        where: { id: input.definitionId, publishedAt: null },
-        data: { publishedAt: new Date(), status: "PUBLISHED" },
-      });
-      await recordWrapperActivation(tx, {
-        audience: input.audience, previousDefinitionId: result.previousDefinitionId,
-        definitionId: input.definitionId, sourceHash: definition.sourceHash,
-        editVersion: result.editVersion, actorId: deps.principal.id, reason: input.reason.trim(),
-      });
-      return { replay: false, editVersion: result.editVersion };
+      return activateConversationWrapperInTransaction(input, { tx, principal: deps.principal });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 });
   } catch (error) {
     if (error instanceof WrapperRequestError || error instanceof WrapperConflictError) throw error;
