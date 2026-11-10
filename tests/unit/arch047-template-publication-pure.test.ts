@@ -144,6 +144,18 @@ test("same-purpose assignments are selected by immutable target and header kind,
   assert.equal(impact.public.counts.conflict, 0);
   assert.equal(impact.variantsByLanguage.get("en")?.[0]?.id, "alternative_text");
 
+  const personalized = variant("personalized", "ALTERNATIVE_PRODUCT", "TEXT");
+  const personalizedRow = {...personalized, metaRegistration: {...personalized.metaRegistration,
+    parameterBindingsSnapshot: {...personalized.metaRegistration.parameterBindingsSnapshot,
+      body: [{position: 1, variable: "customer.firstName"}]}}};
+  const bothGreetings = fixtureDatabase({variants: [alternativeText, personalizedRow]});
+  const genericImpact = (await readShopImpacts(bothGreetings.db as any, source, [candidate], false))[0];
+  assert.deepEqual(genericImpact.variantsByLanguage.get("en")?.map(row => row.id), ["alternative_text"]);
+  const namedSource = {...source, locales: [{...source.locales[0],
+    view: {bindings: personalizedRow.metaRegistration.parameterBindingsSnapshot}}]};
+  const namedImpact = (await readShopImpacts(bothGreetings.db as any, namedSource, [candidate], false))[0];
+  assert.deepEqual(namedImpact.variantsByLanguage.get("en")?.map(row => row.id), ["personalized"]);
+
   const duplicateMatch = fixtureDatabase({ variants: [checkout, alternativeImage, alternativeText,
     variant("alternative_text_duplicate", "ALTERNATIVE_PRODUCT", "TEXT")] });
   const ambiguous = (await readShopImpacts(duplicateMatch.db as any, source, [candidate], false))[0];
