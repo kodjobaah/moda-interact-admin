@@ -97,10 +97,10 @@ Supply `DATABASE_URL` through the invoking process environment or in the input
 file. The existing process environment takes precedence. All records go to
 **that one database**, not to two independent databases.
 
-Secret groups require the existing ARCH-043 configuration-unseal root:
-`MODA_CONFIG_UNSEAL_KEY` and `MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID` (also resolved
-from the process environment first, then the input file). Use the **same root
-used by the application readers**. The importer never inserts either root into
+Secret groups require the unified deployment encryption keyring:
+`MODA_ENCRYPTION_KEYS_JSON` and `MODA_ENCRYPTION_ACTIVE_KEY_ID` (also resolved
+from the process environment first, then the input file). Use the **same map
+used by the application readers**. The importer never inserts either setting into
 PostgreSQL. Secret payloads are validated with the Admin secret contract and
 sealed independently for each `(environment,key,version)` with the canonical
 AAD. Audit rows are redacted, not plaintext or ciphertext copies.
@@ -170,7 +170,7 @@ the Shopify Partner identity. No identifiers or access tokens are logged.
 
 Recognised env names are explicitly mapped to the Admin-owned fields of:
 `woo.couponSync`, `speech.transcription`, `admin.grafana`, `omini.moderation`,
-`commerce.connectionKeys`, `auth.admin`, `auth.commerce`, `commerce.bootstrap`,
+`auth.admin`, `auth.commerce`, `commerce.bootstrap`,
 `merchant.knowledge.r2`, `woocommerce.auth`, `shopify.oauth`, `messaging.meta`,
 `woocommerce.billing`, `shopify.partner`, `shopify.appEvents`,
 `messaging.sender`, and `ai.providers`.
@@ -202,3 +202,6 @@ The focused tests exercise env parsing, mapping, two-environment insert/skip,
 policy and secret updates, revision/audit behavior, alias conflicts, and
 read-only dry runs. Live database execution should additionally be checked
 against the intended development PostgreSQL instance before general use.
+
+
+Encryption keys are deployment-owned. Configure `MODA_ENCRYPTION_KEYS_JSON` as a JSON map of key IDs to canonical base64 32-byte AES keys and `MODA_ENCRYPTION_ACTIVE_KEY_ID` as a member of that map. Both platform-secret and provider-credential writers use this pair. Preserve all historical wrapping and commerce key IDs/material in the unified map so existing ciphertext remains readable. The importer deliberately ignores this pair and `COMMERCE_CONNECTION_COMMAND_HMAC_KEY`; it never creates or updates `commerce.connectionKeys`. Existing database records and audit history are preserved. The command HMAC key is a separate signing secret, not an encryption key.

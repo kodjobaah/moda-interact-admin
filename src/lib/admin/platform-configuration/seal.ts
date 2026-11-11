@@ -35,7 +35,7 @@ export function secretAAD(environment: string, key: string, version: number): st
   return JSON.stringify(["moda-platform-config-v1", environment, key, version, 1]);
 }
 
-/** Dedicated external wrapping keyring, never the Commerce keyring that this service manages.
+/** Unified deployment encryption keyring; historical wrapping and credential keys remain by ID.
  * Parse the opaque descriptor in the same Shared module instance that seals/unseals.
  * The CLI must not construct this descriptor via its own Shared import: key bytes
  * are held in a module-private WeakMap, not in the returned descriptor.
@@ -54,7 +54,7 @@ export function createConfigUnsealKeyring(
 export function loadConfigUnsealKeyring(): UnsealKeyring {
   try {
     return createConfigUnsealKeyring(
-      process.env.MODA_CONFIG_UNSEAL_KEY, process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID,
+      process.env.MODA_ENCRYPTION_KEYS_JSON, process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID,
     );
   } catch {
     // Never log the keyring JSON, key ID, or raw security configuration.

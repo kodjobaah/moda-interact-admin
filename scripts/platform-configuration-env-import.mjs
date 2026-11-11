@@ -35,11 +35,6 @@ export const PLATFORM_ENV_MAPPINGS = Object.freeze([
   { key: "omini.moderation", fields: {
     baseUrl: ["OPENAI_MODERATION_BASE_URL"], modelId: ["OPENAI_MODERATION_MODEL_ID"],
   } },
-  { key: "commerce.connectionKeys", fields: {
-    connectionKeysJson: ["COMMERCE_CONNECTION_KEYS_JSON"],
-    activeKeyId: ["COMMERCE_CONNECTION_ACTIVE_KEY_ID"],
-    commandHmacKey: ["COMMERCE_CONNECTION_COMMAND_HMAC_KEY"],
-  } },
   ...["auth.admin", "auth.commerce"].map((key) => ({ key, fields: {
     authSecret: ["AUTH_SECRET"], googleClientId: ["AUTH_GOOGLE_ID"],
     googleClientSecret: ["AUTH_GOOGLE_SECRET"],
@@ -93,7 +88,8 @@ export const PLATFORM_ENV_MAPPINGS = Object.freeze([
  */
 const PLATFORM_INPUT_NAMES = new Set([
   ...PLATFORM_ENV_MAPPINGS.flatMap((mapping) => Object.values(mapping.fields).flat()),
-  "DATABASE_URL", "MODA_CONFIG_UNSEAL_KEY", "MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID",
+  "DATABASE_URL", "MODA_ENCRYPTION_KEYS_JSON", "MODA_ENCRYPTION_ACTIVE_KEY_ID",
+  "COMMERCE_CONNECTION_COMMAND_HMAC_KEY",
 ]);
 
 function unsupportedKnownShellAssignment(line) {

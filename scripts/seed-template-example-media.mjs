@@ -84,7 +84,7 @@ async function main() {
   if (options.help) {
     console.log("Usage: npm run admin:seed-template-media -- --environment test --confirm [--source-image FILE | --logo FILE.png --square-logo FILE.png --cover-image FILE.png]");
     console.log("--source-image generates a logo preview, a square crop and a cover from one PNG/JPEG/WebP image. Omitted per-role images use deterministic defaults.");
-    console.log("Requires DATABASE_URL and MODA_CONFIG_UNSEAL_KEY in the process environment.");
+    console.log("Requires DATABASE_URL and MODA_ENCRYPTION_KEYS_JSON in the process environment.");
     return;
   }
   const databaseUrl = process.env.DATABASE_URL;

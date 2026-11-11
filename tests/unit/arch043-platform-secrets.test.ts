@@ -7,9 +7,9 @@ import { createConfigUnsealKeyring, sealSecret, secretAAD, unsealSecret } from "
 const pair = { consumerKey: `ck_${"a".repeat(40)}`, consumerSecret: `cs_${"b".repeat(40)}` };
 const r2 = { endpoint: `https://${"a".repeat(32)}.r2.cloudflarestorage.com`, bucket: "merchant-knowledge", accessKeyId: "r2-access", secretAccessKey: "r2-secret", maxUploadBytes: 10485760, maxXlsxUncompressedBytes: 52428800 };
 
-test("thirteen closed secret purposes are registered once", () => {
-  assert.deepEqual([...SECRET_PURPOSES], ["commerce.connectionKeys", "auth.admin", "auth.commerce", "commerce.bootstrap", "merchant.knowledge.r2", "woocommerce.auth", "shopify.oauth", "messaging.meta", "woocommerce.billing", "shopify.partner", "shopify.appEvents", "messaging.sender", "ai.providers"]);
-  assert.equal(PLATFORM_SECRET_CONTRACTS.length, 13);
+test("twelve closed secret purposes are registered once", () => {
+  assert.deepEqual([...SECRET_PURPOSES], ["auth.admin", "auth.commerce", "commerce.bootstrap", "merchant.knowledge.r2", "woocommerce.auth", "shopify.oauth", "messaging.meta", "woocommerce.billing", "shopify.partner", "shopify.appEvents", "messaging.sender", "ai.providers"]);
+  assert.equal(PLATFORM_SECRET_CONTRACTS.length, 12);
   for (const contract of PLATFORM_SECRET_CONTRACTS) {
     assert.equal(contract.kind, "secret");
     assert.equal(contract.requiredRole, "SUPER_ADMIN");
@@ -145,4 +145,25 @@ test("reconciled secrets keep canonical AAD binding", () => {
     assert.equal(secretAAD("production", purpose, 2), JSON.stringify(["moda-platform-config-v1", "production", purpose, 2, 1]));
     assert.notEqual(secretAAD("production", purpose, 2), secretAAD("staging", purpose, 2));
   }
+});
+
+
+test("deployment encryption keys are not editable platform secrets", () => {
+  assert.equal(SECRET_PURPOSES.has("commerce.connectionKeys"), false);
+  assert.throws(() => validateSecretPayload("commerce.connectionKeys", {
+    connectionKeysJson: JSON.stringify({ old: Buffer.alloc(32, 1).toString("base64") }), activeKeyId: "old",
+  }), /Unsupported/);
+});
+
+test("unified map decrypts historical platform secrets after selecting a different writer key", () => {
+  const historical = Buffer.alloc(32, 0x41).toString("base64");
+  const credential = Buffer.alloc(32, 0x42).toString("base64");
+  const original = createConfigUnsealKeyring(JSON.stringify({ historical }), "historical");
+  const combined = createConfigUnsealKeyring(JSON.stringify({ historical, credential }), "credential");
+  const plaintext = JSON.stringify({ apiKey: "fixture-id", apiSecret: "fixture-secret" });
+  const saved = sealSecret({ environment: "production", key: "shopify.oauth", version: 7, plaintext, wrapping: original });
+  assert.equal(unsealSecret({ environment: "production", key: "shopify.oauth", version: 7, value: saved, wrapping: combined }), plaintext);
+  const next = sealSecret({ environment: "production", key: "shopify.oauth", version: 8, plaintext, wrapping: combined });
+  assert.equal(next.wrappingKeyId, "credential");
+  assert.equal(unsealSecret({ environment: "production", key: "shopify.oauth", version: 8, value: next, wrapping: combined }), plaintext);
 });

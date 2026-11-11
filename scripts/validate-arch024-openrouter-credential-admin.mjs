@@ -232,10 +232,10 @@ async function cleanup() {
 }
 
 async function proveLifecycle(databaseUrl) {
-  process.env.COMMERCE_CONNECTION_KEYS_JSON = JSON.stringify({
+  process.env.MODA_ENCRYPTION_KEYS_JSON = JSON.stringify({
     [keyId]: Buffer.from(testKey).toString("base64"),
   });
-  process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID = keyId;
+  process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID = keyId;
   process.env.DEPLOYMENT_ENVIRONMENT_NAME = "test";
 
   const prisma = new PrismaClient({
