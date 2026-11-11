@@ -13,6 +13,7 @@ function setup() {
       return `${path}?${Object.entries(selected).filter(([, v]) => v !== null).map(([k, v]) => `${k}=${v}`).join('&')}`;
     } },
     './admin-detail-drawer': { AdminDetailDrawer: ({ children }) => h.jsxRuntime.jsx('admin-drawer', { children }) },
+    './commerce-model-policy/live-plan-policy': { LivePlanPolicyControls: (props) => h.jsxRuntime.jsx('live-plan-policy', props) },
     './billing-event-retry-control': { BillingEventRetryControl: () => null },
     './merchant/merchant-pricing-plan-builder': { MerchantPricingPlanBuilder: (props) => {
       planBuilderProps.push(props);
@@ -22,7 +23,7 @@ function setup() {
   return { h, Drawer: moduleRecord.MerchantPricingPlanDrawer, planBuilderProps };
 }
 
-test('editing an existing plan passes policy into the wizard instead of rendering it above the tabs', () => {
+test('editing an existing plan passes the same policy to live controls and the wizard', () => {
   const f = setup();
   const plan = { id: 'plan-1', displayName: 'Growth', commerceModelId: 'model-1',
     translations: [{ locale: 'fr', description: 'Croissance' }], recurringAmountMinor: 2500 };
@@ -38,7 +39,7 @@ test('editing an existing plan passes policy into the wizard instead of renderin
     canEditPlanPolicy: true,
     params: { view: 'plans', section: 'pricing', planId: 'plan-1' } };
   const tree = f.h.render(f.Drawer, props);
-  assert.equal(findElement(tree, n => n.type === 'commerceagent-policy'), undefined);
+  assert.equal(findElement(tree, n => n.type === 'live-plan-policy')?.props.policy, policy);
   assert.ok(findElement(tree, n => n.type === 'pricing-builder'));
   assert.equal(f.planBuilderProps.length, 1);
   assert.equal(f.planBuilderProps[0].planPolicy, policy);

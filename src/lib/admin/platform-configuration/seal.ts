@@ -14,6 +14,7 @@ const logger = createLogger({
 });
 
 const ENVIRONMENTS = new Set(["local", "test", "development", "staging", "production"]);
+// Retain the retired connection-key purpose only for historical ciphertext/AAD compatibility.
 const PURPOSES = new Set(["commerce.connectionKeys", "auth.admin", "auth.commerce", "commerce.bootstrap", "merchant.knowledge.r2", "woocommerce.auth", "shopify.oauth", "messaging.meta", "woocommerce.billing", "shopify.partner", "shopify.appEvents", "messaging.sender", "ai.providers"]);
 const KEY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const B64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;

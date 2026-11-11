@@ -34,7 +34,7 @@ export function validateSecretPayload(key: string, value: unknown): Record<strin
       cleaned[field.name] = input;
     } else if (typeof input !== "string" || !input || input !== input.trim() ||
       Buffer.byteLength(input, "utf8") > (field.kind === "secret" ? 4096 : 2048) ||
-      (field.name !== "connectionKeysJson" && CONTROL.test(input))) {
+      CONTROL.test(input)) {
       throw new ConfigurationError("INVALID_INPUT", "Unsupported or incomplete secret configuration.");
     } else {
       cleaned[field.name] = input;
