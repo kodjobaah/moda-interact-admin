@@ -27,7 +27,12 @@ export function impactKind(current: Variant[], locale: ApprovedSource["locales"]
     variant.providerTemplateId === locale.providerTemplateId ? "unchanged" : "conflict";
 }
 
-function matchesSelectedVariant(variant: Variant, source: ApprovedSource): boolean {
+function usesCustomerName(bindings: Record<string, unknown> | null | undefined): boolean {
+  return [bindings?.header, bindings?.body].some(section =>
+    Array.isArray(section) && section.some(entry => entry?.variable === "customer.firstName"));
+}
+
+function matchesSelectedVariant(variant: Variant, source: ApprovedSource, locale: ApprovedSource["locales"][number]): boolean {
   const registration = variant.metaRegistration;
   if (!registration) return true;
   const bindings = registration.parameterBindingsSnapshot && typeof registration.parameterBindingsSnapshot === "object"
@@ -37,7 +42,11 @@ function matchesSelectedVariant(variant: Variant, source: ApprovedSource): boole
   const components = Array.isArray(registration.componentsSnapshot) ? registration.componentsSnapshot as Array<Record<string, unknown>> : [];
   const header = components.find((component) => component.type === "HEADER");
   const headerKind = header?.format === "IMAGE" ? "IMAGE" : header?.format === "TEXT" ? "TEXT" : "NONE";
-  return headerKind === source.headerKind;
+  if (headerKind !== source.headerKind) return false;
+  // Publishing the other initial greeting must preserve the current assignment.
+  return !source.purpose.startsWith("INITIAL_") ||
+    usesCustomerName(bindings) === usesCustomerName(locale.view.bindings);
+
 }
 
 function brandState(keys: string[], row: Record<string, unknown> | null, verified: boolean): BrandIndicator[] {
@@ -69,7 +78,7 @@ export async function readShopImpacts(db: ImpactReader, source: ApprovedSource, 
   }
   return shops.map((shop) => {
     const byLanguage = new Map<string, Variant[]>(source.locales.map((l) => [l.languageTag, variants.filter((v) =>
-      v.shopId === shop.id && v.languageTag === l.languageTag && matchesSelectedVariant(v, source))]));
+      v.shopId === shop.id && v.languageTag === l.languageTag && matchesSelectedVariant(v, source, l))]));
     const counts = emptyCounts();
     for (const locale of source.locales) counts[impactKind(byLanguage.get(locale.languageTag) ?? [], locale)]++;
     const brand = brandState(source.brandFields, brands.find((b) => b.shopId === shop.id) ?? null, brandReadSucceeded && includeBrand);
