@@ -3,7 +3,7 @@ import type {
   RecoveryCreditPurchaseItem,
 } from "@/lib/admin/types";
 import type { Feature } from "@prisma/client";
-import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
+import { adminBillingPackStatusLabel, adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
 import { BillingEventRetryControl } from "./billing-event-retry-control";
@@ -134,7 +134,7 @@ export function RecoveryCreditPurchaseDrawer({
           [adminI18n.t("billing.shop"), purchase.shop.domain],
           [
             adminI18n.t("billing.status"),
-            adminI18n.t(`billing.packStatus.${purchase.status}`),
+            adminBillingPackStatusLabel(purchase.status),
           ],
           [adminI18n.t("billing.creditsGranted"), purchase.creditsGranted],
           [
@@ -187,7 +187,7 @@ export function RecoveryCreditPurchaseDrawer({
           {adminI18n.t("billing.asyncReceiptHelp")}
         </p>
       ) : null}
-      {eventReported && purchase.status === "PENDING_BILLING" ? (
+      {eventReported && purchase.status === "REQUESTED" ? (
         <p className="mt-3 rounded-md bg-amber-50 p-4 text-sm text-amber-900">
           {adminI18n.t("billing.devDashboardHelp")}
         </p>

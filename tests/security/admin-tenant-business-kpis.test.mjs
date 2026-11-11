@@ -19,7 +19,8 @@ test('Tenant Directory KPIs are derived from durable business state', async () =
   assert.match(dataSource, /CheckoutRecoveryStatus\.COMPLETED/);
   assert.match(dataSource, /prisma\.conversation\.count/);
   assert.match(dataSource, /prisma\.conversationMessage\.count/);
-  assert.match(dataSource, /type:\s*["']RECOVERY["']/);
+  assert.match(dataSource, /prisma\.conversation\.count\(\{\s*where: \{\s*checkoutRecovery: \{ shop: \{ status: "ACTIVE"/);
+  assert.match(dataSource, /prisma\.conversationMessage\.count\(\{\s*where: \{\s*conversation: \{\s*checkoutRecovery: \{ shop: \{ status: "ACTIVE"/);
 
   for (const key of [
     'activeRecoveries',

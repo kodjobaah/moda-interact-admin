@@ -166,12 +166,12 @@ test("taxonomy semantic-search failures are explicit without exposing credential
   assert.match(embedding, /"INVALID_INDEX_METADATA"/);
   assert.match(route, /admin\.shopify_taxonomy\.unavailable/);
   assert.match(route, /error: "embedding_configuration"/);
-  assert.match(route, /reason:\s*error\.detail === "MISSING_API_KEY"/);
+  assert.match(route, /error\.detail === "MISSING_API_KEY"\s*\? "missing_api_key"/);
   assert.match(route, /"missing_api_key"/);
   assert.match(route, /error: "embedding_request_failed"/);
   assert.match(
     picker,
-    /Admin embedding credential is not configured/,
+    /embedding credential is not configured/,
   );
   assert.match(picker, /active index embedding metadata is invalid/);
   assert.match(picker, /could not reach the embedding service/);

@@ -6,7 +6,7 @@ import type {
   TenantBilling,
   TenantDetail,
 } from "@/lib/admin/types";
-import { adminBillingReportStateLabel, adminI18n } from "@/i18n";
+import { adminBillingPackStatusLabel, adminBillingReportStateLabel, adminI18n } from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { Pagination } from "./pagination";
 import {
@@ -372,7 +372,7 @@ function Activity({
                       {adminI18n.formatDateTime(purchase.createdAt)}
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-600">
-                      {adminI18n.t(`billing.packStatus.${purchase.status}`)}
+                      {adminBillingPackStatusLabel(purchase.status)}
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-600">
                       {adminI18n.formatNumber(purchase.creditsGranted)}
