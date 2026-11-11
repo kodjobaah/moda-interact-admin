@@ -21,6 +21,8 @@ export function ConfigurationEditor({ contract, snapshot }: { contract: PublicCo
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ConfigurationActionResult | null>(null);
+  const sections = [...new Set(contract.fields.map((field) => "section" in field ? field.section : undefined).filter((section): section is string => Boolean(section)))];
+  const [activeSection, setActiveSection] = useState(sections[0] ?? "");
   const original = JSON.stringify(initialConfigurationValues(contract, snapshot));
   const dirty = JSON.stringify(values) !== original;
   const disabled = pending;
@@ -52,6 +54,9 @@ export function ConfigurationEditor({ contract, snapshot }: { contract: PublicCo
     } finally { processing.current = false; setPending(false); }
   }
 
+  const visibleFields = sections.length
+    ? contract.fields.filter((field) => ("section" in field ? field.section : undefined) === activeSection)
+    : contract.fields;
   return <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-label={`${contract.title} editor`}>
     <h2 className="text-xl font-semibold text-gray-900">{contract.title}</h2>
     <p className="mt-1 text-sm text-gray-600">{contract.description}</p>
@@ -64,9 +69,20 @@ export function ConfigurationEditor({ contract, snapshot }: { contract: PublicCo
     {snapshot.version === 0 && !contract.defaults && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Not configured. All required values must be supplied before the first save; no placeholders are persisted.</p>}
     <form onSubmit={submit} className="space-y-4">
       <fieldset disabled={disabled} className="space-y-4 disabled:opacity-70">
-        {contract.fields.map((field) => <ConfigurationField key={field.name} field={field} value={values[field.name]} disabled={disabled}
+        {sections.length > 0 && <div role="tablist" aria-label={`${contract.title} sections`} className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+          {sections.map((section) => <button key={section} type="button" role="tab" id={`${contract.key}-${section}-tab`}
+            aria-selected={activeSection === section} aria-controls={`${contract.key}-fields`} tabIndex={activeSection === section ? 0 : -1}
+            onClick={() => setActiveSection(section)}
+            className={`rounded-md px-3 py-2 text-sm font-semibold ${activeSection === section ? "bg-[var(--brand-700)] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+            {section}
+          </button>)}
+        </div>}
+        <div id={`${contract.key}-fields`} role={sections.length ? "tabpanel" : undefined}
+          aria-labelledby={sections.length ? `${contract.key}-${activeSection}-tab` : undefined} className="space-y-4">
+        {visibleFields.map((field) => <ConfigurationField key={field.name} field={field} value={values[field.name]} disabled={disabled}
           error={result && !result.ok ? result.fieldErrors?.[field.name] : undefined}
           onChange={(value) => { setValues((previous) => ({ ...previous, [field.name]: value })); setResult(null); }} />)}
+        </div>
         <label htmlFor="config-reason" className="block text-sm font-semibold text-gray-900">Audit reason (optional)</label>
         <textarea id="config-reason" maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)}
           className="w-full rounded-md border border-gray-300 p-2 text-sm" rows={2} />

@@ -1,6 +1,6 @@
 /** ARCH-043 Admin-owned, closed policy authoring contracts. No browser-supplied contract is trusted. */
 export type FieldContract =
-  | { name: string; kind: "integer"; label: string; description: string; min: number; max: number; unit?: string }
+  | { name: string; kind: "integer"; label: string; description: string; min: number; max: number; unit?: string; section?: string }
   | { name: string; kind: "boolean"; label: string; description: string }
   | { name: string; kind: "string"; label: string; description: string; maxLength: number; optional?: boolean; pattern?: "model-id" | "bucket" }
   | { name: string; kind: "enum"; label: string; description: string; options: readonly string[] }
@@ -25,7 +25,7 @@ const withEnvironmentReference = (field: FieldContract, name: string): FieldCont
   ...field, description: `${field.description} Environment variable: ${name}.`,
 });
 
-const integer = (name: string, label: string, min: number, max: number, unit?: string): FieldContract =>
+const integer = (name: string, label: string, min: number, max: number, unit?: string): Extract<FieldContract, { kind: "integer" }> =>
   ({ name, label, kind: "integer", min, max, unit, description: `Whole number from ${min} to ${max}${unit ? ` ${unit}` : ""}.` });
 const model = (name: string, label: string): FieldContract =>
   ({ name, label, kind: "string", maxLength: 128, pattern: "model-id", description: "Required model identifier (up to 128 characters)." });
@@ -39,6 +39,47 @@ const httpsUrl = (name: string, label: string, description: string): FieldContra
 export const APPROVED_PREVIEW_SLOT_MS = 120_000;
 
 export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Object.freeze([
+  {
+    key: "commerce.recoveryExecution", title: "Recovery execution", kind: "policy", requiredRole: "SUPER_ADMIN",
+    description: "Shared production recovery limits and Studio test defaults. Studio can override the preview defaults for isolated tests; hard safety ceilings remain enforced.",
+    canReset: true, defaultsOnRead: true,
+    fields: [
+      { ...integer("initialOutreachModelSteps", "Initial outreach model steps", 1, 64), section: "Initial outreach" },
+      { ...integer("initialOutreachToolCalls", "Initial outreach tool calls", 1, 64), section: "Initial outreach" },
+      { ...integer("initialOutreachDeadlineMs", "Initial outreach deadline", 1000, 90000, "ms"), section: "Initial outreach" },
+      { ...integer("initialOutreachOutputTokens", "Initial outreach output tokens", 1, 32768), section: "Initial outreach" },
+      { ...integer("initialOutreachMaxProductDetailReads", "Maximum product detail reads", 1, 50), section: "Initial outreach" },
+      { ...integer("initialOutreachMaxToolResultBytes", "Maximum tool result size", 1024, 1048576, "bytes"), section: "Initial outreach" },
+      { ...integer("initialOutreachMaxModelRequestBytes", "Maximum model request size", 1024, 4194304, "bytes"), section: "Initial outreach" },
+      { ...integer("offerMaxCandidates", "Recovery offer candidates", 1, 100), section: "Offer verification" },
+      { ...integer("offerVerificationTimeoutMs", "Offer verification timeout", 100, 30000, "ms"), section: "Offer verification" },
+      { ...integer("offerAiTimeoutMs", "Offer AI timeout", 100, 30000, "ms"), section: "Offer verification" },
+      { ...integer("offerEvidenceMaxAgeMs", "Maximum offer evidence age", 1000, 600000, "ms"), section: "Offer verification" },
+      { ...integer("offerEvidenceMaxLifetimeMs", "Maximum offer evidence lifetime", 1000, 600000, "ms"), section: "Offer verification" },
+      { ...integer("outreachRevalidationTimeoutMs", "Outreach revalidation timeout", 100, 60000, "ms"), section: "Offer verification" },
+      { ...integer("discountSourceReadTimeoutMs", "Discount source read timeout", 100, 60000, "ms"), section: "Offer verification" },
+      { ...integer("recoveryDelayMinutes", "Default recovery delay", 1, 1440, "minutes"), section: "Recovery timing" },
+      { ...integer("recoveryCandidateTtlBufferMs", "Recovery candidate retention buffer", 60000, 86400000, "ms"), section: "Recovery timing" },
+      { ...integer("abandonedCheckoutMaxCandidates", "Abandoned checkout lookup limit", 1, 100), section: "Recovery timing" },
+      { ...integer("abandonedCheckoutLookupWindowMs", "Abandoned checkout lookup window", 60000, 3600000, "ms"), section: "Recovery timing" },
+      { ...integer("studioPreviewModelSteps", "Studio preview model steps", 1, 64), section: "Studio test defaults" },
+      { ...integer("studioPreviewRemoteCalls", "Studio preview remote calls", 1, 64), section: "Studio test defaults" },
+      { ...integer("studioPreviewDeadlineMs", "Studio preview deadline", 1000, APPROVED_PREVIEW_SLOT_MS - 30000, "ms"), section: "Studio test defaults" },
+      { ...integer("studioPreviewOutputTokens", "Studio preview output tokens", 1, 32768), section: "Studio test defaults" },
+    ],
+    defaults: {
+      initialOutreachModelSteps: 8, initialOutreachToolCalls: 16, initialOutreachDeadlineMs: 45000,
+      initialOutreachOutputTokens: 512, initialOutreachMaxProductDetailReads: 5,
+      initialOutreachMaxToolResultBytes: 32768, initialOutreachMaxModelRequestBytes: 131072,
+      offerMaxCandidates: 8, offerVerificationTimeoutMs: 2000, offerAiTimeoutMs: 1500,
+      offerEvidenceMaxAgeMs: 60000, offerEvidenceMaxLifetimeMs: 60000,
+      outreachRevalidationTimeoutMs: 15000, discountSourceReadTimeoutMs: 10000,
+      recoveryDelayMinutes: 30, recoveryCandidateTtlBufferMs: 3600000,
+      abandonedCheckoutMaxCandidates: 20, abandonedCheckoutLookupWindowMs: 600000,
+      studioPreviewModelSteps: 4, studioPreviewRemoteCalls: 4,
+      studioPreviewDeadlineMs: 60000, studioPreviewOutputTokens: 1200,
+    },
+  },
   {
     key: "woo.couponSync", title: "WooCommerce coupon sync", kind: "policy", requiredRole: "SUPER_ADMIN",
     description: "Background coupon polling and dispatch policy. Worker concurrency changes require worker recreation/restart.",
