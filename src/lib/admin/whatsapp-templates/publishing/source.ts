@@ -59,7 +59,7 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
       const compliant = validateTemplateAst(localeAuthoring, { requireInitialReply: true, contentLanguageTag: tag });
       if (!compliant.ok) return reject("CONTENT", `Initial recovery semantics are incomplete for ${tag}.`);
     }
-    if (!locale.providerLanguageCode || reg.wabaId !== wabaId || reg.submissionState !== "APPROVED" ||
+    if (!locale.providerLanguageCode || reg.wabaId !== wabaId || reg.submissionState !== "SUBMITTED" ||
         reg.providerLanguageCode !== locale.providerLanguageCode ||
         reg.providerTemplateName !== definition.providerTemplateName || reg.category !== definition.category ||
         !equivalentRegistration(reg, locale)) return reject("NOT_READY", `Meta approval or content verification failed for ${tag}.`);
