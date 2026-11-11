@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { makeTemplateView, parseScope, classify, brandAvailability, equivalentRegistration,
-  LANGUAGES, PublicationError, parseBindings } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
+  LANGUAGES, PublicationError, parseBindings, observedMetaContentHash } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
 import { approvedSource } from "../../src/lib/admin/whatsapp-templates/publishing/source.ts";
 import { readShopImpacts } from "../../src/lib/admin/whatsapp-templates/publishing/impact.ts";
 import { computePreview, languageComparison } from "../../src/lib/admin/whatsapp-templates/publishing/preview.ts";
@@ -196,9 +196,9 @@ test("reviewed translation cannot silently replace or add semantic bindings whil
   locale.localeAst.prepared.parameterBindings = structuredClone(bindings);
   const { templateHash } = await import("../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts");
   const changedHash = templateHash(locale.localeAst.prepared);
-  locale.contentHash = changedHash; reg.submittedContentHash = changedHash; reg.lastObservedContentHash = changedHash;
+  locale.contentHash = changedHash; reg.submittedContentHash = changedHash; reg.lastObservedContentHash = observedMetaContentHash(reg.componentsSnapshot);
   assert.equal(equivalentRegistration(reg, locale), true, "frozen snapshot itself is internally consistent");
-  await assert.rejects(approvedSource(fixtureDatabase({ definition }).db as any, DEFINITION_ID, WABA), issueCode("CONTENT"));
+  await assert.rejects(approvedSource(fixtureDatabase({ definition }).db as any, DEFINITION_ID, WABA), issueCode("NOT_READY"));
 });
 
 // Sender WABA lookup must preserve the platform configuration security contract
@@ -267,6 +267,29 @@ for (const submissionState of ["READY_TO_SUBMIT", "SUBMITTING", "SUBMISSION_UNKN
   test(`publication rejects provider-approved template with invalid submission state ${submissionState}`, async () => {
     const fixture = fixtureDatabase();
     fixture.definition.locales[0].metaRegistrations[0].submissionState = submissionState;
+    await assert.rejects(approvedSource(fixture.db as any, DEFINITION_ID, WABA), issueCode("NOT_READY"));
+  });
+}
+
+test("Meta observation hashes ignore submission examples but detect changed rendered text", () => {
+  const component = [{ type: "BODY", text: "Hello {{1}}", example: { body_text: [["Alice"]] } }];
+  assert.equal(observedMetaContentHash(component), observedMetaContentHash([{ type: "BODY", text: "Hello {{1}}" }]));
+  assert.notEqual(observedMetaContentHash(component), observedMetaContentHash([{ type: "BODY", text: "Changed {{1}}" }]));
+});
+
+for (const field of ["sourceHash", "localeContentHash"]) {
+  test(`publication rejects altered frozen registration ${field}`, async () => {
+    const fixture = fixtureDatabase();
+    (fixture.definition.locales[0].metaRegistrations[0].parameterBindingsSnapshot as any)[field] = "f".repeat(64);
+    await assert.rejects(approvedSource(fixture.db as any, DEFINITION_ID, WABA), issueCode("NOT_READY"));
+  });
+}
+
+for (const status of ["TRANSLATION_QUEUED", "TRANSLATING", "PARTIALLY_FAILED", "READY_FOR_REVIEW"]) {
+  test(`completed frozen approvals remain publishable with stale translation marker ${status}`, async () => {
+    const fixture = fixtureDatabase(); fixture.definition.status = status;
+    assert.equal((await approvedSource(fixture.db as any, DEFINITION_ID, WABA)).locales.length, 20);
+    fixture.definition.locales[0].metaRegistrations[0].providerStatus = "PENDING";
     await assert.rejects(approvedSource(fixture.db as any, DEFINITION_ID, WABA), issueCode("NOT_READY"));
   });
 }

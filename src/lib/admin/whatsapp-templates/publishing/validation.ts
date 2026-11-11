@@ -34,7 +34,17 @@ export function reasonText(value: unknown): string {
   return value.trim();
 }
 export function parseBindings(input: unknown): NonNullable<CompiledTemplateView["bindings"]> {
-  const parsed = RecoveryTemplateFrozenBindingsSchema.safeParse(input);
+  let semanticInput = input;
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    const { sourceHash, localeContentHash, ...bindings } = input as Record<string, unknown>;
+    if (sourceHash !== undefined || localeContentHash !== undefined) {
+      if (bindings.schemaVersion !== 1 || !isValidFingerprint(sourceHash) || !isValidFingerprint(localeContentHash)) {
+        return reject("CONTENT", "Invalid legacy registration digest metadata.");
+      }
+      semanticInput = bindings;
+    }
+  }
+  const parsed = RecoveryTemplateFrozenBindingsSchema.safeParse(semanticInput);
   if (!parsed.success) return reject("CONTENT", "Missing or invalid frozen parameter bindings.");
   const v = input as Record<string, unknown>;
   if (v.promotionTarget !== undefined && !["CHECKOUT", "ALTERNATIVE_PRODUCT"].includes(String(v.promotionTarget))) return reject("CONTENT", "Unknown promotion target.");
@@ -121,15 +131,28 @@ export function brandAvailability(keys: string[], record: Record<string, unknown
     return { key, availability: !verified ? "unverifiable" as const : value === null || value === undefined || value === "" ? "missing" as const : "configured" as const };
   });
 }
+/** Meta observes rendered components, excluding submission-only examples. */
+export function observedMetaContentHash(value: unknown): string {
+  const canonical = (input: unknown): string => {
+    if (Array.isArray(input)) return `[${input.map(canonical).join(",")}]`;
+    if (input && typeof input === "object") {
+      const record = input as Record<string, unknown>;
+      return `{${Object.keys(record).filter((key) => key !== "example").sort().map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`).join(",")}}`;
+    }
+    return JSON.stringify(input) ?? "null";
+  };
+  return createHash("sha256").update(canonical(value)).digest("hex");
+}
+
 /** Enforce exact submitted versus reviewed projection; approval alone is insufficient. */
 export function equivalentRegistration(record: {
   componentsSnapshot: unknown; parameterBindingsSnapshot: unknown; category: string;
   submittedContentHash: string; providerStatus: string | null; providerTemplateId: string | null;
   driftDetectedAt: Date | null; lastObservedContentHash: string | null; lastObservedCategory: string | null;
   failureCode: string | null;
-}, locale: { contentHash: string | null; localeAst: unknown; reviewedAt: Date | null; reviewedByAdminId: string | null; languageTag: string }): boolean {
+}, locale: { contentHash: string | null; localeAst: unknown; reviewedAt: Date | null; reviewedByAdminId: string | null; languageTag: string }, expected?: { components: unknown; bindings: unknown }): boolean {
   if (record.providerStatus !== "APPROVED" || !record.providerTemplateId || record.driftDetectedAt || record.failureCode ||
-      record.lastObservedContentHash && record.lastObservedContentHash !== record.submittedContentHash ||
+      record.lastObservedContentHash && record.lastObservedContentHash !== observedMetaContentHash(record.componentsSnapshot) ||
       record.lastObservedCategory && record.lastObservedCategory !== record.category) return false;
   if (locale.languageTag !== "en" && (!locale.reviewedAt || !locale.reviewedByAdminId)) return false;
   const wrapper = locale.localeAst;
@@ -138,8 +161,6 @@ export function equivalentRegistration(record: {
   if (!prepared || typeof prepared !== "object" || Array.isArray(prepared)) return false;
   try {
     const p = prepared as Record<string, unknown>;
-    const expected = { schemaVersion: 1, family: "META_RECOVERY", category: record.category,
-      components: record.componentsSnapshot, parameterBindings: record.parameterBindingsSnapshot };
     const pieces = parseComponents(record.componentsSnapshot);
     const mappings = parseBindings(record.parameterBindingsSnapshot);
     const exactPlaceholders = (text: string | null, list: Array<{ position: number }>) => {
@@ -157,6 +178,8 @@ export function equivalentRegistration(record: {
     }
     return p.schemaVersion === 1 && p.family === "META_RECOVERY" &&
       templateHash(prepared) === locale.contentHash && locale.contentHash === record.submittedContentHash &&
-      stableJson(prepared) === stableJson(expected) && !!parseComponents(record.componentsSnapshot) && !!parseBindings(record.parameterBindingsSnapshot);
+      p.category === record.category &&
+      stableJson(record.componentsSnapshot) === stableJson(expected?.components ?? p.components) &&
+      stableJson(record.parameterBindingsSnapshot) === stableJson(expected?.bindings ?? p.parameterBindings) && !!parseComponents(record.componentsSnapshot) && !!parseBindings(record.parameterBindingsSnapshot);
   } catch { return false; }
 }

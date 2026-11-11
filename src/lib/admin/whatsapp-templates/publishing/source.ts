@@ -1,3 +1,4 @@
+import { frozenLocaleSnapshot } from "../meta/snapshot";
 import type { Prisma } from "@prisma/client";
 import { LANGUAGES, equivalentRegistration, isValidDefinitionId, makeTemplateView, brandKeys, digest, reject } from "./validation";
 import { stableJson } from "../authoring/canonical";
@@ -21,7 +22,7 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
   } });
   if (!definition || definition.kind !== "META_RECOVERY" || !["INITIAL", "FOLLOW_UP"].includes(definition.purpose || "") ||
       !["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"].includes(definition.offerType || "") ||
-      !["SAVED", "PUBLISHED"].includes(definition.status) || definition.retiredAt ||
+      !["SAVED", "TRANSLATION_QUEUED", "TRANSLATING", "PARTIALLY_FAILED", "READY_FOR_REVIEW", "PUBLISHED"].includes(definition.status) || definition.retiredAt ||
       definition.astSchemaVersion !== 1 || definition.sourceLanguageTag !== "en" ||
       definition.category !== "MARKETING" || !definition.providerTemplateName) return reject("NOT_READY", "A saved, active Moda recovery definition is required.");
   if (definition.locales.length !== LANGUAGES.length ||
@@ -52,6 +53,9 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
     if (!locale || !["SOURCE_SAVED", "REVIEWED", "APPROVED", "READY"].includes(locale.status) ||
         locale.metaRegistrations.length !== 1) return reject("NOT_READY", `No approved registration for ${tag}.`);
     const reg = locale.metaRegistrations[0];
+    let frozen;
+    try { frozen = frozenLocaleSnapshot(locale, definition); }
+    catch { return reject("NOT_READY", `Immutable registration snapshot failed for ${tag}.`); }
     if (definition.purpose === "INITIAL") {
       const localeRecord = locale.localeAst;
       const localeAuthoring = localeRecord && typeof localeRecord === "object" && !Array.isArray(localeRecord) &&
@@ -62,7 +66,7 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
     if (!locale.providerLanguageCode || reg.wabaId !== wabaId || reg.submissionState !== "SUBMITTED" ||
         reg.providerLanguageCode !== locale.providerLanguageCode ||
         reg.providerTemplateName !== definition.providerTemplateName || reg.category !== definition.category ||
-        !equivalentRegistration(reg, locale)) return reject("NOT_READY", `Meta approval or content verification failed for ${tag}.`);
+        !equivalentRegistration(reg, locale, frozen)) return reject("NOT_READY", `Meta approval or content verification failed for ${tag}.`);
     const view = makeTemplateView(reg);
     return { languageTag: tag, registrationId: reg.id, view, brandFields: brandKeys(view.bindings!),
       providerLanguageCode: reg.providerLanguageCode, providerTemplateName: reg.providerTemplateName,

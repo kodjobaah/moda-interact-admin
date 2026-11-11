@@ -1,8 +1,10 @@
+import { frozenLocaleSnapshot } from "../../src/lib/admin/whatsapp-templates/meta/snapshot.ts";
+import { expectedProviderLanguageCode } from "../../src/lib/admin/whatsapp-templates/meta/languages.ts";
 import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import { makeImmutableAuthoringRecord } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { localizedInitialReplyNodes } from "../../src/lib/admin/whatsapp-templates/authoring/initial-reply-instructions.ts";
-import { LANGUAGES } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
+import { LANGUAGES, observedMetaContentHash } from "../../src/lib/admin/whatsapp-templates/publishing/validation.ts";
 
 export const DEFINITION_ID = `wtdef_${"a".repeat(64)}`;
 export const WABA = "1234567890";
@@ -45,23 +47,27 @@ export function definitionFixture(withBrand = true) {
       const contentHash = templateHash(localePrepared);
       return {
         id: `locale_${index}`, definitionId: DEFINITION_ID, languageTag,
-        providerLanguageCode: languageTag, localeAst: localeRecord, contentHash,
+        providerLanguageCode: expectedProviderLanguageCode(languageTag), localeAst: localeRecord, contentHash,
         status: languageTag === "en" ? "SOURCE_SAVED" : "REVIEWED",
         reviewedAt: languageTag === "en" ? null : new Date("2026-10-25T10:00:00Z"),
         reviewedByAdminId: languageTag === "en" ? null : ACTOR_ID,
         metaRegistrations: [{
           id: `registration_${index}`, localeId: `locale_${index}`, wabaId: WABA,
-          providerTemplateName: PROVIDER_NAME, providerLanguageCode: languageTag,
+          providerTemplateName: PROVIDER_NAME, providerLanguageCode: expectedProviderLanguageCode(languageTag),
           category: "MARKETING", providerTemplateId: String(1000 + index),
           componentsSnapshot: structuredClone(localePrepared.components),
           parameterBindingsSnapshot: structuredClone(localePrepared.parameterBindings),
           submittedContentHash: contentHash, providerStatus: "APPROVED", submissionState: "SUBMITTED",
-          driftDetectedAt: null, lastObservedContentHash: contentHash, lastObservedCategory: "MARKETING",
+          driftDetectedAt: null, lastObservedContentHash: observedMetaContentHash(localePrepared.components), lastObservedCategory: "MARKETING",
           failureCode: null,
         }],
       };
     }),
   };
+  for (const locale of definition.locales) {
+    const snapshot = frozenLocaleSnapshot(locale, definition);
+    locale.metaRegistrations[0].parameterBindingsSnapshot = snapshot.bindings as any;
+  }
   return definition;
 }
 export function shopFixture(index: number, platform = "SHOPIFY", status = "ACTIVE", wooStatus: string | null = null) {

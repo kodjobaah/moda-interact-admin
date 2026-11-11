@@ -37,7 +37,7 @@ async function persistDefinition(original = definitionFixture()) {
       parameterBindingsSnapshot: reg.parameterBindingsSnapshot as unknown as Prisma.InputJsonValue,
       submittedContentHash: reg.submittedContentHash, providerTemplateId: reg.providerTemplateId,
       submissionState: "SUBMITTED", providerStatus: "APPROVED",
-      lastObservedCategory: "MARKETING", lastObservedContentHash: reg.submittedContentHash,
+      lastObservedCategory: "MARKETING", lastObservedContentHash: reg.lastObservedContentHash,
     } });
   }
 }
