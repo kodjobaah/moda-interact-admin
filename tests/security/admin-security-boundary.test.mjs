@@ -184,6 +184,7 @@ function runDevelopmentPrincipalCheck() {
       env: {
         ...process.env,
         NODE_ENV: 'development',
+        ADMIN_DEVELOPMENT_AUTH_BYPASS: 'true',
         DEPLOYMENT_ENVIRONMENT_NAME: 'development',
       },
       encoding: 'utf8',
@@ -327,9 +328,11 @@ test('identity, revocation, mutation, session, and route contracts are wired', a
   assert.match(mutationSource, /requirePlatformAdminMutation,/);
   assert.match(mutationSource, /runProtectedTenantAction\(/);
   assert.ok(
-    mutationSource.indexOf('await requirePlatformAdminMutation();') <
+    mutationSource.indexOf('requirePlatformAdminMutation,') <
       mutationSource.indexOf('formData.get('),
   );
+  const boundarySource = await readFile(sourcePath('src/lib/auth/tenant-action.ts'), 'utf8');
+  assert.ok(boundarySource.indexOf('await requireAdmin();') < boundarySource.indexOf('return mutate(formData)'));
   assert.equal((dataSource.match(/await requirePlatformAdminRead\(\);/g) ?? []).length, 5);
   assert.match(authSource, /maxAge: 8 \* 60 \* 60/);
   assert.match(authSource, /httpOnly: true/);

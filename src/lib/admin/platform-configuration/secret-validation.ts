@@ -1,6 +1,5 @@
 /** Server-only payload validation; never import this file from React components. */
 import { Buffer } from "node:buffer";
-import { parseCredentialKeyring, resolveActiveCredentialKey } from "@modainteract/moda-interact-shared/security/credentials/node";
 import { PLATFORM_SECRET_CONTRACTS } from "./secrets-contracts";
 import { ConfigurationError } from "./errors";
 
@@ -35,19 +34,13 @@ export function validateSecretPayload(key: string, value: unknown): Record<strin
       cleaned[field.name] = input;
     } else if (typeof input !== "string" || !input || input !== input.trim() ||
       Buffer.byteLength(input, "utf8") > (field.kind === "secret" ? 4096 : 2048) ||
-      (field.name !== "connectionKeysJson" && CONTROL.test(input))) {
+      CONTROL.test(input)) {
       throw new ConfigurationError("INVALID_INPUT", "Unsupported or incomplete secret configuration.");
     } else {
       cleaned[field.name] = input;
     }
   }
-  if (key === "commerce.connectionKeys") {
-    try {
-      const parsed = parseCredentialKeyring(cleaned.connectionKeysJson as string);
-      resolveActiveCredentialKey(parsed, cleaned.activeKeyId as string);
-      if (cleaned.commandHmacKey !== undefined && Buffer.byteLength(cleaned.commandHmacKey as string, "utf8") < 32) throw Error();
-    } catch { throw new ConfigurationError("INVALID_INPUT", "Invalid Commerce connection configuration."); }
-  } else if (key === "auth.admin" || key === "auth.commerce") {
+  if (key === "auth.admin" || key === "auth.commerce") {
     if (Buffer.byteLength(cleaned.authSecret as string, "utf8") < 32) throw new ConfigurationError("INVALID_INPUT", "Auth.js signing secret must have at least 32 bytes.");
   } else if (key === "commerce.bootstrap") {
     const email = cleaned.adminEmail as string;

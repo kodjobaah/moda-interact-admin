@@ -46,6 +46,12 @@ export function adminBillingReportStateLabel(
   );
 }
 
+export function adminBillingPackStatusLabel(value: string | null | undefined): string {
+  if (!value) return "—";
+  const key = `billing.packStatus.${value}`;
+  return Object.hasOwn(catalogue, key) ? adminI18n.t(key) : value;
+}
+
 export function adminRoleLabel(value: string): string {
   return Object.hasOwn(catalogue, `role.${value}`)
     ? adminI18n.t(`role.${value}`)

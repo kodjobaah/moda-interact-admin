@@ -6,15 +6,15 @@ import {
 } from "../../src/lib/admin/shared-credential-keyring.ts";
 import { CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "../../src/lib/admin/shared-credential-keyring.ts";
 
-const keysBefore = process.env.COMMERCE_CONNECTION_KEYS_JSON;
-const activeBefore = process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID;
+const keysBefore = process.env.MODA_ENCRYPTION_KEYS_JSON;
+const activeBefore = process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID;
 const key = Buffer.alloc(32, 7).toString("base64");
 
 function setKeyring(raw: string | undefined, active: string | undefined): void {
-  if (raw === undefined) delete process.env.COMMERCE_CONNECTION_KEYS_JSON;
-  else process.env.COMMERCE_CONNECTION_KEYS_JSON = raw;
-  if (active === undefined) delete process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID;
-  else process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID = active;
+  if (raw === undefined) delete process.env.MODA_ENCRYPTION_KEYS_JSON;
+  else process.env.MODA_ENCRYPTION_KEYS_JSON = raw;
+  if (active === undefined) delete process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID;
+  else process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID = active;
 }
 
 test("writer uses canonical Shared keyring and active ID without exposing bytes", () => {

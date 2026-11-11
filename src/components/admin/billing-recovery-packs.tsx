@@ -1,11 +1,11 @@
 import Link from "next/link";
-import type { RecoveryCreditPurchaseStatus } from "@prisma/client";
-import { adminI18n } from "@/i18n";
+import { RecoveryCreditPurchaseStatus } from "@prisma/client";
+import { adminBillingPackStatusLabel, adminI18n } from "@/i18n";
 import type { PageResult, RecoveryCreditPurchaseItem } from "@/lib/admin/types";
 import { buildUrl } from "@/lib/admin/query";
 import { Pagination } from "./pagination";
 
-const statuses = ["PENDING_BILLING", "ACTIVE", "NEEDS_ATTENTION", "CANCELLED"] as const;
+const statuses = Object.values(RecoveryCreditPurchaseStatus);
 
 export function BillingRecoveryPacks({
   purchases,
@@ -26,7 +26,7 @@ export function BillingRecoveryPacks({
           {adminI18n.t("billing.status")}
           <select name="packStatus" defaultValue={params.packStatus ?? ""} className="mt-1 block rounded-md border border-gray-300 bg-white p-2 text-sm font-normal">
             <option value="">{adminI18n.t("billing.allStatuses")}</option>
-            {statuses.map((status) => <option key={status} value={status}>{adminI18n.t(`billing.packStatus.${status}`)}</option>)}
+            {statuses.map((status) => <option key={status} value={status}>{adminBillingPackStatusLabel(status)}</option>)}
           </select>
         </label>
         <button type="submit" className="rounded-md bg-[var(--brand-700)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]">{adminI18n.t("billing.applyFilters")}</button>
@@ -41,7 +41,7 @@ export function BillingRecoveryPacks({
               {purchases.items.map((purchase) => (
                 <tr key={purchase.id}>
                   <td className="px-5 py-3 text-sm font-medium text-gray-900">{purchase.shop.domain}</td>
-                  <td className="px-5 py-3 text-sm text-gray-600">{adminI18n.t(`billing.packStatus.${purchase.status}`)}</td>
+                  <td className="px-5 py-3 text-sm text-gray-600">{adminBillingPackStatusLabel(purchase.status)}</td>
                   <td className="px-5 py-3 text-sm text-gray-600">{adminI18n.formatNumber(purchase.creditsGranted)}</td>
                   <td className="px-5 py-3 text-sm text-gray-600">{adminI18n.formatDateTime(purchase.createdAt)}</td>
                   <td className="px-5 py-3 text-sm text-gray-600">{purchase.activatedAt ? adminI18n.formatDateTime(purchase.activatedAt) : adminI18n.t("empty.notRecorded")}</td>

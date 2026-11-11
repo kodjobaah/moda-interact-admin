@@ -157,7 +157,7 @@ export async function getEmbeddingRuntimeConfiguration(
   // Do not require an active writer key when recovering an existing credential.
   let apiKey: string;
   try {
-    const keyring = parseCredentialKeyring(process.env.COMMERCE_CONNECTION_KEYS_JSON);
+    const keyring = parseCredentialKeyring(process.env.MODA_ENCRYPTION_KEYS_JSON);
     const aad = createCommerceEmbeddingCredentialAad({
       environment,
       purpose,

@@ -18,6 +18,7 @@ function setup(role) {
       getTenantDetail: async (id) => ({ id }),
     },
     '@/lib/admin/billing': {},
+    '@/lib/admin/human-messaging': { getHumanMessagingDashboard: async () => { throw new Error('Unexpected human messaging read'); } },
     '@/lib/admin/commerce-model-policy-fields': { canEditLiveCommerceBudget: (role) => role === 'SUPER_ADMIN' },
     '@/lib/admin/commerce-model-shop-policy-scope': { issueLiveShopPolicyScope: (shopId, adminId) => `scope:${shopId}:${adminId}` },
     '@/lib/admin/commerce-model-shop-policy': { getLiveShopPolicyDashboard: async (id, page) => {

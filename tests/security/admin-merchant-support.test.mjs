@@ -25,6 +25,7 @@ function runBehaviorScript(script) {
         env: {
           ...process.env,
           NODE_ENV: 'test',
+          ADMIN_DEVELOPMENT_AUTH_BYPASS: 'true',
           DEPLOYMENT_ENVIRONMENT_NAME: 'development',
         },
         encoding: 'utf8',
@@ -36,10 +37,7 @@ function runBehaviorScript(script) {
 const moduleUrl = pathToFileURL(sourcePath).href;
 
 test('consumes the published shared release without a local declaration shim', () => {
-  assert.equal(
-    packageJson.dependencies['@modainteract/moda-interact-shared'],
-    '1.0.1',
-  );
+  assert.match(packageJson.dependencies['@modainteract/moda-interact-shared'], /^\d+\.\d+\.\d+$/);
   assert.equal(
     existsSync(resolve(root, 'src/types/shared-merchant-communications.d.ts')),
     false,

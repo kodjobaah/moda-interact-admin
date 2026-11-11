@@ -30,8 +30,8 @@ is implemented.
   and Prisma Client generated (`npm ci && npm run prisma:generate`).
 - The target database must have a name containing `test` or `development` and be
   a disposable development/test database. This command refuses production.
-- Supply `DATABASE_URL`, `MODA_CONFIG_UNSEAL_KEY`, and, where required,
-  `MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID` in the CLI process environment. The script
+- Supply `DATABASE_URL`, `MODA_ENCRYPTION_KEYS_JSON`, and, where required,
+  `MODA_ENCRYPTION_ACTIVE_KEY_ID` in the CLI process environment. The script
   reads existing sealed `merchant.knowledge.r2` credentials in the **selected**
   environment, using the canonical Shared unsealer. These credentials must be
   authorized by R2 to upload/HEAD objects in the *separate* bucket configured by

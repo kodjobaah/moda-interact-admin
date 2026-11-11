@@ -23,7 +23,7 @@ test("each IMAGE header role compiles through the existing authoring compiler, n
     if (prepared.family !== "META_RECOVERY") continue;
     assert.deepEqual(prepared.components[0], { type: "HEADER", format: "IMAGE" });
     assert.deepEqual(prepared.parameterBindings, { schemaVersion: 1, headerMediaRole: shopBrandMediaRole,
-      header: [], body: [{ position: 1, variable: "customer.firstName" }, { position: 2, variable: "shop.name" }], buttons: [] });
+      header: [], body: [{ position: 1, variable: "customer.firstName" }, { position: 2, variable: "checkout.itemsSummary" }, { position: 3, variable: "shop.name" }], buttons: [] });
     const registrationBindings = imageHeaderRegistrationBindings(prepared);
     assert.deepEqual(registrationBindings, prepared.parameterBindings);
     assert.equal(templateHash({ ...prepared, parameterBindings: registrationBindings }), templateHash(prepared));

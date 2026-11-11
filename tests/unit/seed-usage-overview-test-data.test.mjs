@@ -13,7 +13,10 @@ const source = readFileSync(new URL("../../scripts/seed-usage-overview-test-data
 
 function harness() {
   const environment = { DATABASE_URL: "postgresql://localhost:5432/moda_interact_postgres_test" };
-  const context = { Date, Map, Set, URL, console, buildPaidAllowanceFixtures, verifyPaidFixtureCleanup,
+  const context = { Date: class extends Date {
+    constructor(...args) { super(...(args.length ? args : [NOW])); }
+    static now() { return NOW.getTime(); }
+  }, Map, Set, URL, console, buildPaidAllowanceFixtures, verifyPaidFixtureCleanup,
     createRecoveryIdempotencyKey: (shopId, recoveryId) => `recovery:${shopId}:${recoveryId}`,
     process: { argv: ["node", "seeder", "seed", "--confirm-test-data"], env: environment },
     __prisma: { shop: { findFirst: async () => null } } };
@@ -223,7 +226,7 @@ test("CLI keeps HUMAN audit purge explicit and fixture-scoped", () => {
 function seedTransaction(kind) {
   const writes = { events: [], reservations: [], periods: [], paidCounters: [], supportMessages: [], supportThreads: [] };
   const store = shop(kind);
-  const now = Date.now();
+  const now = NOW.getTime();
   const current = {
     id: "actual-paid-period", shopId: store.id, subscriptionId: store.subscription.id,
     status: "OPEN", planKindSnapshot: "PAID_METERED",

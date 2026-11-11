@@ -14,6 +14,7 @@ const logger = createLogger({
 });
 
 const ENVIRONMENTS = new Set(["local", "test", "development", "staging", "production"]);
+// Retain the retired connection-key purpose only for historical ciphertext/AAD compatibility.
 const PURPOSES = new Set(["commerce.connectionKeys", "auth.admin", "auth.commerce", "commerce.bootstrap", "merchant.knowledge.r2", "woocommerce.auth", "shopify.oauth", "messaging.meta", "woocommerce.billing", "shopify.partner", "shopify.appEvents", "messaging.sender", "ai.providers"]);
 const KEY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const B64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
@@ -35,7 +36,7 @@ export function secretAAD(environment: string, key: string, version: number): st
   return JSON.stringify(["moda-platform-config-v1", environment, key, version, 1]);
 }
 
-/** Dedicated external wrapping keyring, never the Commerce keyring that this service manages.
+/** Unified deployment encryption keyring; historical wrapping and credential keys remain by ID.
  * Parse the opaque descriptor in the same Shared module instance that seals/unseals.
  * The CLI must not construct this descriptor via its own Shared import: key bytes
  * are held in a module-private WeakMap, not in the returned descriptor.
@@ -54,7 +55,7 @@ export function createConfigUnsealKeyring(
 export function loadConfigUnsealKeyring(): UnsealKeyring {
   try {
     return createConfigUnsealKeyring(
-      process.env.MODA_CONFIG_UNSEAL_KEY, process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID,
+      process.env.MODA_ENCRYPTION_KEYS_JSON, process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID,
     );
   } catch {
     // Never log the keyring JSON, key ID, or raw security configuration.

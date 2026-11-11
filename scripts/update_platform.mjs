@@ -60,11 +60,11 @@ async function main() {
     if (wrapping) return wrapping;
     try {
       wrapping = createConfigUnsealKeyring(
-        process.env.MODA_CONFIG_UNSEAL_KEY || variables.MODA_CONFIG_UNSEAL_KEY,
-        process.env.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID || variables.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID,
+        process.env.MODA_ENCRYPTION_KEYS_JSON || variables.MODA_ENCRYPTION_KEYS_JSON,
+        process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID || variables.MODA_ENCRYPTION_ACTIVE_KEY_ID,
       );
       return wrapping;
-    } catch { throw new Error("MODA_CONFIG_UNSEAL_KEY and its active key ID are required to import secret configurations."); }
+    } catch { throw new Error("MODA_ENCRYPTION_KEYS_JSON and its active key ID are required to import secret configurations."); }
   };
   const prisma = new PrismaClient({ datasources: { db: { url: dbUrl } } });
   try {

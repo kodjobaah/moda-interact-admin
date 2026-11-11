@@ -47,7 +47,7 @@ test("Admin stages Store Category translation work without publishing to BullMQ"
   assert.doesNotMatch(service, /MERCHANT_PRICING_LOCALES/);
   assert.match(service, /REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION/);
   assert.match(service, /status: CommerceStoreCategoryTranslationRunStatus\.PENDING/);
-  assert.match(editor, /ADMIN-002 intentionally stops here/);
+  assert.match(editor, /This step only stages durable work; it does not call the provider or enable the category yet/);
   assert.doesNotMatch(contents, /Queue\.add|queue\.add|BullMQ|new Queue\(/);
 });
 

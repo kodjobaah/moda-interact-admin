@@ -51,10 +51,10 @@ test("App Events filters preserve the events view and reset only event selection
 
 test("recovery-pack receipt guidance distinguishes pending and submitted events", async () => {
   const drawers = await read("src/components/admin/billing-drawers.tsx");
-  assert.match(drawers, /const eventReported = event\.shopifyReportState === "REPORTED"/);
+  assert.match(drawers, /const eventReported = event\?\.shopifyReportState === "REPORTED"/);
   assert.match(drawers, /\{eventReported \? \(/);
-  assert.match(drawers, /eventReported && purchase\.status === "PENDING_BILLING"/);
-  assert.doesNotMatch(drawers, /\{purchase\.status === "PENDING_BILLING" \? \(/);
+  assert.match(drawers, /eventReported && purchase\.status === "REQUESTED"/);
+  assert.doesNotMatch(drawers, /\{purchase\.status === "REQUESTED" \? \(/);
 });
 
 test("overview and plans use progressive disclosure", async () => {

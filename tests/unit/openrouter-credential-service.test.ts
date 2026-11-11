@@ -253,11 +253,11 @@ test("ADMIN mutations are rejected and audit failure propagates for transaction 
 });
 
 test("SET and REPLACE fail closed on unavailable keyring before importing Prisma", async () => {
-  const previousKeys = process.env.COMMERCE_CONNECTION_KEYS_JSON;
-  const previousActiveKey = process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID;
+  const previousKeys = process.env.MODA_ENCRYPTION_KEYS_JSON;
+  const previousActiveKey = process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID;
   const previousEnvironment = process.env.DEPLOYMENT_ENVIRONMENT_NAME;
-  process.env.COMMERCE_CONNECTION_KEYS_JSON = "not-json";
-  process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID = "missing";
+  process.env.MODA_ENCRYPTION_KEYS_JSON = "not-json";
+  process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID = "missing";
   process.env.DEPLOYMENT_ENVIRONMENT_NAME = "test";
   try {
     for (const operation of [
@@ -281,11 +281,11 @@ test("SET and REPLACE fail closed on unavailable keyring before importing Prisma
     }
   } finally {
     if (previousKeys === undefined)
-      delete process.env.COMMERCE_CONNECTION_KEYS_JSON;
-    else process.env.COMMERCE_CONNECTION_KEYS_JSON = previousKeys;
+      delete process.env.MODA_ENCRYPTION_KEYS_JSON;
+    else process.env.MODA_ENCRYPTION_KEYS_JSON = previousKeys;
     if (previousActiveKey === undefined)
-      delete process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID;
-    else process.env.COMMERCE_CONNECTION_ACTIVE_KEY_ID = previousActiveKey;
+      delete process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID;
+    else process.env.MODA_ENCRYPTION_ACTIVE_KEY_ID = previousActiveKey;
     if (previousEnvironment === undefined)
       delete process.env.DEPLOYMENT_ENVIRONMENT_NAME;
     else process.env.DEPLOYMENT_ENVIRONMENT_NAME = previousEnvironment;

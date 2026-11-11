@@ -142,8 +142,8 @@ test("shell startup file detection is based on the filename or --shell-file flag
   });
 });
 
-test("recognises canonical env mappings; ignores HOST, DATABASE_URL, MODA_CONFIG_UNSEAL_KEY", () => {
-  const parsed = plan("export HOST=localhost\nDATABASE_URL=postgres://nowhere\nMODA_CONFIG_UNSEAL_KEY=external\nWOO_COUPON_SYNC_DISPATCH_BATCH_SIZE=8\n");
+test("recognises canonical env mappings; ignores HOST, DATABASE_URL, MODA_ENCRYPTION_KEYS_JSON", () => {
+  const parsed = plan("export HOST=localhost\nDATABASE_URL=postgres://nowhere\nMODA_ENCRYPTION_KEYS_JSON=external\nWOO_COUPON_SYNC_DISPATCH_BATCH_SIZE=8\n");
   assert.equal(parsed.ignoredCount, 3);
   assert.equal(parsed.groups.length, 1);
   assert.equal(parsed.groups[0].key, "woo.couponSync");
@@ -293,8 +293,8 @@ test("importer and Admin sealing share one keyring factory; raw secret keys are 
   assert.doesNotMatch(importer, /import\("@modainteract\/moda-interact-shared\/security\/credentials\/node"\)/);
   assert.match(sealer, /export function createConfigUnsealKeyring\(/);
   assert.match(sealer, /const keyring = parseCredentialKeyring\(raw\)/);
-  assert.doesNotMatch(sealer, /error: process\.env\.MODA_CONFIG_UNSEAL_KEY/);
-  assert.doesNotMatch(sealer, /error: process\.env\.MODA_CONFIG_UNSEAL_ACTIVE_KEY_ID/);
+  assert.doesNotMatch(sealer, /error: process\.env\.MODA_ENCRYPTION_KEYS_JSON/);
+  assert.doesNotMatch(sealer, /error: process\.env\.MODA_ENCRYPTION_ACTIVE_KEY_ID/);
 });
 
 test("import condition allows CommonJS to resolve an import-only Shared entrypoint", (t) => {
@@ -437,4 +437,10 @@ test("Shopify Partner diagnostics name the invalid field and never reveal identi
     assert.equal(db.rows.size, 0);
     assert.equal(db.audits.length, 0);
   }
+});
+
+
+test("deployment encryption and signing keys never become database import candidates", () => {
+  const parsed = plan('MODA_ENCRYPTION_KEYS_JSON={"key":"value"}\nMODA_ENCRYPTION_ACTIVE_KEY_ID=key\nCOMMERCE_CONNECTION_COMMAND_HMAC_KEY=signing\n');
+  assert.equal(parsed.groups.length, 0);
 });

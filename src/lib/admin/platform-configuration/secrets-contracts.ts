@@ -16,8 +16,6 @@ const location = (name: string, label: string, kind: "url" | "bucket"): FieldCon
   : { name, kind: "string", maxLength: 63, pattern: "bucket", label, description: "Required R2 bucket name." };
 
 export const PLATFORM_SECRET_CONTRACTS: readonly ConfigurationContract[] = Object.freeze([
-  { key: "commerce.connectionKeys", title: "Commerce connection keys", description: "Encrypted connection keyring with independent config-unseal root.", kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
-    fields: [withEnvironmentReference(secret("connectionKeysJson", "Connection keyring JSON"), "COMMERCE_CONNECTION_KEYS_JSON"), withEnvironmentReference(secret("activeKeyId", "Active key ID"), "COMMERCE_CONNECTION_ACTIVE_KEY_ID"), withEnvironmentReference(secret("commandHmacKey", "Command HMAC key", true), "COMMERCE_CONNECTION_COMMAND_HMAC_KEY")] },
   ...(["admin", "commerce"] as const).map((app): ConfigurationContract => ({ key: `auth.${app}`, title: `${app === "admin" ? "Admin" : "Commerce"} authentication`,
     description: "Auth.js session and Google OAuth credentials, resolved on authentication requests with environment fallback when the database record is absent.",
     kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
@@ -58,7 +56,7 @@ export const PLATFORM_SECRET_CONTRACTS: readonly ConfigurationContract[] = Objec
     fields: [withEnvironmentReference(secret("groqApiKey", "Groq API key", true), "GROQ_API_KEY"),
       withEnvironmentReference(secret("openAiApiKey", "OpenAI API key", true), "OPENAI_API_KEY", "WHATSAPP_OPENAI_API_KEY")] },
 ]);
-export type SecretPurpose = "commerce.connectionKeys" | "auth.admin" | "auth.commerce" | "commerce.bootstrap" | "merchant.knowledge.r2" | "woocommerce.auth" | "shopify.oauth" | "messaging.meta" | "woocommerce.billing" | "shopify.partner" | "shopify.appEvents" | "messaging.sender" | "ai.providers";
+export type SecretPurpose = "auth.admin" | "auth.commerce" | "commerce.bootstrap" | "merchant.knowledge.r2" | "woocommerce.auth" | "shopify.oauth" | "messaging.meta" | "woocommerce.billing" | "shopify.partner" | "shopify.appEvents" | "messaging.sender" | "ai.providers";
 export const SECRET_PURPOSES = new Set<string>(PLATFORM_SECRET_CONTRACTS.map((entry) => entry.key));
 export const SECRET_REASONS = ["initial-setup", "configuration-update", "scheduled-rotation", "credential-compromise", "decommission"] as const;
 export type SecretReason = typeof SECRET_REASONS[number];

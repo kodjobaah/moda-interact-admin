@@ -315,3 +315,8 @@ The CLI uses the existing esbuild tool to load the server core as native ESM,
 leaving installed npm dependencies external through their public exports. It
 removes its temporary local-code artifact on exit; no package-wide module-mode
 change or global Node import-condition override is required.
+
+
+### Deployment encryption
+
+All Admin encryption uses `MODA_ENCRYPTION_KEYS_JSON` (a JSON map of key IDs to base64-encoded 32-byte keys) and `MODA_ENCRYPTION_ACTIVE_KEY_ID` (the key selected for new ciphertext). Preserve the historical platform-wrapping and commerce credential keys under their existing IDs when migrating; existing ciphertext continues to select its own decryption key. The encryption map is managed in deployment configuration, never in the Admin platform-secret editor or environment importer. Existing `commerce.connectionKeys` records remain untouched for historical compatibility. `COMMERCE_CONNECTION_COMMAND_HMAC_KEY` is an independent command-signing secret.
