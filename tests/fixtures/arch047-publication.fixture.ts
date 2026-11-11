@@ -55,7 +55,7 @@ export function definitionFixture(withBrand = true) {
           category: "MARKETING", providerTemplateId: String(1000 + index),
           componentsSnapshot: structuredClone(localePrepared.components),
           parameterBindingsSnapshot: structuredClone(localePrepared.parameterBindings),
-          submittedContentHash: contentHash, providerStatus: "APPROVED", submissionState: "APPROVED",
+          submittedContentHash: contentHash, providerStatus: "APPROVED", submissionState: "SUBMITTED",
           driftDetectedAt: null, lastObservedContentHash: contentHash, lastObservedCategory: "MARKETING",
           failureCode: null,
         }],

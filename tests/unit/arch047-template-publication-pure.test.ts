@@ -262,3 +262,11 @@ test("publication parses both frozen URL bindings at their approved component in
     { index: 1, variable: "promotion.productUrl" },
   ]);
 });
+
+for (const submissionState of ["READY_TO_SUBMIT", "SUBMITTING", "SUBMISSION_UNKNOWN", "FAILED", "BLOCKED", "APPROVED"]) {
+  test(`publication rejects provider-approved template with invalid submission state ${submissionState}`, async () => {
+    const fixture = fixtureDatabase();
+    fixture.definition.locales[0].metaRegistrations[0].submissionState = submissionState;
+    await assert.rejects(approvedSource(fixture.db as any, DEFINITION_ID, WABA), issueCode("NOT_READY"));
+  });
+}
