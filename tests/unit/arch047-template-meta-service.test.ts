@@ -19,7 +19,7 @@ function mockedDb() {
   let serialization = Promise.resolve();
   const registrationClient = (rows: any[], newEvents: any[]) => ({
     findMany: async ({ where, include }: any) => {
-      const matches = rows.filter((r) => where.OR
+      const matches = (rows === registrations ? rows : [...registrations, ...rows]).filter((r) => where.OR
         ? where.OR.some((q: any) => q.localeId?.in?.includes(r.localeId) || q.wabaId === r.wabaId && q.providerTemplateName === r.providerTemplateName)
         : f.locales.some((l) => l.id === r.localeId));
       if (!include) return matches;
@@ -56,14 +56,19 @@ function mockedDb() {
       let release!: () => void;
       serialization = new Promise<void>((resolve) => { release = resolve; });
       await previous;
+      const stagedLocales = structuredClone(f.locales);
       const stagedRegistrations: any[] = [];
       const stagedEvents: any[] = [];
       const stagedAudits: any[] = [];
       try {
         const tx: any = {
-          $queryRaw: async (sql: TemplateStringsArray) => { assert.match(sql.join(""), /pg_advisory_xact_lock/); return [{ acquired: 1 }]; },
+          $queryRaw: async (sql: TemplateStringsArray) => { const query=sql.join(""); assert.match(query, /pg_advisory_xact_lock|FOR UPDATE|FOR SHARE/); return [{ acquired: 1, id: principal.id }]; },
           whatsAppConversationWrapperActiveSlot: { findUnique: async () => null },
-          whatsAppTemplateDefinition: definitionClient,
+          whatsAppTemplateDefinition: { findUnique: async () => ({ ...f.definition, locales: stagedLocales }) },
+          whatsAppTemplateLocale: {
+            findUnique: async () => stagedLocales.find(l => l.languageTag === "en"),
+            updateMany: async ({where,data}: any) => { const row=stagedLocales.find(l=>l.id===where.id && l.status===where.status && l.contentHash===where.contentHash); if(!row)return {count:0};Object.assign(row,data);return {count:1}; },
+          },
           whatsAppTemplateMetaRegistration: registrationClient(stagedRegistrations, stagedEvents),
           whatsAppTemplateMetaEvent: {
             findFirst: async ({ where }: any) => events.find((event) => event.registrationId === where.registrationId &&
@@ -87,6 +92,7 @@ function mockedDb() {
           } },
         };
         const output = await callback(tx);
+        f.locales.splice(0,f.locales.length,...stagedLocales);
         registrations.push(...stagedRegistrations);
         events.push(...stagedEvents);
         audits.push(...stagedAudits);
@@ -106,7 +112,7 @@ test("confirmation inserts twenty immutable rows once; repeat and simultaneous c
   const [first, second, third] = await Promise.all(Array.from({ length: 3 }, () => confirmMetaSubmission(confirmation(f.f), deps(f))));
   assert.equal([first, second, third].filter((r) => !r.replay).length, 1);
   assert.equal(f.registrations.length, 20);
-  assert.equal(f.audits.length, 1);
+  assert.equal(f.audits.length, 2);
   assert.ok(f.registrations.every((r) => r.submissionState === "READY_TO_SUBMIT" && r.providerStatus === null));
   assert.equal(f.registrations[0].submittedContentHash, f.registrations[0].parameterBindingsSnapshot.localeContentHash);
   assert.deepEqual(f.registrations[0].parameterBindingsSnapshot.header, [{ position: 1, variable: "shopBrand.brandName" }]);
@@ -139,7 +145,7 @@ test("IMAGE confirmation persists handle-free READY_TO_SUBMIT intent and replays
   ]);
   assert.equal([first, replay].filter((result) => !result.replay).length, 1);
   assert.equal(f.registrations.length, 20);
-  assert.equal(f.audits.length, 1);
+  assert.equal(f.audits.length, 2);
   assert.equal(f.events.length, 0);
   assert.ok(f.registrations.every((row) => row.submissionState === "READY_TO_SUBMIT"));
   assert.ok(f.registrations.every((row) => row.parameterBindingsSnapshot.headerMediaRole === "CHECKOUT_PRODUCT" &&
@@ -155,6 +161,7 @@ test("audit failure rolls back every registration; explicit confirmation and SUP
   await assert.rejects(confirmMetaSubmission(confirmation(f.f), deps(f)), /forced audit failure/);
   assert.equal(f.registrations.length, 0);
   assert.equal(f.audits.length, 0);
+  assert.equal(f.f.locales.find(l=>l.languageTag==="en")!.status,"SOURCE_SAVED");
   await assert.rejects(confirmMetaSubmission({ ...confirmation(f.f), confirmation: "YES" } as any, deps(f)), /Explicit confirmation/);
   await assert.rejects(confirmMetaSubmission(confirmation(f.f), { ...deps(f), principal: { id: "fake", role: "ADMIN" } as any }), /SUPER_ADMIN/);
 });
@@ -167,7 +174,7 @@ test("stale preview, different WABA, and registration collisions are refused", a
   f.registrations[0].componentsSnapshot = [{ type: "BODY", text: "altered" }];
   await assert.rejects(confirmMetaSubmission(confirmation(f.f), deps(f)), /partial Meta registration/);
   assert.equal(f.registrations.length, 20);
-  assert.equal(f.audits.length, 1);
+  assert.equal(f.audits.length, 2);
 });
 
 test("reconciliation appends an unprocessed event and audit only after provider submission", async () => {
@@ -179,7 +186,7 @@ test("reconciliation appends an unprocessed event and audit only after provider 
   const first = await requestMetaReconciliation(input, { ...deps(f), now: () => new Date("2026-10-25T12:30:00Z") });
   const again = await requestMetaReconciliation(input, { ...deps(f), now: () => new Date("2026-10-25T12:31:00Z") });
   assert.equal(first.queued, true); assert.equal(again.queued, false);
-  assert.equal(f.events.length, 1); assert.equal(f.audits.length, 2);
+  assert.equal(f.events.length, 1); assert.equal(f.audits.length, 3);
   assert.equal(f.events[0].source, "ADMIN"); assert.equal(f.events[0].eventType, "RECONCILE_REQUESTED");
   assert.equal(f.events[0].processedAt, null);
   assert.equal(f.registrations[0].submissionState, "PENDING");
@@ -193,7 +200,7 @@ test("forged tenant/WABA registration reconciliation is blocked without audit", 
   const input = { definitionId: f.f.definition.id, registrationId: f.registrations[0].id };
   await assert.rejects(requestMetaReconciliation(input, { ...deps(f), trustedWabaId: "99999999" }), /does not belong/);
   await assert.rejects(requestMetaReconciliation({ ...input, definitionId: `wtdef_${"f".repeat(64)}` }, deps(f)), /does not belong/);
-  assert.equal(f.events.length, 0); assert.equal(f.audits.length, 1);
+  assert.equal(f.events.length, 0); assert.equal(f.audits.length, 2);
 });
 
 test("DB-only provider approval status reads do not alter submissions or trust provider webhooks as publication", async () => {
@@ -214,7 +221,7 @@ test("DB-only provider approval status reads do not alter submissions or trust p
   assert.equal(result.registrations[0].events[0].reasonCode, "POLICY_REJECTION");
   assert.equal(result.registrations[1].providerStatus, "APPROVED");
   assert.ok(result.registrations[2].driftDetectedAt);
-  assert.equal(f.audits.length, 1);
+  assert.equal(f.audits.length, 2);
   await assert.rejects(readMetaStatus(f.f.definition.id, { ...deps(f), principal: { id: "u", role: "ADMIN" } as any }), /SUPER_ADMIN/);
 });
 
@@ -238,7 +245,29 @@ test("technical retry is impossible without a matching processed provider-absenc
   assert.deepEqual(await requestMetaTechnicalRetry(input, deps(f)), { queued: false });
   assert.equal(f.events.filter((e) => e.eventType === "TECHNICAL_RETRY_REQUESTED").length, 1);
   assert.equal(f.registrations.length, 20);
-  assert.equal(f.audits.length, 2);
+  assert.equal(f.audits.length, 3);
   row.providerStatus = "REJECTED";
   await assert.rejects(requestMetaTechnicalRetry(input, deps(f)), /Only an unresolved technical submission/);
+});
+
+
+test("collision replay re-enters review transaction and never returns with missing English review",async()=>{
+ const f=mockedDb();await confirmMetaSubmission(confirmation(f.f),deps(f));
+ const en=f.f.locales.find(l=>l.languageTag==="en")!;en.status="SOURCE_SAVED";en.reviewedAt=null;en.reviewedByAdminId=null;
+ f.audits.splice(0,f.audits.length);const registrations=structuredClone(f.registrations);
+ const actual=f.db.$transaction;let calls=0;f.db.$transaction=async(cb:any)=>{if(calls++===0)throw {code:"P2002"};return actual(cb);};
+ assert.equal((await confirmMetaSubmission(confirmation(f.f),deps(f))).replay,true);assert.equal(calls,2);
+ assert.equal(f.f.locales.find(l=>l.languageTag==="en")!.status,"REVIEWED");
+ assert.deepEqual(f.registrations,registrations);assert.equal(f.audits.length,1);assert.equal(f.audits[0].action,"REVIEW_WHATSAPP_TEMPLATE_LOCALE");
+});
+
+test("raw PostgreSQL serialization conflicts retry the full confirmation, unrelated raw failures do not",async()=>{
+ const f=mockedDb();const actual=f.db.$transaction;let calls=0;
+ f.db.$transaction=async(cb:any)=>{if(calls++===0)throw {code:"P2010",meta:{code:"40001"}};return actual(cb);};
+ assert.equal((await confirmMetaSubmission(confirmation(f.f),deps(f))).replay,false);assert.equal(calls,2);
+ assert.equal(f.f.locales.find(l=>l.languageTag==="en")!.status,"REVIEWED");assert.equal(f.registrations.length,20);
+ const broken=mockedDb();let attempts=0;const failure={code:"P2010",meta:{code:"42P01"}};
+ broken.db.$transaction=async()=>{attempts++;throw failure;};
+ await assert.rejects(confirmMetaSubmission(confirmation(broken.f),deps(broken)),e=>e===failure);
+ assert.equal(attempts,1);assert.equal(broken.registrations.length,0);assert.equal(broken.audits.length,0);
 });
