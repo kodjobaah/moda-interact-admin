@@ -6,7 +6,7 @@ import { TemplateReadOnlyPreview } from "./template-read-only-preview";
 
 export function TemplateSavedDetail({ detail }: { detail: TemplateDetail }) {
   const preview = detail.english?.authoring && validateTemplateAst(detail.english.authoring).ok && detail.english.prepared
-    ? makeExamplePreview(detail.english.prepared) : null;
+    ? makeExamplePreview(detail.english.prepared, detail.english.authoring.family === "META_RECOVERY" ? detail.english.authoring.commonLayout : undefined) : null;
   return <article className="space-y-4 rounded-lg border bg-white p-4" aria-label="Saved immutable template">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Saved definition (read only)</h2>
       {detail.english && <div className="flex flex-wrap gap-2">

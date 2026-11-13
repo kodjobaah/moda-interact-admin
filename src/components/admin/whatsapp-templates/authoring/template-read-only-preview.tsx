@@ -15,6 +15,15 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
   return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5" aria-label="Example template preview">
     <div><h2 className="font-semibold text-slate-900">{title}</h2>
       <p className="mt-1 text-xs text-slate-500">Illustrative values only — no customer or checkout data is loaded.</p></div>
+    {preview?.commonLayout && <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm">
+      <div><h3 className="font-semibold">Common shop header</h3><p className="whitespace-pre-wrap">{preview.commonLayout.header}</p></div>
+      <div><h3 className="font-semibold">Common checkout footer</h3><p className="whitespace-pre-wrap">{preview.commonLayout.footer}</p></div>
+      <details><summary>Compare AI and human messages</summary>
+        <h4 className="mt-2 font-semibold">AI answer</h4><p className="whitespace-pre-wrap">{preview.commonLayout.ai}</p>
+        <p className="my-2 text-xs">A verified product image is a separate message after the shop header.</p>
+        <h4 className="font-semibold">Human reply</h4><p className="whitespace-pre-wrap">{preview.commonLayout.human}</p>
+      </details>
+    </div>}
     <div className="rounded-xl border border-slate-200 bg-[#e7f0e8] p-3 sm:p-5" aria-label="WhatsApp-style preview">
       <div className="mx-auto max-w-sm rounded-xl bg-white p-4 shadow-sm" role="region" aria-label="Example message">
         {!preview ? <p className="text-sm text-slate-600">No preview available.</p> : <>

@@ -1,6 +1,6 @@
 import type { RecoveryPromotionTarget, RecoveryTemplateFrozenBindings, RecoveryTemplateHeaderMediaRole, RecoveryTemplateSemanticKey } from "@modainteract/moda-interact-shared/recovery-template-bindings";
 
-import type { ConversationProductImageBinding } from "@modainteract/moda-interact-shared/commerce/presentation";
+import type { CommonRecoveryLayoutReference, ConversationProductImageBinding } from "@modainteract/moda-interact-shared/commerce/presentation";
 
 /** Versioned Admin-owned source contract. No provider/DB/React dependencies. */
 export const TEMPLATE_AST_VERSION = 1 as const;
@@ -33,6 +33,7 @@ export type MetaTemplateAst = {
   header: ContentNode[];
   /** Exclusive IMAGE header binding. Merchant-specific URLs are never persisted in the AST. */
   shopBrandMediaRole?: HeaderMediaRole;
+  commonLayout?: CommonRecoveryLayoutReference;
   body: ContentNode[];
   footer: TextNode[];
   buttons: UrlButton[];
@@ -76,6 +77,7 @@ export type ImmutableAuthoringRecord = {
   prepared: PreparedTemplate;
 };
 export type TemplateListItem = {
+  progress?: { runStatus: string; translated: number; reviewed: number; total: number };
   id: string;
   kind: string;
   purpose: string | null;
@@ -92,6 +94,7 @@ export type TemplateDetail = TemplateListItem & {
   english: ImmutableAuthoringRecord | null;
 };
 export type TemplatePreviewDTO = {
+  commonLayout?: { header: string; footer: string; ai: string; human: string };
   family: TemplateFamily;
   header: string;
   body: string;

@@ -1,4 +1,5 @@
 import { ConversationProductImageBindingSchema } from "@modainteract/moda-interact-shared/commerce/presentation";
+import { requireCommonLayout } from "./common-layout";
 import { eligibleHeaderVariables, eligibleVariables } from "./registry";
 import { INITIAL_REPLY_INSTRUCTIONS } from "./initial-reply-instructions";
 import { RecoveryTemplateHeaderMediaRoleSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
@@ -27,7 +28,15 @@ export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?
   const family = raw.family;
   const meta = family === "META_RECOVERY";
   const common = ["schemaVersion", "family", "sourceLanguageTag", "header", "body", "footer"];
-  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "promotionTarget", "buttons", "shopBrandMediaRole"] : [...common, "audience", "conditionals", "productImage"])) fail("root", "Unknown template fields.");
+  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "promotionTarget", "buttons", "shopBrandMediaRole", "commonLayout"] : [...common, "audience", "conditionals", "productImage"])) fail("root", "Unknown template fields.");
+  if (meta && raw.commonLayout !== undefined) {
+    try {
+      const ref = requireCommonLayout(raw.commonLayout);
+      if (options.contentLanguageTag && ref.languageTag !== options.contentLanguageTag) fail("commonLayout", "Common layout language must match this locale.");
+    } catch { fail("commonLayout", "Select a valid saved common shop layout."); }
+    if (!Array.isArray(raw.header) || raw.header.length) fail("header", "Common shop identity belongs in the body. Review and explicitly remove the old text header before using the common layout.");
+    if (!["LOGO", "SQUARE_LOGO"].includes(String(raw.shopBrandMediaRole))) fail("shopBrandMediaRole", "Common layouts require a genuine logo or square logo IMAGE header; product media remains separate.");
+  }
   if (meta) {
     if (!enumMember(raw.stage, ["INITIAL", "FOLLOW_UP"])) fail("stage", "Select a recovery stage.");
     if (!enumMember(raw.offerType, ["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"])) fail("offerType", "Select an offer type.");

@@ -1,3 +1,4 @@
+import { commonMetaBody } from "./common-layout";
 import { VARIABLE_REGISTRY } from "./registry";
 import { validateTemplateAst } from "./validation";
 import type { ContentNode, ImmutableAuthoringRecord, PreparedTemplate, RuntimeToken, TemplateAst, VariableBinding, WrapperNode } from "./types";
@@ -38,14 +39,17 @@ export function compileTemplateAst(draft: TemplateAst): PreparedTemplate {
   };
   const components: Array<Record<string, unknown>> = [];
   const header = bodyText(draft.header);
-  const footer = draft.footer.map((n) => n.value).join("");
+  const footer = draft.commonLayout ? "" : draft.footer.map((n) => n.value).join("");
   if (draft.shopBrandMediaRole) {
     // Deliberately no Meta sample handle: this task does not acquire/authorise one.
     // The Meta submission boundary fails closed with IMAGE_SAMPLE_HANDLE_REQUIRED.
     components.push({ type: "HEADER", format: "IMAGE" });
   } else if (header.text.trim()) components.push({ type: "HEADER", format: "TEXT", text: header.text,
     ...(header.examples.length ? { example: { header_text: header.examples } } : {}) });
-  const body = bodyText(draft.body);
+  const body = bodyText(commonMetaBody(draft));
+  if (draft.commonLayout && (body.text.length > 1024 || body.bindings.length > 10)) {
+    throw new Error("Common layout plus message exceeds Meta's 1024-character or 10-parameter limit. Shorten the reviewed source; no content was removed.");
+  }
   components.push({ type: "BODY", text: body.text,
     ...(body.examples.length ? { example: { body_text: [body.examples] } } : {}) });
   if (footer.trim()) components.push({ type: "FOOTER", text: footer });

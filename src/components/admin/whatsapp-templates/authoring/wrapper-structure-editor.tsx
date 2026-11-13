@@ -14,6 +14,7 @@ export function WrapperStructureEditor({ draft, onChange, issues = [] }: {
   const normalVariables = eligibleVariables(draft).filter((name) => name !== "checkout.url");
   const forField = (path: string) => issues.filter((issue) => issue.path === path || issue.path.startsWith(`${path}.`));
   return <div className="space-y-5">
+    {draft.audience === "SHARED" && <p className="rounded border border-blue-100 bg-blue-50 p-3 text-sm">For the common recovery layout, include the shop name and website once in the header. Keep only the response slot in the body, leave the static footer empty, and end the checkout-aware message with the checkout link on its own line. Your text is shared across Meta, AI and human messages after review and coordinated activation.</p>}
     {draft.audience === "AI" && <div className="rounded-lg border border-slate-200 p-4">
       <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox"
         checked={!!draft.productImage} aria-describedby="optional-product-image-help"

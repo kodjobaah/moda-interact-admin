@@ -1,3 +1,4 @@
+import { assertSavedCommonLayout } from "../authoring/common-layout-repository";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { templateHash } from "../authoring/identifiers";
 import { MetaSubmissionError, type MetaLocaleSnapshot, type MetaSubmissionPlan } from "./contracts";
@@ -11,6 +12,13 @@ export async function readMetaPlan(db: Pick<MetaTransaction, "whatsAppTemplateDe
   const definition = await db.whatsAppTemplateDefinition.findUnique({ where: { id },
     include: { locales: true } });
   if (!definition) throw new MetaSubmissionError("NOT_FOUND", "Template definition was not found.");
+  for (const locale of definition.locales) {
+    const record = locale.localeAst as { authoring?: { commonLayout?: unknown } } | null;
+    if (record?.authoring?.commonLayout) {
+      try { await assertSavedCommonLayout(db, record.authoring.commonLayout); }
+      catch { throw new MetaSubmissionError("INVALID_LOCALE", "The referenced common layout is no longer available or fully reviewed. Existing registration history is preserved; select a reviewed revision in a new clone."); }
+    }
+  }
   return makeMetaSubmissionPlan({ definition, locales: definition.locales, trustedWabaId: wabaId });
 }
 

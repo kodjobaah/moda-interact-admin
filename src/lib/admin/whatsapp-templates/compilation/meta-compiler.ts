@@ -17,5 +17,5 @@ export function compileMetaLocale(ast: MetaTemplateAst): CompilationCandidate {
     throw new Error("Inconsistent positional Meta parameter bindings.");
   }
   return { record: { schemaVersion: 1, authoring: ast, prepared },
-    contentHash: templateHash(prepared), preview: makeExamplePreview(prepared) };
+    contentHash: templateHash(prepared), preview: makeExamplePreview(prepared, ast.commonLayout) };
 }

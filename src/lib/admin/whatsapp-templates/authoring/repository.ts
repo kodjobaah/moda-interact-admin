@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { assertSavedCommonLayout } from "./common-layout-repository";
 import type { TemplateAst, ImmutableAuthoringRecord } from "./types";
 
 export type TemplateRepository = Pick<PrismaClient, "$transaction" | "whatsAppTemplateDefinition">;
@@ -18,6 +19,10 @@ export type DefinitionRecordInput = {
 
 /** Same transaction-local save path for ordinary authoring and structural initialization. */
 export async function insertTemplateRecordInTransaction(tx: Prisma.TransactionClient, input: DefinitionRecordInput): Promise<void> {
+  if (input.draft.family === "META_RECOVERY" && input.draft.commonLayout) {
+    await tx.$queryRaw(Prisma.sql`SELECT id FROM whatsapp."WhatsAppTemplateDefinition" WHERE id=${input.draft.commonLayout.definitionId} FOR SHARE`);
+    await assertSavedCommonLayout(tx, input.draft.commonLayout);
+  }
   await tx.whatsAppTemplateDefinition.create({ data: {
     id: input.id,
     kind: input.draft.family,

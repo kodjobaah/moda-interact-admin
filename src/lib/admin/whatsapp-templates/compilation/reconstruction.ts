@@ -1,3 +1,5 @@
+import type { CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
+import { requireCommonLayout } from "../authoring/common-layout";
 import { templateHash } from "../authoring/identifiers";
 import { validateTemplateAst } from "../authoring/validation";
 import type { TemplateAst } from "../authoring/types";
@@ -9,6 +11,7 @@ import { compileWrapperLocale } from "./wrapper-compiler";
 import { providerLanguageCode } from "./language-codes";
 
 export type ReconstructionInput = {
+  commonLayout?: CommonRecoveryLayoutReference;
   definitionId: string;
   definitionSourceHash: string;
   runSourceHash: string;
@@ -39,6 +42,13 @@ export function reconstructAndCompile(input: ReconstructionInput): CompilationCa
   }
   verifyTranslatedKeysAndMarkers(source, output);
   const ast = reconstructLocaleAst(input.english, source, output, input.languageTag);
+  if (ast.family === "META_RECOVERY" && ast.commonLayout) {
+    const ref = requireCommonLayout(input.commonLayout);
+    if (ref.definitionId !== ast.commonLayout.definitionId || ref.sourceHash !== ast.commonLayout.sourceHash || ref.languageTag !== input.languageTag) {
+      throw new Error("Translated common layout must match the saved revision and target language.");
+    }
+    ast.commonLayout = ref;
+  }
   const validated = validateTemplateAst(ast, { requireInitialReply: true, contentLanguageTag: input.languageTag });
   if (!validated.ok) throw new Error(`Translation violates provider/component limits: ${validated.issues[0].path}: ${validated.issues[0].message}`);
   return ast.family === "META_RECOVERY" ? compileMetaLocale(ast) : compileWrapperLocale(ast);
