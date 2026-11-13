@@ -1,3 +1,4 @@
+import { listCommonLayoutChoices } from "@/lib/admin/whatsapp-templates/authoring/common-layout-reads";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
@@ -5,7 +6,8 @@ import { TemplateCatalogue } from "@/components/admin/whatsapp-templates/authori
 import { TemplateSavedDetail } from "@/components/admin/whatsapp-templates/authoring/template-saved-detail";
 import { TemplateAuthoringWorkspace } from "@/components/admin/whatsapp-templates/authoring/template-authoring-workspace";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
-import { getDefinitionDetail, listDefinitions } from "@/lib/admin/whatsapp-templates/authoring/reads";
+import { ScenarioCoverageSummary } from "@/components/admin/whatsapp-templates/authoring/scenario-coverage";
+import { getDefinitionDetail, listDefinitions, getScenarioCoverage, getDynamicLayoutCoverage } from "@/lib/admin/whatsapp-templates/authoring/reads";
 
 export const dynamic = "force-dynamic";
 type SearchParams = { definition?: string | string[]; clone?: string | string[]; create?: string | string[];
@@ -32,6 +34,9 @@ export default async function WhatsAppTemplatesPage({ searchParams }: { searchPa
     cloneId ? getDefinitionDetail(cloneId) : Promise.resolve(null),
   ]);
   if ((selectedId && !selected) || (cloneId && (!cloneFrom || !cloneFrom.english))) notFound();
+  const coverage = !creating && !selected ? await getScenarioCoverage() : [];
+  const dynamicLayouts = !creating && !selected ? await getDynamicLayoutCoverage() : [];
+  const commonLayouts = creating ? await listCommonLayoutChoices() : [];
   const catalogue = !creating && !selected ? await listDefinitions(page, search, { kind, status }) : null;
 
   return <AdminShell active="whatsapp-templates">
@@ -46,8 +51,8 @@ export default async function WhatsAppTemplatesPage({ searchParams }: { searchPa
       {selected ? <div className="mx-auto max-w-5xl space-y-4">
         <Link href="/system-controls/whatsapp-templates" className="text-sm font-medium text-blue-800 underline">← Back to catalogue</Link>
         <TemplateSavedDetail detail={selected} />
-      </div> : creating ? <TemplateAuthoringWorkspace key={cloneFrom?.id || "new"} cloneFrom={cloneFrom} />
-        : catalogue ? <TemplateCatalogue {...catalogue} search={search} kind={kind} status={status} /> : null}
+      </div> : creating ? <TemplateAuthoringWorkspace key={cloneFrom?.id || "new"} cloneFrom={cloneFrom} commonLayouts={commonLayouts} />
+        : catalogue ? <div className="space-y-6"><ScenarioCoverageSummary rows={coverage} dynamicLayouts={dynamicLayouts} /><TemplateCatalogue {...catalogue} search={search} kind={kind} status={status} /></div> : null}
     </div>
   </AdminShell>;
 }

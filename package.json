@@ -59,11 +59,14 @@
     "test:arch068-admin-authoring": "node scripts/test-arch068-admin-authoring.mjs",
     "whatsapp:initialize-conversation-wrapper": "node scripts/initialize-conversation-wrapper.mjs",
     "test:arch068-admin-initializer:unit": "node scripts/test-arch068-admin-authoring.mjs tests/unit/arch068-conversation-wrapper-initializer.test.ts",
-    "test:arch068-admin-initializer:postgres": "npm run prisma:generate && node scripts/test-arch068-admin-initializer-postgres.mjs"
+    "test:arch068-admin-initializer:postgres": "npm run prisma:generate && node scripts/test-arch068-admin-initializer-postgres.mjs",
+    "test:arch075-admin-common-layout": "node scripts/test-unit.mjs tests/unit/arch075-common-layout.test.ts",
+    "test:arch075-admin-common-layout:postgres": "node scripts/test-arch075-common-layout-postgres.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
-    "@modainteract/moda-interact-shared": "5.12.0",
+    "@modainteract/moda-interact-shared": "5.13.9",
+    "@noble/hashes": "2.0.1",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
     "codemirror": "^6.0.2",

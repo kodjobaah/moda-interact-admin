@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { saveWhatsAppTemplateDraft } from "@/app/actions/whatsapp-template-authoring";
 import { cloneDraft, newMetaDraft, newWrapperDraft } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
 import { makeImmutableAuthoringRecord } from "@/lib/admin/whatsapp-templates/authoring/compiler";
-import { makeExamplePreview, makeDraftExamplePreview } from "@/lib/admin/whatsapp-templates/authoring/preview";
+import { commonPreparedExample, makeExamplePreview, makeDraftExamplePreview } from "@/lib/admin/whatsapp-templates/authoring/preview";
 import { validateTemplateAst } from "@/lib/admin/whatsapp-templates/authoring/validation";
 import type { TemplateAst, TemplateDetail, TemplatePreviewDTO } from "@/lib/admin/whatsapp-templates/authoring/types";
 
@@ -18,11 +18,20 @@ export function useTemplateAuthoringDraft(source?: TemplateDetail | null) {
   const [touched, setTouched] = useState(false);
   const pending = useRef(false);
   const submissionId = useRef<string | null>(null);
-  const checked = useMemo(() => validateTemplateAst(draft), [draft]);
+  const checked = useMemo(() => {
+    const value = validateTemplateAst(draft);
+    if (!value.ok) return value;
+    try { makeImmutableAuthoringRecord(value.value); return value; }
+    catch (error) { return { ok: false as const, issues: [{ path: "body", message: error instanceof Error ? error.message : "Unable to compile the complete message." }] }; }
+  }, [draft]);
   const preview = useMemo<TemplatePreviewDTO | null>(() => {
-    return checked.ok
-      ? makeExamplePreview(makeImmutableAuthoringRecord(checked.value).prepared)
-      : makeDraftExamplePreview(draft);
+    if (!checked.ok) return makeDraftExamplePreview(draft);
+    const prepared = makeImmutableAuthoringRecord(checked.value).prepared;
+    const result = makeExamplePreview(prepared, checked.value.family === "META_RECOVERY" ? checked.value.commonLayout : undefined);
+    if (checked.value.family === "MODA_CONVERSATION_WRAPPER" && checked.value.audience === "SHARED" && prepared.family === "MODA_CONVERSATION_WRAPPER") {
+      try { result.commonLayout = commonPreparedExample(prepared); } catch { /* Existing wrappers with unavailable fixture-only variables retain their original preview. */ }
+    }
+    return result;
   }, [checked, draft]);
   const updateDraft = (next: TemplateAst) => {
     if (pending.current || savedId) return;

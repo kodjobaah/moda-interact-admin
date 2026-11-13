@@ -55,6 +55,7 @@ export function frozenLocaleSnapshot(row: LocaleForMeta, def: DefinitionForMeta)
       source.offerType !== def.offerType || source.sourceLanguageTag !== "en") {
     fail("INVALID_LOCALE", `Inconsistent template purpose for ${row.languageTag}.`);
   }
+  if (source.commonLayout && source.commonLayout.languageTag !== row.languageTag) fail("INVALID_LOCALE", "Common layout locale does not match the registered language.");
   if (source.stage === "INITIAL") {
     const compliant = validateTemplateAst(source, { requireInitialReply: true, contentLanguageTag: row.languageTag });
     if (!compliant.ok) fail("INVALID_LOCALE", `Initial recovery semantics are incomplete for ${row.languageTag}.`);

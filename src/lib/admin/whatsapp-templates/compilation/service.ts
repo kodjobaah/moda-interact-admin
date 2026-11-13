@@ -1,3 +1,4 @@
+import { readSavedCommonLayout } from "../authoring/common-layout-repository";
 import { Prisma } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "../authoring/service";
@@ -58,10 +59,12 @@ export async function reviewTranslation(input: ReviewInput, deps: ReviewDependen
       });
       if (!item || !isCompletedTranslationItem(item)) throw new ReviewRequestError("Translated language is not complete.");
       const providerCode = providerLanguageCode(input.languageTag, english.authoring.family);
+      const commonLayout = input.decision === "APPROVE" && english.authoring.family === "META_RECOVERY" && english.authoring.commonLayout
+        ? await readSavedCommonLayout(tx, english.authoring.commonLayout.definitionId, input.languageTag, english.authoring.commonLayout.sourceHash) : undefined;
       const candidate = input.decision === "APPROVE" ? reconstructAndCompile({
         definitionId: definition.id, definitionSourceHash: definition.sourceHash,
         runSourceHash: run.sourceHash, languageTag: input.languageTag,
-        english: english.authoring, snapshot: run.sourceSnapshot,
+        commonLayout, english: english.authoring, snapshot: run.sourceSnapshot,
         translated: item.translatedAst, outputContentHash: item.outputContentHash,
       }) : null;
       const existing = await tx.whatsAppTemplateLocale.findUnique({

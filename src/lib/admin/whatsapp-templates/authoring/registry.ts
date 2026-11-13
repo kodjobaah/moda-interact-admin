@@ -14,6 +14,7 @@ export const SHOP_BRAND_VARIABLES = [
 
 export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
   "customer.firstName": { label: "Customer's first name", sample: "Alex" },
+  "shop.websiteUrl": { label: "Shop website", sample: "https://www.example.com" },
   "shop.name": { label: "Shop name", sample: "Example Shop" },
   "shop.categoryName": { label: "What the shop sells (active store category)", sample: "outdoor clothing and accessories", sourceField: "CommerceShopProfile.activeCategory.displayName" },
   "checkout.url": { label: "Checkout link", sample: "https://www.example.com/checkout/demo" },
@@ -38,7 +39,7 @@ export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
 export function eligibleVariables(draft: TemplateAst): SemanticVariable[] {
   // Taxonomy-backed store category is a Meta recovery-body binding only.
   // It requires an active category for the destination shop when the message is prepared.
-  const base: SemanticVariable[] = ["customer.firstName", "shop.name", "checkout.url",
+  const base: SemanticVariable[] = ["customer.firstName", "shop.name", "shop.websiteUrl", "checkout.url",
     ...(draft.family === "META_RECOVERY" ? ["shop.categoryName" as const] : []),
     ...(draft.family === "META_RECOVERY" && draft.stage === "INITIAL" ? ["checkout.itemsSummary" as const] : []),
     ...SHOP_BRAND_VARIABLES];

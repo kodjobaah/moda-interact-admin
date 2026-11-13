@@ -1,3 +1,4 @@
+import { scenarioLabel } from "@/lib/admin/whatsapp-templates/authoring/scenarios";
 import Link from "next/link";
 import type { TemplateListItem } from "@/lib/admin/whatsapp-templates/authoring/types";
 
@@ -49,9 +50,9 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
               {entry.providerTemplateName || `Wrapper · ${entry.audience || "unknown"}`}</Link>
               <span className="mt-1 block truncate font-mono text-[11px] text-slate-500" title={entry.id}>{entry.id}</span></td>
             <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? "Meta recovery" : "Conversation wrapper"}</td>
-            <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? `${entry.purpose}/${entry.offerType}` : entry.audience}</td>
+            <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? scenarioLabel(entry.purpose, entry.offerType) : entry.audience}</td>
             <td className="px-4 py-4">{entry.sourceLanguageTag}</td>
-            <td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{entry.status}</span></td>
+            <td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{entry.status}</span>{entry.progress && <p className="mt-2 text-xs text-slate-600">Latest translation run: {entry.progress.runStatus}. Translated {entry.progress.translated}/{entry.progress.total}; reviewed {entry.progress.reviewed}/{entry.progress.total}.</p>}</td>
             <td className="whitespace-nowrap px-4 py-4">{new Date(entry.createdAt).toLocaleDateString("en-GB")}</td>
           </tr>)}
         </tbody>

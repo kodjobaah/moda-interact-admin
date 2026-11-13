@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import {test,after} from "node:test";
+import {randomUUID} from "node:crypto";
+import {PrismaClient,type Prisma} from "@prisma/client";
+import {layoutAst} from "../fixtures/arch075-common-layout.ts";
+import {saveEnglishTemplate} from "../../src/lib/admin/whatsapp-templates/authoring/service.ts";
+import {RECOVERY_SCENARIOS} from "../../src/lib/admin/whatsapp-templates/authoring/scenarios.ts";
+import {readSavedCommonLayout} from "../../src/lib/admin/whatsapp-templates/authoring/common-layout-repository.ts";
+import {compileTemplateAst} from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
+import {templateHash} from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
+import {REVIEW_LANGUAGES} from "../../src/lib/admin/whatsapp-templates/compilation/language-codes.ts";
+if(process.env.ARCH047_DISPOSABLE_POSTGRES!=="1"||new URL(process.env.DATABASE_URL!).hostname!=="127.0.0.1")throw Error("Disposable localhost fixture required");
+const db=new PrismaClient();after(()=>db.$disconnect());
+test("real immutable common revision is frozen into new clone; stale caller fails atomically and original source remains identical",async()=>{
+ const id="common-test-"+randomUUID();const principal={id,role:"SUPER_ADMIN" as const,developmentBypass:false};
+ await db.platformAdmin.create({data:{id,provider:"fixture",providerSubject:id,email:id+"@example.invalid",displayName:"Test admin",role:"SUPER_ADMIN",active:true}});
+ const original=await saveEnglishTemplate({submissionId:randomUUID(),draft:RECOVERY_SCENARIOS[0].draft},{db,principal});
+ const before=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:original.id},include:{locales:true}});
+ const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft:layoutAst()},{db,principal});
+ await assert.rejects(readSavedCommonLayout(db,saved.id,"en"),/20/);
+ for(const languageTag of REVIEW_LANGUAGES.filter(t=>t!=="en")){
+  const ast=layoutAst();if(languageTag==="fr")ast.header[0]={type:"text",value:"Bienvenue chez "};const prepared=compileTemplateAst(ast);
+  await db.whatsAppTemplateLocale.create({data:{definitionId:saved.id,languageTag,providerLanguageCode:null,localeAst:{schemaVersion:1,authoring:ast,prepared} as unknown as Prisma.InputJsonValue,contentHash:templateHash(prepared),status:"REVIEWED",reviewedAt:new Date(),reviewedByAdminId:id}});
+ }
+ const ref=await readSavedCommonLayout(db,saved.id,"en");
+ const draft={...structuredClone(RECOVERY_SCENARIOS[0].draft),commonLayout:ref,shopBrandMediaRole:"LOGO",footer:[{type:"text",value:"Reply STOP to opt out."}]};
+ const submissionId=randomUUID();const clone=await saveEnglishTemplate({submissionId,draft,cloneFromDefinitionId:original.id},{db,principal});
+ assert.equal((await saveEnglishTemplate({submissionId,draft,cloneFromDefinitionId:original.id},{db,principal})).replay,true);
+ const stored=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:clone.id},include:{locales:true}});
+ assert.equal(stored.clonedFromDefinitionId,original.id);assert.equal(stored.sourceHash,templateHash(draft));
+ assert.deepEqual((stored.locales[0].localeAst as unknown as {authoring:{commonLayout:unknown}}).authoring.commonLayout,ref);
+ assert.equal(await db.commerceAuditEvent.count({where:{operationId:clone.id}}),1);
+ const count=await db.whatsAppTemplateDefinition.count();
+ await assert.rejects(saveEnglishTemplate({submissionId:randomUUID(),draft:{...draft,commonLayout:{...ref,localeId:"forged"}}},{db,principal}),/differs/);
+ assert.equal(await db.whatsAppTemplateDefinition.count(),count);
+ const french=await readSavedCommonLayout(db,saved.id,"fr",ref.sourceHash);assert.notEqual(french.contentHash,ref.contentHash);
+ await db.whatsAppTemplateDefinition.update({where:{id:saved.id},data:{status:"RETIRED",retiredAt:new Date()}});
+ await assert.rejects(saveEnglishTemplate({submissionId:randomUUID(),draft},{db,principal}),/not ready/);
+ assert.equal(await db.whatsAppTemplateDefinition.count(),count);
+ assert.deepEqual(await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:original.id},include:{locales:true}}),before);
+ assert.equal(await db.whatsAppTemplateMetaRegistration.count(),0);assert.equal(await db.whatsAppConversationWrapperActiveSlot.count(),0);
+});

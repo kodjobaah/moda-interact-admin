@@ -1,13 +1,33 @@
+import { readPreparedWrapper, stableJson, renderPreparedWrapper, type CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
+import { layoutDigest, requireCommonLayout } from "./common-layout";
 import { VARIABLE_REGISTRY } from "./registry";
 import type { PreparedTemplate, RuntimeToken, TemplatePreviewDTO } from "./types";
 
-function renderTokens(tokens: RuntimeToken[]): string {
+export function commonExample(raw: CommonRecoveryLayoutReference): NonNullable<TemplatePreviewDTO["commonLayout"]> {
+  return commonPreparedExample(requireCommonLayout(raw).prepared);
+}
+export function commonPreparedExample(raw: unknown): NonNullable<TemplatePreviewDTO["commonLayout"]> {
+  // Draft preview validates the runtime shape, without claiming a saved or active source identity.
+  const parsed = readPreparedWrapper({ schemaVersion: 1, prepared: raw }, layoutDigest(stableJson(raw)), layoutDigest);
+  if (parsed.kind !== "ok") throw new Error("Draft cannot be rendered as a conversation wrapper.");
+  const prepared = parsed.prepared;
+  const context = { conversationId: "example-conversation", shopId: "example-shop", conversationLanguageTag: "en", merchantLanguageTag: "en", variables: { "shop.name": VARIABLE_REGISTRY["shop.name"].sample, "shop.websiteUrl": VARIABLE_REGISTRY["shop.websiteUrl"].sample, "checkout.url": VARIABLE_REGISTRY["checkout.url"].sample }, checkoutAvailable: true };
+  const render = (responseBody: string) => {
+    const result = renderPreparedWrapper({ prepared, context, responseBody });
+    if (result.kind !== "rendered") throw new Error("Common layout example could not be rendered.");
+    return result.body;
+  };
+  return { header: renderTokens(prepared.header), footer: renderTokens(prepared.conditionals[0]?.tokens ?? []),
+    ai: render("Example AI answer about your products."), human: render("Example human reply about your checkout.") };
+}
+function renderTokens(tokens: readonly RuntimeToken[]): string {
   return tokens.map((token) => token.kind === "text" ? token.value
     : token.kind === "variable" ? VARIABLE_REGISTRY[token.name].sample : "Example AI or merchant response").join("");
 }
 
 /** Fixture-only projection; no customer/shop context or network access. */
-export function makeExamplePreview(prepared: PreparedTemplate): TemplatePreviewDTO {
+export function makeExamplePreview(prepared: PreparedTemplate, common?: CommonRecoveryLayoutReference): TemplatePreviewDTO {
+  const commonLayout = common ? commonExample(common) : undefined;
   if (prepared.family === "MODA_CONVERSATION_WRAPPER") return {
     family: prepared.family, header: renderTokens(prepared.header), body: renderTokens(prepared.body), footer: renderTokens(prepared.footer),
     ...(prepared.productImage ? { productImage: prepared.productImage } : {}),
@@ -28,7 +48,7 @@ export function makeExamplePreview(prepared: PreparedTemplate): TemplatePreviewD
   const buttons = part("BUTTONS")?.buttons;
   const variableButtonIndexes = new Map(prepared.parameterBindings.buttons.map((binding) => [binding.index, binding.variable]));
   return {
-    family: prepared.family,
+    family: prepared.family, commonLayout,
     header: renderedHeader,
     ...(prepared.parameterBindings.headerMediaRole ? { headerMediaRole: prepared.parameterBindings.headerMediaRole } : {}),
     body: renderedBody, footer: String(part("FOOTER")?.text ?? ""),

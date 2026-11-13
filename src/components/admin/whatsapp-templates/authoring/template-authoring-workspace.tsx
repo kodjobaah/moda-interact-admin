@@ -1,4 +1,6 @@
 "use client";
+import { CommonLayoutSelector } from "./common-layout-selector";
+import type { CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { useState } from "react";
 import Link from "next/link";
 import type { TemplateDetail } from "@/lib/admin/whatsapp-templates/authoring/types";
@@ -12,7 +14,7 @@ import { useTemplateAuthoringDraft } from "./use-template-authoring-draft";
 import { useShopBrandMediaRole } from "../media/use-shop-brand-media-role";
 
 /** Layout only: all AST mutations, validation, preview and saving live in the controller or pure services. */
-export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: TemplateDetail | null }) {
+export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [] }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonRecoveryLayoutReference[] }) {
   const controller = useTemplateAuthoringDraft(cloneFrom);
   const media = useShopBrandMediaRole();
   const [step, setStep] = useState<TemplateEditorStep>("setup");
@@ -27,6 +29,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom }: { cloneFrom?: Template
         <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">{controller.savedId ? "Saved" : "Unsaved draft"}</span>
       </div>
     </header>
+    <CommonLayoutSelector draft={controller.draft} choices={commonLayouts} onChange={controller.updateDraft} />
     <TemplateEditorSteps value={step} onChange={select} issueCount={issues.length} />
     <div id="whatsapp-panel-setup" role="tabpanel" aria-labelledby="whatsapp-tab-setup" hidden={step !== "setup"}
       className={step === "setup" ? "grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(270px,0.6fr)]" : "hidden"}>
