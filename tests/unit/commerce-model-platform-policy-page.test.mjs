@@ -11,13 +11,34 @@ import {
 // invoking the SUPER_ADMIN-only LIVE policy or audit-history read.
 function setup(role, { billingPolicy = { id: 'billing-policy' }, commerceHistoryPage = '1', dashboardError } = {}) {
   const h = createComponentHarness();
-  const calls = { billing: 0, commerce: [], pageAuth: 0 };
+  const calls = { billing: 0, commerce: [], recovery: [], pageAuth: 0 };
   const dashboard = {
     policy: { id: 'live-platform', editVersion: 3 },
     history: [{ id: 'change-1' }],
     hasMore: true,
   };
+  const tabs = loadPolicyModule('src/components/admin/platform-policy-tabs.tsx', { react: h.react, 'react/jsx-runtime': h.jsxRuntime });
+  const recoveryContract = { key: 'commerce.recoveryExecution' };
+  const recovery = { snapshot: { version: 1 }, history: { entries: [] } };
   const pageModule = loadPolicyModule('src/app/(protected)/system-controls/platform-policy/page.tsx', {
+    '@/components/admin/platform-policy-tabs': tabs,
+    '@/components/admin/platform-configuration/configuration-editor': {
+      ConfigurationEditor: (props) => h.jsxRuntime.jsx('section', { 'data-testid': 'recovery-execution-policy', ...props }),
+    },
+    '@/components/admin/platform-configuration/configuration-history': {
+      ConfigurationHistoryPanel: (props) => h.jsxRuntime.jsx('section', { 'data-testid': 'recovery-execution-history', ...props }),
+    },
+    '@/lib/admin/platform-configuration/contracts': {
+      PLATFORM_POLICY_REGISTRY: new Map([[recoveryContract.key, recoveryContract]]),
+      publicContracts: (registry) => [...registry.values()],
+    },
+    '@/lib/admin/platform-configuration/service': {
+      configurationPageData: async (key) => {
+        calls.recovery.push(key);
+        if (role !== 'SUPER_ADMIN') throw new Error('Forbidden recovery execution read');
+        return recovery;
+      },
+    },
     'react/jsx-runtime': h.jsxRuntime,
     '@/components/admin/admin-shell': {
       AdminShell: ({ children }) => h.jsxRuntime.jsx('main', { children }),
@@ -69,6 +90,9 @@ for (const role of ['ADMIN', 'SUPPORT']) {
     assert.equal(context.calls.pageAuth, 1);
     assert.equal(context.calls.billing, 1);
     assert.deepEqual(context.calls.commerce, []);
+    assert.deepEqual(context.calls.recovery, []);
+    assert.equal(byTestId(root, 'recovery-execution-policy'), undefined);
+    assert.equal(byTestId(root, 'recovery-execution-history'), undefined);
     assert.deepEqual(byTestId(root, 'billing-policy')?.props.policy, { id: 'billing-policy' });
     assert.equal(byTestId(root, 'live-platform-policy'), undefined);
     assert.equal(byTestId(root, 'mcp-platform-policy'), undefined);
@@ -80,6 +104,9 @@ test('SUPER_ADMIN can see billing plus LIVE policy/history, with correct paginat
   const root = await context.render();
   assert.equal(context.calls.billing, 1);
   assert.deepEqual(context.calls.commerce, [4]);
+  assert.deepEqual(context.calls.recovery, ['commerce.recoveryExecution']);
+  assert.equal(byTestId(root, 'recovery-execution-policy')?.props.contract.key, 'commerce.recoveryExecution');
+  assert.equal(byTestId(root, 'recovery-execution-history')?.props.keyName, 'commerce.recoveryExecution');
   assert.ok(byTestId(root, 'billing-policy'));
   assert.ok(byTestId(root, 'mcp-platform-policy'));
   const livePolicy = byTestId(root, 'live-platform-policy');

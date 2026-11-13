@@ -16,8 +16,8 @@ const fixture: ConfigurationContract = {
 };
 
 test("production allowlist has canonical policy groups including preview storage", () => {
-  assert.deepEqual([...registry.keys()], ["woo.couponSync", "speech.transcription", "commerce.previewStorage", "commerce.preview", "admin.grafana", "omini.moderation", "shopBrand.publicMedia"]);
-  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 28);
+  assert.deepEqual([...registry.keys()], ["commerce.recoveryExecution", "woo.couponSync", "speech.transcription", "commerce.previewStorage", "commerce.preview", "admin.grafana", "omini.moderation", "shopBrand.publicMedia"]);
+  assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 50);
   for (const contract of registry.values()) {
     assert.equal(contract.requiredRole, "SUPER_ADMIN");
     assert.equal(contract.kind, "policy");
