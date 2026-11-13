@@ -47,6 +47,8 @@ export type MetaRegistrationView = {
   providerLanguageCode: string;
   wabaId: string;
   submittedContentHash: string;
+  /** Server-derived provider component fingerprint; distinct from prepared identity. */
+  expectedProviderContentHash: string | null;
   submissionState: string;
   providerStatus: string | null;
   failureCode: string | null;
@@ -66,12 +68,17 @@ export type MetaStatusView = {
   updatedAt: string;
 };
 
-/** The provider can drift without having populated the explicit drift timestamp yet. */
+/** Provider observations compare only to the server-derived component fingerprint. */
 export function hasMetaProviderDrift(row: Pick<MetaRegistrationView,
-  "driftDetectedAt" | "lastObservedContentHash" | "submittedContentHash" | "lastObservedCategory">): boolean {
-  return Boolean(row.driftDetectedAt ||
-    (row.lastObservedContentHash && row.lastObservedContentHash !== row.submittedContentHash) ||
-    (row.lastObservedCategory && row.lastObservedCategory !== "MARKETING"));
+  "driftDetectedAt" | "lastObservedContentHash" | "expectedProviderContentHash" | "lastObservedCategory">): boolean {
+  if (row.driftDetectedAt != null) return true;
+  const observed = row.lastObservedContentHash;
+  const category = row.lastObservedCategory;
+  if (observed == null && category == null) return false;
+  const expected = row.expectedProviderContentHash;
+  if (typeof expected !== "string" || !DIGEST.test(expected)) return true;
+  return (observed != null && (typeof observed !== "string" || !DIGEST.test(observed) || observed !== expected)) ||
+    (category != null && category !== "MARKETING");
 }
 
 export class MetaSubmissionError extends Error {

@@ -2,6 +2,16 @@ import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "../authoring/service";
 import { DEFINITION_ID, MetaSubmissionError, type MetaStatusView } from "./contracts";
 import type { MetaDatabase } from "./repository";
+import { observedMetaContentHash, parseComponents } from "../publishing/validation";
+
+/** No provider JSON crosses the DTO boundary; malformed persisted data stays unverifiable. */
+function expectedProviderContentHash(components: unknown): string | null {
+  try {
+    const parsed = parseComponents(components);
+    if (!parsed.body?.trim()) return null;
+    return observedMetaContentHash(components);
+  } catch { return null; }
+}
 
 /** The dashboard reads only bounded local PostgreSQL state, never Meta's API. */
 export async function readMetaStatus(definitionId: string, deps: {
@@ -27,7 +37,7 @@ export async function readMetaStatus(definitionId: string, deps: {
     registrations: rows.map((row) => ({
       id: row.id, localeId: row.localeId, languageTag: row.locale.languageTag,
       providerLanguageCode: row.providerLanguageCode, wabaId: row.wabaId,
-      submittedContentHash: row.submittedContentHash, submissionState: row.submissionState,
+      submittedContentHash: row.submittedContentHash, expectedProviderContentHash: expectedProviderContentHash(row.componentsSnapshot), submissionState: row.submissionState,
       providerStatus: row.providerStatus, failureCode: row.failureCode,
       providerTemplateId: row.providerTemplateId, lastSubmittedAt: row.lastSubmittedAt?.toISOString() ?? null,
       nextRetryAt: row.nextRetryAt?.toISOString() ?? null, lastReconciledAt: row.lastReconciledAt?.toISOString() ?? null,
