@@ -2,6 +2,7 @@ import {
   COMMERCE_MODEL_BUDGET_FIELDS,
   CommerceBudgetValidationError,
   LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS,
+  MAX_INITIAL_OUTREACH_TOOL_CALLS,
   type CommerceBudgetFieldErrors,
   type CommerceBudgetKey,
 } from "./commerce-model-policy-fields.ts";
@@ -25,6 +26,10 @@ export function parseLiveShopBudgetForm(form: FormData, trustedShopId: string): 
       continue;
     }
     const number = Number(value);
+    if (field.key === "initialOutreachToolCalls" && number > MAX_INITIAL_OUTREACH_TOOL_CALLS) {
+      errors.initialOutreachToolCalls = `Initial outreach tool calls cannot exceed ${MAX_INITIAL_OUTREACH_TOOL_CALLS}.`;
+      continue;
+    }
     if (field.key === "deadlineMs" && number > LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS) {
       errors.deadlineMs = `The current LIVE Background envelope supports up to ${LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS} ms.`;
       continue;

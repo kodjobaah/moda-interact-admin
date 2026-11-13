@@ -75,10 +75,18 @@ test("Stale version, CAS races, missing plan and audit failures are rejected", a
 test("Plan history is filtered by stable policy identity and environment after deletion", async () => {
   const {tx,events}=fixture({existing:null});
   const result=await loadLivePlanPolicyDashboard(tx,"DEVELOPMENT","plan-1",1);
-  assert.deepEqual(result.policy.effective,{deadlineMs:60000,outputTokens:800});
-  assert.deepEqual(result.policy.sources,{deadlineMs:"PLATFORM",outputTokens:"PLATFORM"});
+  assert.deepEqual(result.policy.effective,{deadlineMs:60000,outputTokens:800,initialOutreachToolCalls:16});
+  assert.deepEqual(result.policy.sources,{deadlineMs:"PLATFORM",outputTokens:"PLATFORM",initialOutreachToolCalls:"PLATFORM"});
   const history=events.find(e=>e.kind==="history")!.params;
   assert.equal(history.where.modelPolicyId,"arch038-live-plan-development-plan-1");
   assert.equal(history.where.environment,"DEVELOPMENT");
   assert.equal(history.skip,10);
+});
+
+test("an outreach-only Price Plan override inherits deadline and output tokens independently", async () => {
+  const {tx}=fixture({existing:{id:"arch038-live-plan-development-plan-1",editVersion:2,budget:{initialOutreachToolCalls:32},budgetSchemaVersion:1}});
+  const result=await loadLivePlanPolicyDashboard(tx,"DEVELOPMENT","plan-1",0);
+  assert.deepEqual(result.policy.budget,{initialOutreachToolCalls:32});
+  assert.deepEqual(result.policy.effective,{deadlineMs:60000,outputTokens:800,initialOutreachToolCalls:32});
+  assert.deepEqual(result.policy.sources,{deadlineMs:"PLATFORM",outputTokens:"PLATFORM",initialOutreachToolCalls:"PRICE_PLAN"});
 });

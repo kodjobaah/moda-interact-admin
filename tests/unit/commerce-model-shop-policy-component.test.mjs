@@ -5,9 +5,9 @@ import { createComponentHarness, findElement, elementText, loadPolicyModule } fr
 const fields = loadPolicyModule('src/lib/admin/commerce-model-policy-fields.ts', {});
 const policy = {
   shopId: 'shop-1', environment: 'DEVELOPMENT', editVersion: 2,
-  budget: { outputTokens: 1500 }, platformBudget: { deadlineMs: 60000, outputTokens: 800 },
-  planBudget: { deadlineMs: 80000 }, effective: { deadlineMs: 80000, outputTokens: 1500 },
-  sources: { deadlineMs: 'PRICE_PLAN', outputTokens: 'MERCHANT' },
+  budget: { outputTokens: 1500 }, platformBudget: { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 },
+  planBudget: { deadlineMs: 80000 }, effective: { deadlineMs: 80000, outputTokens: 1500, initialOutreachToolCalls: 16 },
+  sources: { deadlineMs: 'PRICE_PLAN', outputTokens: 'MERCHANT', initialOutreachToolCalls: 'PLATFORM' },
   currentPlan: { state: 'RESOLVED', message: 'Matched.', plan: { id: 'plan-1', handle: 'growth', name: 'Growth' } },
 };
 const history = [{ id: 'audit-1', createdAt: '2026-10-13T12:00:00Z', actor: 'Administrator',
@@ -51,8 +51,8 @@ test('displays Platform/Plan/Merchant/Effective per-field comparison and verifie
 test('unresolved plan explicitly shows no matching plan and Platform fallback without a fabricated link', () => {
   const root = setup({ policy: {
     ...policy, currentPlan: { state: 'UNMATCHED_PLAN', message: 'Missing matching plan', plan: null },
-    planBudget: {}, sources: { deadlineMs: 'PLATFORM', outputTokens: 'MERCHANT' },
-    effective: { deadlineMs: 60000, outputTokens: 1500 },
+    planBudget: {}, sources: { deadlineMs: 'PLATFORM', outputTokens: 'MERCHANT', initialOutreachToolCalls: 'PLATFORM' },
+    effective: { deadlineMs: 60000, outputTokens: 1500, initialOutreachToolCalls: 16 },
   } }).render();
   assert.match(elementText(root), /Unmatched current plan/);
   assert.equal(find(root, n => n.type === 'a' && /Growth/.test(elementText(n))), undefined);

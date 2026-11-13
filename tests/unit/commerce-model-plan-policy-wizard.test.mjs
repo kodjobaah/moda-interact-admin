@@ -19,7 +19,7 @@ function setup(step, plan = undefined) {
       formFields: { intent: plan ? 'update' : 'create', payload: '{}', translationRunId: '', economicsOverrideRequested: 'false', economicsOverrideReason: '' },
     },
   };
-  const platform = { deadlineMs: 60000, outputTokens: 800 };
+  const platform = { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 };
   const policyStep = loadPolicyModule('src/components/admin/merchant/merchant-pricing-plan-builder/commerce-agent-policy-step.tsx', {
     'react/jsx-runtime': h.jsxRuntime,
     '@/components/admin/commerce-model-policy/budget-policy-fields': { BudgetPolicyFields: () => h.jsxRuntime.jsx('budget-fields', {}) },
@@ -57,7 +57,7 @@ function setup(step, plan = undefined) {
     createPlanPlatformPolicy: platform,
     planPolicy: plan ? {
       planId: plan.id, editVersion: 1, environment: 'DEVELOPMENT',
-      budget: {}, effective: platform, sources: { deadlineMs: 'PLATFORM', outputTokens: 'PLATFORM' },
+      budget: {}, effective: platform, sources: { deadlineMs: 'PLATFORM', outputTokens: 'PLATFORM', initialOutreachToolCalls: 'PLATFORM' },
     } : undefined,
   };
   return { h, controller, platform, render: () => h.render(moduleRecord.MerchantPricingPlanBuilder, props) };
@@ -106,5 +106,33 @@ test('Translations & review is final eighth step and includes the policy summary
   assert.equal(review.props.step, 7); // overridden by the current step prop
   assert.match(review.props.planPolicySummary, /60000 ms \(Platform\)/);
   assert.match(review.props.planPolicySummary, /800 tokens \(Platform\)/);
+  assert.match(review.props.planPolicySummary, /16 tool calls \(Platform\)/);
   assert.equal(findElement(tree, node => node.type === 'button' && elementText(node) === 'Next'), undefined);
+});
+
+test('wizard serializes only an enabled outreach override and validates its reason and limits', () => {
+  const h = createComponentHarness();
+  const policy = loadPolicyModule('src/components/admin/merchant/merchant-pricing-plan-builder/commerce-agent-policy-step.tsx', {
+    'react/jsx-runtime': h.jsxRuntime,
+    '@/components/admin/commerce-model-policy/budget-policy-fields': { BudgetPolicyFields: () => null },
+    '@/lib/admin/commerce-model-policy-fields': { LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS: 90000 },
+  });
+  const draft = policy.createEmptyNewPlanBudgetDraft({ deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 });
+  draft.overrides.initialOutreachToolCalls = true;
+  draft.reason = 'Bound checkout evaluation';
+  for (const value of ['1', '64']) {
+    draft.values.initialOutreachToolCalls = value;
+    assert.equal(policy.isNewPlanBudgetDraftValid(draft), true);
+    assert.deepEqual(JSON.parse(policy.serializeNewPlanBudgetDraft(draft)), { budget: { initialOutreachToolCalls: value }, reason: draft.reason });
+  }
+  for (const value of ['0', '-1', '1.5', '65', '', 'Infinity', '9007199254740992']) {
+    draft.values.initialOutreachToolCalls = value;
+    assert.equal(policy.isNewPlanBudgetDraftValid(draft), false);
+  }
+  draft.values.initialOutreachToolCalls = '32';
+  draft.reason = '';
+  assert.equal(policy.isNewPlanBudgetDraftValid(draft), false);
+  draft.overrides.initialOutreachToolCalls = false;
+  assert.deepEqual(JSON.parse(policy.serializeNewPlanBudgetDraft(draft)), { budget: {}, reason: '' });
+  assert.equal(policy.isNewPlanBudgetDraftValid(draft), true);
 });

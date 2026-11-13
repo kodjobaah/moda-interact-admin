@@ -28,10 +28,12 @@ export function LivePlanPolicyControls({ policy, history, page, hasMore, canEdit
   const [overrides, setOverrides] = useState<Record<CommerceBudgetKey, boolean>>({
     deadlineMs: policy.budget.deadlineMs !== undefined,
     outputTokens: policy.budget.outputTokens !== undefined,
+    initialOutreachToolCalls: policy.budget.initialOutreachToolCalls !== undefined,
   });
   const [values, setValues] = useState<Record<CommerceBudgetKey, string>>({
     deadlineMs: String(policy.budget.deadlineMs ?? policy.effective.deadlineMs),
     outputTokens: String(policy.budget.outputTokens ?? policy.effective.outputTokens),
+    initialOutreachToolCalls: String(policy.budget.initialOutreachToolCalls ?? policy.effective.initialOutreachToolCalls),
   });
   const [reason, setReason] = useState("");
 
@@ -59,6 +61,7 @@ export function LivePlanPolicyControls({ policy, history, page, hasMore, canEdit
   const inherited = {
     deadlineMs: { value: policy.platformBudget.deadlineMs, source: "LIVE Platform" },
     outputTokens: { value: policy.platformBudget.outputTokens, source: "LIVE Platform" },
+    initialOutreachToolCalls: { value: policy.platformBudget.initialOutreachToolCalls, source: "LIVE Platform" },
   };
   const errorFields = result && !result.ok ? result.fieldErrors : undefined;
   return (
@@ -73,6 +76,7 @@ export function LivePlanPolicyControls({ policy, history, page, hasMore, canEdit
       <dl className="my-4 grid gap-3 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-2">
         <div><dt className="text-xs text-gray-600">Effective conversation deadline</dt><dd className="font-semibold">{policy.effective.deadlineMs.toLocaleString()} ms · {policy.sources.deadlineMs}</dd></div>
         <div><dt className="text-xs text-gray-600">Effective model output tokens</dt><dd className="font-semibold">{policy.effective.outputTokens.toLocaleString()} · {policy.sources.outputTokens}</dd></div>
+        <div><dt className="text-xs text-gray-600">Effective initial outreach tool calls</dt><dd className="font-semibold">{(policy.effective.initialOutreachToolCalls ?? policy.platformBudget.initialOutreachToolCalls).toLocaleString()} · {policy.sources.initialOutreachToolCalls}</dd></div>
       </dl>
       <form onSubmit={save} className="space-y-4">
         <fieldset disabled={pending || !canEdit} className="space-y-4 disabled:opacity-70">

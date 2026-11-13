@@ -58,7 +58,8 @@ export async function updateLivePlatformPolicy(
   }
   const previous = projectLivePlatformPolicy(rows[0]!);
   if (previous.editVersion !== input.expectedEditVersion) throw new CommerceModelPolicyConflict();
-  if (previous.budget.deadlineMs === input.budget.deadlineMs && previous.budget.outputTokens === input.budget.outputTokens) {
+  if (previous.budget.deadlineMs === input.budget.deadlineMs && previous.budget.outputTokens === input.budget.outputTokens &&
+      previous.budget.initialOutreachToolCalls === input.budget.initialOutreachToolCalls) {
     throw new Error("No CommerceAgent policy values have changed.");
   }
   const updated = await transaction.commerceModelPolicy.updateMany({

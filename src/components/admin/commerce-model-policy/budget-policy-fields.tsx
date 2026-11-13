@@ -36,7 +36,7 @@ export function BudgetPolicyFields({
               <input
                 id={`commerce-budget-${field.key}`}
                 name={enabled ? field.key : undefined}
-                type="number" min="1" step="1" inputMode="numeric"
+                type="number" min="1" max={field.key === "initialOutreachToolCalls" ? "64" : undefined} step="1" inputMode="numeric"
                 value={enabled ? (values[field.key] ?? "") : ""}
                 disabled={disabled || !enabled}
                 aria-invalid={Boolean(fieldErrors[field.key])}

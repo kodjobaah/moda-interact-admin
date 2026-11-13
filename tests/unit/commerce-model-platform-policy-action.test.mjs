@@ -11,7 +11,7 @@ function fixture(role = 'SUPER_ADMIN') {
   let revalidated = 0;
   let auditFails = false;
   let casLost = false;
-  const stored = { budget: { deadlineMs: 60000, outputTokens: 800 }, editVersion: 3 };
+  const stored = { budget: { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 }, editVersion: 3 };
   const events = [];
   const readQueries = [];
   let stage;
@@ -81,7 +81,7 @@ function fixture(role = 'SUPER_ADMIN') {
     '@/lib/prisma': { prisma },
   });
   const form = (overrides = {}) => {
-    const entries = { deadlineMs: '70000', outputTokens: '1200', expectedEditVersion: '3', reason: 'Increase budget for testing', ...overrides };
+    const entries = { deadlineMs: '70000', outputTokens: '1200', initialOutreachToolCalls: '16', expectedEditVersion: '3', reason: 'Increase budget for testing', ...overrides };
     const data = new FormData();
     for (const [key, value] of Object.entries(entries)) data.set(key, value);
     return data;
@@ -137,7 +137,7 @@ test('save action commits updated LIVE policy and audit together', async () => {
   const f = fixture();
   const result = await f.action.saveLivePlatformBudgetAction(f.form());
   assert.deepEqual(result, { ok: true });
-  assert.deepEqual(f.stored.budget, { deadlineMs: 70000, outputTokens: 1200 });
+  assert.deepEqual(f.stored.budget, { deadlineMs: 70000, outputTokens: 1200, initialOutreachToolCalls: 16 });
   assert.equal(f.stored.editVersion, 4);
   assert.equal(f.events.length, 1);
   assert.equal(f.events[0].action, 'SET_LIVE_PLATFORM_BUDGET');
@@ -153,7 +153,7 @@ test('stale version and concurrent CAS loss return recoverable conflicts without
   const concurrent = fixture();
   concurrent.loseCas();
   assert.equal((await concurrent.action.saveLivePlatformBudgetAction(concurrent.form())).conflict, true);
-  assert.deepEqual(concurrent.stored.budget, { deadlineMs: 60000, outputTokens: 800 });
+  assert.deepEqual(concurrent.stored.budget, { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 });
   assert.equal(concurrent.events.length, 0);
 });
 
@@ -162,8 +162,65 @@ test('audit insertion failure rolls back action transaction and avoids revalidat
   f.failAudit();
   const result = await f.action.saveLivePlatformBudgetAction(f.form());
   assert.equal(result.ok, false);
-  assert.deepEqual(f.stored.budget, { deadlineMs: 60000, outputTokens: 800 });
+  assert.deepEqual(f.stored.budget, { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 });
   assert.equal(f.stored.editVersion, 3);
   assert.equal(f.events.length, 0);
   assert.deepEqual(f.counts(), { transactionCount: 1, commitCount: 0, revalidated: 0 });
+});
+
+test('missing outreach value in an old cached form cannot reset a saved non-default value', async () => {
+  const f = fixture();
+  f.stored.budget.initialOutreachToolCalls = 32;
+  const data = f.form();
+  data.delete('initialOutreachToolCalls');
+  const result = await f.action.saveLivePlatformBudgetAction(data);
+  assert.equal(result.ok, false);
+  assert.ok(result.fieldErrors.initialOutreachToolCalls);
+  assert.equal(f.stored.budget.initialOutreachToolCalls, 32);
+  assert.equal(f.stored.editVersion, 3);
+  assert.deepEqual(f.counts(), { transactionCount: 0, commitCount: 0, revalidated: 0 });
+  assert.equal(f.events.length, 0);
+});
+
+test('an outreach-only edit uses the existing atomic policy and audit transaction', async () => {
+  const f = fixture();
+  const result = await f.action.saveLivePlatformBudgetAction(f.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32' }));
+  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(f.stored.budget, { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 32 });
+  assert.equal(f.events.length, 1);
+  assert.equal(f.events[0].metadata.previousBudget.initialOutreachToolCalls, 16);
+  assert.equal(f.events[0].metadata.nextBudget.initialOutreachToolCalls, 32);
+  assert.deepEqual(f.counts(), { transactionCount: 1, commitCount: 1, revalidated: 1 });
+
+  const failed = fixture();
+  failed.failAudit();
+  assert.equal((await failed.action.saveLivePlatformBudgetAction(failed.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32' }))).ok, false);
+  assert.equal(failed.stored.budget.initialOutreachToolCalls, 16);
+  assert.equal(failed.stored.editVersion, 3);
+  assert.equal(failed.events.length, 0);
+  assert.deepEqual(failed.counts(), { transactionCount: 1, commitCount: 0, revalidated: 0 });
+});
+
+test('saving an unchanged outreach budget is a no-op without an audit or revalidation', async () => {
+  const f = fixture();
+  assert.equal((await f.action.saveLivePlatformBudgetAction(f.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '16' }))).ok, false);
+  assert.equal(f.stored.editVersion, 3);
+  assert.equal(f.events.length, 0);
+  assert.equal(f.counts().commitCount, 0);
+  assert.equal(f.counts().revalidated, 0);
+});
+
+test('outreach-only edits retain stale-version and concurrent CAS protection', async () => {
+  const stale = fixture();
+  const data = stale.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32', expectedEditVersion: '2' });
+  assert.equal((await stale.action.saveLivePlatformBudgetAction(data)).conflict, true);
+  const raced = fixture();
+  raced.loseCas();
+  assert.equal((await raced.action.saveLivePlatformBudgetAction(raced.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32' }))).conflict, true);
+  for (const f of [stale, raced]) {
+    assert.equal(f.stored.budget.initialOutreachToolCalls, 16);
+    assert.equal(f.stored.editVersion, 3);
+    assert.equal(f.events.length, 0);
+    assert.equal(f.counts().commitCount, 0);
+  }
 });

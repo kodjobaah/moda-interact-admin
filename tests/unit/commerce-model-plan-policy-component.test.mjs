@@ -8,9 +8,9 @@ const fields = loadPolicyModule('src/lib/admin/commerce-model-policy-fields.ts',
 const samplePolicy = {
   planId: 'plan-1', environment: 'DEVELOPMENT', editVersion: 2,
   budget: { deadlineMs: 70000 },
-  platformBudget: { deadlineMs: 60000, outputTokens: 800 },
-  effective: { deadlineMs: 70000, outputTokens: 800 },
-  sources: { deadlineMs: 'PRICE_PLAN', outputTokens: 'PLATFORM' },
+  platformBudget: { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 },
+  effective: { deadlineMs: 70000, outputTokens: 800, initialOutreachToolCalls: 16 },
+  sources: { deadlineMs: 'PRICE_PLAN', outputTokens: 'PLATFORM', initialOutreachToolCalls: 'PLATFORM' },
 };
 const historyEntry = {
   id: 'event-1', createdAt: '2026-10-13T12:00:00.000Z', actor: 'Super Admin',
@@ -80,11 +80,11 @@ test('independent Override/Inherit switches change sparse inputs without copying
     walk(root);
     return all;
   };
-  assert.deepEqual(toggles().map(n => n.props.checked), [true, false]);
+  assert.deepEqual(toggles().map(n => n.props.checked), [true, false, false]);
   toggles()[0].props.onChange({ target: { checked: false } });
   toggles()[1].props.onChange({ target: { checked: true } });
   root = f.render();
-  assert.deepEqual(toggles().map(n => n.props.checked), [false, true]);
+  assert.deepEqual(toggles().map(n => n.props.checked), [false, true, false]);
   assert.equal(byInputName(root, 'override_deadlineMs'), undefined);
   assert.equal(byInputName(root, 'override_outputTokens').props.value, 'on');
   assert.equal(byInputName(root, 'deadlineMs'), undefined);

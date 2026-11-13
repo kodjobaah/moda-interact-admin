@@ -5,6 +5,7 @@ import { type CommerceBudgetKey, LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS } from "@/
 import type { CommerceModelBudget } from "@/lib/admin/commerce-model-policy-fields";
 
 type PolicyKey = CommerceBudgetKey;
+const POLICY_KEYS: readonly PolicyKey[] = ["deadlineMs", "outputTokens", "initialOutreachToolCalls"];
 export type NewPlanBudgetDraft = {
   overrides: Record<PolicyKey, boolean>;
   values: Record<PolicyKey, string>;
@@ -12,27 +13,28 @@ export type NewPlanBudgetDraft = {
 };
 export function createEmptyNewPlanBudgetDraft(platform: CommerceModelBudget | null): NewPlanBudgetDraft {
   return {
-    overrides: { deadlineMs: false, outputTokens: false },
-    values: { deadlineMs: String(platform?.deadlineMs ?? ""), outputTokens: String(platform?.outputTokens ?? "") },
+    overrides: Object.fromEntries(POLICY_KEYS.map((key) => [key, false])) as Record<PolicyKey, boolean>,
+    values: Object.fromEntries(POLICY_KEYS.map((key) => [key, String(platform?.[key] ?? "")])) as Record<PolicyKey, string>,
     reason: "",
   };
 }
 export function serializeNewPlanBudgetDraft(draft: NewPlanBudgetDraft) {
   const budget: Partial<Record<PolicyKey, string>> = {};
-  for (const key of ["deadlineMs", "outputTokens"] as const) {
+  for (const key of POLICY_KEYS) {
     if (draft.overrides[key]) budget[key] = draft.values[key];
   }
   return JSON.stringify({ budget, reason: draft.reason });
 }
 export function isNewPlanBudgetDraftValid(draft: NewPlanBudgetDraft): boolean {
-  const keys = (["deadlineMs", "outputTokens"] as const).filter((key) => draft.overrides[key]);
+  const keys = POLICY_KEYS.filter((key) => draft.overrides[key]);
   if (!keys.length) return true;
   if (!draft.reason.trim() || draft.reason.trim().length > 1000) return false;
   return keys.every((key) => {
     const value = draft.values[key].trim();
     const n = Number(value);
     return /^[1-9]\d*$/.test(value) && Number.isSafeInteger(n) &&
-      (key !== "deadlineMs" || n <= LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS);
+      (key !== "deadlineMs" || n <= LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS) &&
+      (key !== "initialOutreachToolCalls" || n <= 64);
   });
 }
 
@@ -47,12 +49,12 @@ export function CommerceAgentPolicyStep({ platform, draft, onChange }: {
     <section className="space-y-4 rounded-lg border border-gray-200 p-4" aria-label="CommerceAgent Policy">
       <h2 className="text-lg font-semibold text-[var(--brand-900)]">CommerceAgent Policy</h2>
       <p className="text-sm text-gray-600">Optional LIVE budget overrides for this new Price Plan. Configure them before saving; unselected fields inherit the current Platform policy. Budget changes will be saved and audited together with plan creation.</p>
-      <div className="rounded bg-gray-50 p-3 text-xs text-gray-700">Default: {platform.deadlineMs.toLocaleString()} ms · {platform.outputTokens.toLocaleString()} output tokens (LIVE Platform)</div>
+      <div className="rounded bg-gray-50 p-3 text-xs text-gray-700">LIVE Platform defaults: {platform.deadlineMs.toLocaleString()} ms · {platform.outputTokens.toLocaleString()} output tokens · {platform.initialOutreachToolCalls.toLocaleString()} initial outreach tool calls</div>
       <BudgetPolicyFields
         values={draft.values} onChange={(key, value) => onChange({ ...draft, values: { ...draft.values, [key]: value } })}
         optional overrides={draft.overrides}
         onOverrideChange={(key, enabled) => onChange({ ...draft, overrides: { ...draft.overrides, [key]: enabled } })}
-        inherited={{ deadlineMs: { value: platform.deadlineMs, source: "LIVE Platform" }, outputTokens: { value: platform.outputTokens, source: "LIVE Platform" } }}
+        inherited={Object.fromEntries(POLICY_KEYS.map((key) => [key, { value: platform[key], source: "LIVE Platform" }])) as Record<PolicyKey, { value: number; source: string }>}
       />
       <p className="text-xs text-gray-600">The current LIVE Background turn envelope supports deadlines up to {LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS.toLocaleString()} ms.</p>
       {anyOverride ? <label className="block text-sm font-semibold">Policy audit reason
