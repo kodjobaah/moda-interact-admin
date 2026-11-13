@@ -31,11 +31,12 @@ function translationInput() {
 }
 
 test("default-off and toggled-off preserve exact legacy source, prepared shape and digests", () => {
-  const legacy = newWrapperDraft("AI");
+  // Historical saved shape is explicit: new editable drafts now omit an exactly empty footer.
+  const legacy = { ...newWrapperDraft("AI"), footer: [{ type: "text" as const, value: "" }] };
   const expected = { schemaVersion: 1, family: "MODA_CONVERSATION_WRAPPER", responseSlot: "response.body", header: [{ kind: "text", value: "" }], body: [{ kind: "responseSlot", name: "response.body" }], footer: [{ kind: "text", value: "" }], conditionals: [] };
   assert.equal(Object.hasOwn(legacy, "productImage"), false);
   assert.deepEqual(compileTemplateAst(legacy), expected);
-  const restored = setWrapperProductImage(imageDraft(), false);
+  const restored = setWrapperProductImage(setWrapperProductImage(legacy, true), false);
   assert.deepEqual(restored, legacy);
   assert.equal(templateHash(restored), templateHash(legacy));
   assert.equal(templateHash(compileTemplateAst(restored)), templateHash(expected));

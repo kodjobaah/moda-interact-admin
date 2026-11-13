@@ -61,7 +61,7 @@ export function newWrapperDraft(audience: WrapperTemplateAst["audience"] = "SHAR
   return {
     schemaVersion: 1, family: "MODA_CONVERSATION_WRAPPER", sourceLanguageTag: "en", audience,
     header: [{ type: "text", value: "" }], body: [{ type: "slot", name: "response.body" }],
-    footer: [{ type: "text", value: "" }], conditionals: [],
+    footer: [], conditionals: [],
   };
 }
 export function addVariable(nodes: ContentNode[], name: SemanticVariable): ContentNode[] {
@@ -74,7 +74,11 @@ export function removeNode<T extends WrapperNode>(nodes: T[], index: number): T[
   return nodes.filter((_, pos) => pos !== index);
 }
 export function cloneDraft(value: TemplateAst): TemplateAst {
-  return structuredClone(value);
+  const draft = structuredClone(value);
+  // Only editable clones are normalized; saved records and compiler hashes stay immutable.
+  if (draft.family === "MODA_CONVERSATION_WRAPPER" &&
+      draft.footer.every((node) => node.type === "text" && node.value === "")) draft.footer = [];
+  return draft;
 }
 
 /** Human-readable editing notation. The AST remains the only saved representation. */

@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { requireCommonLayout } from "./common-layout";
 import { templateHash } from "./identifiers";
-import { checkWrapperEligibility } from "../wrappers/eligibility";
+import { checkWrapperEligibility, WRAPPER_STAGING_STATUSES } from "../wrappers/eligibility";
 
 type LayoutReader = Pick<Prisma.TransactionClient, "whatsAppTemplateDefinition">;
 /** Re-read all reviewed locales from the same immutable SHARED revision. Active pointers are deliberately not changed. */
@@ -21,4 +21,19 @@ export async function assertSavedCommonLayout(db: LayoutReader, raw: unknown): P
   const ref = requireCommonLayout(raw);
   const saved = await readSavedCommonLayout(db, ref.definitionId, ref.languageTag, ref.sourceHash);
   if (templateHash(saved) !== templateHash(ref)) throw new Error("Common layout snapshot differs from its saved immutable locale. Refresh the selection.");
+}
+
+/** Selector and save gates share the same immutable readiness checks; status alone is never readiness. */
+export async function listReviewedCommonLayouts(db: LayoutReader): Promise<CommonRecoveryLayoutReference[]> {
+  const rows = await db.whatsAppTemplateDefinition.findMany({
+    where: { kind: "MODA_CONVERSATION_WRAPPER", audience: "SHARED", retiredAt: null,
+      status: { in: WRAPPER_STAGING_STATUSES } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 40, select: { id: true },
+  });
+  const result: CommonRecoveryLayoutReference[] = [];
+  for (const row of rows) {
+    try { result.push(await readSavedCommonLayout(db, row.id, "en")); }
+    catch { /* Incomplete or invalid immutable sources remain unavailable. */ }
+  }
+  return result;
 }
