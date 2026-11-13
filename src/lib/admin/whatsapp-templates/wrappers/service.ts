@@ -1,3 +1,5 @@
+import { lockCommonActivation } from "../common-activation/gates";
+import { requireCommonLayout } from "../authoring/common-layout";
 import { Prisma } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "../authoring/service";
@@ -34,10 +36,26 @@ export async function activateConversationWrapperInTransaction(input: ActivateWr
   tx: Prisma.TransactionClient;
   now?: Date;
   auditMetadata?: Prisma.InputJsonObject;
+  coordinatedCommonActivation?: true;
 }): Promise<ActivateWrapperResult> {
   requireTemplateSuperAdmin(deps.principal);
   checkInput(input);
   const tx = deps.tx;
+  await lockCommonActivation(tx);
+  if (input.audience === "SHARED" && !deps.coordinatedCommonActivation) {
+    const current = await tx.whatsAppConversationWrapperActiveSlot.findUnique({ where: { audience: "SHARED" } });
+    for (const id of new Set([input.definitionId, ...(current ? [current.definitionId] : [])])) {
+      let common = false;
+      const source = await tx.whatsAppTemplateDefinition.findUnique({ where: { id }, include: { locales: true } });
+      const english = source?.locales.find(locale => locale.languageTag === "en");
+      // Retiring a current revision must not reopen the unsafe legacy pointer path.
+      try { requireCommonLayout({ schemaVersion: 1, definitionId: id, sourceHash: source?.sourceHash,
+        localeId: english?.id, languageTag: "en", contentHash: english?.contentHash,
+        prepared: (english?.localeAst as { prepared?: unknown } | null)?.prepared }); common = true; }
+      catch { /* Non-common legacy wrappers retain their existing path. */ }
+      if (common) throw new WrapperRequestError("Use coordinated common-layout activation to switch the complete approved Meta cohort and SHARED pointer together.");
+    }
+  }
   const definition = await tx.whatsAppTemplateDefinition.findUnique({
     where: { id: input.definitionId }, include: { locales: true },
   });

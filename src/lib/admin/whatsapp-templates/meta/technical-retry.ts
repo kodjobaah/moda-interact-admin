@@ -1,3 +1,4 @@
+import { lockCommonActivation, assertCommonSourceGate } from "../common-activation/gates";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
@@ -23,6 +24,8 @@ export async function requestMetaTechnicalRetry(input: { definitionId: string; r
     throw new MetaSubmissionError("INVALID_INPUT", "Invalid technical retry request.");
   }
   return deps.db.$transaction(async (tx) => {
+    await lockCommonActivation(tx);
+    await assertCommonSourceGate(tx, input.definitionId, "submission");
     const registration = await tx.whatsAppTemplateMetaRegistration.findUnique({ where: { id: input.registrationId },
       include: { locale: { select: { definitionId: true } } } });
     if (!registration || registration.locale.definitionId !== input.definitionId || registration.wabaId !== deps.trustedWabaId) {

@@ -9,7 +9,7 @@ import { MAX_SELECTED_SHOPS } from "./types";
 
 export const LANGUAGES = [...MODA_SUPPORTED_LANGUAGE_TAGS];
 const ID = /^[a-zA-Z0-9_-]{1,191}$/;
-const BINDING = /^(?:customer\.firstName|shop\.(?:name|categoryName)|checkout\.(?:url|itemsSummary)|offer\.(?:code|description)|promotion\.(?:productName|productUrl|offerDescription|code)|shopBrand\.(?:brandName|logoUrl|logoAltText|logoWidth|logoHeight|squareLogoUrl|squareLogoAltText|coverImageUrl))$/;
+const BINDING = /^(?:customer\.firstName|shop\.(?:name|categoryName|websiteUrl)|checkout\.(?:url|itemsSummary)|offer\.(?:code|description)|promotion\.(?:productName|productUrl|offerDescription|code)|shopBrand\.(?:brandName|logoUrl|logoAltText|logoWidth|logoHeight|squareLogoUrl|squareLogoAltText|coverImageUrl))$/;
 
 export class PublicationError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "PublicationError"; }

@@ -26,6 +26,7 @@ export default async function ConversationWrappersPage({ searchParams }: { searc
       </nav>
       <h1 className="mb-2 text-2xl font-bold">Publish conversation wrappers</h1>
       <p className="mb-5 text-sm text-slate-700">Platform-level SHARED, AI and HUMAN pointers. No Meta submission or merchant assignment.</p>
+      <p className="mb-4"><Link className="underline" href="/system-controls/whatsapp-templates/common-activation">Review and activate the common recovery layout with approved Meta replacements</Link></p>
       <WrapperPublicationPanel key={audience + ":" + (workspace.selectedDefinitionId ?? "none")} workspace={workspace} audience={audience} />
     </div>
   </AdminShell>;

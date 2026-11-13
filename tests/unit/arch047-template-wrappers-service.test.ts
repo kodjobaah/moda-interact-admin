@@ -11,6 +11,7 @@ function fake() {
   const db = { $transaction: async (execute: (tx: unknown) => Promise<unknown>) => {
     const snapshot = structuredClone(state);
     const tx = {
+      $queryRaw: async (sql: TemplateStringsArray) => { assert.match(sql.join(""), /pg_advisory_xact_lock/); return [{ acquired: 1 }]; },
       whatsAppTemplateDefinition: {
         findUnique: async ({ where }: {where:{id:string}}) => definitions.find((row) => row.id === where.id) ?? null,
         updateMany: async ({ where, data }: { where:{id:string;publishedAt:null}; data:{publishedAt:Date;status:string} }) => {

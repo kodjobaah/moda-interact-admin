@@ -1,3 +1,4 @@
+import { lockCommonActivation, assertCommonSourceGate } from "../common-activation/gates";
 import { Prisma } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "../authoring/service";
@@ -26,6 +27,8 @@ export async function confirmMetaSubmission(input: ConfirmMetaInput, deps: {
   requireTemplateSuperAdmin(deps.principal);
   assertInput(input);
   const attempt = async () => deps.db.$transaction(async (tx) => {
+    await lockCommonActivation(tx);
+    await assertCommonSourceGate(tx, input.definitionId, "submission");
     const plan = await readMetaPlan(tx, input.definitionId, deps.trustedWabaId);
     if (plan.digest !== input.expectedDigest) throw new MetaSubmissionError("STALE_PREVIEW", "The submitted content or sender changed. Refresh and review again.");
     const existing = await examineExistingRegistrations(tx, plan);
