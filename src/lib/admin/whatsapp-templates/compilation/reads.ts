@@ -3,9 +3,9 @@ import { requirePlatformAdminRead } from "../../../auth/platform-admin";
 import { prisma } from "../../../prisma";
 import { requireTemplateSuperAdmin } from "../authoring/service";
 import { templateHash } from "../authoring/identifiers";
-import { compileTemplateAst } from "../authoring/compiler";
+import { verifyFrozenTemplateProjection } from "../authoring/frozen-projection";
 import { makeExamplePreview } from "../authoring/preview";
-import { validateTemplateAst } from "../authoring/validation";
+import { validateTemplateStructure } from "../authoring/validation";
 import type { ImmutableAuthoringRecord, TemplateAst } from "../authoring/types";
 import { isCompletedTranslationItem } from "./service";
 import type { ReviewLocaleDTO, ReviewWorkspaceDTO } from "./contracts";
@@ -25,10 +25,10 @@ function savedLocale(record: unknown, contentHash: string | null, family: Templa
 } {
   if (!record || typeof record !== "object" || Array.isArray(record)) throw new Error("Saved locale content missing.");
   const saved = record as ImmutableAuthoringRecord;
-  const checked = validateTemplateAst(saved.authoring, { contentLanguageTag: languageTag });
+  const checked = validateTemplateStructure(saved.authoring, { contentLanguageTag: languageTag });
   if (saved.schemaVersion !== 1 || !checked.ok || checked.value.family !== family ||
       !saved.prepared || templateHash(saved.prepared) !== contentHash ||
-      templateHash(compileTemplateAst(checked.value)) !== contentHash) {
+      templateHash(verifyFrozenTemplateProjection(saved, contentHash)) !== contentHash) {
     throw new Error("Finalised locale failed content or compilation integrity checks.");
   }
   return { record: saved, preview: makeExamplePreview(saved.prepared, saved.authoring.family === "META_RECOVERY" ? saved.authoring.commonLayout : undefined) };
@@ -47,8 +47,9 @@ export async function getTranslationReviewWorkspace(definitionId: string): Promi
   if (!definition) return null;
   const englishRow = definition.locales.find((locale) => locale.languageTag === "en");
   const english = validateEnglishEnvelope(englishRow?.localeAst, definition.sourceHash, englishRow?.contentHash ?? null);
-  const validated = validateTemplateAst(english.authoring);
+  const validated = validateTemplateStructure(english.authoring);
   if (!validated.ok || validated.value.family !== definition.kind) throw new Error("Saved source AST is invalid.");
+  verifyFrozenTemplateProjection(english, englishRow?.contentHash ?? null);
   const englishDTO: ReviewLocaleDTO = {
     languageTag: "en", providerLanguageCode: providerLanguageCode("en", english.authoring.family),
     status: "SOURCE", reason: null, preview: makeExamplePreview(english.prepared, english.authoring.family === "META_RECOVERY" ? english.authoring.commonLayout : undefined), authoring: english.authoring,

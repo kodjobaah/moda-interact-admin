@@ -11,14 +11,20 @@ export function requireCommonLayout(raw: unknown): CommonRecoveryLayoutReference
   return result.reference;
 }
 /** Provider projection of the saved structure, not another authored frame. Shared joins sections with one newline. */
-export function commonMetaBody(draft: MetaTemplateAst): ContentNode[] {
+function projectCommonMetaBody(draft: MetaTemplateAst, historical: boolean): ContentNode[] {
   if (!draft.commonLayout) return draft.body;
   const { prepared } = requireCommonLayout(draft.commonLayout);
   const nodes = (tokens: typeof prepared.header): ContentNode[] => tokens.map(token => {
     if (token.kind === "responseSlot") throw new Error("Common frame cannot contain a response slot outside its body.");
     return token.kind === "text" ? { type: "text", value: token.value } : { type: "variable", name: token.name };
   });
-  const middle = [...draft.body, ...(draft.footer.length ? [{ type: "text" as const, value: "\n" }, ...draft.footer] : [])];
-  return [...nodes(prepared.header), { type: "text", value: "\n" }, ...middle,
-    { type: "text", value: "\n" }, ...nodes(prepared.conditionals[0].tokens)];
+  const optOut: ContentNode[] = draft.footer.length ? [{ type: "text", value: "\n" }, ...draft.footer] : [];
+  const checkout: ContentNode[] = [{ type: "text", value: "\n" }, ...nodes(prepared.conditionals[0].tokens)];
+  // Historical order is verification-only: never use it for new authoring/submissions.
+  return [...nodes(prepared.header), { type: "text", value: "\n" }, ...draft.body,
+    ...(historical ? [...optOut, ...checkout] : [...checkout, ...optOut])];
 }
+
+export function commonMetaBody(draft: MetaTemplateAst): ContentNode[] { return projectCommonMetaBody(draft, false); }
+/** Only the server-side frozen verifier may use this exact pre-ADMIN007 ordering. */
+export function historicalCommonMetaBody(draft: MetaTemplateAst): ContentNode[] { return projectCommonMetaBody(draft, true); }

@@ -124,7 +124,7 @@ test("IMAGE confirmation persists handle-free READY_TO_SUBMIT intent and replays
   const image = newMetaDraft("INITIAL", "CODE_OFFER");
   image.promotionTarget = "CHECKOUT";
   image.shopBrandMediaRole = "CHECKOUT_PRODUCT";
-  image.body = [{ type: "variable", name: "checkout.itemsSummary" },
+  image.body = [{ type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
     { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" },
     { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
     { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
@@ -270,4 +270,23 @@ test("raw PostgreSQL serialization conflicts retry the full confirmation, unrela
  broken.db.$transaction=async()=>{attempts++;throw failure;};
  await assert.rejects(confirmMetaSubmission(confirmation(broken.f),deps(broken)),e=>e===failure);
  assert.equal(attempts,1);assert.equal(broken.registrations.length,0);assert.equal(broken.audits.length,0);
+});
+
+test("technical retry refuses an invalid historical BODY even with matching provider-absence evidence", async () => {
+  const f = mockedDb(); await confirmMetaSubmission(confirmation(f.f), deps(f));
+  const row = f.registrations[0];
+  row.submissionState = "SUBMISSION_UNCERTAIN";
+  row.lastSubmittedAt = new Date("2026-10-25T12:00:00Z");
+  row.lastReconciledAt = new Date("2026-10-25T12:05:00Z");
+  f.events.push({ id: "absence-boundary", registrationId: row.id, source: "RECONCILIATION",
+    eventType: "PROVIDER_ABSENT_CONFIRMED", outcome: "NOT_FOUND", processedAt: row.lastReconciledAt,
+    receivedAt: new Date("2026-10-25T12:04:00Z"), requestDigest: row.submittedContentHash,
+    wabaId: row.wabaId, providerTemplateName: row.providerTemplateName, providerLanguageCode: row.providerLanguageCode });
+  for (const text of ["{{1}} has your basket.", "Your basket: {{1}}", "Your basket: {{1}}...", "{{1}}", " "]) {
+    row.componentsSnapshot = [{ type: "BODY", text }];
+    const before = JSON.stringify({ registrations: f.registrations, events: f.events, audits: f.audits });
+    await assert.rejects(requestMetaTechnicalRetry({ definitionId: f.f.definition.id, registrationId: row.id }, deps(f)), /BODY|meaningful fixed text/);
+    assert.equal(JSON.stringify({ registrations: f.registrations, events: f.events, audits: f.audits }), before);
+  }
+  assert.equal(f.events.filter(event => event.eventType === "TECHNICAL_RETRY_REQUESTED").length, 0);
 });

@@ -130,6 +130,13 @@ export function makeTranslationSourceSnapshot(input: {
       templateHash(compileTemplateAst(record.authoring)) !== input.englishContentHash) {
     throw new Error("Saved prepared projection differs from immutable English source or bindings.");
   }
+  if (record.authoring.family === "META_RECOVERY" && record.authoring.commonLayout) {
+    try {
+      if (templateHash(compileTemplateAst(record.authoring)) !== input.englishContentHash) throw new Error("Historical projection");
+    } catch {
+      throw new Error("Saved Meta source uses a historical or invalid provider projection. Clone as New and review corrected content before starting translations; saved bytes are unchanged.");
+    }
+  }
   const segments = extractTranslationSegments(input.definitionId, record.authoring);
   if (!segments.length) throw new Error("English template has no translatable text.");
   const snapshot: TemplateTranslationSourceSnapshot = {

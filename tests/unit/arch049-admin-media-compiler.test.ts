@@ -50,8 +50,8 @@ test("CHECKOUT_PRODUCT IMAGE headers compile only for a promotion target and fre
   const draft = newMetaDraft("INITIAL", "CODE_OFFER");
   draft.promotionTarget = "CHECKOUT";
   draft.shopBrandMediaRole = "CHECKOUT_PRODUCT";
-  draft.body = [{ type: "variable", name: "checkout.itemsSummary" },
-    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+  draft.body = [{ type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " has offer " }, { type: "variable", name: "offer.description" }, { type: "text", value: " with code " }, { type: "variable", name: "offer.code" }, { type: "text", value: " subject to eligibility." }];
   draft.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
 
   assert.equal(validateTemplateAst(draft).ok, true);
@@ -95,6 +95,10 @@ test("frozen IMAGE intent rejects injected sample handles and URLs", () => {
   if (prepared.family !== "META_RECOVERY") return;
   const definition = { id: DEF_ID, kind: "META_RECOVERY", purpose: "INITIAL", offerType: "NO_OFFER",
     providerTemplateName: "moda_example_media", category: "MARKETING", sourceHash: templateHash(draft), sourceLanguageTag: "en", status: "SAVED" };
+  const missingHeader = { ...structuredClone(prepared), components: prepared.components.filter(component => component.type !== "HEADER") };
+  assert.throws(() => frozenLocaleSnapshot({ ...en, localeAst: { schemaVersion: 1, authoring: draft, prepared: missingHeader },
+    contentHash: templateHash(missingHeader) }, definition), (err: unknown) =>
+    err instanceof MetaSubmissionError && err.reasonCode === "IMAGE_SAMPLE_UNTRUSTED");
   for (const example of [{ header_handle: ["untrusted-handle"] }, { url: "https://untrusted.example/image.jpg" }]) {
     const locale = { ...en, localeAst: { schemaVersion: 1, authoring: draft,
       prepared: { ...structuredClone(prepared), components: [{ ...prepared.components[0], example }] } },

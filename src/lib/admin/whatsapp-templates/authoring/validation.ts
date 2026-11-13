@@ -1,5 +1,6 @@
 import { ConversationProductImageBindingSchema } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { requireCommonLayout } from "./common-layout";
+import { metaBodyIssues, projectMetaBody } from "./meta-body";
 import { eligibleHeaderVariables, eligibleVariables } from "./registry";
 import { INITIAL_REPLY_INSTRUCTIONS } from "./initial-reply-instructions";
 import { RecoveryTemplateHeaderMediaRoleSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
@@ -12,7 +13,7 @@ const ownKeys = (o: Record<string, unknown>, keys: string[]) => Object.keys(o).e
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const enumMember = (v: unknown, choices: readonly string[]): v is string => typeof v === "string" && choices.includes(v);
 
-export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {}): { ok: true; value: TemplateAst } | { ok: false; issues: AuthoringIssue[] } {
+export function validateTemplateStructure(raw: unknown, options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {}): { ok: true; value: TemplateAst } | { ok: false; issues: AuthoringIssue[] } {
   const issues: AuthoringIssue[] = [];
   const fail = (path: string, message: string) => issues.push({ path, message });
   if (!object(raw)) return { ok: false, issues: [{ path: "root", message: "Expected a template object." }] };
@@ -205,4 +206,20 @@ export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?
     if (count !== 1) fail("body", "Exactly one response.body slot is required.");
   }
   return issues.length ? { ok: false, issues } : { ok: true, value: raw as TemplateAst };
+}
+
+/** New authoring/reconstruction admission always validates the final provider BODY. */
+export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {}): ReturnType<typeof validateTemplateStructure> {
+  const checked = validateTemplateStructure(raw, options);
+  if (!checked.ok || checked.value.family !== "META_RECOVERY") return checked;
+  try {
+    const projected = projectMetaBody(checked.value);
+    const issues = metaBodyIssues(projected.text);
+    if (checked.value.commonLayout && projected.bindings.filter(binding => binding.variable === "checkout.url").length !== 1) {
+      issues.push({ path: "body", message: "Common Meta BODY must bind checkout.url exactly once through the common checkout footer. Review and remove any duplicate inline checkout binding in a new source." });
+    }
+    return issues.length ? { ok: false, issues } : checked;
+  } catch (error) {
+    return { ok: false, issues: [{ path: "body", message: error instanceof Error ? error.message : "Unable to project the final Meta BODY." }] };
+  }
 }

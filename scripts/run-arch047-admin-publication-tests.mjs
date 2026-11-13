@@ -22,6 +22,8 @@ const suites = {
     "tests/unit/arch047-template-publication-pure.test.ts",
     "tests/unit/arch047-template-publication-components.test.tsx",
   ],
+  "authoring-postgres": ["tests/integration/arch047-template-authoring.postgres.test.ts"],
+  "compilation-postgres": ["tests/integration/arch047-template-compilation.postgres.test.ts"],
   "meta-postgres": ["tests/integration/arch047-template-meta.postgres.test.ts"],
   postgres: ["tests/integration/arch047-template-publication.postgres.test.ts"],
   "common-activation-postgres": ["tests/integration/arch075-common-activation.postgres.test.ts"],
@@ -29,7 +31,7 @@ const suites = {
 };
 const selected = suites[process.argv[2]];
 if (!selected || process.argv.length !== 3) {
-  throw new Error("Usage: node scripts/run-arch047-admin-publication-tests.mjs unit|postgres");
+  throw new Error(`Usage: node scripts/run-arch047-admin-publication-tests.mjs ${Object.keys(suites).join("|")}`);
 }
 
 // Keep bundles inside the Admin repository so normal package resolution finds

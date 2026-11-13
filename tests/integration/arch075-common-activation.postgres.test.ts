@@ -19,7 +19,7 @@ import {assertCommonSourceGate} from "../../src/lib/admin/whatsapp-templates/com
 import {activateConversationWrapper} from "../../src/lib/admin/whatsapp-templates/wrappers/service.ts";
 import {progressForOperation} from "../../src/lib/admin/whatsapp-templates/publishing/operation.ts";
 if(process.env.ARCH047_DISPOSABLE_POSTGRES!=="1"||new URL(process.env.DATABASE_URL!).hostname!=="127.0.0.1")throw Error("Disposable localhost fixture required");
-const db=new PrismaClient();after(()=>db.$disconnect());const waba="1234567890";process.env.WHATSAPP_BUSINESS_ACCOUNT_ID=waba;
+const db=new PrismaClient();after(()=>db.$disconnect());const waba="1234567890";process.env.DEPLOYMENT_ENVIRONMENT_NAME="test";process.env.WHATSAPP_BUSINESS_ACCOUNT_ID=waba;
 const id="activation-"+randomUUID();const principal={id,role:"SUPER_ADMIN" as const,developmentBypass:false};
 const json=(v:unknown)=>v as Prisma.InputJsonValue;
 async function common(label="Welcome to "){
@@ -32,6 +32,7 @@ async function common(label="Welcome to "){
 }
 async function meta(commonId?:string){
  const draft:MetaTemplateAst=structuredClone(RECOVERY_SCENARIOS.find(s=>s.draft.stage==="FOLLOW_UP"&&s.draft.offerType==="NO_OFFER")!.draft);
+ draft.footer=[{type:"text",value:"Reply STOP to opt out."}];
  if(commonId){draft.commonLayout=await readSavedCommonLayout(db,commonId,"en");draft.shopBrandMediaRole="LOGO";draft.header=[];}
  const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft},{db,principal});
  for(const tag of REVIEW_LANGUAGES.filter(t=>t!=="en")){

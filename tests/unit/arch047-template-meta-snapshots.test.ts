@@ -32,7 +32,7 @@ test("CHECKOUT_PRODUCT IMAGE plans are immutable, handle-free, and reject locale
   const image = newMetaDraft("INITIAL", "CODE_OFFER");
   image.promotionTarget = "CHECKOUT";
   image.shopBrandMediaRole = "CHECKOUT_PRODUCT";
-  image.body = [{ type: "variable", name: "checkout.itemsSummary" },
+  image.body = [{ type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
     { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" },
     { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
     { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
@@ -129,7 +129,7 @@ test("promotion target is frozen in every locale approval and locale target drif
   const f = fixture();
   const checkout = newMetaDraft("INITIAL", "CODE_OFFER");
   checkout.promotionTarget = "CHECKOUT";
-  checkout.body = [{ type: "variable", name: "checkout.itemsSummary" },
+  checkout.body = [{ type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
     { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" },
     { type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
     { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." }];
@@ -243,7 +243,7 @@ test("changing WABA or a locale changes the confirmation digest", () => {
   assert.notEqual(a.digest, b.digest);
   const translated = f.locales.find((l) => l.languageTag === "fr")!;
   translated.localeAst = structuredClone(translated.localeAst);
-  (translated.localeAst as any).authoring.body[1].value = " ensuite ";
+  (translated.localeAst as any).authoring.body[2].value = " ensuite ";
   const prepared = compileTemplateAst((translated.localeAst as any).authoring);
   (translated.localeAst as any).prepared = prepared;
   translated.contentHash = templateHash(prepared);

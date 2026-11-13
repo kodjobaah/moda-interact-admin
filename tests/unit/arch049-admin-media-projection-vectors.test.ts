@@ -40,8 +40,8 @@ test("CHECKOUT_PRODUCT role stays in the immutable source while translation hand
   const draft = newMetaDraft("INITIAL", "CODE_OFFER");
   draft.promotionTarget = "CHECKOUT";
   draft.shopBrandMediaRole = "CHECKOUT_PRODUCT";
-  draft.body = [{ type: "variable", name: "checkout.itemsSummary" },
-    { type: "variable", name: "offer.description" }, { type: "variable", name: "offer.code" }];
+  draft.body = [{ type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " has offer " }, { type: "variable", name: "offer.description" }, { type: "text", value: " with code " }, { type: "variable", name: "offer.code" }, { type: "text", value: " subject to eligibility." }];
   draft.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
 
   const keys = sourceLocations(draft).map((segment) => segment.key);

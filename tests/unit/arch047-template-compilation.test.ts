@@ -68,7 +68,7 @@ test("initial contextual Reply merchant binding survives every supported locale 
 test("English/French/German/Japanese: reordered semantic tokens keep correct Meta binding positions", () => {
   const english = recoveryFixture(); const f = compilationFixture(english);
   const original = JSON.stringify(english);
-  const translated = replaced(f.translated, "body", "{{5}} und {{2}} / {{3}} {{4}} et {{6}}");
+  const translated = replaced(f.translated, "body", "Voici {{5}} und {{2}} / {{3}} {{4}} et {{6}}");
   for (const language of ["fr", "de", "ja", "zh-Hans"]) {
     const candidate = f.run(language, translated);
     assert.equal(candidate.record.authoring.sourceLanguageTag, "en");
@@ -99,7 +99,7 @@ test("all 20 supported language/provider identities stay canonical", () => {
 
 test("all eight canonical shopBrand fields remain semantic identifiers, not sample values", () => {
   const ast = newMetaDraft("FOLLOW_UP");
-  ast.body = SHOP_BRAND_VARIABLES.flatMap((name): ContentNode[] => [{ type: "variable", name }, { type: "text", value: "," }]);
+  ast.body = [{ type: "text", value: "Brand details: " }, ...SHOP_BRAND_VARIABLES.flatMap((name): ContentNode[] => [{ type: "variable", name }, { type: "text", value: "," }]), { type: "text", value: " for this shop." }];
   const f = compilationFixture(ast);
   const candidate = f.run();
   assert.equal(candidate.record.prepared.family, "META_RECOVERY");

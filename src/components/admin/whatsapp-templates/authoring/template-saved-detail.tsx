@@ -1,12 +1,18 @@
 import Link from "next/link";
-import { validateTemplateAst } from "@/lib/admin/whatsapp-templates/authoring/validation";
+import { verifyFrozenTemplateProjection } from "@/lib/admin/whatsapp-templates/authoring/frozen-projection";
+import { templateHash } from "@/lib/admin/whatsapp-templates/authoring/identifiers";
 import { makeExamplePreview } from "@/lib/admin/whatsapp-templates/authoring/preview";
 import type { TemplateDetail } from "@/lib/admin/whatsapp-templates/authoring/types";
 import { TemplateReadOnlyPreview } from "./template-read-only-preview";
 
 export function TemplateSavedDetail({ detail }: { detail: TemplateDetail }) {
-  const preview = detail.english?.authoring && validateTemplateAst(detail.english.authoring).ok && detail.english.prepared
-    ? makeExamplePreview(detail.english.prepared, detail.english.authoring.family === "META_RECOVERY" ? detail.english.authoring.commonLayout : undefined) : null;
+  let preview = null;
+  if (detail.english) {
+    try {
+      const prepared = verifyFrozenTemplateProjection(detail.english, templateHash(detail.english.prepared));
+      preview = makeExamplePreview(prepared, detail.english.authoring.family === "META_RECOVERY" ? detail.english.authoring.commonLayout : undefined);
+    } catch { /* Historical invalid/tampered sources remain read-only and are never recompiled for display. */ }
+  }
   return <article className="space-y-4 rounded-lg border bg-white p-4" aria-label="Saved immutable template">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Saved definition (read only)</h2>
       {detail.english && <div className="flex flex-wrap gap-2">
