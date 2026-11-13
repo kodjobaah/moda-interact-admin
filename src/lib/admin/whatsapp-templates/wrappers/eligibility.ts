@@ -7,6 +7,8 @@ import type { RuntimeToken, WrapperPrepared } from "../authoring/types";
 import { REVIEW_LANGUAGES } from "../compilation/language-codes";
 import type { Audience, WrapperDefinitionRow, WrapperEligibility } from "./contracts";
 
+export const WRAPPER_STAGING_STATUSES = ["SAVED", "TRANSLATION_QUEUED", "TRANSLATING", "PARTIALLY_FAILED", "READY_FOR_REVIEW", "PUBLISHED"];
+
 function fail(reason: string): WrapperEligibility { return { eligible: false, reason }; }
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -32,7 +34,7 @@ function preservesProtectedTokens(source: WrapperPrepared, translation: WrapperP
 export function checkWrapperEligibility(definition: WrapperDefinitionRow, audience: Audience): WrapperEligibility {
   if (definition.kind !== "MODA_CONVERSATION_WRAPPER" || definition.audience !== audience ||
       !definition.createdByAdminId || definition.sourceLanguageTag !== "en" || definition.astSchemaVersion !== 1 ||
-      !["SAVED", "PUBLISHED"].includes(definition.status) || definition.retiredAt !== null) {
+      !WRAPPER_STAGING_STATUSES.includes(definition.status) || definition.retiredAt !== null) {
     return fail("Definition is not an available, centrally authored wrapper for the selected audience.");
   }
   if (!/^[a-f0-9]{64}$/.test(definition.sourceHash)) return fail("Invalid immutable English source digest.");
