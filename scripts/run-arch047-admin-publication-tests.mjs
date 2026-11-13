@@ -22,6 +22,7 @@ const suites = {
     "tests/unit/arch047-template-publication-pure.test.ts",
     "tests/unit/arch047-template-publication-components.test.tsx",
   ],
+  "meta-postgres": ["tests/integration/arch047-template-meta.postgres.test.ts"],
   postgres: ["tests/integration/arch047-template-publication.postgres.test.ts"],
   "common-activation-postgres": ["tests/integration/arch075-common-activation.postgres.test.ts"],
   "common-layout-postgres": ["tests/integration/arch075-common-layout.postgres.test.ts"],

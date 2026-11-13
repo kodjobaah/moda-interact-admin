@@ -7,6 +7,7 @@ import { confirmMetaSubmission } from "../../src/lib/admin/whatsapp-templates/me
 import { readMetaStatus } from "../../src/lib/admin/whatsapp-templates/meta/status.ts";
 import { requestMetaReconciliation } from "../../src/lib/admin/whatsapp-templates/meta/reconcile.ts";
 import { makeMetaSubmissionPlan } from "../../src/lib/admin/whatsapp-templates/meta/snapshot.ts";
+import { insertRegistrations } from "../../src/lib/admin/whatsapp-templates/meta/repository.ts";
 import type { MetaDatabase } from "../../src/lib/admin/whatsapp-templates/meta/repository.ts";
 
 if (process.env.ARCH047_DISPOSABLE_POSTGRES !== "1") throw new Error("Refusing non-disposable PostgreSQL integration execution.");
@@ -57,6 +58,11 @@ test("serializable 20-row registration, no-op replay, provider event status and 
   assert.equal(results.filter((r) => !r.replay).length, 1);
   const rows = await db.whatsAppTemplateMetaRegistration.findMany({ where: { locale: { definitionId: f.definition.id } } });
   assert.equal(rows.length, 20);
+  const english = await db.whatsAppTemplateLocale.findFirstOrThrow({ where: { definitionId: f.definition.id, languageTag: "en" } });
+  assert.equal(english.status, "REVIEWED"); assert.equal(english.reviewedByAdminId, actorId); assert.ok(english.reviewedAt);
+  assert.deepEqual(english.localeAst, f.locales.find(l => l.languageTag === "en")!.localeAst);
+  assert.equal(english.contentHash, f.locales.find(l => l.languageTag === "en")!.contentHash);
+  assert.equal(await db.commerceAuditEvent.count({ where: { action: "REVIEW_WHATSAPP_TEMPLATE_LOCALE", operationId: `${f.definition.id}:en` } }), 1);
   assert.equal(new Set(rows.map((r) => r.providerLanguageCode)).size, 20);
   assert.ok(rows.every((r) => r.providerStatus === null && r.submissionState === "READY_TO_SUBMIT"));
   assert.equal(await db.commerceAuditEvent.count({ where: { actorAdminId: actorId, action: "REQUEST_WHATSAPP_TEMPLATE_META_SUBMISSION" } }), 1);
@@ -90,6 +96,7 @@ test("serializable 20-row registration, no-op replay, provider event status and 
 
 test("forced audit failure leaves no registration; stale digest denies all writes", async () => {
   const f = await seed();
+  const enBefore = await db.whatsAppTemplateLocale.findFirstOrThrow({where:{definitionId:f.definition.id,languageTag:"en"}});
   const failing: MetaDatabase = {
     // Prisma model delegates are client properties, not reliably enumerable via
     // object spread. Supply the complete injected database port explicitly.
@@ -99,13 +106,48 @@ test("forced audit failure leaves no registration; stale digest denies all write
     platformConfiguration: db.platformConfiguration,
     $transaction: ((callback: (tx: Prisma.TransactionClient) => Promise<unknown>, options?: unknown) => db.$transaction(async (tx) => callback(new Proxy(tx, {
       get(target, prop, receiver) {
-        if (prop === "commerceAuditEvent") return { create: async () => { throw new Error("forced meta audit failure"); } };
+        if (prop === "commerceAuditEvent") return { create: async (args: Prisma.CommerceAuditEventCreateArgs) => { if(args.data.action === "REQUEST_WHATSAPP_TEMPLATE_META_SUBMISSION") throw new Error("forced meta audit failure"); return target.commerceAuditEvent.create(args); } };
         return Reflect.get(target, prop, receiver);
       },
     }) as Prisma.TransactionClient), options as any)) as MetaDatabase["$transaction"],
   };
   await assert.rejects(confirmMetaSubmission(args(f), { ...dependencies, db: failing }), /forced meta audit failure/);
+  assert.deepEqual(await db.whatsAppTemplateLocale.findUniqueOrThrow({where:{id:enBefore.id}}),enBefore);
+  assert.equal(await db.commerceAuditEvent.count({where:{operationId:`${f.definition.id}:en`}}),0);
   assert.equal(await db.whatsAppTemplateMetaRegistration.count({ where: { locale: { definitionId: f.definition.id } } }), 0);
   await assert.rejects(confirmMetaSubmission({ ...args(f), expectedDigest: "0".repeat(64) }, dependencies), /sender changed/);
   assert.equal(await db.whatsAppTemplateMetaRegistration.count({ where: { locale: { definitionId: f.definition.id } } }), 0);
+});
+
+
+test("historical identical registrations gain explicit English review without provider recreation or state changes", async () => {
+  const f = await seed();
+  // Actual frozen intents created by the historical Admin path; no provider calls.
+  await insertRegistrations(db, makeMetaSubmissionPlan({definition:f.definition,locales:f.locales,trustedWabaId:dependencies.trustedWabaId}));
+  await db.whatsAppTemplateMetaRegistration.updateMany({where:{locale:{definitionId:f.definition.id}},data:{submissionState:"BLOCKED",failureCode:"META_APP_ID_MISSING"}});
+  const before=await db.whatsAppTemplateMetaRegistration.findMany({where:{locale:{definitionId:f.definition.id}},orderBy:{id:"asc"}});
+  const enBefore=await db.whatsAppTemplateLocale.findFirstOrThrow({where:{definitionId:f.definition.id,languageTag:"en"}});
+  assert.equal(enBefore.status,"SOURCE_SAVED");
+  const result=await confirmMetaSubmission(args(f),dependencies);assert.equal(result.replay,true);
+  const enAfter=await db.whatsAppTemplateLocale.findUniqueOrThrow({where:{id:enBefore.id}});assert.equal(enAfter.status,"REVIEWED");assert.equal(enAfter.reviewedByAdminId,actorId);assert.ok(enAfter.reviewedAt);
+  assert.deepEqual(enAfter.localeAst,enBefore.localeAst);assert.equal(enAfter.contentHash,enBefore.contentHash);
+  assert.deepEqual(await db.whatsAppTemplateMetaRegistration.findMany({where:{locale:{definitionId:f.definition.id}},orderBy:{id:"asc"}}),before);
+  assert.equal((await confirmMetaSubmission(args(f),dependencies)).replay,true);
+  assert.deepEqual(await db.whatsAppTemplateLocale.findUniqueOrThrow({where:{id:enBefore.id}}),enAfter);
+  assert.equal(await db.commerceAuditEvent.count({where:{action:"REVIEW_WHATSAPP_TEMPLATE_LOCALE",operationId:`${f.definition.id}:en`}}),1);
+});
+
+
+test("unauthorized/inactive actor, stale hash and malformed reviewed English never create review or registrations",async()=>{
+ const f=await seed();const input=args(f);const en=await db.whatsAppTemplateLocale.findFirstOrThrow({where:{definitionId:f.definition.id,languageTag:"en"}});
+ await assert.rejects(confirmMetaSubmission(input,{...dependencies,principal:{...principal,role:"ADMIN"}}),/SUPER_ADMIN/);
+ await db.platformAdmin.update({where:{id:actorId},data:{active:false}});
+ await assert.rejects(confirmMetaSubmission(input,dependencies),/active SUPER_ADMIN/);
+ await db.platformAdmin.update({where:{id:actorId},data:{active:true}});
+ await db.whatsAppTemplateLocale.update({where:{id:en.id},data:{contentHash:"0".repeat(64)}});
+ await assert.rejects(confirmMetaSubmission(input,dependencies),/digest|mapping|source/i);
+ await db.whatsAppTemplateLocale.update({where:{id:en.id},data:{contentHash:en.contentHash,status:"REVIEWED",reviewedAt:null,reviewedByAdminId:null}});
+ await assert.rejects(confirmMetaSubmission(input,dependencies),/attribution/);
+ assert.equal(await db.whatsAppTemplateMetaRegistration.count({where:{locale:{definitionId:f.definition.id}}}),0);
+ assert.equal(await db.commerceAuditEvent.count({where:{operationId:`${f.definition.id}:en`}}),0);
 });

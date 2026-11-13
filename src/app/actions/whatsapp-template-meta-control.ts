@@ -27,7 +27,7 @@ export async function confirmWhatsAppMetaTemplates(input: ConfirmMetaInput): Pro
       ensureActor: (tx) => ensureDevelopmentPlatformAdmin(tx, principal) });
     revalidatePath(routePath(input.definitionId));
     return { ok: true, replay: result.replay, message: result.replay
-      ? "Identical registrations already exist; no duplicate submission was created."
+      ? "Identical registrations confirmed and English review recorded if missing; no duplicate submission was created."
       : `${result.registered} immutable languages queued for Background submission. Provider approval is still pending.` };
   } catch (cause) { return { ok: false, message: message(cause) }; }
 }

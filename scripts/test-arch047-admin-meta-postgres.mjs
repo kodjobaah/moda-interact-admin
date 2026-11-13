@@ -25,7 +25,7 @@ try {
   });
   const port = docker(["port", container, "5432/tcp"]).trim().match(/:(\d+)$/)?.[1];
   assert.ok(port);
-  execFileSync(process.execPath, ["--import", "tsx", "--test", "tests/integration/arch047-template-meta.postgres.test.ts"], {
+  execFileSync(process.execPath, ["scripts/run-arch047-admin-publication-tests.mjs", "meta-postgres"], {
     env: { ...process.env, DATABASE_URL: `postgresql://postgres:fixture-only@127.0.0.1:${port}/${dbName}?schema=public`, ARCH047_DISPOSABLE_POSTGRES: "1" },
     stdio: "inherit",
   });
