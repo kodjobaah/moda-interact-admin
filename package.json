@@ -61,7 +61,9 @@
     "test:arch068-admin-initializer:unit": "node scripts/test-arch068-admin-authoring.mjs tests/unit/arch068-conversation-wrapper-initializer.test.ts",
     "test:arch068-admin-initializer:postgres": "npm run prisma:generate && node scripts/test-arch068-admin-initializer-postgres.mjs",
     "test:arch075-admin-common-layout": "node scripts/test-unit.mjs tests/unit/arch075-common-layout.test.ts",
-    "test:arch075-admin-common-layout:postgres": "node scripts/test-arch075-common-layout-postgres.mjs"
+    "test:arch075-admin-common-layout:postgres": "node scripts/test-arch075-common-layout-postgres.mjs",
+    "test:arch075-admin-common-activation": "node scripts/test-unit.mjs tests/unit/arch075-common-activation.test.ts",
+    "test:arch075-admin-common-activation:postgres": "node scripts/test-arch075-common-activation-postgres.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",

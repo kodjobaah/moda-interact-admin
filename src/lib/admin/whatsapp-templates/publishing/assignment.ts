@@ -1,3 +1,4 @@
+import { lockCommonActivation, assertCommonSourceGate } from "../common-activation/gates";
 import { Prisma } from "@prisma/client";
 import type { PublicationDb, OperationSnapshot } from "./operation";
 import { operationSnapshot, progressForOperation } from "./operation";
@@ -16,6 +17,8 @@ import { assignmentAuditOperationId } from "./audit";
 async function assignShop(db: PublicationDb, operationId: string, definitionId: string,
   actorId: string, snapshot: OperationSnapshot, shopId: string): Promise<void> {
   await db.$transaction(async (tx) => {
+    await lockCommonActivation(tx);
+    await assertCommonSourceGate(tx, definitionId, "assignment");
     await tx.$queryRaw`SELECT 1 AS acquired FROM pg_advisory_xact_lock(hashtextextended(${`${shopId}|${snapshot.wabaId}|${snapshot.purpose}`}::text, 0))`;
     if (await configuredSenderWaba(tx) !== snapshot.wabaId) return reject("STALE", "Configured sender WABA changed. Reconfirm publication.");
     const targets = await tx.whatsAppTemplatePublicationTarget.findMany({ where: { operationId, shopId }, orderBy: { languageTag: "asc" } });

@@ -23,6 +23,7 @@ const suites = {
     "tests/unit/arch047-template-publication-components.test.tsx",
   ],
   postgres: ["tests/integration/arch047-template-publication.postgres.test.ts"],
+  "common-activation-postgres": ["tests/integration/arch075-common-activation.postgres.test.ts"],
   "common-layout-postgres": ["tests/integration/arch075-common-layout.postgres.test.ts"],
 };
 const selected = suites[process.argv[2]];

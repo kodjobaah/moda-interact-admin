@@ -1,3 +1,4 @@
+import { readSavedCommonLayout } from "./common-layout-repository";
 import type { TemplateDetail, TemplateListItem, ImmutableAuthoringRecord } from "./types";
 import { Prisma } from "@prisma/client";
 import { requirePlatformAdminRead } from "../../../auth/platform-admin";
@@ -91,8 +92,10 @@ export async function getDynamicLayoutCoverage() {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
   const slots = await prisma.whatsAppConversationWrapperActiveSlot.findMany({ take: 3, select: { audience: true, definitionId: true } });
   const shared = slots.find(slot => slot.audience === "SHARED");
+  let commonRecovery = false;
+  if (shared) { try { await readSavedCommonLayout(prisma, shared.definitionId, "en"); commonRecovery = true; } catch { /* Display only verified common-mode precedence. */ } }
   return (["SHARED", "AI", "HUMAN"] as const).map(audience => {
     const own = slots.find(slot => slot.audience === audience);
-    return { audience, selection: own ? "Audience layout selected" : audience !== "SHARED" && shared ? "Uses shared layout" : "No layout selected" };
+    return { audience, selection: commonRecovery ? "Uses common SHARED layout for recovery; audience history retained" : own ? "Audience layout selected" : audience !== "SHARED" && shared ? "Uses shared layout" : "No layout selected" };
   });
 }

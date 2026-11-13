@@ -1,3 +1,4 @@
+import { lockCommonActivation, assertCommonSourceGate } from "../common-activation/gates";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "../authoring/service";
@@ -60,6 +61,8 @@ export async function confirmPublication(input: ConfirmationRequest, deps: {
   };
   try {
     const row = await deps.db.$transaction(async (tx) => {
+      await lockCommonActivation(tx);
+      await assertCommonSourceGate(tx, input.definitionId, "assignment");
       await deps.ensureActor?.(tx);
       const created = await tx.whatsAppTemplatePublicationOperation.create({ data: {
         definitionId: input.definitionId, requestedByAdminId: deps.principal.id,

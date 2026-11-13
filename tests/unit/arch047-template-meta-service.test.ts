@@ -61,6 +61,8 @@ function mockedDb() {
       const stagedAudits: any[] = [];
       try {
         const tx: any = {
+          $queryRaw: async (sql: TemplateStringsArray) => { assert.match(sql.join(""), /pg_advisory_xact_lock/); return [{ acquired: 1 }]; },
+          whatsAppConversationWrapperActiveSlot: { findUnique: async () => null },
           whatsAppTemplateDefinition: definitionClient,
           whatsAppTemplateMetaRegistration: registrationClient(stagedRegistrations, stagedEvents),
           whatsAppTemplateMetaEvent: {
