@@ -29,3 +29,17 @@ test("A requested override must be a valid number with a supported deadline", ()
   assert.throws(() => parseLivePlanBudgetForm(form({ ...basic, reason: "" })), (e) => e instanceof CommerceBudgetValidationError && !!e.fieldErrors.reason);
   assert.throws(() => parseLivePlanBudgetForm(form({ ...basic, expectedEditVersion: "-1" })), (e) => e instanceof CommerceBudgetValidationError && !!e.fieldErrors.expectedEditVersion);
 });
+
+test("outreach override is independently bounded and clearing it leaves other fields intact", () => {
+  for (const value of ["1", "64"]) {
+    assert.deepEqual(parseLivePlanBudgetForm(form({ ...basic, override_initialOutreachToolCalls: "on", initialOutreachToolCalls: value })).budget,
+      { initialOutreachToolCalls: Number(value) });
+    assert.deepEqual(readSparseCommerceBudget({ initialOutreachToolCalls: Number(value) }, 1), { initialOutreachToolCalls: Number(value) });
+  }
+  assert.deepEqual(parseLivePlanBudgetForm(form({ ...basic, override_outputTokens: "on", outputTokens: "1200", initialOutreachToolCalls: "32" })).budget, { outputTokens: 1200 });
+  for (const value of ["", "0", "-1", "1.5", "65", "Infinity", "9007199254740992"]) {
+    assert.throws(() => parseLivePlanBudgetForm(form({ ...basic, override_initialOutreachToolCalls: "on", initialOutreachToolCalls: value })),
+      (error) => error instanceof CommerceBudgetValidationError && Boolean(error.fieldErrors.initialOutreachToolCalls));
+  }
+  for (const value of [0, 1.5, 65, null, "16"]) assert.throws(() => readSparseCommerceBudget({ initialOutreachToolCalls: value }, 1));
+});

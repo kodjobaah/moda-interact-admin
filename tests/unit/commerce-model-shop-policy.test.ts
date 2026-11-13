@@ -38,8 +38,8 @@ const input = { shopId: "shop-1", expectedEditVersion: 2, reason: "Merchant exce
 test("LIVE dashboard resolves Platform, verified current Price Plan and Merchant independently", async () => {
   const { tx, calls } = mockDb();
   const result = await loadLiveShopPolicyDashboard(tx, "DEVELOPMENT", "shop-1", 0);
-  assert.deepEqual(result.policy.effective, { deadlineMs: 80000, outputTokens: 1500 });
-  assert.deepEqual(result.policy.sources, { deadlineMs: "PRICE_PLAN", outputTokens: "MERCHANT" });
+  assert.deepEqual(result.policy.effective, { deadlineMs: 80000, outputTokens: 1500, initialOutreachToolCalls: 16 });
+  assert.deepEqual(result.policy.sources, { deadlineMs: "PRICE_PLAN", outputTokens: "MERCHANT", initialOutreachToolCalls: "PLATFORM" });
   assert.equal(result.policy.currentPlan.plan?.id, "plan-1");
   const scopeFilters = calls.filter(({ op }) => op === "find").map(({ args }) => args.where);
   assert.ok(scopeFilters.every((q: any) => q.context === "LIVE" && q.environment === "DEVELOPMENT"));
@@ -50,7 +50,7 @@ test("no active/trialing current plan explicitly falls back to Platform, without
   const { tx, calls } = mockDb({ currentStatus: "NO_CONTRACT", shopBudget: null });
   const result = await loadLiveShopPolicyDashboard(tx, "DEVELOPMENT", "shop-1", 0);
   assert.equal(result.policy.currentPlan.state, "NO_CURRENT_PLAN");
-  assert.deepEqual(result.policy.sources, { deadlineMs: "PLATFORM", outputTokens: "PLATFORM" });
+  assert.deepEqual(result.policy.sources, { deadlineMs: "PLATFORM", outputTokens: "PLATFORM", initialOutreachToolCalls: "PLATFORM" });
   assert.equal(calls.filter(({ op }) => op === "current-plan").length, 0);
 });
 test("unmatched current Billing Plan handle never fabricates Price Plan override", async () => {
@@ -171,4 +171,25 @@ test("legacy clear audit with nextEditVersion zero still has a nonzero durable r
   await assert.rejects(mutateLiveShopPolicy(tx, {
     shopId: "shop-1", expectedEditVersion: 0, budget: { outputTokens: 1600 }, reason: "Replay",
   }, "DEVELOPMENT", "admin-1"), CommerceModelPolicyConflict);
+});
+
+test("initial outreach inherits the current plan or Merchant override without changing other fields", async () => {
+  for (const [planCalls, shopCalls, expected, source] of [
+    [32, undefined, 32, "PRICE_PLAN"],
+    [48, undefined, 48, "PRICE_PLAN"],
+    [32, 64, 64, "MERCHANT"],
+  ] as const) {
+    const {tx}=mockDb({planBudget:{budget:{deadlineMs:80000,initialOutreachToolCalls:planCalls},budgetSchemaVersion:1},
+      shopBudget:{id:"arch038-live-shop-development-shop-1",editVersion:2,budgetSchemaVersion:1,
+        budget:{outputTokens:1500,...(shopCalls===undefined?{}:{initialOutreachToolCalls:shopCalls})}}});
+    const {policy}=await loadLiveShopPolicyDashboard(tx,"DEVELOPMENT","shop-1",0);
+    assert.deepEqual(policy.effective,{deadlineMs:80000,outputTokens:1500,initialOutreachToolCalls:expected});
+    assert.deepEqual(policy.sources,{deadlineMs:"PRICE_PLAN",outputTokens:"MERCHANT",initialOutreachToolCalls:source});
+  }
+  const {tx,calls}=mockDb({currentStatus:"NO_CONTRACT",shopBudget:null,
+    planBudget:{budget:{initialOutreachToolCalls:64},budgetSchemaVersion:1}});
+  const {policy}=await loadLiveShopPolicyDashboard(tx,"DEVELOPMENT","shop-1",0);
+  assert.equal(policy.effective.initialOutreachToolCalls,16);
+  assert.equal(policy.sources.initialOutreachToolCalls,"PLATFORM");
+  assert.equal(calls.some(({op,args})=>op==="find"&&args.where.scope==="PRICE_PLAN"),false);
 });

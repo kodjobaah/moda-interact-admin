@@ -33,3 +33,14 @@ test('unknown fields and structural tampering are rejected', () => {
     JSON.stringify({ budget: {}, reason: '', permission: 'admin' }),
   ]) assert.throws(() => parseCreatePlanPolicyDraft(raw));
 });
+
+test('a new plan accepts a reasoned bounded outreach-only override', () => {
+  for (const value of ['1', '64']) {
+    assert.deepEqual(parseCreatePlanPolicyDraft(JSON.stringify({ budget: { initialOutreachToolCalls: value }, reason: 'Bound checkout evaluation' })),
+      { budget: { initialOutreachToolCalls: Number(value) }, reason: 'Bound checkout evaluation' });
+  }
+  for (const value of ['0', '-1', '1.5', '65', '', 'Infinity', '9007199254740992', null, 16]) {
+    assert.throws(() => parseCreatePlanPolicyDraft(JSON.stringify({ budget: { initialOutreachToolCalls: value }, reason: 'Bound checkout evaluation' })));
+  }
+  assert.throws(() => parseCreatePlanPolicyDraft(JSON.stringify({ budget: { initialOutreachToolCalls: '32' }, reason: '' })));
+});

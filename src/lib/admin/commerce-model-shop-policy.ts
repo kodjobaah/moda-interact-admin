@@ -1,5 +1,5 @@
 import type { CommerceEnvironment, Prisma } from "@prisma/client";
-import { COMMERCE_MODEL_BUDGET_FIELDS, readCommerceModelBudget, type CommerceModelBudget } from "./commerce-model-policy-fields.ts";
+import { COMMERCE_MODEL_BUDGET_FIELDS, MAX_INITIAL_OUTREACH_TOOL_CALLS, readCommerceModelBudget, type CommerceModelBudget } from "./commerce-model-policy-fields.ts";
 import type { SparseShopCommerceBudget } from "./commerce-model-shop-policy-fields.ts";
 import { CommerceModelPolicyConflict } from "./commerce-model-platform-policy.ts";
 import { resolveAdminCommerceEnvironment } from "./commerce-environment.ts";
@@ -87,7 +87,8 @@ function readSparseShopBudget(value: unknown, version: number): SparseShopCommer
   for (const field of COMMERCE_MODEL_BUDGET_FIELDS) {
     if (!Object.hasOwn(data, field.key)) continue;
     const number = data[field.key];
-    if (typeof number !== "number" || !Number.isSafeInteger(number) || number <= 0) {
+    if (typeof number !== "number" || !Number.isSafeInteger(number) || number <= 0 ||
+      (field.key === "initialOutreachToolCalls" && number > MAX_INITIAL_OUTREACH_TOOL_CALLS)) {
       throw new Error("CommerceAgent Merchant policy contains invalid values.");
     }
     result[field.key] = number;
@@ -152,7 +153,8 @@ export async function loadLiveShopPolicyDashboard(
   const effective = { ...platformBudget, ...planBudget, ...budget };
   const source = (key: keyof CommerceModelBudget): Source =>
     Object.hasOwn(budget, key) ? "MERCHANT" : Object.hasOwn(planBudget, key) ? "PRICE_PLAN" : "PLATFORM";
-  const sources = { deadlineMs: source("deadlineMs"), outputTokens: source("outputTokens") };
+  const sources = { deadlineMs: source("deadlineMs"), outputTokens: source("outputTokens"),
+    initialOutreachToolCalls: source("initialOutreachToolCalls") };
   const audit = await client.commerceAuditEvent.findMany({
     where: { modelPolicyId: shopPolicyId(environment, shopId), environment, action: "SET_LIVE_SHOP_BUDGET_OVERRIDE", actorType: "PLATFORM_ADMIN" },
     select: { id: true, createdAt: true, reason: true, metadata: true, actorAdminId: true, actor: { select: { email: true, displayName: true } } },

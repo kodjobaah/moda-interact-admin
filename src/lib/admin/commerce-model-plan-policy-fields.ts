@@ -2,6 +2,7 @@ import {
   COMMERCE_MODEL_BUDGET_FIELDS,
   CommerceBudgetValidationError,
   LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS,
+  MAX_INITIAL_OUTREACH_TOOL_CALLS,
   type CommerceBudgetFieldErrors,
   type CommerceBudgetKey,
 } from "./commerce-model-policy-fields.ts";
@@ -21,7 +22,8 @@ export function readSparseCommerceBudget(value: unknown, schemaVersion: number):
   for (const field of COMMERCE_MODEL_BUDGET_FIELDS) {
     if (!Object.hasOwn(source, field.key)) continue;
     const n = source[field.key];
-    if (typeof n !== "number" || !Number.isSafeInteger(n) || n <= 0) {
+    if (typeof n !== "number" || !Number.isSafeInteger(n) || n <= 0 ||
+      (field.key === "initialOutreachToolCalls" && n > MAX_INITIAL_OUTREACH_TOOL_CALLS)) {
       throw new Error("CommerceAgent Price Plan policy contains invalid values.");
     }
     result[field.key] = n;
@@ -47,6 +49,10 @@ export function parseLivePlanBudgetForm(form: FormData): {
       continue;
     }
     const number = Number(value);
+    if (field.key === "initialOutreachToolCalls" && number > MAX_INITIAL_OUTREACH_TOOL_CALLS) {
+      errors.initialOutreachToolCalls = `Initial outreach tool calls cannot exceed ${MAX_INITIAL_OUTREACH_TOOL_CALLS}.`;
+      continue;
+    }
     if (field.key === "deadlineMs" && number > LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS) {
       errors.deadlineMs = `The current LIVE Background envelope supports up to ${LIVE_BACKGROUND_DEADLINE_ENVELOPE_MS} ms.`;
       continue;

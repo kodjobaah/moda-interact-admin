@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CommerceModelPolicyConflict, loadLivePlatformPolicyDashboard, updateLivePlatformPolicy } from "../../src/lib/admin/commerce-model-platform-policy.ts";
 
-function fakePolicy(budget = { deadlineMs: 60000, outputTokens: 800 }) {
+function fakePolicy(budget = { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 }) {
   return { id: "live-platform", environment: "DEVELOPMENT", context: "LIVE", scope: "PLATFORM", budget, budgetSchemaVersion: 1, editVersion: 3, updatedAt: new Date("2026-10-13T12:00:00Z") };
 }
 function fixture({ count = 1, updated = 1, auditFails = false } = {}) {
@@ -19,7 +19,7 @@ function fixture({ count = 1, updated = 1, auditFails = false } = {}) {
   };
   return { transaction: transaction as never, calls };
 }
-const input = { budget: { deadlineMs: 70000, outputTokens: 1200 }, expectedEditVersion: 3, reason: "Raise Studio-independent LIVE budget" };
+const input = { budget: { deadlineMs: 70000, outputTokens: 1200, initialOutreachToolCalls: 20 }, expectedEditVersion: 3, reason: "Raise Studio-independent LIVE budget" };
 
 test("LIVE Platform update uses scoped CAS and creates an atomic audit entry", async () => {
   const f = fixture();
@@ -32,7 +32,7 @@ test("LIVE Platform update uses scoped CAS and creates an atomic audit entry", a
   assert.equal(audit.action, "SET_LIVE_PLATFORM_BUDGET");
   assert.equal(audit.actorAdminId, "admin-1");
   assert.equal(audit.reason, input.reason);
-  assert.deepEqual(audit.metadata.previousBudget, { deadlineMs: 60000, outputTokens: 800 });
+  assert.deepEqual(audit.metadata.previousBudget, { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 });
   assert.deepEqual(audit.metadata.nextBudget, input.budget);
   assert.equal(audit.metadata.nextEditVersion, 4);
 });

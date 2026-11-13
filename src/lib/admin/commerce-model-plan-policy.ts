@@ -54,6 +54,7 @@ export async function loadLivePlanPolicyDashboard(
   const sources: LivePlanPolicyView["sources"] = {
     deadlineMs: Object.hasOwn(budget, "deadlineMs") ? "PRICE_PLAN" : "PLATFORM",
     outputTokens: Object.hasOwn(budget, "outputTokens") ? "PRICE_PLAN" : "PLATFORM",
+    initialOutreachToolCalls: Object.hasOwn(budget, "initialOutreachToolCalls") ? "PRICE_PLAN" : "PLATFORM",
   };
   const id = planPolicyId(environment, planId);
   const audit = await client.commerceAuditEvent.findMany({

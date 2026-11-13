@@ -9,7 +9,7 @@ import type { CommerceBudgetKey } from "@/lib/admin/commerce-model-policy-fields
 
 function budgetDescription(budget: LivePlatformPolicyHistoryEntry["previousBudget"]) {
   if (!budget) return "Unavailable";
-  return `${budget.deadlineMs.toLocaleString()} ms · ${budget.outputTokens.toLocaleString()} tokens`;
+  return `${budget.deadlineMs.toLocaleString()} ms · ${budget.outputTokens.toLocaleString()} tokens · ${budget.initialOutreachToolCalls.toLocaleString()} initial outreach tool calls`;
 }
 
 export function LivePlatformPolicyControls({ policy, history, page, hasMore, canEdit }: {
@@ -26,6 +26,7 @@ export function LivePlatformPolicyControls({ policy, history, page, hasMore, can
   const [values, setValues] = useState(() => ({
     deadlineMs: policy ? String(policy.budget.deadlineMs) : "",
     outputTokens: policy ? String(policy.budget.outputTokens) : "",
+    initialOutreachToolCalls: policy ? String(policy.budget.initialOutreachToolCalls) : "16",
   }));
   const [reason, setReason] = useState("");
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -56,7 +57,7 @@ export function LivePlatformPolicyControls({ policy, history, page, hasMore, can
       <div className="mb-5">
         <h2 id="commerce-live-policy-title" className="text-xl font-bold text-[var(--brand-900)]">CommerceAgent Execution Policy</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
-          Administrator-managed LIVE defaults for customer conversation turns. Price Plan and Merchant overrides are managed separately; these settings do not change Studio Preview policies or billing limits.
+          Administrator-managed LIVE defaults for CommerceAgent execution. Price Plan and Merchant overrides are managed separately. The initial outreach tool-call limit also bounds the Studio checkout outreach simulation.
         </p>
       </div>
       {!policy ? (

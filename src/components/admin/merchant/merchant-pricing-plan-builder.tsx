@@ -72,11 +72,12 @@ export function MerchantPricingPlanBuilder({
   };
   const planPolicySummary = plan
     ? planPolicy
-      ? `Deadline: ${planPolicy.effective.deadlineMs} ms (${planPolicy.sources.deadlineMs}); output: ${planPolicy.effective.outputTokens} tokens (${planPolicy.sources.outputTokens})`
+      ? `Deadline: ${planPolicy.effective.deadlineMs} ms (${planPolicy.sources.deadlineMs}); output: ${planPolicy.effective.outputTokens} tokens (${planPolicy.sources.outputTokens}); initial outreach: ${planPolicy.effective.initialOutreachToolCalls} tool calls (${planPolicy.sources.initialOutreachToolCalls})`
       : "Unavailable"
     : [
         `Deadline: ${policyDraft.overrides.deadlineMs ? `${policyDraft.values.deadlineMs} ms (Price Plan override)` : `${createPlanPlatformPolicy?.deadlineMs ?? "unavailable"} ms (Platform)`}`,
         `Output: ${policyDraft.overrides.outputTokens ? `${policyDraft.values.outputTokens} tokens (Price Plan override)` : `${createPlanPlatformPolicy?.outputTokens ?? "unavailable"} tokens (Platform)`}`,
+        `Initial outreach: ${policyDraft.overrides.initialOutreachToolCalls ? `${policyDraft.values.initialOutreachToolCalls} tool calls (Price Plan override)` : `${createPlanPlatformPolicy?.initialOutreachToolCalls ?? "unavailable"} tool calls (Platform)`}`,
       ].join("; ");
   const {
     step,

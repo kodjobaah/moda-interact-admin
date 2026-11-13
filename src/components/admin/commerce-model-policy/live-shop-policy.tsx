@@ -28,10 +28,12 @@ export function LiveShopPolicyControls({ policy, history, page, hasMore, history
   const [overrides, setOverrides] = useState<Record<CommerceBudgetKey, boolean>>({
     deadlineMs: policy.budget.deadlineMs !== undefined,
     outputTokens: policy.budget.outputTokens !== undefined,
+    initialOutreachToolCalls: policy.budget.initialOutreachToolCalls !== undefined,
   });
   const [values, setValues] = useState<Record<CommerceBudgetKey, string>>({
     deadlineMs: String(policy.budget.deadlineMs ?? policy.effective.deadlineMs),
     outputTokens: String(policy.budget.outputTokens ?? policy.effective.outputTokens),
+    initialOutreachToolCalls: String(policy.budget.initialOutreachToolCalls ?? policy.effective.initialOutreachToolCalls),
   });
   const [reason, setReason] = useState("");
   const historyHref = (nextPage: number) => `${historyBaseHref}${historyBaseHref.includes("?") ? "&" : "?"}commerceShopHistoryPage=${nextPage + 1}`;
@@ -56,6 +58,8 @@ export function LiveShopPolicyControls({ policy, history, page, hasMore, history
       source: policy.planBudget.deadlineMs === undefined ? "LIVE Platform" : "current Price Plan" },
     outputTokens: { value: policy.planBudget.outputTokens ?? policy.platformBudget.outputTokens,
       source: policy.planBudget.outputTokens === undefined ? "LIVE Platform" : "current Price Plan" },
+    initialOutreachToolCalls: { value: policy.planBudget.initialOutreachToolCalls ?? policy.platformBudget.initialOutreachToolCalls,
+      source: policy.planBudget.initialOutreachToolCalls === undefined ? "LIVE Platform" : "current Price Plan" },
   };
   const fieldErrors = result && !result.ok ? result.fieldErrors : undefined;
   const plan = policy.currentPlan.plan;
@@ -81,9 +85,13 @@ export function LiveShopPolicyControls({ policy, history, page, hasMore, history
           <caption className="px-3 py-2 text-left font-semibold">LIVE per-field inheritance and effective values</caption>
           <thead className="bg-gray-50 text-gray-700"><tr>{["Field", "Platform", "Current Price Plan", "Merchant override", "Effective source/value"].map((label) => <th className="px-3 py-2" key={label}>{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-gray-200">
-            {(["deadlineMs", "outputTokens"] as const).map((key) => (
+            {([
+              { key: "deadlineMs", label: "Conversation deadline", unit: "ms" },
+              { key: "outputTokens", label: "Model output tokens", unit: "tokens" },
+              { key: "initialOutreachToolCalls", label: "Initial outreach tool calls", unit: "calls" },
+            ] as const).map(({ key, label, unit }) => (
               <tr key={key}>
-                <th className="px-3 py-2">{key === "deadlineMs" ? "Conversation deadline (ms)" : "Model output tokens"}</th>
+                <th className="px-3 py-2">{label} ({unit})</th>
                 <td className="px-3 py-2">{policy.platformBudget[key].toLocaleString()}</td>
                 <td className="px-3 py-2">{policy.planBudget[key]?.toLocaleString() ?? (plan ? "Inherit Platform" : "Not resolved")}</td>
                 <td className="px-3 py-2">{policy.budget[key]?.toLocaleString() ?? "Inherit"}</td>

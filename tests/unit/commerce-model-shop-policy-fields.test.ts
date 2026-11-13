@@ -37,3 +37,17 @@ test("tenant identity must be present; policy cannot accept a missing Shop id", 
 test("another valid Shop ID is rejected against the trusted selection", () => {
   assert.throws(() => parseLiveShopBudgetForm(makeForm({ ...common, shopId: "shop-2" }), "shop-1"), /scope does not match/);
 });
+
+test("a Merchant outreach override is bounded and does not copy inherited budgets", () => {
+  for (const value of ["1", "64"]) {
+    assert.deepEqual(parseLiveShopBudgetForm(makeForm({ ...common,
+      override_initialOutreachToolCalls: "on", initialOutreachToolCalls: value, deadlineMs: "60000", outputTokens: "800" }), "shop-1").budget,
+    { initialOutreachToolCalls: Number(value) });
+  }
+  assert.deepEqual(parseLiveShopBudgetForm(makeForm({ ...common,
+    override_outputTokens: "on", outputTokens: "1200", initialOutreachToolCalls: "32" }), "shop-1").budget, { outputTokens: 1200 });
+  for (const value of ["0", "-1", "1.5", "65", "", "Infinity", "9007199254740992"]) {
+    assert.throws(() => parseLiveShopBudgetForm(makeForm({ ...common,
+      override_initialOutreachToolCalls: "on", initialOutreachToolCalls: value }), "shop-1"));
+  }
+});

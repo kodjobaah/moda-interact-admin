@@ -4,13 +4,13 @@ import { createComponentHarness, findElement, elementText, loadPolicyModule } fr
 
 const fields = loadPolicyModule('src/lib/admin/commerce-model-policy-fields.ts', {});
 const policy = {
-  id: 'live-platform', environment: 'DEVELOPMENT', budget: { deadlineMs: 60000, outputTokens: 800 },
+  id: 'live-platform', environment: 'DEVELOPMENT', budget: { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 },
   budgetSchemaVersion: 1, editVersion: 3, updatedAt: '2026-10-13T12:00:00.000Z',
 };
 const record = {
   id: 'evt-1', actor: 'Platform administrator', createdAt: '2026-10-13T12:00:00.000Z',
-  reason: 'Update policy', previousBudget: { deadlineMs: 60000, outputTokens: 800 },
-  nextBudget: { deadlineMs: 70000, outputTokens: 1200 }, previousEditVersion: 2, nextEditVersion: 3,
+  reason: 'Update policy', previousBudget: { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 },
+  nextBudget: { deadlineMs: 70000, outputTokens: 1200, initialOutreachToolCalls: 20 }, previousEditVersion: 2, nextEditVersion: 3,
 };
 
 function setup({ canEdit = true, history = [], page = 0, hasMore = false } = {}) {
