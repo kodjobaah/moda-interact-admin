@@ -30,7 +30,7 @@ async function ensureConfiguration() {
   } });
 }
 
-test("persist committed English, atomically create one Run + 19 Items under concurrent requests", async () => {
+test("concurrent run creation and repeated failed-language retries preserve audits, no-ops and rollback", async () => {
   await ensureConfiguration();
   const saved = await saveEnglishTemplate({ submissionId: randomUUID(), draft: newMetaDraft() }, { db, principal });
   const results = await Promise.all(Array.from({ length: 4 }, () => startWhatsAppTemplateTranslation(saved.id, { db, principal })));
@@ -70,6 +70,66 @@ test("persist committed English, atomically create one Run + 19 Items under conc
   assert.equal(failed.status, "PENDING");
   assert.equal(failed.failureCode, null);
   assert.ok(failed.nextAttemptAt);
+
+  // A provider may fail the same language again after the first genuine retry.
+  // Preserve its first audit and all completed/in-flight work across that second decision.
+  await db.whatsAppTemplateTranslationItem.update({ where: { id: run.items[3].id },
+    data: { status: "REVIEWED", translatedAst: { schemaVersion: 1, segments: [{ key: "body.text", text: "hola" }] } } });
+  const priorAudits = await db.commerceAuditEvent.findMany({ orderBy: { id: "asc" } });
+  const unchangedItems = await db.whatsAppTemplateTranslationItem.findMany({
+    where: { runId: run.id, id: { not: failed.id } }, orderBy: { id: "asc" },
+  });
+  await db.whatsAppTemplateTranslationItem.update({ where: { id: failed.id },
+    data: { status: "FAILED", failureCode: "INVALID_TOKENS", nextAttemptAt: null } });
+  const retries = await Promise.all(Array.from({ length: 3 }, () =>
+    retryWhatsAppTemplateTranslation(saved.id, { db, principal })));
+  assert.deepEqual(retries.map((result) => result.retryRequested).sort(), [0, 0, 1]);
+  assert.equal((await retryWhatsAppTemplateTranslation(saved.id, { db, principal })).retryRequested, 0);
+  const allAudits = await db.commerceAuditEvent.findMany({ orderBy: { id: "asc" } });
+  assert.deepEqual(allAudits.filter((audit) => priorAudits.some((old) => old.id === audit.id)), priorAudits);
+  const added = allAudits.filter((audit) => !priorAudits.some((old) => old.id === audit.id));
+  assert.equal(added.length, 1);
+  assert.equal(added[0].actorAdminId, adminId);
+  assert.equal(added[0].action, "REQUEST_WHATSAPP_TEMPLATE_TRANSLATION");
+  assert.deepEqual(added[0].metadata, { definitionId: saved.id, runId: run.id, retriedFailed: 1, requeuedPending: 0 });
+  assert.ok(added[0].operationId && added[0].operationId.length <= 128);
+  assert.equal(new Set(allAudits.map((audit) => audit.operationId).filter(Boolean)).size,
+    allAudits.filter((audit) => audit.operationId).length);
+  assert.deepEqual(await db.whatsAppTemplateTranslationItem.findMany({
+    where: { runId: run.id, id: { not: failed.id } }, orderBy: { id: "asc" },
+  }), unchangedItems);
+  const retried = await db.whatsAppTemplateTranslationItem.findUniqueOrThrow({ where: { id: failed.id } });
+  assert.equal(retried.status, "PENDING");
+  assert.equal(retried.retryCount, failed.retryCount);
+  assert.equal(retried.failureCode, null);
+  assert.ok(retried.nextAttemptAt);
+  assert.deepEqual(await db.whatsAppTemplateLocale.findUniqueOrThrow({ where: { id: sourceLocale.id } }), sourceLocale);
+
+  // A real database audit insertion failure must roll back item/run/definition writes.
+  await db.whatsAppTemplateTranslationItem.update({ where: { id: failed.id },
+    data: { status: "FAILED", failureCode: "INVALID_TOKENS", nextAttemptAt: null } });
+  await db.whatsAppTemplateTranslationRun.update({ where: { id: run.id },
+    data: { status: "FAILED", failureCode: "TRANSLATION_ITEM_FAILED", completedAt: new Date() } });
+  await db.whatsAppTemplateDefinition.update({ where: { id: saved.id }, data: { status: "PARTIALLY_FAILED" } });
+  const beforeFailure = {
+    item: await db.whatsAppTemplateTranslationItem.findUniqueOrThrow({ where: { id: failed.id } }),
+    run: await db.whatsAppTemplateTranslationRun.findUniqueOrThrow({ where: { id: run.id } }),
+    definition: await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: saved.id } }),
+  };
+  // Missing actor is rejected by the real audit FK, after all retry writes have run.
+  await assert.rejects(retryWhatsAppTemplateTranslation(saved.id, { db,
+    principal: { ...principal, id: `missing-${randomUUID()}` } }), /Foreign key constraint/);
+  assert.deepEqual({
+    item: await db.whatsAppTemplateTranslationItem.findUniqueOrThrow({ where: { id: failed.id } }),
+    run: await db.whatsAppTemplateTranslationRun.findUniqueOrThrow({ where: { id: run.id } }),
+    definition: await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: saved.id } }),
+  }, beforeFailure);
+  assert.deepEqual(await db.commerceAuditEvent.findMany({ orderBy: { id: "asc" } }), allAudits);
+  const indexes = await db.$queryRaw<Array<{ indexdef: string }>>`
+    SELECT indexdef FROM pg_indexes WHERE schemaname = 'commerce'
+    AND indexname = 'CommerceAuditEvent_operation_id_unique'`;
+  assert.equal(indexes.length, 1);
+  assert.match(indexes[0].indexdef, /CREATE UNIQUE INDEX/);
 });
 
 test("no run or audit created before English source has committed", async () => {
