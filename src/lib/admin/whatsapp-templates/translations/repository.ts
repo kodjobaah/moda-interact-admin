@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { CommerceEnvironment, Prisma, PrismaClient } from "@prisma/client";
 import { resolveCommerceEnvironment } from "../../openrouter-credential-environment";
 import { TRANSLATION_PROVIDER } from "../../translation-configuration-validation";
@@ -121,7 +122,7 @@ export async function requestFailedTranslationRetry(db: TranslationDatabase, inp
     }, data: { status: "TRANSLATION_QUEUED" } });
     await tx.commerceAuditEvent.create({ data: {
       actorType: "PLATFORM_ADMIN", actorAdminId: input.actorId,
-      action: "REQUEST_WHATSAPP_TEMPLATE_TRANSLATION", operationId: `${run.id.slice(0, 100)}:retry`,
+      action: "REQUEST_WHATSAPP_TEMPLATE_TRANSLATION", operationId: `${run.id.slice(0, 80)}:retry:${randomUUID()}`,
       reason: "Retry requested for pending or failed language items",
       metadata: { definitionId: input.definitionId, runId: run.id, retriedFailed: failedIds.length,
         requeuedPending: pendingIds.length },

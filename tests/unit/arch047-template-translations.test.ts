@@ -221,6 +221,28 @@ test("retry preserves completed and processing locales and remains idempotent", 
   assert.equal(f.audits.length, 2);
 });
 
+test("genuine retry decisions have bounded distinct server identities; empty replay has no audit", async () => {
+  const f = fixture();
+  await startWhatsAppTemplateTranslation(definitionId, { db: f.db, principal: actor });
+  f.runs[0].id = "r".repeat(128);
+  await retryWhatsAppTemplateTranslation(definitionId, { db: f.db, principal: actor });
+  const first = structuredClone(f.audits[1]);
+  f.status(0, "FAILED", "BAD_PROVIDER_RESPONSE");
+  const result = await retryWhatsAppTemplateTranslation(definitionId, { db: f.db, principal: actor });
+  assert.equal(result.retryRequested, 1);
+  assert.equal(f.audits.length, 3);
+  const second = f.audits[2];
+  assert.deepEqual(f.audits[1], first);
+  assert.notEqual(second.operationId, first.operationId);
+  for (const audit of [first, second]) {
+    assert.ok(audit.operationId.length <= 128);
+    assert.equal(audit.metadata.runId, "r".repeat(128));
+    assert.equal(audit.actorAdminId, actor.id);
+  }
+  assert.equal((await retryWhatsAppTemplateTranslation(definitionId, { db: f.db, principal: actor })).retryRequested, 0);
+  assert.equal(f.audits.length, 3);
+});
+
 test("persisted partial failure and completion states are derived from item status", async () => {
   const f = fixture();
   await startWhatsAppTemplateTranslation(definitionId, { db: f.db, principal: actor });
