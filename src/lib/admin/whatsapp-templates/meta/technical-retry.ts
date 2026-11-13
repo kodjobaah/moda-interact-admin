@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "../authoring/service";
+import { preparedMetaBodyIssues } from "../authoring/meta-body";
 import { recordMetaControlAudit } from "./audit";
 import { DEFINITION_ID, MetaSubmissionError } from "./contracts";
 import type { MetaDatabase } from "./repository";
@@ -36,6 +37,10 @@ export async function requestMetaTechnicalRetry(input: { definitionId: string; r
         !registration.lastSubmittedAt || !registration.lastReconciledAt ||
         registration.lastReconciledAt < registration.lastSubmittedAt || registration.driftDetectedAt) {
       throw new MetaSubmissionError("RETRY_NOT_ELIGIBLE", "Only an unresolved technical submission may be retried after confirmed absence at Meta. Rejected or approved content requires no retry.");
+    }
+    const bodyIssues = preparedMetaBodyIssues(registration.componentsSnapshot);
+    if (bodyIssues.length) {
+      throw new MetaSubmissionError("META_BODY_INVALID", `${bodyIssues[0].message} Existing registration history is preserved; clone and review corrected content instead of retrying.`);
     }
     // Exact durable absence evidence is written ONLY by Background after a
     // successful provider lookup for the frozen WABA/name/language.

@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { LANGUAGES, equivalentRegistration, isValidDefinitionId, makeTemplateView, brandKeys, digest, reject } from "./validation";
 import { stableJson } from "../authoring/canonical";
 import { templateHash } from "../authoring/identifiers";
-import { validateTemplateAst } from "../authoring/validation";
+import { validateTemplateStructure } from "../authoring/validation";
 import type { CompiledTemplateView } from "./types";
 
 type SourceReader = Pick<Prisma.TransactionClient, "whatsAppTemplateDefinition">;
@@ -33,7 +33,7 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
   const authoring = (english as { authoring: Record<string, unknown> }).authoring;
   const prepared = (english as { prepared: Record<string, unknown> }).prepared;
   if (definition.purpose === "INITIAL") {
-    const compliant = validateTemplateAst(authoring, { requireInitialReply: true, contentLanguageTag: "en" });
+    const compliant = validateTemplateStructure(authoring, { requireInitialReply: true, contentLanguageTag: "en" });
     if (!compliant.ok) return reject("CONTENT", "Initial outreach requires the current merchant-name and contextual Reply revision.");
   }
   const bindings = prepared?.parameterBindings as Record<string, unknown> | undefined;
@@ -60,7 +60,7 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
       const localeRecord = locale.localeAst;
       const localeAuthoring = localeRecord && typeof localeRecord === "object" && !Array.isArray(localeRecord) &&
         "authoring" in localeRecord ? (localeRecord as { authoring: unknown }).authoring : null;
-      const compliant = validateTemplateAst(localeAuthoring, { requireInitialReply: true, contentLanguageTag: tag });
+      const compliant = validateTemplateStructure(localeAuthoring, { requireInitialReply: true, contentLanguageTag: tag });
       if (!compliant.ok) return reject("CONTENT", `Initial recovery semantics are incomplete for ${tag}.`);
     }
     if (!locale.providerLanguageCode || reg.wabaId !== wabaId || reg.submissionState !== "SUBMITTED" ||

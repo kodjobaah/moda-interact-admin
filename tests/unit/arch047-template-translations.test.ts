@@ -111,7 +111,7 @@ test("Meta keyed header/body/footer/button labels: stable keys, repeated indepen
   draft.header = [{ type: "text", value: "From " }, { type: "variable", name: "shopBrand.brandName" }];
   draft.body = [{ type: "text", value: "Hello " }, { type: "variable", name: "shopBrand.brandName" },
     { type: "text", value: " — " }, { type: "variable", name: "shopBrand.brandName" },
-    { type: "text", value: " (" }, { type: "variable", name: "shopBrand.logoAltText" }, { type: "text", value: ")" }];
+    { type: "text", value: " (" }, { type: "variable", name: "shopBrand.logoAltText" }, { type: "text", value: ") sends this update." }];
   draft.footer = [{ type: "text", value: "Thanks for visiting." }];
   draft.buttons = [{ type: "url", label: "Open basket", urlPrefix: "https://shop.example.com/go?url=", variable: "checkout.url" }];
   const rows = extractTranslationSegments(definitionId, draft);
@@ -129,7 +129,7 @@ test("alternative-product proof variables and both CTA labels survive the transl
   draft.promotionTarget = "ALTERNATIVE_PRODUCT";
   draft.body = [{ type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
-    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" }];
+    { type: "text", value: ". This offer does not apply to your abandoned basket: " }, { type: "variable", name: "promotion.productUrl" }, { type: "text", value: " for offer details." }];
   draft.buttons = [
     { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
     { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
@@ -143,7 +143,7 @@ test("alternative-product proof variables and both CTA labels survive the transl
 test("all eight ShopBrand identifiers remain opaque; Meta footer variables are refused by authoring", () => {
   const draft = newMetaDraft("FOLLOW_UP");
   const eight = ["brandName", "logoUrl", "logoAltText", "logoWidth", "logoHeight", "squareLogoUrl", "squareLogoAltText", "coverImageUrl"] as const;
-  draft.body = eight.flatMap((name) => [{ type: "variable" as const, name: `shopBrand.${name}` as const }, { type: "text" as const, value: " " }]);
+  draft.body = [{ type: "text", value: "Brand details: " }, ...eight.flatMap((name) => [{ type: "variable" as const, name: `shopBrand.${name}` as const }, { type: "text" as const, value: " " }]), { type: "text", value: " for this shop." }];
   const row = extractTranslationSegments(definitionId, draft).find((item) => item.key === "body.text");
   assert.deepEqual(row?.protectedTokens.map((item) => item.variable), eight.map((name) => `shopBrand.${name}`));
   assert.ok(!row?.text.includes("Example Brand"));
@@ -308,7 +308,7 @@ test("taxonomy category binding survives protected translation segmentation", ()
   draft.body = [
     { type: "text", value: "We sell " },
     { type: "variable", name: "shop.categoryName" },
-    { type: "text", value: "." },
+    { type: "text", value: " in this store." },
   ];
   const segments = extractTranslationSegments("definition-test", draft);
   assert.equal(segments.length > 0, true);

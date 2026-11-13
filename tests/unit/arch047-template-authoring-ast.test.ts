@@ -155,8 +155,8 @@ test("new initial multi-offer wording does not alter follow-up template validati
   const followUp = newMetaDraft("FOLLOW_UP", "AUTOMATIC_OFFER");
   followUp.promotionTarget = "CHECKOUT";
   followUp.body = [
-    { type: "variable", name: "checkout.itemsSummary" },
-    { type: "variable", name: "offer.description" },
+    { type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " has offer " }, { type: "variable", name: "offer.description" }, { type: "text", value: " subject to eligibility." },
   ];
   assert.equal(validateTemplateAst(followUp).ok, true);
 });
@@ -187,7 +187,7 @@ test("checkout and alternative-product targets freeze distinct proof-backed bind
     { type: "text", value: "Hi " }, { type: "variable", name: "customer.firstName" },
     { type: "text", value: ", your basket " }, { type: "variable", name: "checkout.itemsSummary" },
     { type: "text", value: " qualifies for " }, { type: "variable", name: "offer.description" },
-    { type: "text", value: " with code " }, { type: "variable", name: "offer.code" },
+    { type: "text", value: " with code " }, { type: "variable", name: "offer.code" }, { type: "text", value: " subject to eligibility." },
   ];
   checkout.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
   assert.equal(validateTemplateAst(checkout).ok, true);
@@ -206,7 +206,7 @@ test("checkout and alternative-product targets freeze distinct proof-backed bind
     { type: "text", value: ". A different product: " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
     { type: "text", value: ". This offer does not apply to your abandoned basket. See " },
-    { type: "variable", name: "promotion.productUrl" },
+    { type: "variable", name: "promotion.productUrl" }, { type: "text", value: " for offer details." },
   ];
   alternative.buttons = checkout.buttons;
   assert.equal(validateTemplateAst(alternative).ok, true);
@@ -238,7 +238,7 @@ test("automatic targets reject coupon bindings and code alternatives require a v
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
     { type: "text", value: " with code " }, { type: "variable", name: "promotion.code" },
     { type: "text", value: ". This offer does not apply to your abandoned basket. " },
-    { type: "variable", name: "promotion.productUrl" },
+    { type: "variable", name: "promotion.productUrl" }, { type: "text", value: " for offer details." },
   ];
   codeAlternative.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
   assert.equal(validateTemplateAst(codeAlternative).ok, true);
@@ -282,7 +282,7 @@ test("Meta body variables compile in occurrence order, repeated variables remain
     { type: "text", value: "Hi " }, { type: "variable", name: "customer.firstName" },
     { type: "text", value: ", use " }, { type: "variable", name: "offer.code" },
     { type: "text", value: " at " }, { type: "variable", name: "shop.name" },
-    { type: "text", value: ". Code: " }, { type: "variable", name: "offer.code" },
+    { type: "text", value: ". Code: " }, { type: "variable", name: "offer.code" }, { type: "text", value: " subject to eligibility." },
   ];
   const prepared = compileTemplateAst(draft);
   assert.equal(prepared.family, "META_RECOVERY");
@@ -313,7 +313,7 @@ test("alternative product templates freeze both approved dynamic CTA indexes and
     { type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
     { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
     { type: "text", value: ". This offer does not apply to your abandoned basket. " },
-    { type: "variable", name: "promotion.productUrl" },
+    { type: "variable", name: "promotion.productUrl" }, { type: "text", value: " for offer details." },
   ];
   draft.buttons = [
     { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
@@ -389,7 +389,7 @@ test("ShopBrand exposes every merchant-display content field as a semantic varia
       // The parser can produce response slots for wrappers; Meta bodies cannot contain them.
       const contentNodes = nodes.filter((node): node is ContentNode => node.type !== "slot");
       if (draft.family === "META_RECOVERY") {
-        const candidate = { ...draft, body: contentNodes };
+        const candidate = { ...draft, body: [...contentNodes, { type: "text" as const, value: " sends this update." }] };
         assert.equal(validateTemplateAst(candidate).ok, true, name);
         assert.doesNotMatch(makeDraftExamplePreview(candidate).body, /\{\{shopBrand\./);
       } else {
@@ -409,7 +409,7 @@ test("Meta text header supports one brand variable, freezes its positional bindi
     { type: "text", value: "From " },
     { type: "variable", name: "shopBrand.brandName" },
   ];
-  draft.body = [{ type: "text", value: "Visit " }, { type: "variable", name: "shopBrand.logoUrl" }];
+  draft.body = [{ type: "text", value: "Visit " }, { type: "variable", name: "shopBrand.logoUrl" }, { type: "text", value: " to view our logo." }];
   const prepared = compileTemplateAst(draft);
   assert.equal(prepared.family, "META_RECOVERY");
   if (prepared.family !== "META_RECOVERY") return;

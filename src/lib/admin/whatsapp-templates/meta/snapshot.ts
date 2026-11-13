@@ -1,5 +1,6 @@
-import { compileTemplateAst } from "../authoring/compiler";
-import { validateTemplateAst } from "../authoring/validation";
+import { FrozenProjectionMismatchError, verifyFrozenTemplateProjection } from "../authoring/frozen-projection";
+import { preparedMetaBodyIssues } from "../authoring/meta-body";
+import { validateTemplateStructure } from "../authoring/validation";
 import { templateHash } from "../authoring/identifiers";
 import type { ImmutableAuthoringRecord, MetaPrepared, MetaTemplateAst } from "../authoring/types";
 import { DIGEST, MetaSubmissionError, type MetaLocaleSnapshot, type MetaSubmissionPlan } from "./contracts";
@@ -57,29 +58,28 @@ export function frozenLocaleSnapshot(row: LocaleForMeta, def: DefinitionForMeta)
   }
   if (source.commonLayout && source.commonLayout.languageTag !== row.languageTag) fail("INVALID_LOCALE", "Common layout locale does not match the registered language.");
   if (source.stage === "INITIAL") {
-    const compliant = validateTemplateAst(source, { requireInitialReply: true, contentLanguageTag: row.languageTag });
+    const compliant = validateTemplateStructure(source, { requireInitialReply: true, contentLanguageTag: row.languageTag });
     if (!compliant.ok) fail("INVALID_LOCALE", `Initial recovery semantics are incomplete for ${row.languageTag}.`);
   }
   const contentHash = row.contentHash;
   if (!contentHash || !DIGEST.test(contentHash) || templateHash(record.prepared) !== contentHash) {
     throw new MetaSubmissionError("LOCALE_HASH_MISMATCH", `Frozen content digest differs for ${row.languageTag}.`);
   }
-  // This also detects forged or stale positional/header/button semantic bindings,
-  // including reordered brand variables in the translated AST.
-  const recompiled = (() => {
-    try { return compileTemplateAst(source as MetaTemplateAst) as MetaPrepared; }
-    catch { throw new MetaSubmissionError("INVALID_LOCALE", `Stored Meta projection is invalid for ${row.languageTag}.`); }
-  })();
-  const imageHeader = recompiled.components.find((component) => component.type === "HEADER" && component.format === "IMAGE");
-  if (imageHeader) {
-    const storedPrepared = record.prepared as unknown as { components?: unknown };
-    const storedComponents = Array.isArray(storedPrepared.components) ? storedPrepared.components : [];
-    const storedImageHeader = storedComponents.find((component) => jsonObject(component) &&
-      component.type === "HEADER" && component.format === "IMAGE");
-    if (JSON.stringify(storedImageHeader) !== JSON.stringify(imageHeader)) {
+  if (source.shopBrandMediaRole) {
+    const stored = record.prepared as unknown as { components?: unknown };
+    const image = Array.isArray(stored.components) ? stored.components.find(component => jsonObject(component) && component.type === "HEADER" && component.format === "IMAGE") : null;
+    if (!jsonObject(image) || templateHash(image) !== templateHash({ type: "HEADER", format: "IMAGE" })) {
       fail("IMAGE_SAMPLE_UNTRUSTED", "IMAGE registration intents cannot include caller-supplied sample media.");
     }
   }
+  // Accept only exact known historical/current projections; never recompile saved bytes for admission.
+  const recompiled = (() => {
+    try { return verifyFrozenTemplateProjection(record, contentHash) as MetaPrepared; }
+    catch (error) {
+      if (error instanceof FrozenProjectionMismatchError) fail("BINDING_HASH_MISMATCH", `Component/variable mapping differs for ${row.languageTag}.`);
+      throw new MetaSubmissionError("INVALID_LOCALE", `Stored Meta projection is invalid for ${row.languageTag}.`);
+    }
+  })();
   if (templateHash(recompiled) !== contentHash || record.prepared.family !== "META_RECOVERY" ||
       record.prepared.category !== "MARKETING") {
     fail("BINDING_HASH_MISMATCH", `Component/variable mapping differs for ${row.languageTag}.`);
@@ -128,7 +128,10 @@ export function makeMetaSubmissionPlan(input: {
   const snapshots = META_LANGUAGES.map((tag) => {
     const locale = byTag.get(tag);
     if (!locale) throw new MetaSubmissionError("INCOMPLETE_LOCALES", `Missing reviewed language ${tag}.`);
-    return frozenLocaleSnapshot(locale, def);
+    const snapshot = frozenLocaleSnapshot(locale, def);
+    const issues = preparedMetaBodyIssues(snapshot.components);
+    if (issues.length) fail("META_BODY_INVALID", `${tag}: ${issues[0].message} Existing snapshots are unchanged; clone and review a corrected source before submission.`);
+    return snapshot;
   });
   const englishSnapshot = snapshots.find((locale) => locale.languageTag === "en");
   const headerKind = (components: Array<Record<string, unknown>>) => {

@@ -22,16 +22,16 @@ const draft=():MetaTemplateAst=>({...structuredClone(RECOVERY_SCENARIOS[0].draft
 test("all six reviewed scenario ASTs pass actual INITIAL semantics and final common composition",()=>{
  assert.equal(RECOVERY_SCENARIOS.length,6);
  for(const s of RECOVERY_SCENARIOS){assert.deepEqual(validateTemplateAst(s.draft,{requireInitialReply:true,contentLanguageTag:"en"}),{ok:true,value:s.draft});
- const a={...structuredClone(s.draft),commonLayout:commonRef(),shopBrandMediaRole:"LOGO" as const};const p=compileTemplateAst(a);assert.equal(p.family,"META_RECOVERY");if(p.family!=="META_RECOVERY")return;
+ const a={...structuredClone(s.draft),commonLayout:commonRef(),shopBrandMediaRole:"LOGO" as const,footer:[{type:"text" as const,value:"Reply STOP to opt out."}]};const p=compileTemplateAst(a);assert.equal(p.family,"META_RECOVERY");if(p.family!=="META_RECOVERY")return;
  assert.ok(p.parameterBindings.body.length<=10);assert.ok(String(p.components.find(c=>c.type==="BODY")?.text).length<=1024);
  assert.equal(p.parameterBindings.body.at(-1)?.variable,"checkout.url");assert.equal(p.components.some(c=>c.type==="FOOTER"),false);}
 });
 test("custom frozen header/footer match real Shared rendering while body and opt-out bytes remain unchanged",()=>{
  const a=draft(),before=JSON.stringify(a);const p=compileTemplateAst(a);const preview=makeExamplePreview(p,a.commonLayout);
  const bare=makeExamplePreview(compileTemplateAst({...a,commonLayout:undefined,shopBrandMediaRole:undefined}));
- const rendered=renderPreparedWrapper({prepared:commonRef().prepared,context:{conversationId:"example",shopId:"example",conversationLanguageTag:"en",merchantLanguageTag:"en",checkoutAvailable:true,variables:{"shop.name":"Example Shop","shop.websiteUrl":"https://www.example.com","checkout.url":"https://www.example.com/checkout/demo"}},responseBody:bare.body+"\n"+bare.footer});
- assert.equal(rendered.kind,"rendered");if(rendered.kind!=="rendered")return;assert.equal(preview.body,rendered.body);assert.equal(JSON.stringify(a),before);
- assert.match(preview.body,/Reply STOP to opt out\.\n── Continue when ready/);assert.ok(preview.body.endsWith("https://www.example.com/checkout/demo"));
+ const rendered=renderPreparedWrapper({prepared:commonRef().prepared,context:{conversationId:"example",shopId:"example",conversationLanguageTag:"en",merchantLanguageTag:"en",checkoutAvailable:true,variables:{"shop.name":"Example Shop","shop.websiteUrl":"https://www.example.com","checkout.url":"https://www.example.com/checkout/demo"}},responseBody:bare.body});
+ assert.equal(rendered.kind,"rendered");if(rendered.kind!=="rendered")return;assert.equal(preview.body,rendered.body+"\n"+bare.footer);assert.equal(JSON.stringify(a),before);
+ assert.match(preview.body,/Continue when ready[^]*https:\/\/www.example.com\/checkout\/demo\nReply STOP/);assert.ok(preview.body.endsWith("Reply STOP to opt out."));
  const html=renderToStaticMarkup(createElement(TemplateReadOnlyPreview,{preview}));for(const label of ["Common shop header","Common checkout footer","AI answer","Human reply","Custom shop divider"])assert.ok(html.includes(label));
 });
 test("hash tamper, illegal media, locale mismatch and final composed limits fail closed",()=>{

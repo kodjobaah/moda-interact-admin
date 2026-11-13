@@ -67,7 +67,7 @@ export function fixture() {
   const locales: LocaleForMeta[] = META_LANGUAGES.map((tag) => {
     const authoring = structuredClone(english);
     if (tag === "fr") {
-      authoring.body = [{ type: "variable", name: "shopBrand.logoAltText" },
+      authoring.body = [{ type: "text", value: "Chez " }, { type: "variable", name: "shopBrand.logoAltText" },
         { type: "text", value: " avant " }, { type: "variable", name: "customer.firstName" },
         { type: "text", value: ".\n\nArticles du panier abandonné d’origine : " },
         { type: "variable", name: "checkout.itemsSummary" }, { type: "text", value: ".\n\nFrom " },
