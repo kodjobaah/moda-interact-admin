@@ -17,3 +17,13 @@ test('Meta approval UI remains decomposed and does not perform provider network 
   assert.match(reconcile, /RECONCILE_REQUESTED/);
   assert.ok(!reconcile.includes('fetch('));
 });
+
+test('provider drift contract stays browser-safe and server DTO reuses the existing observation codec', () => {
+  const contracts = source('src/lib/admin/whatsapp-templates/meta/contracts.ts');
+  assert.doesNotMatch(contracts, /node:crypto|publishing\/validation|observedMetaContentHash/);
+  assert.match(contracts, /expectedProviderContentHash: string \| null/);
+  const status = source('src/lib/admin/whatsapp-templates/meta/status.ts');
+  assert.match(status, /observedMetaContentHash, parseComponents/);
+  assert.match(status, /expectedProviderContentHash\(row.componentsSnapshot\)/);
+  assert.ok(!status.includes('createHash('));
+});
