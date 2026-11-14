@@ -31,4 +31,3 @@ export function TemplateCompositeProfilePreview({ values, headerText, caption }:
     </>}
   </section>;
 }
-
