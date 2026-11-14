@@ -5,7 +5,7 @@ import { WrapperConflictError, type WrapperRepository } from "../../src/lib/admi
 import { wrapperRow, FIXTURE_ID, ANOTHER_ID } from "../fixtures/arch047-wrapper-fixture.ts";
 
 function fake() {
-  const definitions = [wrapperRow(), wrapperRow({ id: ANOTHER_ID })];
+  const definitions = [wrapperRow({ audience: "AI" }), wrapperRow({ id: ANOTHER_ID, audience: "AI" })];
   type Slot = { audience: string; definitionId: string; editVersion: number; updatedByAdminId: string };
   const state = { slots: [] as Slot[], audits: [] as unknown[], definitionPublication: [] as string[], auditFails: false };
   const db = { $transaction: async (execute: (tx: unknown) => Promise<unknown>) => {
@@ -57,7 +57,7 @@ function fake() {
 
 const principal = { id: "fixture-admin", role: "SUPER_ADMIN" as const };
 const request = (definitionId = FIXTURE_ID, expectedVersion: number | null = null,
-  expectedDefinitionId: string | null = null) => ({ audience: "SHARED" as const, definitionId,
+  expectedDefinitionId: string | null = null) => ({ audience: "AI" as const, definitionId,
     expectedVersion, expectedDefinitionId, reason: "Reviewed 20 locales and approved this activation." });
 
 test("new pointer, audited replacement, old-version reactivation and replay only update active state", async () => {
@@ -88,7 +88,7 @@ test("stale CAS, mismatched audience and non-SUPER_ADMIN fail with no pointer/au
   assert.equal(f.state.slots.length, 0);
   await activateConversationWrapper(request(), { db: f.db, principal });
   await assert.rejects(activateConversationWrapper(request(ANOTHER_ID), { db: f.db, principal }), WrapperConflictError);
-  await assert.rejects(activateConversationWrapper({ ...request(), audience: "AI" }, { db: f.db, principal }), WrapperRequestError);
+  await assert.rejects(activateConversationWrapper({ ...request(), audience: "HUMAN" }, { db: f.db, principal }), WrapperRequestError);
   await assert.rejects(activateConversationWrapper({ ...request(), reason: "oops" }, { db: f.db, principal }), WrapperRequestError);
   assert.equal(f.state.slots[0].definitionId, FIXTURE_ID);
   assert.equal(f.state.audits.length, 1);

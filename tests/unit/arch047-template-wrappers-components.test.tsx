@@ -28,11 +28,11 @@ test("audience buttons and fallback / audit history are accessible", () => {
 });
 
 test("before/after preview shows header, response insertion, footer, conditional URL, nullable disclosures and first published", () => {
-  const row = wrapperRow();
-  const eligible = checkWrapperEligibility(row, "SHARED");
+  const row = wrapperRow({ audience: "AI" });
+  const eligible = checkWrapperEligibility(row, "AI");
   assert.equal(eligible.eligible, true);
   if (!eligible.eligible) return;
-  const proposal = { id: row.id, audience: "SHARED" as const, sourceHash: row.sourceHash,
+  const proposal = { id: row.id, audience: "AI" as const, sourceHash: row.sourceHash,
     publishedAt: null, projections: eligible.projections };
   const html = renderToStaticMarkup(<WrapperBeforeAfterPreview current={proposal} proposed={proposal}
     languageTag="fr" checkoutAvailable={true} audience="AI" />);

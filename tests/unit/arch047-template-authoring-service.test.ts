@@ -48,7 +48,7 @@ test("atomic English Meta definition, prepared locale, exact audit, and safe rep
   const replay = await saveEnglishTemplate({ submissionId, draft }, { db: fixture.db, principal: admin });
   assert.deepEqual(replay, { id: result.id, replay: true });
   assert.equal(fixture.definitions.length, 1); assert.equal(fixture.audits.length, 1);
-  await assert.rejects(saveEnglishTemplate({ submissionId, draft: newWrapperDraft() }, { db: fixture.db, principal: admin }), /already used/);
+  await assert.rejects(saveEnglishTemplate({ submissionId, draft: newWrapperDraft("AI") }, { db: fixture.db, principal: admin }), /already used/);
 });
 test("initial checkout multi-code revision saves as a distinct immutable approved-candidate identity", async () => {
   const fixture = makeFixture();

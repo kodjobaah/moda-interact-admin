@@ -1,3 +1,4 @@
+import { commonLayoutPolicyError } from "./common-layout-policy";
 import { readPreparedWrapper, stableJson, renderPreparedWrapper, type CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { layoutDigest, requireCommonLayout } from "./common-layout";
 import { VARIABLE_REGISTRY } from "./registry";
@@ -11,6 +12,8 @@ export function commonPreparedExample(raw: unknown): NonNullable<TemplatePreview
   const parsed = readPreparedWrapper({ schemaVersion: 1, prepared: raw }, layoutDigest(stableJson(raw)), layoutDigest);
   if (parsed.kind !== "ok") throw new Error("Draft cannot be rendered as a conversation wrapper.");
   const prepared = parsed.prepared;
+  const policyError = commonLayoutPolicyError(prepared);
+  if (policyError) throw new Error(policyError);
   const context = { conversationId: "example-conversation", shopId: "example-shop", conversationLanguageTag: "en", merchantLanguageTag: "en", variables: { "shop.name": VARIABLE_REGISTRY["shop.name"].sample, "shop.websiteUrl": VARIABLE_REGISTRY["shop.websiteUrl"].sample, "checkout.url": VARIABLE_REGISTRY["checkout.url"].sample }, checkoutAvailable: true };
   const render = (responseBody: string) => {
     const result = renderPreparedWrapper({ prepared, context, responseBody });

@@ -88,7 +88,7 @@ test("ShopBrand insertion is grouped alongside each supported section, not offer
   assert.match(meta, /Meta footers must be static/);
   assert.match(meta, /Brand name/);
   assert.match(meta, /Logo URL \(text\)/);
-  const wrapper = renderToStaticMarkup(<TemplateContentEditor draft={newWrapperDraft()} onChange={() => {}} />);
+  const wrapper = renderToStaticMarkup(<TemplateContentEditor draft={newWrapperDraft("AI")} onChange={() => {}} />);
   assert.equal((wrapper.match(/ShopBrand fields \(8\)/g) ?? []).length, 3); // header/body/footer
   assert.match(wrapper, /Square logo alt text/);
 });

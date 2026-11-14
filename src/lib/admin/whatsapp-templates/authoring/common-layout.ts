@@ -1,3 +1,4 @@
+import { commonLayoutPolicyError } from "./common-layout-policy";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { readCommonRecoveryLayoutReference, type CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
@@ -8,6 +9,8 @@ export const layoutDigest = (text: string): string => bytesToHex(sha256(new Text
 export function requireCommonLayout(raw: unknown): CommonRecoveryLayoutReference {
   const result = readCommonRecoveryLayoutReference(raw, layoutDigest);
   if (result.kind !== "ok") throw new Error("Choose an intact common shop layout with a name, website and checkout footer.");
+  const policyError = commonLayoutPolicyError(result.reference.prepared);
+  if (policyError) throw new Error(policyError);
   return result.reference;
 }
 /** Provider projection of the saved structure, not another authored frame. Shared joins sections with one newline. */
@@ -18,6 +21,7 @@ function projectCommonMetaBody(draft: MetaTemplateAst, historical: boolean): Con
     if (token.kind === "responseSlot") throw new Error("Common frame cannot contain a response slot outside its body.");
     return token.kind === "text" ? { type: "text", value: token.value } : { type: "variable", name: token.name };
   });
+  // Admin policy requires prepared.footer to be empty; conditional tokens carry the complete clickable footer.
   const optOut: ContentNode[] = draft.footer.length ? [{ type: "text", value: "\n" }, ...draft.footer] : [];
   const checkout: ContentNode[] = [{ type: "text", value: "\n" }, ...nodes(prepared.conditionals[0].tokens)];
   // Historical order is verification-only: never use it for new authoring/submissions.

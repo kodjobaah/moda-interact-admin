@@ -62,6 +62,8 @@ test("real editable draft, immutable save, queued translation review, selector a
  const old=await saveEnglishTemplate({submissionId:randomUUID(),draft:legacy},{db,principal});
  const oldBefore=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:old.id},include:{locales:true}});
  const editable=cloneDraft(legacy);assert.deepEqual(editable.footer,[]);if(editable.family!=="MODA_CONVERSATION_WRAPPER")throw new Error("Wrong clone family");
+ editable.header=parseEditorNodes("Shop: {{shop.name}}\n──────────",{variables:["shop.name"]}) as typeof editable.header;
+ editable.conditionals=[{when:"checkout.available",nodes:parseEditorNodes("──────────\nWebsite: {{shop.websiteUrl}}\nReturn to your checkout:\n{{checkout.url}}",{variables:["shop.websiteUrl","checkout.url"]}) as typeof editable.header}];
  const {leftCompositeProfile,topCompositeProfile}=await import("../fixtures/arch075-composite-profile.ts");
  editable.compositeProfile=leftCompositeProfile;
  const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft:editable,cloneFromDefinitionId:old.id},{db,principal});assert.notEqual(saved.id,old.id);
@@ -84,6 +86,8 @@ test("real editable draft, immutable save, queued translation review, selector a
  assert.equal(reviewed.status,"TRANSLATION_QUEUED");assert.equal(reviewed.locales.length,20);
  for(const locale of reviewed.locales){const record=locale.localeAst as unknown as {authoring:{compositeProfile:unknown},prepared:{compositeProfile:unknown,compositeProfileSha256:string}};assert.deepEqual(record.authoring.compositeProfile,leftCompositeProfile);assert.deepEqual(record.prepared.compositeProfile,leftCompositeProfile);assert.equal(typeof record.prepared.compositeProfileSha256,"string");}
  const selected=(await listReviewedCommonLayouts(db)).find(r=>r.definitionId===saved.id);assert.ok(selected);assert.deepEqual(selected.prepared.footer,[]);assert.deepEqual(selected.prepared.compositeProfile,leftCompositeProfile);
+ assert.equal(selected.prepared.header.some(t=>t.kind==="variable"&&t.name==="shop.websiteUrl"),false);
+ assert.deepEqual(selected.prepared.conditionals[0].tokens.filter(t=>t.kind==="variable").map(t=>t.name),["shop.websiteUrl","checkout.url"]);
  assert.equal(await db.commerceAuditEvent.count({where:{action:"REVIEW_WHATSAPP_TEMPLATE_LOCALE",operationId:{startsWith:saved.id+":"}}}),19);
  const selection={commonDefinitionId:saved.id,replacements:[]};const preview=await previewCommonActivation(db,selection);
  const request={selection,issuedAt:preview.issuedAt,fingerprint:preview.fingerprint,operationKey:randomUUID(),reason:"Reviewed new editor common layout through all nineteen translations",acknowledgeOverrides:true as const,consumerDeploymentConfirmed:true as const,englishContentReviewed:true as const};

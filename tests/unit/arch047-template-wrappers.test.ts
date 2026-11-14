@@ -8,9 +8,9 @@ import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/i
 import { wrapperRow, brandedWrapper } from "../fixtures/arch047-wrapper-fixture.ts";
 
 test("all 20 reviewed prepared locale projections, eight brand keys and immutable hashes are required", () => {
-  const row = wrapperRow();
+  const row = wrapperRow({ audience: "AI" });
   const original = JSON.stringify(row);
-  const check = checkWrapperEligibility(row, "SHARED");
+  const check = checkWrapperEligibility(row, "AI");
   assert.equal(check.eligible, true);
   if (!check.eligible) return;
   assert.equal(Object.keys(check.projections).length, 20);
@@ -41,37 +41,37 @@ test("unsafe source, missing review, duplicates, missing slots and corrupted con
     (row) => { (row.locales[3].localeAst as {authoring:{body:unknown[]}}).authoring.body = []; },
   ];
   for (const [i, change] of changes.entries()) {
-    const row = wrapperRow(); change(row);
-    assert.equal(checkWrapperEligibility(row, "SHARED").eligible, false, `fixture ${i}`);
+    const row = wrapperRow({ audience: "AI" }); change(row);
+    assert.equal(checkWrapperEligibility(row, "AI").eligible, false, `fixture ${i}`);
   }
-  assert.equal(checkWrapperEligibility(wrapperRow(), "AI").eligible, false, "No audience hijack");
+  assert.equal(checkWrapperEligibility(wrapperRow({ audience: "AI" }), "SHARED").eligible, false, "No audience hijack");
 });
 
 test("altered translated protected markers, unknown ShopBrand key and forbidden checkout URL placement fail closed", () => {
-  const altered = wrapperRow();
+  const altered = wrapperRow({ audience: "AI" });
   const french = altered.locales.find((item) => item.languageTag === "fr")!;
   const record = french.localeAst as { authoring: ReturnType<typeof brandedWrapper>; prepared: unknown };
   record.authoring.footer = [{ type: "variable", name: "shopBrand.logoUrl" }];
   record.prepared = compileTemplateAst(record.authoring);
   french.contentHash = templateHash(record.prepared);
-  assert.match((checkWrapperEligibility(altered, "SHARED") as {reason:string}).reason, /protected variable identities/);
+  assert.match((checkWrapperEligibility(altered, "AI") as {reason:string}).reason, /protected variable identities/);
 
-  const invalid = wrapperRow();
+  const invalid = wrapperRow({ audience: "AI" });
   const locale = invalid.locales.find((item) => item.languageTag === "en")!;
   (locale.localeAst as { authoring: { header: unknown[] } }).authoring.header = [
     { type: "variable", name: "shopBrand.unknownKey" },
   ];
-  assert.equal(checkWrapperEligibility(invalid, "SHARED").eligible, false);
+  assert.equal(checkWrapperEligibility(invalid, "AI").eligible, false);
 
-  const misplaced = wrapperRow();
+  const misplaced = wrapperRow({ audience: "AI" });
   (misplaced.locales[0].localeAst as { authoring: { header: unknown[] } }).authoring.header = [
     { type: "variable", name: "checkout.url" },
   ];
-  assert.equal(checkWrapperEligibility(misplaced, "SHARED").eligible, false);
+  assert.equal(checkWrapperEligibility(misplaced, "AI").eligible, false);
 });
 
 test("fictional preview shows all sections; unavailable ShopBrand values are labelled rather than invented", () => {
-  const valid = checkWrapperEligibility(wrapperRow(), "SHARED");
+  const valid = checkWrapperEligibility(wrapperRow({ audience: "AI" }), "AI");
   assert.equal(valid.eligible, true);
   if (!valid.eligible) return;
   const prepared = valid.projections.en;
