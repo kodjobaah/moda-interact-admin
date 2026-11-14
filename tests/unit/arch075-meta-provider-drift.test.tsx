@@ -124,3 +124,38 @@ test("client status table uses the same drift predicate while keeping retry life
   assert.ok(findElement(render(uncertain), (element: { type: string; props: { children?: unknown } }) => element.type === "button" && elementText(element).includes("Request technical retry")));
   assert.ok(!elementText(render({ ...uncertain, driftDetectedAt: "2026-11-13T00:02:00Z" })).includes("Request technical retry"));
 });
+
+import { nbspExpectedComponents, nbspObservedComponents, NBSP_EXPECTED_RAW_HASH, NBSP_OBSERVED_RAW_HASH } from "../fixtures/arch075-meta-nbsp.ts";
+
+test("BG017 French golden representative remains in the unchanged raw Admin hash domain", async () => {
+  const expected = nbspExpectedComponents(), observed = nbspObservedComponents();
+  const original = JSON.stringify({ expected, observed });
+  const goldenPreparedHash = templateHash({ schemaVersion: 1, family: "META_RECOVERY", category: "MARKETING", components: expected,
+    parameterBindings: { schemaVersion: 1, headerMediaRole: "LOGO", header: [], body: [{ position: 1, variable: "checkout.url" }], buttons: [] } });
+  assert.equal(observedMetaContentHash(expected), NBSP_EXPECTED_RAW_HASH);
+  assert.equal(observedMetaContentHash(observed), NBSP_OBSERVED_RAW_HASH);
+  assert.notEqual(NBSP_EXPECTED_RAW_HASH, NBSP_OBSERVED_RAW_HASH, "Admin must not normalize either raw input");
+  // Only Background's proven equivalent receipt supplies the expected-raw representative.
+  const accepted = (await projected(expected, { languageTag: "fr", submittedContentHash: goldenPreparedHash, lastObservedContentHash: NBSP_EXPECTED_RAW_HASH })).registrations[0];
+  assert.equal(accepted.expectedProviderContentHash, NBSP_EXPECTED_RAW_HASH);
+  assert.equal(hasMetaProviderDrift(accepted), false);
+  assert.equal(accepted.submittedContentHash, goldenPreparedHash, "Prepared identity stays independent of the observation representative");
+  assert.equal(hasMetaProviderDrift({ ...accepted, lastObservedContentHash: NBSP_OBSERVED_RAW_HASH }), true, "Raw provider difference alone is not an Admin proof");
+  assert.equal(renderToStaticMarkup(<MetaDriftNotice status={{ definitionId: "fixture", registrations: [accepted], updatedAt: "fixture" }} />), "");
+  assert.equal(JSON.stringify({ expected, observed }), original);
+});
+
+test("representative receipt cannot bypass explicit drift, category or genuine text/URL/whitespace differences", async () => {
+  const expected = nbspExpectedComponents();
+  const accepted = (await projected(expected, { lastObservedContentHash: NBSP_EXPECTED_RAW_HASH })).registrations[0];
+  const variants = ["Boutique : Autre\nPanier : {{1}}", "Boutique : Exemple Panier : {{1}}",
+    "Boutique  : Exemple\nPanier : {{1}}", "Boutique\u202f: Exemple\nPanier\u202f: {{1}}"];
+  for (const text of variants) assert.equal(hasMetaProviderDrift({ ...accepted,
+    lastObservedContentHash: observedMetaContentHash([{ type: "HEADER", format: "IMAGE" }, { type: "BODY", text }]) }), true);
+  const url = [{ type: "BODY", text: "Text" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Return", url: "https://shop.example/path\u00a0" }] }];
+  const asciiUrl = [{ type: "BODY", text: "Text" }, { type: "BUTTONS", buttons: [{ type: "URL", text: "Return", url: "https://shop.example/path " }] }];
+  assert.notEqual(observedMetaContentHash(url), observedMetaContentHash(asciiUrl));
+  for (const patch of [{ driftDetectedAt: "2026-11-14T00:00:00Z" }, { lastObservedCategory: "UTILITY" }]) {
+    assert.equal(hasMetaProviderDrift({ ...accepted, ...patch }), true);
+  }
+});
