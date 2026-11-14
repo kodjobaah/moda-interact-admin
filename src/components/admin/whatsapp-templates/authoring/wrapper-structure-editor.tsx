@@ -1,4 +1,5 @@
 "use client";
+import { TemplateCompositeProfileEditor } from "./template-composite-profile-editor";
 import { setWrapperProductImage } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
 import { eligibleVariables } from "@/lib/admin/whatsapp-templates/authoring/registry";
 import { TemplateHeaderEditor } from "./template-header-editor";
@@ -23,6 +24,7 @@ export function WrapperStructureEditor({ draft, onChange, issues = [] }: {
       <p className="mt-1 text-xs text-slate-600">If the complete reply exceeds the image caption limit, the full reply is sent as text.</p>
       {!!forField("productImage").length && <p role="alert" className="mt-2 text-xs text-amber-800">{forField("productImage").map((issue) => issue.message).join("; ")}</p>}
     </div>}
+    <TemplateCompositeProfileEditor draft={draft} onChange={onChange} issues={forField("compositeProfile")} />
     <TemplateHeaderEditor nodes={draft.header} issues={forField("header")} variables={normalVariables}
       onChange={(header) => onChange({ ...draft, header: header.filter((node): node is ContentNode => node.type !== "slot") })} />
     <TemplateBodyEditor nodes={draft.body} issues={forField("body")} variables={normalVariables} allowResponseSlot

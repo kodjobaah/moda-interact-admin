@@ -69,7 +69,11 @@ test("cloning and compilation preserve binding and change both source/prepared h
   for (const audience of ["HUMAN", "SHARED"] as const) {
     const next = setWrapperAudience(ast, audience);
     assert.equal(Object.hasOwn(next, "productImage"), false);
-    assert.equal(validateTemplateAst(next).ok, true);
+    assert.equal(validateTemplateAst(next).ok, audience !== "SHARED");
+    if (audience === "SHARED") {
+      next.compositeProfile = newWrapperDraft("SHARED").compositeProfile;
+      assert.equal(validateTemplateAst(next).ok, true);
+    }
     assert.equal(Object.hasOwn(setWrapperProductImage(next, true), "productImage"), false);
   }
 });

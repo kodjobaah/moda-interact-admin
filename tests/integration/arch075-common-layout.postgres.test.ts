@@ -61,7 +61,9 @@ test("real editable draft, immutable save, queued translation review, selector a
  const legacy={...draft,footer:[{type:"text" as const,value:""}]};
  const old=await saveEnglishTemplate({submissionId:randomUUID(),draft:legacy},{db,principal});
  const oldBefore=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:old.id},include:{locales:true}});
- const editable=cloneDraft(legacy);assert.deepEqual(editable.footer,[]);
+ const editable=cloneDraft(legacy);assert.deepEqual(editable.footer,[]);if(editable.family!=="MODA_CONVERSATION_WRAPPER")throw new Error("Wrong clone family");
+ const {leftCompositeProfile,topCompositeProfile}=await import("../fixtures/arch075-composite-profile.ts");
+ editable.compositeProfile=leftCompositeProfile;
  const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft:editable,cloneFromDefinitionId:old.id},{db,principal});assert.notEqual(saved.id,old.id);
  await db.commerceTranslationProviderCredential.create({data:{environment:"TEST",provider:"openai",ciphertext:Buffer.alloc(32,1),nonce:Buffer.alloc(12,2),authTag:Buffer.alloc(16,3),keyId:"fixture",updatedByAdminId:id}});
  await db.commerceTranslationModelConfiguration.create({data:{environment:"TEST",provider:"openai",providerModelId:"fixture-no-network",displayName:"Fixture",enabled:true,automaticDefault:true,createdByAdminId:id,updatedByAdminId:id}});
@@ -80,7 +82,8 @@ test("real editable draft, immutable save, queued translation review, selector a
  await reviewTranslation({definitionId:saved.id,runId:run.id,languageTag:tags.at(-1)!,decision:"APPROVE"},{db,principal});
  const reviewed=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id},include:{locales:true}});
  assert.equal(reviewed.status,"TRANSLATION_QUEUED");assert.equal(reviewed.locales.length,20);
- const selected=(await listReviewedCommonLayouts(db)).find(r=>r.definitionId===saved.id);assert.ok(selected);assert.deepEqual(selected.prepared.footer,[]);
+ for(const locale of reviewed.locales){const record=locale.localeAst as unknown as {authoring:{compositeProfile:unknown},prepared:{compositeProfile:unknown,compositeProfileSha256:string}};assert.deepEqual(record.authoring.compositeProfile,leftCompositeProfile);assert.deepEqual(record.prepared.compositeProfile,leftCompositeProfile);assert.equal(typeof record.prepared.compositeProfileSha256,"string");}
+ const selected=(await listReviewedCommonLayouts(db)).find(r=>r.definitionId===saved.id);assert.ok(selected);assert.deepEqual(selected.prepared.footer,[]);assert.deepEqual(selected.prepared.compositeProfile,leftCompositeProfile);
  assert.equal(await db.commerceAuditEvent.count({where:{action:"REVIEW_WHATSAPP_TEMPLATE_LOCALE",operationId:{startsWith:saved.id+":"}}}),19);
  const selection={commonDefinitionId:saved.id,replacements:[]};const preview=await previewCommonActivation(db,selection);
  const request={selection,issuedAt:preview.issuedAt,fingerprint:preview.fingerprint,operationKey:randomUUID(),reason:"Reviewed new editor common layout through all nineteen translations",acknowledgeOverrides:true as const,consumerDeploymentConfirmed:true as const,englishContentReviewed:true as const};
@@ -92,4 +95,12 @@ test("real editable draft, immutable save, queued translation review, selector a
  assert.deepEqual(await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:old.id},include:{locales:true}}),oldBefore);
  assert.equal((await activateCommonRecoveryLayout(request,{db,principal})).replay,true);
  assert.equal(await db.whatsAppTemplateVariant.count(),0);assert.equal(await db.whatsAppTemplateMetaRegistration.count(),0);
+ const topDraft=cloneDraft(editable);if(topDraft.family!=="MODA_CONVERSATION_WRAPPER")throw new Error("Wrong clone family");topDraft.compositeProfile=topCompositeProfile;
+ const topSaved=await saveEnglishTemplate({submissionId:randomUUID(),draft:topDraft,cloneFromDefinitionId:saved.id},{db,principal});
+ const topRecord=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:topSaved.id},include:{locales:true}});
+ assert.notEqual(topRecord.sourceHash,reviewed.sourceHash);
+ assert.deepEqual((topRecord.locales[0].localeAst as unknown as {prepared:{compositeProfile:unknown}}).prepared.compositeProfile,topCompositeProfile);
+ assert.deepEqual((await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id},include:{locales:true}})).locales,reviewed.locales);
+ assert.equal(await db.platformConfiguration.count({where:{key:"messaging.recoveryCompositeLayout"}}),0);
+
 });

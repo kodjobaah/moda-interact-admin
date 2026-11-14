@@ -1,3 +1,4 @@
+import { TemplateCompositeProfilePreview } from "./template-composite-profile-preview";
 import { ConversationProductImageExample } from "./conversation-product-image-example";
 import type { TemplatePreviewDTO } from "@/lib/admin/whatsapp-templates/authoring/types";
 import type { MediaRoleView } from "@/lib/admin/whatsapp-templates/media/readiness";
@@ -20,11 +21,11 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
       <div><h3 className="font-semibold">Common checkout footer</h3><p className="whitespace-pre-wrap">{preview.commonLayout.footer}</p></div>
       <details><summary>Compare AI and human messages</summary>
         <h4 className="mt-2 font-semibold">AI answer</h4><p className="whitespace-pre-wrap">{preview.commonLayout.ai}</p>
-        <p className="my-2 text-xs">A verified product image is a separate message after the shop header.</p>
+        <p className="my-2 text-xs">Product media stays below the shop header in the composite image when a saved composite profile is selected; otherwise normal message rendering applies.</p>
         <h4 className="font-semibold">Human reply</h4><p className="whitespace-pre-wrap">{preview.commonLayout.human}</p>
       </details>
     </div>}
-    <div className="rounded-xl border border-slate-200 bg-[#e7f0e8] p-3 sm:p-5" aria-label="WhatsApp-style preview">
+    {preview?.compositeProfile ? <TemplateCompositeProfilePreview values={preview.compositeProfile} headerText={preview.header} caption={[preview.body, preview.footer, preview.conditional].filter(Boolean).join("\n\n")} /> : <div className="rounded-xl border border-slate-200 bg-[#e7f0e8] p-3 sm:p-5" aria-label="WhatsApp-style preview">
       <div className="mx-auto max-w-sm rounded-xl bg-white p-4 shadow-sm" role="region" aria-label="Example message">
         {!preview ? <p className="text-sm text-slate-600">No preview available.</p> : <>
           {preview.family === "MODA_CONVERSATION_WRAPPER" && preview.productImage && <ConversationProductImageExample />}
@@ -45,7 +46,7 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
           </div>)}
         </>}
       </div>
-    </div>
+    </div>}
     {!preview ? <p className="text-xs text-slate-600" role="status">A validated example preview is not available.</p>
       : draftInvalid ? <p className="text-xs text-amber-800" role="status">Draft preview only. Correct validation issues before saving; the displayed message is not a validated Meta projection.</p>
       : <p className="text-xs text-emerald-800" role="status">Example based on the validated {localeLanguageTag} template.</p>}

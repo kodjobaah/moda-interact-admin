@@ -1,3 +1,4 @@
+import { COMPOSITE_PROFILE_DEFAULTS } from "./composite-profile";
 import { ConversationProductImageBindingSchema } from "@modainteract/moda-interact-shared/commerce/presentation";
 import type { ContentNode, MetaTemplateAst, TemplateAst, WrapperNode, WrapperTemplateAst, SemanticVariable } from "./types";
 
@@ -60,6 +61,7 @@ export function removeInitialBasketSummary(nodes: ContentNode[]): ContentNode[] 
 export function newWrapperDraft(audience: WrapperTemplateAst["audience"] = "SHARED"): WrapperTemplateAst {
   return {
     schemaVersion: 1, family: "MODA_CONVERSATION_WRAPPER", sourceLanguageTag: "en", audience,
+    ...(audience === "SHARED" ? { compositeProfile: { ...COMPOSITE_PROFILE_DEFAULTS } } : {}),
     header: [{ type: "text", value: "" }], body: [{ type: "slot", name: "response.body" }],
     footer: [], conditionals: [],
   };
@@ -132,5 +134,6 @@ export function setWrapperProductImage(draft: WrapperTemplateAst, enabled: boole
 }
 export function setWrapperAudience(draft: WrapperTemplateAst, audience: WrapperTemplateAst["audience"]): WrapperTemplateAst {
   const next = { ...draft, audience };
+  if (audience !== "SHARED") delete next.compositeProfile;
   return audience === "AI" ? next : setWrapperProductImage(next, false);
 }
