@@ -67,7 +67,7 @@
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
-    "@modainteract/moda-interact-shared": "5.13.9",
+    "@modainteract/moda-interact-shared": "6.0.0",
     "@noble/hashes": "2.0.1",
     "@prisma/client": "^6.19.3",
     "bullmq": "^6.3.4",
