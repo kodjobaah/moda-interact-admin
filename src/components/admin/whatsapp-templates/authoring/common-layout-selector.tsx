@@ -18,7 +18,7 @@ export function CommonLayoutSelector({ draft, choices, onChange }: {
         onChange(selected ? { ...rest, commonLayout: selected, shopBrandMediaRole: draft.shopBrandMediaRole ?? "LOGO" } : rest);
       }}><option value="">Keep existing layout</option>{choices.map(ref => <option key={ref.definitionId} value={ref.definitionId}>{ref.definitionId.slice(-12)} · 20 reviewed languages</option>)}</select>
     </label>
-    {!choices.length && <p className="text-sm text-amber-800">No reviewed shared layout is ready. Create a shared wrapper with the shop name and website in its header, only the response in its body, and the checkout link last in its checkout footer; review all 20 languages.</p>}
+    {!choices.length && <p className="text-sm text-amber-800">No reviewed shared layout is ready. Create a shared wrapper with the shop name in its header, only the response in its body, and the clickable website before the final checkout link in its checkout-aware footer; review all 20 languages.</p>}
     {draft.commonLayout && <p className="text-sm text-slate-600">Review any existing inline checkout link or text header explicitly. Product images remain separate from the shop logo. Meta approval is still required for the final composition.</p>}
     <label className="block text-sm">Start from a reviewed scenario body
       <select className="mt-1 w-full rounded border p-2" value="" onChange={event => {

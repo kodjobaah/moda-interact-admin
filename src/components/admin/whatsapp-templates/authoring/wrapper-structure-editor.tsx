@@ -12,10 +12,12 @@ export function WrapperStructureEditor({ draft, onChange, issues = [] }: {
   draft: WrapperTemplateAst; onChange: (draft: WrapperTemplateAst) => void; issues?: AuthoringIssue[];
 }) {
   const conditional = draft.conditionals[0];
+  const common = draft.audience === "SHARED";
+  const staticFooterHasContent = draft.footer.some(node => node.type !== "text" || node.value !== "");
   const normalVariables = eligibleVariables(draft).filter((name) => name !== "checkout.url");
   const forField = (path: string) => issues.filter((issue) => issue.path === path || issue.path.startsWith(`${path}.`));
   return <div className="space-y-5">
-    {draft.audience === "SHARED" && <p className="rounded border border-blue-100 bg-blue-50 p-3 text-sm">For the common recovery layout, include the shop name and website once in the header. Keep only the response slot in the body, leave the static footer empty, and end the checkout-aware message with the checkout link on its own line. Your text is shared across Meta, AI and human messages after review and coordinated activation.</p>}
+    {draft.audience === "SHARED" && <p className="rounded border border-blue-100 bg-blue-50 p-3 text-sm">For the common recovery layout, include the shop name once in the image header. Put the clickable shop website in the checkout-aware footer before the checkout link. Keep only the response slot in the body, leave the static footer empty, and end the checkout-aware message with the checkout link on its own line. Your text is shared across Meta, AI and human messages after review and coordinated activation.</p>}
     {draft.audience === "AI" && <div className="rounded-lg border border-slate-200 p-4">
       <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox"
         checked={!!draft.productImage} aria-describedby="optional-product-image-help"
@@ -30,18 +32,29 @@ export function WrapperStructureEditor({ draft, onChange, issues = [] }: {
     <TemplateBodyEditor nodes={draft.body} issues={forField("body")} variables={normalVariables} allowResponseSlot
       onChange={(body) => onChange({ ...draft, body })} />
     <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
-      <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={!!conditional}
-        onChange={(e) => onChange({ ...draft, conditionals: e.target.checked
-          ? [{ when: "checkout.available", nodes: [{ type: "text", value: "Checkout: " }, { type: "variable", name: "checkout.url" }] }]
-          : [] })} /> Include checkout-aware message</label>
-      <p className="mt-1 text-xs text-slate-600">Only displayed when checkout context is available.</p>
-      {conditional && <div className="mt-3"><TemplateInlineEditor title="Checkout conditional" rows={3}
+      {common ? <>
+        <h3 className="font-semibold">Website and checkout footer</h3>
+        <p className="mt-1 text-sm text-slate-600">This dynamic footer is the place for the clickable shop website and checkout link. It appears when checkout context is available. Put shop.websiteUrl before checkout.url, with checkout.url alone on the final line.</p>
+        {!conditional && <button type="button" className="mt-2 rounded border px-3 py-2 text-sm font-semibold" onClick={() => onChange({ ...draft, conditionals: [{ when: "checkout.available", nodes: [
+          { type: "text", value: "──────────\nWebsite: " }, { type: "variable", name: "shop.websiteUrl" },
+          { type: "text", value: "\nCheckout:\n" }, { type: "variable", name: "checkout.url" },
+        ] }] })}>Add website and checkout footer</button>}
+      </> : <>
+        <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={!!conditional}
+          onChange={(e) => onChange({ ...draft, conditionals: e.target.checked
+            ? [{ when: "checkout.available", nodes: [{ type: "text", value: "Checkout: " }, { type: "variable", name: "checkout.url" }] }]
+            : [] })} /> Include checkout-aware message</label>
+        <p className="mt-1 text-xs text-slate-600">Only displayed when checkout context is available.</p>
+      </>}
+      {conditional && <div className="mt-3"><TemplateInlineEditor title={common ? "Dynamic footer" : "Checkout conditional"} rows={3}
         nodes={conditional.nodes} variables={eligibleVariables(draft)} issues={forField("conditionals")}
         onChange={(nodes) => onChange({ ...draft, conditionals: [{ ...conditional,
           nodes: nodes.filter((node): node is ContentNode => node.type !== "slot") }] })} /></div>}
       {!conditional && !!forField("conditionals").length && <p role="alert" className="mt-2 text-xs text-amber-800">{forField("conditionals").map((i) => i.message).join("; ")}</p>}
     </div>
-    <TemplateFooterEditor nodes={draft.footer} issues={forField("footer")} variables={normalVariables}
-      onChange={(footer) => onChange({ ...draft, footer: footer.filter((node): node is ContentNode => node.type !== "slot") })} />
+    {common && <p className="rounded border border-slate-200 p-3 text-sm">The common template has no static footer. Use Website and checkout footer above for its clickable links.{staticFooterHasContent && " Remove the existing static footer content below before saving; it will not be silently discarded."}</p>}
+    {(!common || staticFooterHasContent) && <TemplateFooterEditor nodes={draft.footer} issues={forField("footer")} variables={normalVariables}
+      onChange={(footer) => onChange({ ...draft, footer: footer.filter((node): node is ContentNode => node.type !== "slot") })} />}
+
   </div>;
 }

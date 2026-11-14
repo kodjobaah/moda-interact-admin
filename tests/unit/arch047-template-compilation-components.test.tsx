@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { newMetaDraft, newWrapperDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
+import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
+import { layoutAst } from "../fixtures/arch075-common-layout";
 import { makeImmutableAuthoringRecord } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
 import { makeExamplePreview } from "../../src/lib/admin/whatsapp-templates/authoring/preview.ts";
 import type { ReviewLocaleDTO } from "../../src/lib/admin/whatsapp-templates/compilation/contracts.ts";
@@ -11,7 +12,7 @@ import { ComponentAndVariableDiff } from "../../src/components/admin/whatsapp-te
 import { TranslationReviewActions } from "../../src/components/admin/whatsapp-templates/compilation/translation-review-actions.tsx";
 
 function demo(kind: "META_RECOVERY" | "MODA_CONVERSATION_WRAPPER" = "META_RECOVERY") {
-  const ast = kind === "META_RECOVERY" ? newMetaDraft() : newWrapperDraft();
+  const ast = kind === "META_RECOVERY" ? newMetaDraft() : layoutAst();
   const compiled = makeImmutableAuthoringRecord(ast);
   const locale = (languageTag: string, status: ReviewLocaleDTO["status"]): ReviewLocaleDTO => ({
     languageTag, providerLanguageCode: languageTag, status, reason: null,

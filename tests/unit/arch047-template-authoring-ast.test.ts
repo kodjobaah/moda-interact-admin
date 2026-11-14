@@ -1,3 +1,4 @@
+import { layoutAst } from "../fixtures/arch075-common-layout";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { newMetaDraft, newWrapperDraft, formatEditorNodes, parseEditorNodes, insertEditorToken, ensureInitialBasketSummary, removeInitialBasketSummary } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
@@ -247,7 +248,7 @@ test("automatic targets reject coupon bindings and code alternatives require a v
 });
 test("three wrapper audiences each require exactly one response slot", () => {
   for (const audience of ["SHARED", "AI", "HUMAN"] as const) {
-    const draft = newWrapperDraft(audience);
+    const draft = audience === "SHARED" ? layoutAst() : newWrapperDraft(audience);
     assert.equal(validateTemplateAst(draft).ok, true);
     invalid({ ...draft, body: [] }, "body");
     invalid({ ...draft, body: [...draft.body, { type: "slot", name: "response.body" }] }, "body");
@@ -270,7 +271,7 @@ test("server validation rejects arbitrary nodes and fields, placeholder spoofing
   invalid({ ...draft, body: [{ type: "text", value: "A".repeat(1100) }] }, "body");
 });
 test("wrapper checkout URL only inside a checkout.available conditional", () => {
-  const draft = newWrapperDraft();
+  const draft = newWrapperDraft("AI");
   invalid({ ...draft, header: [{ type: "variable", name: "checkout.url" }] }, "header");
   const valid = { ...draft, conditionals: [{ when: "checkout.available", nodes: [{ type: "variable", name: "checkout.url" }] }] };
   assert.equal(validateTemplateAst(valid).ok, true);
@@ -357,7 +358,7 @@ test("inline composer never upgrades unknown or ineligible token text to AST var
   invalid({ ...draft, body: unknown }, "body");
   const response = parseEditorNodes("Before {{response.body}} after", { variables: [] , allowResponseSlot: true });
   assert.equal(response.filter((node) => node.type === "slot").length, 1);
-  assert.equal(validateTemplateAst({ ...newWrapperDraft(), body: response }).ok, true);
+  assert.equal(validateTemplateAst({ ...newWrapperDraft("AI"), body: response }).ok, true);
 });
 
 test("draft preview remains visible while a button is invalid without creating a prepared projection", () => {
@@ -382,7 +383,7 @@ test("ShopBrand exposes every merchant-display content field as a semantic varia
     assert.equal(VARIABLE_REGISTRY[name].sourceField, `ShopBrand.${field.slice("shopBrand.".length)}`);
     assert.ok(VARIABLE_REGISTRY[name].sample.trim());
   }
-  for (const draft of [newMetaDraft(), newWrapperDraft()]) {
+  for (const draft of [newMetaDraft(), newWrapperDraft("AI"), newWrapperDraft("HUMAN")]) {
     assert.deepEqual(eligibleVariables(draft).filter((v) => v.startsWith("shopBrand.")), expected);
     for (const name of expected) {
       const nodes = parseEditorNodes(`From {{${name}}}`, { variables: eligibleVariables(draft) });

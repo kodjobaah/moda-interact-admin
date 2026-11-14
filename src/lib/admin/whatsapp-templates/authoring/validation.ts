@@ -1,3 +1,5 @@
+import { commonLayoutPolicyError } from "./common-layout-policy";
+import { prepareValidatedTemplateProjection } from "./projection";
 import { compositeProfileError } from "./composite-profile";
 import { ConversationProductImageBindingSchema } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { requireCommonLayout } from "./common-layout";
@@ -220,6 +222,12 @@ export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?
   if (!checked.ok) return checked;
   if (checked.value.family === "MODA_CONVERSATION_WRAPPER") {
     if (checked.value.audience === "SHARED" && !checked.value.compositeProfile) return { ok: false, issues: [{ path: "compositeProfile", message: "The current common template requires a saved composite profile. Clone historical content and explicitly define its layout before saving or activating." }] };
+    if (checked.value.audience === "SHARED") {
+      const prepared = prepareValidatedTemplateProjection(checked.value, []);
+      if (prepared.family !== "MODA_CONVERSATION_WRAPPER") throw new Error("Invalid common family.");
+      const error = commonLayoutPolicyError(prepared);
+      if (error) return { ok: false, issues: [{ path: prepared.footer.some(token => token.kind !== "text" || token.value !== "") ? "footer" : "conditionals", message: error }] };
+    }
     return checked;
   }
   try {
