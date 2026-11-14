@@ -293,3 +293,42 @@ for (const status of ["TRANSLATION_QUEUED", "TRANSLATING", "PARTIALLY_FAILED", "
     await assert.rejects(approvedSource(fixture.db as any, DEFINITION_ID, WABA), issueCode("NOT_READY"));
   });
 }
+
+import { frozenLocaleSnapshot } from "../../src/lib/admin/whatsapp-templates/meta/snapshot.ts";
+import { makeImmutableAuthoringRecord } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
+import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
+
+test("French expected-raw representative passes publication without normalizing immutable source or permitting actual drift", async () => {
+  const definition = definitionFixture();
+  const locale = definition.locales.find(item => item.languageTag === "fr")!;
+  const authoring = structuredClone(locale.localeAst.authoring);
+  authoring.body.unshift({ type: "text", value: "Boutique\u00a0: Exemple\nPanier\u00a0: " });
+  const record = makeImmutableAuthoringRecord(authoring);
+  if (record.prepared.family !== "META_RECOVERY") throw Error("Wrong fixture family");
+  locale.localeAst = record; locale.contentHash = templateHash(record.prepared);
+  const reg = locale.metaRegistrations[0];
+  reg.componentsSnapshot = structuredClone(record.prepared.components);
+  const exact = frozenLocaleSnapshot(locale, definition);
+  reg.parameterBindingsSnapshot = structuredClone(exact.bindings) as typeof reg.parameterBindingsSnapshot;
+  reg.submittedContentHash = locale.contentHash;
+  const expectedRawHash = observedMetaContentHash(reg.componentsSnapshot);
+  const observed = structuredClone(reg.componentsSnapshot);
+  const body = observed.find(component => component.type === "BODY")!;
+  body.text = String(body.text).replaceAll("\u00a0", " ");
+  const actualRawHash = observedMetaContentHash(observed);
+  assert.notEqual(expectedRawHash, actualRawHash);
+  const frozen = JSON.stringify({ sourceHash: definition.sourceHash, record, submitted: reg.submittedContentHash,
+    components: reg.componentsSnapshot, bindings: reg.parameterBindingsSnapshot });
+  reg.lastObservedContentHash = expectedRawHash;
+  assert.equal(equivalentRegistration(reg, locale, exact), true);
+  const fixture = fixtureDatabase({ definition });
+  assert.equal((await approvedSource(fixture.db as any, DEFINITION_ID, WABA)).locales.length, 20);
+  for (const patch of [{ lastObservedContentHash: actualRawHash }, { lastObservedCategory: "UTILITY" },
+    { driftDetectedAt: new Date() }, { failureCode: "PROVIDER_DRIFT" }, { providerStatus: "PAUSED" },
+    { submittedContentHash: "f".repeat(64) },
+    { parameterBindingsSnapshot: { ...reg.parameterBindingsSnapshot, body: [{ position: 1, variable: "checkout.url" }] } },
+    { lastObservedContentHash: observedMetaContentHash([...observed, { type: "BUTTONS", buttons: [{ type: "URL", text: "Return", url: "https://changed.example/" }] }]) },
+  ]) assert.equal(equivalentRegistration({ ...reg, ...patch }, locale, exact), false, JSON.stringify(patch));
+  assert.equal(JSON.stringify({ sourceHash: definition.sourceHash, record, submitted: reg.submittedContentHash,
+    components: reg.componentsSnapshot, bindings: reg.parameterBindingsSnapshot }), frozen);
+});

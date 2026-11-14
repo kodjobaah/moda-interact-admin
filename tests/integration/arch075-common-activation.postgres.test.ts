@@ -17,6 +17,9 @@ import {previewCommonActivation} from "../../src/lib/admin/whatsapp-templates/co
 import {activateCommonRecoveryLayout} from "../../src/lib/admin/whatsapp-templates/common-activation/service.ts";
 import {assertCommonSourceGate} from "../../src/lib/admin/whatsapp-templates/common-activation/gates.ts";
 import {activateConversationWrapper} from "../../src/lib/admin/whatsapp-templates/wrappers/service.ts";
+import {readMetaStatus} from "../../src/lib/admin/whatsapp-templates/meta/status.ts";
+import {hasMetaProviderDrift} from "../../src/lib/admin/whatsapp-templates/meta/contracts.ts";
+import {NBSP_NORMALIZATION_KIND} from "../fixtures/arch075-meta-nbsp.ts";
 import {progressForOperation} from "../../src/lib/admin/whatsapp-templates/publishing/operation.ts";
 if(process.env.ARCH047_DISPOSABLE_POSTGRES!=="1"||new URL(process.env.DATABASE_URL!).hostname!=="127.0.0.1")throw Error("Disposable localhost fixture required");
 const db=new PrismaClient();after(()=>db.$disconnect());const waba="1234567890";process.env.DEPLOYMENT_ENVIRONMENT_NAME="test";process.env.WHATSAPP_BUSINESS_ACCOUNT_ID=waba;
@@ -36,7 +39,7 @@ async function meta(commonId?:string){
  if(commonId){draft.commonLayout=await readSavedCommonLayout(db,commonId,"en");draft.shopBrandMediaRole="LOGO";draft.header=[];}
  const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft},{db,principal});
  for(const tag of REVIEW_LANGUAGES.filter(t=>t!=="en")){
-  const ast=structuredClone(draft);if(commonId)ast.commonLayout=await readSavedCommonLayout(db,commonId,tag);const prepared=compileTemplateAst(ast);
+  const ast=structuredClone(draft);if(tag==="fr")ast.body.unshift({type:"text",value:"Boutique\u00a0: Exemple\nPanier\u00a0: "});if(commonId)ast.commonLayout=await readSavedCommonLayout(db,commonId,tag);const prepared=compileTemplateAst(ast);
   await db.whatsAppTemplateLocale.create({data:{definitionId:saved.id,languageTag:tag,providerLanguageCode:expectedProviderLanguageCode(tag),localeAst:json({schemaVersion:1,authoring:ast,prepared}),contentHash:templateHash(prepared),status:"REVIEWED",reviewedAt:new Date(),reviewedByAdminId:id}});
  }
  const definition=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id},include:{locales:true}});
@@ -51,7 +54,36 @@ test("complete conservative cohort commits with English review, rollback, CAS co
  const registrations=await db.whatsAppTemplateMetaRegistration.findMany({where:{locale:{definitionId:original.id}},include:{locale:true}});
  for(const shopId of shops)for(const reg of registrations)await db.whatsAppTemplateVariant.create({data:{shopId,providerAccountId:waba,purpose:"FOLLOW_UP_NO_OFFER",languageTag:reg.locale.languageTag,providerLanguageCode:reg.providerLanguageCode,providerTemplateName:reg.providerTemplateName,providerTemplateId:reg.providerTemplateId,metaRegistrationId:reg.id,status:"APPROVED",enabled:true}});
  const selection={commonDefinitionId:commonId,replacements:[{definitionId:replacement.id,shopIds:shops}]};
+ // Simulate only the output receipt of BG017's separately tested bounded reconciliation.
+ // Admin never proves equivalence or rewrites either immutable snapshot/hash.
+ const fr=await db.whatsAppTemplateMetaRegistration.findFirstOrThrow({where:{locale:{definitionId:replacement.id,languageTag:"fr"}},include:{locale:true}});
+ const immutable={components:fr.componentsSnapshot,bindings:fr.parameterBindingsSnapshot,submittedHash:fr.submittedContentHash,locale:fr.locale,sourceHash:replacement.sourceHash};
+ const expectedRaw=observedMetaContentHash(fr.componentsSnapshot);
+ const actualComponents=structuredClone(fr.componentsSnapshot) as Array<Record<string,unknown>>;
+ const actualBody=actualComponents.find(c=>c.type==="BODY")!;assert.match(String(actualBody.text),/\u00a0/);
+ actualBody.text=String(actualBody.text).replaceAll("\u00a0"," ");
+ const actualRaw=observedMetaContentHash(actualComponents);assert.notEqual(actualRaw,expectedRaw);
+ await db.whatsAppTemplateMetaRegistration.update({where:{id:fr.id},data:{lastObservedContentHash:actualRaw}});
+ assert.equal(hasMetaProviderDrift((await readMetaStatus(replacement.id,{db,principal})).registrations.find(r=>r.languageTag==="fr")!),true);
+ await assert.rejects(previewCommonActivation(db,selection),/approval|content/i);
+ for(const data of [{lastObservedContentHash:expectedRaw,lastObservedCategory:"UTILITY"},
+  {lastObservedContentHash:expectedRaw,lastObservedCategory:"MARKETING",driftDetectedAt:new Date()},
+  {lastObservedContentHash:observedMetaContentHash([{type:"BODY",text:"Substantive changed offer"}]),lastObservedCategory:"MARKETING",driftDetectedAt:null}]){
+  await db.whatsAppTemplateMetaRegistration.update({where:{id:fr.id},data});
+  await assert.rejects(previewCommonActivation(db,selection),/approval|content/i);
+ }
+ await db.whatsAppTemplateMetaRegistration.update({where:{id:fr.id},data:{lastObservedContentHash:expectedRaw,lastObservedCategory:"MARKETING",driftDetectedAt:null,lastReconciledAt:new Date(Date.now()-2*60*60_000)}});
+ await assert.rejects(previewCommonActivation(db,selection),/current provider reconciliation/i);
+ const receipt=await db.whatsAppTemplateMetaEvent.create({data:{registrationId:fr.id,eventIdentity:randomUUID(),source:"BACKGROUND",eventType:"RECONCILE",outcome:"CURRENT",wabaId:waba,requestDigest:fr.submittedContentHash,processedAt:new Date(),evidence:{normalizationKind:NBSP_NORMALIZATION_KIND,rawObservedContentHash:actualRaw,expectedContentHash:expectedRaw}}});
+ await db.whatsAppTemplateMetaRegistration.update({where:{id:fr.id},data:{lastReconciledAt:new Date()}});
+ const status=await readMetaStatus(replacement.id,{db,principal});const frStatus=status.registrations.find(r=>r.languageTag==="fr")!;
+ assert.equal(frStatus.expectedProviderContentHash,expectedRaw);assert.equal(frStatus.lastObservedContentHash,expectedRaw);assert.equal(hasMetaProviderDrift(frStatus),false);
+ assert.ok(!JSON.stringify(status).includes(actualRaw),"Actual observation evidence remains server-side; status receives only the raw-domain representative");
+ assert.deepEqual((await db.whatsAppTemplateMetaEvent.findUniqueOrThrow({where:{id:receipt.id}})).evidence,{normalizationKind:NBSP_NORMALIZATION_KIND,rawObservedContentHash:actualRaw,expectedContentHash:expectedRaw});
+ const unchanged=await db.whatsAppTemplateMetaRegistration.findUniqueOrThrow({where:{id:fr.id},include:{locale:true}});
+ assert.deepEqual({components:unchanged.componentsSnapshot,bindings:unchanged.parameterBindingsSnapshot,submittedHash:unchanged.submittedContentHash,locale:unchanged.locale,sourceHash:(await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:replacement.id}})).sourceHash},immutable);
  const first=await previewCommonActivation(db,selection);assert.equal(first.variants.length,40);assert.equal(first.shops[1].status,"SUSPENDED");assert.equal(first.targetCount,40);assert.equal(first.missingScenarios.length,5);
+ assert.equal(first.definitions.find(d=>d.source.id===replacement.id)!.registrationFacts.find(r=>r.id===fr.id)!.observedHash,expectedRaw);
  await assert.rejects(previewCommonActivation(db,{...selection,replacements:[{definitionId:replacement.id,shopIds:[shops[0]]}]}),/every shop/);
  const input={selection,issuedAt:first.issuedAt,fingerprint:first.fingerprint,operationKey:randomUUID(),reason:"Review exact English source and all immutable replacements",acknowledgeOverrides:true as const,consumerDeploymentConfirmed:true as const,englishContentReviewed:true as const};
  await db.whatsAppTemplateDefinition.update({where:{id:commonId},data:{status:"RETIRED",retiredAt:new Date()}});
