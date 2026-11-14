@@ -40,6 +40,7 @@ export function parseSourceSnapshot(value: unknown): TranslationSourceSnapshot {
       typeof value.sourceHash !== "string" || !/^[a-f0-9]{64}$/.test(value.sourceHash) ||
       !Array.isArray(value.segments) || value.segments.length > 32 ||
       JSON.stringify(value).length > MAX_SNAPSHOT) throw new Error("Invalid keyed source snapshot or version.");
+  if (Object.hasOwn(value, "compositeProfile") || Object.hasOwn(value, "compositeProfileSha256")) throw new Error("Composite layout metadata cannot enter translated text transport.");
   if (Object.hasOwn(value, "productImage")) throw new Error("Product image binding must not enter translation text transport.");
   const segments: SourceSegment[] = value.segments.map((entry: unknown, i) => {
     if (!isRecord(entry) || typeof entry.key !== "string" || !Array.isArray(entry.protectedTokens) ||
@@ -65,6 +66,7 @@ export function parseTranslatedSegments(value: unknown): TranslationSegmentResul
       value.segments.length > 32 || JSON.stringify(value).length > MAX_SNAPSHOT) {
     throw new Error("Unsupported or malformed translated-segment response.");
   }
+  if (Object.hasOwn(value, "compositeProfile") || Object.hasOwn(value, "compositeProfileSha256")) throw new Error("Composite layout metadata cannot enter translated text transport.");
   if (Object.hasOwn(value, "productImage")) throw new Error("Translated text cannot supply a product image binding.");
   const segments = value.segments.map((entry: unknown, i) => {
     if (!isRecord(entry) || typeof entry.key !== "string") throw new Error(`Translated segment ${i}: malformed.`);

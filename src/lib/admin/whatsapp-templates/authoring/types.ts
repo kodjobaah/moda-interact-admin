@@ -1,6 +1,6 @@
 import type { RecoveryPromotionTarget, RecoveryTemplateFrozenBindings, RecoveryTemplateHeaderMediaRole, RecoveryTemplateSemanticKey } from "@modainteract/moda-interact-shared/recovery-template-bindings";
 
-import type { CommonRecoveryLayoutReference, ConversationProductImageBinding } from "@modainteract/moda-interact-shared/commerce/presentation";
+import type { CommonRecoveryLayoutReference, ConversationProductImageBinding, RecoveryCompositeProfile } from "@modainteract/moda-interact-shared/commerce/presentation";
 
 /** Versioned Admin-owned source contract. No provider/DB/React dependencies. */
 export const TEMPLATE_AST_VERSION = 1 as const;
@@ -43,6 +43,8 @@ export type WrapperTemplateAst = {
   family: "MODA_CONVERSATION_WRAPPER";
   sourceLanguageTag: "en";
   audience: WrapperAudience;
+  /** Optional immutable geometry on the common SHARED source; never an active policy. */
+  compositeProfile?: RecoveryCompositeProfile;
   productImage?: ConversationProductImageBinding;
   header: ContentNode[];
   body: WrapperNode[];
@@ -61,6 +63,8 @@ export type MetaPrepared = {
 };
 export type RuntimeToken = { kind: "text"; value: string } | { kind: "variable"; name: SemanticVariable } | { kind: "responseSlot"; name: "response.body" };
 export type WrapperPrepared = {
+  compositeProfile?: RecoveryCompositeProfile;
+  compositeProfileSha256?: string;
   schemaVersion: 1;
   family: "MODA_CONVERSATION_WRAPPER";
   header: RuntimeToken[];
@@ -94,6 +98,7 @@ export type TemplateDetail = TemplateListItem & {
   english: ImmutableAuthoringRecord | null;
 };
 export type TemplatePreviewDTO = {
+  compositeProfile?: RecoveryCompositeProfile;
   commonLayout?: { header: string; footer: string; ai: string; human: string };
   family: TemplateFamily;
   header: string;

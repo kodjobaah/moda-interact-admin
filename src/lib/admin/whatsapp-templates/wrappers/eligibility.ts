@@ -19,7 +19,9 @@ function identities(tokens: RuntimeToken[]): string[] {
 }
 function preservesProtectedTokens(source: WrapperPrepared, translation: WrapperPrepared): boolean {
   const same = (a: RuntimeToken[], b: RuntimeToken[]) => stableJson(identities(a)) === stableJson(identities(b));
-  return stableJson(source.productImage ?? null) === stableJson(translation.productImage ?? null) &&
+  return stableJson(source.compositeProfile ?? null) === stableJson(translation.compositeProfile ?? null) &&
+    source.compositeProfileSha256 === translation.compositeProfileSha256 &&
+    stableJson(source.productImage ?? null) === stableJson(translation.productImage ?? null) &&
     same(source.header, translation.header) && same(source.body, translation.body) &&
     same(source.footer, translation.footer) && source.conditionals.length === translation.conditionals.length &&
     source.conditionals.every((item, i) => item.when === translation.conditionals[i].when &&
@@ -85,7 +87,7 @@ export function checkWrapperEligibility(definition: WrapperDefinitionRow, audien
   const english = projections.en;
   for (const [tag, translated] of Object.entries(projections)) {
     if (!preservesProtectedTokens(english, translated)) {
-      return fail(`${tag}: protected variable identities or product image binding differ from the English source.`);
+      return fail(`${tag}: protected variable identities, saved layout or product image binding differ from the English source.`);
     }
   }
   // Explicitly retain all eight ShopBrand semantic names as data references. The

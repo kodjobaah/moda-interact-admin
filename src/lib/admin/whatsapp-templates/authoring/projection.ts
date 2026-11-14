@@ -1,3 +1,4 @@
+import { compositeProfileDigest } from "./composite-profile";
 import { positionalMetaText } from "./meta-body";
 import { VARIABLE_REGISTRY } from "./registry";
 import type { ContentNode, PreparedTemplate, RuntimeToken, TemplateAst, WrapperNode } from "./types";
@@ -13,6 +14,7 @@ export function prepareValidatedTemplateProjection(draft: TemplateAst, bodyNodes
   if (draft.family === "MODA_CONVERSATION_WRAPPER") return {
     schemaVersion: 1, family: "MODA_CONVERSATION_WRAPPER", responseSlot: "response.body",
     header: asRuntime(draft.header), body: asRuntime(draft.body), footer: asRuntime(draft.footer),
+    ...(draft.compositeProfile ? { compositeProfile: { ...draft.compositeProfile }, compositeProfileSha256: compositeProfileDigest(draft.compositeProfile) } : {}),
     ...(draft.productImage ? { productImage: { ...draft.productImage } } : {}),
     conditionals: draft.conditionals.map((c) => ({ when: c.when, tokens: asRuntime(c.nodes) })),
   };

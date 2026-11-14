@@ -1,3 +1,4 @@
+import { compositeProfileError } from "./composite-profile";
 import { ConversationProductImageBindingSchema } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { requireCommonLayout } from "./common-layout";
 import { metaBodyIssues, projectMetaBody } from "./meta-body";
@@ -29,7 +30,12 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
   const family = raw.family;
   const meta = family === "META_RECOVERY";
   const common = ["schemaVersion", "family", "sourceLanguageTag", "header", "body", "footer"];
-  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "promotionTarget", "buttons", "shopBrandMediaRole", "commonLayout"] : [...common, "audience", "conditionals", "productImage"])) fail("root", "Unknown template fields.");
+  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "promotionTarget", "buttons", "shopBrandMediaRole", "commonLayout"] : [...common, "audience", "conditionals", "productImage", "compositeProfile"])) fail("root", "Unknown template fields.");
+  if (!meta && raw.compositeProfile !== undefined) {
+    if (raw.audience !== "SHARED") fail("compositeProfile", "Composite layout belongs only to the common SHARED template.");
+    const error = compositeProfileError(raw.compositeProfile);
+    if (error) fail("compositeProfile", error);
+  }
   if (meta && raw.commonLayout !== undefined) {
     try {
       const ref = requireCommonLayout(raw.commonLayout);
@@ -211,7 +217,11 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
 /** New authoring/reconstruction admission always validates the final provider BODY. */
 export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {}): ReturnType<typeof validateTemplateStructure> {
   const checked = validateTemplateStructure(raw, options);
-  if (!checked.ok || checked.value.family !== "META_RECOVERY") return checked;
+  if (!checked.ok) return checked;
+  if (checked.value.family === "MODA_CONVERSATION_WRAPPER") {
+    if (checked.value.audience === "SHARED" && !checked.value.compositeProfile) return { ok: false, issues: [{ path: "compositeProfile", message: "The current common template requires a saved composite profile. Clone historical content and explicitly define its layout before saving or activating." }] };
+    return checked;
+  }
   try {
     const projected = projectMetaBody(checked.value);
     const issues = metaBodyIssues(projected.text);

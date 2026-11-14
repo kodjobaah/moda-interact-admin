@@ -30,6 +30,7 @@ export function makeExamplePreview(prepared: PreparedTemplate, common?: CommonRe
   const commonLayout = common ? commonExample(common) : undefined;
   if (prepared.family === "MODA_CONVERSATION_WRAPPER") return {
     family: prepared.family, header: renderTokens(prepared.header), body: renderTokens(prepared.body), footer: renderTokens(prepared.footer),
+    ...(prepared.compositeProfile ? { compositeProfile: prepared.compositeProfile } : {}),
     ...(prepared.productImage ? { productImage: prepared.productImage } : {}),
     buttons: [], conditional: prepared.conditionals.map((c) => renderTokens(c.tokens)).join("\n"),
   };
@@ -78,6 +79,7 @@ export function makeDraftExamplePreview(draft: import("./types").TemplateAst): T
     buttons: [],
   };
   if (draft.family === "MODA_CONVERSATION_WRAPPER") {
+    if (draft.compositeProfile) result.compositeProfile = draft.compositeProfile;
     if (draft.audience === "AI" && draft.productImage) result.productImage = draft.productImage;
     result.conditional = draft.conditionals.map((conditional) => sampleNodes(conditional.nodes)).join("\n");
   } else {
