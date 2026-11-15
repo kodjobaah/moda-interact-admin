@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { Registry } from "./contracts";
+import { ROUTING_AGENT_KEY, validateRoutingAgentPolicy } from "./routing-agent-contract";
 import { ConfigurationError } from "./errors";
 
 /** Prisma models are supplied by the accepted ARCH-043-DATABASE-001 database submodule. */
@@ -39,10 +40,12 @@ export async function readConfiguration(db: ConfigurationDatabase, environment: 
 export async function writeConfiguration(db: ConfigurationDatabase, input: {
   environment: string; key: string; expectedVersion: number; values: Record<string, unknown>;
   actorId: string; reason: string | null;
+  validatePolicy?: (tx: Prisma.TransactionClient, key: string, values: Record<string, unknown>) => Promise<void>;
 }): Promise<{ key: string; version: number }> {
   const { environment, key, expectedVersion, values, actorId, reason } = input;
   try {
     return await db.$transaction(async (tx) => {
+      if (input.validatePolicy) await input.validatePolicy(tx, key, values);
       // The conditional update is the linearisation point. Reads alone never authorise a write.
       const existing = await tx.platformConfiguration.findUnique({ where: { environment_key: { environment, key } } });
       if (expectedVersion === 0) {
@@ -89,6 +92,14 @@ export async function readConfigurationHistory(db: ConfigurationDatabase, enviro
     select: { id: true, expectedVersion: true, resultingVersion: true, beforeValue: true,
       afterValue: true, actorId: true, reason: true, createdAt: true },
   });
-  const entries = rows.slice(0, 20).map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  const safeAuditValue = (value: unknown) => {
+    if (key !== ROUTING_AGENT_KEY || value === null) return value;
+    const checked = validateRoutingAgentPolicy(value);
+    return checked.ok ? checked.values : { invalidStoredValue: true };
+  };
+  const entries = rows.slice(0, 20).map((row) => ({ ...row,
+    beforeValue: safeAuditValue(row.beforeValue), afterValue: safeAuditValue(row.afterValue),
+    createdAt: row.createdAt.toISOString(),
+  }));
   return { entries, nextCursor: rows.length > 20 ? entries[entries.length - 1]?.id ?? null : null };
 }

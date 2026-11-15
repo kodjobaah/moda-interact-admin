@@ -16,7 +16,7 @@ const fixture: ConfigurationContract = {
 };
 
 test("production allowlist has canonical policy groups including preview storage", () => {
-  assert.deepEqual([...registry.keys()], ["commerce.recoveryExecution", "woo.couponSync", "speech.transcription", "commerce.previewStorage", "commerce.preview", "admin.grafana", "omini.moderation", "shopBrand.publicMedia"]);
+  assert.deepEqual([...registry.keys()], ["commerce.recoveryExecution", "woo.couponSync", "speech.transcription", "commerce.previewStorage", "commerce.preview", "admin.grafana", "omini.moderation", "shopBrand.publicMedia", "recovery.routingAgent"]);
   assert.equal(PLATFORM_POLICY_CONTRACTS.reduce((sum, contract) => sum + contract.fields.length, 0), 50);
   for (const contract of registry.values()) {
     assert.equal(contract.requiredRole, "SUPER_ADMIN");
@@ -30,6 +30,7 @@ test("production allowlist has canonical policy groups including preview storage
 
 test("single-source descriptor controls strict types, bounds and unknown fields", () => {
   for (const contract of registry.values()) {
+    if (contract.validate) continue; // Structured routing policy has its dedicated complete-object suite.
     const input = Object.fromEntries(contract.fields.map((field) => [field.name,
       field.kind === "integer" ? field.min : field.kind === "boolean" ? false :
       field.kind === "enum" ? field.options[0] : field.kind === "nullable-https-url" ? (contract.defaults?.[field.name] ?? (field.purpose === "r2" ? "https://abc.r2.cloudflarestorage.com" : null)) :

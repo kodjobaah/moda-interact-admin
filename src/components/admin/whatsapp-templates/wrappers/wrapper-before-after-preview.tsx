@@ -10,7 +10,7 @@ function FullWrapperCard({ definition, languageTag, checkoutAvailable, audience,
   if (!prepared) return <article className="min-w-0 rounded border p-4"><h3 className="font-semibold">{title}</h3>
     <p className="mt-2 text-sm text-amber-800">No validated prepared wrapper is available for this language.</p></article>;
   const result = renderWrapperPreview(prepared, {
-    response: EXAMPLE_RESPONSES[audience], checkoutAvailable, context: { kind: "FICTIONAL" },
+    response: EXAMPLE_RESPONSES[audience], checkoutAvailable: audience !== "ROUTER" && checkoutAvailable, context: { kind: audience === "ROUTER" ? "NEUTRAL" : "FICTIONAL" },
   });
   return <article className="min-w-0 space-y-3 rounded border bg-white p-4">
     <h3 className="font-semibold">{title}</h3>
@@ -18,14 +18,14 @@ function FullWrapperCard({ definition, languageTag, checkoutAvailable, audience,
     <p className="text-xs text-slate-600">Audience: {definition.audience} · First published: {definition.publishedAt
       ? new Date(definition.publishedAt).toLocaleString() : "Not yet activated"}</p>
     <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs font-medium text-amber-900">
-      Fictional example only — brand, customer and checkout values below are not merchant data.
+      {audience === "ROUTER" ? "Neutral router example only — no shop, customer, checkout or media context is loaded." : "Fictional example only — brand, customer and checkout values below are not merchant data."}
     </p>
     <div className="space-y-2 text-sm">
       {result.productImage && <ConversationProductImageExample />}
       <div><strong>Header</strong><p className="whitespace-pre-wrap break-words">{result.header || "(none)"}</p></div>
       <div><strong>Response (illustrative insertion, not stored)</strong><p className="whitespace-pre-wrap break-words">{result.body}</p></div>
       <div><strong>Footer</strong><p className="whitespace-pre-wrap break-words">{result.footer || "(none)"}</p></div>
-      <div><strong>Checkout conditional</strong><p className="whitespace-pre-wrap break-words">{result.conditional ?? "Omitted — checkout unavailable or stale"}</p></div>
+      {audience !== "ROUTER" && <div><strong>Checkout conditional</strong><p className="whitespace-pre-wrap break-words">{result.conditional ?? "Omitted — checkout unavailable or stale"}</p></div>}
     </div>
     <details className="text-xs"><summary className="cursor-pointer font-medium">Typed variable bindings and availability ({result.disclosures.length})</summary>
       <ul className="mt-2 list-inside list-disc space-y-1">{result.disclosures.map((entry, i) =>

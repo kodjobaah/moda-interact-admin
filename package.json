@@ -50,7 +50,7 @@
     "test:arch047-admin-compilation:unit": "node scripts/test-unit.mjs tests/unit/arch047-template-compilation.test.ts tests/unit/arch047-template-compilation-service.test.ts",
     "test:arch047-admin-compilation:postgres": "node scripts/test-arch047-admin-compilation-postgres.mjs",
     "test:arch047-admin-compilation:components": "node scripts/test-unit.mjs tests/unit/arch047-template-compilation-components.test.tsx",
-    "test:arch047-admin-wrappers:unit": "node scripts/test-unit.mjs tests/unit/arch047-template-wrappers.test.ts tests/unit/arch047-template-wrappers-service.test.ts",
+    "test:arch047-admin-wrappers:unit": "node scripts/test-unit.mjs tests/unit/arch047-template-wrappers.test.ts tests/unit/arch047-template-wrappers-service.test.ts tests/unit/arch076-router-template.test.tsx",
     "test:arch047-admin-wrappers:components": "node scripts/test-unit.mjs tests/unit/arch047-template-wrappers-components.test.tsx",
     "test:arch047-admin-wrappers:postgres": "node scripts/test-arch047-admin-wrappers-postgres.mjs",
     "test:template-sample-seed:unit": "node --test tests/unit/template-sample-seed.test.mjs",
@@ -63,7 +63,11 @@
     "test:arch075-admin-common-layout": "node scripts/test-unit.mjs tests/unit/arch075-common-layout.test.ts",
     "test:arch075-admin-common-layout:postgres": "node scripts/test-arch075-common-layout-postgres.mjs",
     "test:arch075-admin-common-activation": "node scripts/test-unit.mjs tests/unit/arch075-common-activation.test.ts",
-    "test:arch075-admin-common-activation:postgres": "node scripts/test-arch075-common-activation-postgres.mjs"
+    "test:arch075-admin-common-activation:postgres": "node scripts/test-arch075-common-activation-postgres.mjs",
+    "test:sender-pool:unit": "node scripts/test-unit.mjs tests/unit/whatsapp-sender-pool.test.ts tests/unit/whatsapp-sender-pool-components.test.tsx",
+    "test:sender-pool:postgres": "npm run prisma:generate && node scripts/test-whatsapp-sender-pool-postgres.mjs",
+    "test:arch076-routing-agent:unit": "node scripts/test-unit.mjs tests/unit/arch076-routing-agent.test.ts tests/unit/arch076-routing-agent-components.test.tsx",
+    "test:arch076-routing-agent:postgres": "npm run prisma:generate && node scripts/test-arch076-routing-agent-postgres.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",

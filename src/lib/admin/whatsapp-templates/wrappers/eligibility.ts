@@ -1,3 +1,4 @@
+import { neutralRouterProjectionError } from "./router-policy";
 import { stableJson } from "../authoring/canonical";
 import { compileTemplateAst } from "../authoring/compiler";
 import { templateHash } from "../authoring/identifiers";
@@ -71,6 +72,9 @@ export function checkWrapperEligibility(definition: WrapperDefinitionRow, audien
     }
     try {
       const prepared = compileTemplateAst(checked.value);
+      if (audience === "ROUTER" && (neutralRouterProjectionError(storedPrepared) || neutralRouterProjectionError(prepared))) {
+        return fail(`${locale.languageTag}: router projection is not neutral.`);
+      }
       if (prepared.family !== "MODA_CONVERSATION_WRAPPER" ||
           storedPrepared.family !== "MODA_CONVERSATION_WRAPPER" ||
           stableJson(storedPrepared) !== stableJson(prepared) ||

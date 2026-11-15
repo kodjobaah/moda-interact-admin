@@ -1,3 +1,4 @@
+import { lockPoolConfiguration, guardSenderWabaSwitch } from "./whatsapp-pool-configuration-fence";
 /** Authenticated sealed configuration service. Plaintext only leaves on an explicit, authorised field reveal. */
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -192,6 +193,7 @@ export async function mutateSecretWithDependencies(input: unknown, deps: {
 
   try {
     return await deps.db.$transaction(async (tx) => {
+      if (key === "messaging.sender") await lockPoolConfiguration(tx, deps.environment);
       const existing = await tx.platformConfiguration.findUnique({ where: { environment_key: { environment: deps.environment, key } } });
       if ((!existing && expectedVersion !== 0) || existing && existing.version !== expectedVersion) {
         throw new ConfigurationError("CONFLICT", "Configuration changed. Refresh before continuing.");
@@ -216,6 +218,7 @@ export async function mutateSecretWithDependencies(input: unknown, deps: {
         }
         plaintext = JSON.stringify(validateSecretPayload(key, merged));
       }
+      if (key === "messaging.sender") await guardSenderWabaSwitch(tx, deps.environment, existing, plaintext === null ? null : JSON.parse(plaintext), deps.wrapping);
       const nextVersion = expectedVersion + 1;
       const value = plaintext === null ? DISABLED_SECRET : sealSecret({ environment: deps.environment, key, version: nextVersion, plaintext, wrapping: deps.wrapping });
       if (existing) {
@@ -234,7 +237,7 @@ export async function mutateSecretWithDependencies(input: unknown, deps: {
         afterValue: plaintext === null ? REDACTED_FALSE : REDACTED_TRUE,
       } });
       return { key, version: nextVersion };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: key === "messaging.sender" ? Prisma.TransactionIsolationLevel.ReadCommitted : Prisma.TransactionIsolationLevel.Serializable });
   } catch (cause) {
     if (cause instanceof ConfigurationError) throw cause;
     if (cause instanceof Prisma.PrismaClientKnownRequestError && ["P2002", "P2034"].includes(cause.code)) {

@@ -49,7 +49,7 @@ export function TemplateFamilyPurposeSelector({ draft, onChange, onFamilyChange 
       </label>}
     </div> : <label className="block text-sm">Wrapper audience
       <select aria-label="Wrapper audience" className={selectStyle} value={draft.audience} onChange={(e) => onChange(setWrapperAudience(draft, e.target.value as WrapperAudience))}>
-        <option value="SHARED">Shared fallback</option><option value="AI">AI response</option><option value="HUMAN">Human response</option>
+        <option value="ROUTER">Router — before a shop is selected</option><option value="SHARED">Shared fallback</option><option value="AI">AI response</option><option value="HUMAN">Human response</option>
       </select>
     </label>}
     <label className="block text-sm">Source language (explicit selection)
