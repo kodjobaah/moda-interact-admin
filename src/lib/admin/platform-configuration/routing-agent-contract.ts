@@ -17,7 +17,7 @@ export type RoutingAgentPolicy = {
 
 /** Admin-owned business authoring policy. Missing values never acquire runtime defaults. */
 export function validateRoutingAgentPolicy(input: unknown): ValidationResult {
-  const errors: Record<string, string> = {};
+  const errors: Record<string, string> = Object.create(null);
   const object = (value: unknown, fields: readonly string[], path: string): Record<string, unknown> => {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       errors[path || "_form"] = "A complete settings object is required.";
@@ -57,7 +57,7 @@ export function validateRoutingAgentPolicy(input: unknown): ValidationResult {
   integer(root.retentionMs, "retentionMs", 1);
   if (typeof root.retentionMs === "number" && typeof root.decisionTTLms === "number" && root.retentionMs < root.decisionTTLms) errors.retentionMs = "Request retention must cover the decision lifetime.";
   return Object.keys(errors).length
-    ? { ok: false, fieldErrors: errors, message: "Complete all routing settings and correct the highlighted fields." }
+    ? { ok: false, fieldErrors: { ...errors }, message: "Complete all routing settings and correct the highlighted fields." }
     : { ok: true, values: structuredClone(root) };
 }
 

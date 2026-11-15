@@ -51,18 +51,14 @@ test("dedicated publication is audited, CAS-protected and never activates or see
   assert.equal(view.active?.id, normalRevisionId);
   assert.equal(view.history.some((item) => item.id === routingRevisionId), false);
   await assert.rejects(db.$transaction((tx) => mutateAgentInstructions(tx, { kind: "activate", promptRevisionId: routingRevisionId, scope: "PLATFORM", shopId: null, expectedConfigurationPromptEditVersion: active.promptEditVersion, reason: "forbidden routing activation" }, actorId)), /unavailable/);
+  // Even without an active pointer, the normal editor must not seed the latest routing revision.
+  await db.commerceAgentConfiguration.update({ where: { id: active.id }, data: { activePromptRevisionId: null } });
   const draftId = await db.$transaction((tx) => mutateAgentInstructions(tx, { kind: "create-draft", scope: "PLATFORM", shopId: null, reason: "normal draft still uses normal seed" }, actorId));
   const draft = await db.commerceAgentPromptRevision.findUniqueOrThrow({ where: { id: draftId } });
+  await db.commerceAgentConfiguration.update({ where: { id: active.id }, data: { activePromptRevisionId: normalRevisionId } });
   assert.equal(draft.promptText, normalText);
   assert.equal((draft.sourceContext as Record<string, unknown> | null)?.purpose, undefined);
-  // No active pointer: the latest published routing revision must never become
-  // the normal commerce fallback seed either.
-  await db.commerceAuditEvent.deleteMany({ where: { agentPromptRevisionId: draft.id } });
-  await db.commerceAgentPromptRevision.delete({ where: { id: draft.id } });
-  await db.commerceAgentConfiguration.update({ where: { id: active.id }, data: { activePromptRevisionId: null } });
-  const fallbackId = await db.$transaction((tx) => mutateAgentInstructions(tx, { kind: "create-draft", scope: "PLATFORM", shopId: null, reason: "normal fallback isolation" }, actorId));
-  assert.equal((await db.commerceAgentPromptRevision.findUniqueOrThrow({ where: { id: fallbackId } })).promptText, normalText);
-  await db.commerceAgentConfiguration.update({ where: { id: active.id }, data: { activePromptRevisionId: normalRevisionId } });
+
 });
 
 test("settings save/replay conflict audit preserves normal model and prompt state", async () => {

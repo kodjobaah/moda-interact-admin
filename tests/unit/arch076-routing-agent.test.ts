@@ -37,6 +37,8 @@ test("all attributes required, strict nested fields, no credentials, coercion, p
     assert.equal(validateRoutingAgentPolicy({ ...policy, [key]: { ...policy[key], apiKey: "never" } }).ok, false);
   }
   for (const value of [null, {}, { enabled: false }, { ...policy, credentials: "secret" }, { ...policy, confidenceThreshold: 101 }, { ...policy, confidenceThreshold: "83" }, { ...policy, retentionMs: 1 }, { ...policy, modelBinding: { kind: "VERIFIED_SHOP_INHERIT", modelCatalogueEntryId: "model-platform" } }]) assert.equal(validateRoutingAgentPolicy(value).ok, false);
+  const prototypeKey = JSON.parse(JSON.stringify(policy).replace('{"schemaVersion":', '{"__proto__":"unsupported","schemaVersion":'));
+  assert.equal(validateRoutingAgentPolicy(prototypeKey).ok, false, "all own JSON keys are rejected, including prototype-named keys");
   assert.equal(validateRoutingAgentPolicy({ ...policy, enabled: false }).ok, true);
   assert.equal(validateRoutingAgentPolicy({ ...policy, modelBinding: { kind: "VERIFIED_SHOP_INHERIT" } }).ok, true);
   assert.equal(validateRoutingAgentPolicy(routingDraftPayload(routingDraft(null))).ok, false, "empty numeric controls cannot become valid zero defaults");
