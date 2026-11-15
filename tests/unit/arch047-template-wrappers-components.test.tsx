@@ -20,7 +20,7 @@ test("audience buttons and fallback / audit history are accessible", () => {
     <WrapperActiveSlotSummary slots={slots} history={[{ createdAt: "2026-10-25T12:00:00Z", actorId: "a",
       audience: "SHARED", newDefinitionId: FIXTURE_ID, previousDefinitionId: null,
       editVersion: 3, reason: "Manual reviewed activation" }]} /></>);
-  assert.equal((html.match(/aria-pressed=/g) ?? []).length, 3);
+  assert.equal((html.match(/aria-pressed=/g) ?? []).length, 4);
   assert.match(html, /aria-pressed="true"/);
   assert.match(html, /Using SHARED fallback/);
   assert.match(html, /Activation history/);

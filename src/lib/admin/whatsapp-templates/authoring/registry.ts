@@ -37,6 +37,7 @@ export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
 };
 
 export function eligibleVariables(draft: TemplateAst): SemanticVariable[] {
+  if (draft.family === "MODA_CONVERSATION_WRAPPER" && draft.audience === "ROUTER") return [];
   // Taxonomy-backed store category is a Meta recovery-body binding only.
   // It requires an active category for the destination shop when the message is prepared.
   const base: SemanticVariable[] = ["customer.firstName", "shop.name", "shop.websiteUrl", "checkout.url",

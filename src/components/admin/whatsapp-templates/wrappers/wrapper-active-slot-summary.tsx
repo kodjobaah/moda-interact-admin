@@ -6,6 +6,7 @@ export function WrapperActiveSlotSummary({ slots, history }: { slots: WrapperSlo
     <div className="grid gap-3 lg:grid-cols-3">{slots.map((slot) => <article key={slot.audience} className="min-w-0 rounded border p-3">
       <h3 className="font-semibold">{slot.audience}</h3>
       <p className="mt-1 text-xs text-slate-600">{slot.definitionId ? "Direct override / pointer" : slot.effectiveFrom === "SHARED" ? "Using SHARED fallback" : "Not configured"}</p>
+      {slot.refusalReason && <p role="alert" className="mt-2 text-sm text-red-700">Configured template refused: {slot.refusalReason}</p>}
       <p className="mt-2 break-all text-xs">Effective: {slot.effectiveDefinitionId ?? "Unavailable"}</p>
       <p className="mt-1 text-xs text-slate-500">Direct version: {slot.editVersion ?? "none"}
         {slot.updatedAt ? ` · Updated ${new Date(slot.updatedAt).toLocaleString()}` : ""}</p>

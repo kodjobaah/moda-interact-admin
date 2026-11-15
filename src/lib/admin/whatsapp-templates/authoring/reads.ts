@@ -90,12 +90,12 @@ export async function getDefinitionDetail(id: string): Promise<TemplateDetail | 
 /** Existing global pointers only; configured is not proof of current provider/locale eligibility. */
 export async function getDynamicLayoutCoverage() {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
-  const slots = await prisma.whatsAppConversationWrapperActiveSlot.findMany({ take: 3, select: { audience: true, definitionId: true } });
+  const slots = await prisma.whatsAppConversationWrapperActiveSlot.findMany({ where: { audience: { in: ["SHARED", "AI", "HUMAN", "ROUTER"] } }, take: 4, select: { audience: true, definitionId: true } });
   const shared = slots.find(slot => slot.audience === "SHARED");
   let commonRecovery = false;
   if (shared) { try { await readSavedCommonLayout(prisma, shared.definitionId, "en"); commonRecovery = true; } catch { /* Display only verified common-mode precedence. */ } }
-  return (["SHARED", "AI", "HUMAN"] as const).map(audience => {
+  return (["SHARED", "AI", "HUMAN", "ROUTER"] as const).map(audience => {
     const own = slots.find(slot => slot.audience === audience);
-    return { audience, selection: commonRecovery ? "Uses common SHARED layout for recovery; audience history retained" : own ? "Audience layout selected" : audience !== "SHARED" && shared ? "Uses shared layout" : "No layout selected" };
+    return { audience, selection: audience === "ROUTER" ? (own ? "Independent router pointer configured; review publication eligibility" : "Not configured; no shop-layout fallback") : commonRecovery ? "Uses common SHARED layout for recovery; audience history retained" : own ? "Audience layout selected" : audience !== "SHARED" && shared ? "Uses shared layout" : "No layout selected" };
   });
 }

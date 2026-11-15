@@ -1,8 +1,9 @@
+import { neutralRouterProjectionError } from "../wrappers/router-policy";
 import { commonLayoutPolicyError } from "./common-layout-policy";
 import { readPreparedWrapper, stableJson, renderPreparedWrapper, type CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { layoutDigest, requireCommonLayout } from "./common-layout";
 import { VARIABLE_REGISTRY } from "./registry";
-import type { PreparedTemplate, RuntimeToken, TemplatePreviewDTO } from "./types";
+import type { PreparedTemplate, RuntimeToken, TemplatePreviewDTO, WrapperAudience } from "./types";
 
 export function commonExample(raw: CommonRecoveryLayoutReference): NonNullable<TemplatePreviewDTO["commonLayout"]> {
   return commonPreparedExample(requireCommonLayout(raw).prepared);
@@ -23,16 +24,17 @@ export function commonPreparedExample(raw: unknown): NonNullable<TemplatePreview
   return { header: renderTokens(prepared.header), footer: renderTokens(prepared.conditionals[0]?.tokens ?? []),
     ai: render("Example AI answer about your products."), human: render("Example human reply about your checkout.") };
 }
-function renderTokens(tokens: readonly RuntimeToken[]): string {
+function renderTokens(tokens: readonly RuntimeToken[], response = "Example AI or merchant response"): string {
   return tokens.map((token) => token.kind === "text" ? token.value
-    : token.kind === "variable" ? VARIABLE_REGISTRY[token.name].sample : "Example AI or merchant response").join("");
+    : token.kind === "variable" ? VARIABLE_REGISTRY[token.name].sample : response).join("");
 }
 
 /** Fixture-only projection; no customer/shop context or network access. */
-export function makeExamplePreview(prepared: PreparedTemplate, common?: CommonRecoveryLayoutReference): TemplatePreviewDTO {
+export function makeExamplePreview(prepared: PreparedTemplate, common?: CommonRecoveryLayoutReference, audience?: WrapperAudience): TemplatePreviewDTO {
+  if (audience === "ROUTER" && neutralRouterProjectionError(prepared)) throw new Error("Refusing unsafe router example projection.");
   const commonLayout = common ? commonExample(common) : undefined;
   if (prepared.family === "MODA_CONVERSATION_WRAPPER") return {
-    family: prepared.family, header: renderTokens(prepared.header), body: renderTokens(prepared.body), footer: renderTokens(prepared.footer),
+    family: prepared.family, header: renderTokens(prepared.header), body: renderTokens(prepared.body, audience === "ROUTER" ? "Which store is your question about?" : undefined), footer: renderTokens(prepared.footer),
     ...(prepared.compositeProfile ? { compositeProfile: prepared.compositeProfile } : {}),
     ...(prepared.productImage ? { productImage: prepared.productImage } : {}),
     buttons: [], conditional: prepared.conditionals.map((c) => renderTokens(c.tokens)).join("\n"),
@@ -68,9 +70,11 @@ export function makeExamplePreview(prepared: PreparedTemplate, common?: CommonRe
 /** The editing preview must remain usable while a button or another field is invalid.
  * This never creates a prepared/validated projection or becomes a save authority. */
 export function makeDraftExamplePreview(draft: import("./types").TemplateAst): TemplatePreviewDTO {
+  const router = draft.family === "MODA_CONVERSATION_WRAPPER" && draft.audience === "ROUTER";
   const sampleNodes = (nodes: import("./types").WrapperNode[]) => nodes.map((node) => {
     if (node.type === "text") return node.value;
-    if (node.type === "slot") return "Example AI or merchant response";
+    if (node.type === "slot") return router ? "Which store is your question about?" : "Example AI or merchant response";
+    if (router) return "[Binding unavailable in a router template]";
     return VARIABLE_REGISTRY[node.name]?.sample ?? "[Unknown variable]";
   }).join("");
   const result: TemplatePreviewDTO = {
@@ -82,9 +86,9 @@ export function makeDraftExamplePreview(draft: import("./types").TemplateAst): T
     buttons: [],
   };
   if (draft.family === "MODA_CONVERSATION_WRAPPER") {
-    if (draft.compositeProfile) result.compositeProfile = draft.compositeProfile;
+    if (!router && draft.compositeProfile) result.compositeProfile = draft.compositeProfile;
     if (draft.audience === "AI" && draft.productImage) result.productImage = draft.productImage;
-    result.conditional = draft.conditionals.map((conditional) => sampleNodes(conditional.nodes)).join("\n");
+    result.conditional = router ? "" : draft.conditionals.map((conditional) => sampleNodes(conditional.nodes)).join("\n");
   } else {
     result.buttons = draft.buttons.map((button) => ({
       label: button.label,

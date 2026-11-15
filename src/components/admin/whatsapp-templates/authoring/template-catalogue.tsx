@@ -47,10 +47,10 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
           {items.map((entry) => <tr key={entry.id} className="hover:bg-blue-50/40">
             <td className="max-w-xs px-4 py-4"><Link href={`/system-controls/whatsapp-templates?definition=${encodeURIComponent(entry.id)}&${query(page)}`}
               aria-current={entry.id === selectedId ? "page" : undefined} className="block break-words font-semibold text-blue-800 underline underline-offset-2">
-              {entry.providerTemplateName || `Wrapper · ${entry.audience || "unknown"}`}</Link>
+              {entry.providerTemplateName || `Wrapper · ${entry.audience === "ROUTER" ? "Router — before a shop is selected" : entry.audience || "unknown"}`}</Link>
               <span className="mt-1 block truncate font-mono text-[11px] text-slate-500" title={entry.id}>{entry.id}</span></td>
             <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? "Meta recovery" : "Conversation wrapper"}</td>
-            <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? scenarioLabel(entry.purpose, entry.offerType) : entry.audience}</td>
+            <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? scenarioLabel(entry.purpose, entry.offerType) : entry.audience === "ROUTER" ? "Router — before a shop is selected" : entry.audience}</td>
             <td className="px-4 py-4">{entry.sourceLanguageTag}</td>
             <td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{entry.status}</span>{entry.progress && <p className="mt-2 text-xs text-slate-600">Latest translation run: {entry.progress.runStatus}. Translated {entry.progress.translated}/{entry.progress.total}; reviewed {entry.progress.reviewed}/{entry.progress.total}.</p>}</td>
             <td className="whitespace-nowrap px-4 py-4">{new Date(entry.createdAt).toLocaleDateString("en-GB")}</td>
