@@ -1,3 +1,4 @@
+import { requireConfigurationSuperAdmin } from "./configuration-authorization";
 import { readRoutingPromptOptions, publishRoutingPromptWithDependencies } from "./routing-agent-prompts";
 import { prisma } from "@/lib/prisma";
 import { requirePlatformAdminMutation, requirePlatformAdminRead, type PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
@@ -9,9 +10,8 @@ import { mutateConfigurationWithDependencies } from "./mutate";
 
 export { getConfigurationEnvironment };
 
-export function requireConfigurationSuperAdmin(principal: PlatformAdminPrincipal): void {
-  if (principal.role !== "SUPER_ADMIN") throw new ConfigurationError("FORBIDDEN", "SUPER_ADMIN access is required.");
-}
+export { requireConfigurationSuperAdmin } from "./configuration-authorization";
+
 function policy(key: unknown, registry: Registry) {
   if (typeof key !== "string") throw new ConfigurationError("INVALID_INPUT", "Unsupported policy key.");
   const contract = registry.get(key);
