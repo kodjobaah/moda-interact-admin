@@ -1,3 +1,4 @@
+import { neutralRouterProjectionError } from "../wrappers/router-policy";
 // Server-only hash verification of saved immutable records; never a save/admission compiler.
 import { templateHash } from "./identifiers";
 import { commonMetaBody, historicalCommonMetaBody } from "./common-layout";
@@ -14,6 +15,9 @@ export function verifyFrozenTemplateProjection(record: ImmutableAuthoringRecord,
     throw new Error("Saved immutable projection failed its content or authoring integrity checks.");
   }
   const draft = checked.value;
+  if (draft.family === "MODA_CONVERSATION_WRAPPER" && draft.audience === "ROUTER" && neutralRouterProjectionError(record.prepared)) {
+    throw new FrozenProjectionMismatchError("Saved router projection is not neutral.");
+  }
   const projections = [prepareValidatedTemplateProjection(draft, draft.family === "META_RECOVERY" ? commonMetaBody(draft) : [])];
   if (draft.family === "META_RECOVERY" && draft.commonLayout) {
     projections.push(prepareValidatedTemplateProjection(draft, historicalCommonMetaBody(draft)));

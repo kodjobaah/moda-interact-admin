@@ -28,7 +28,7 @@ export type WrapperEligibility =
   | { eligible: true; projections: Record<string, WrapperPrepared> }
   | { eligible: false; reason: string };
 
-export const WRAPPER_AUDIENCES = ["SHARED", "AI", "HUMAN"] as const;
+export const WRAPPER_AUDIENCES = ["SHARED", "AI", "HUMAN", "ROUTER"] as const;
 export type Audience = WrapperAudience;
 export const WRAPPER_DEFINITION_ID = /^wtdef_[a-f0-9]{64}$/;
 
@@ -39,6 +39,7 @@ export type WrapperSlot = {
   updatedAt: string | null;
   effectiveDefinitionId: string | null;
   effectiveFrom: Audience | null;
+  refusalReason?: string | null;
 };
 export type WrapperCandidate = {
   id: string;

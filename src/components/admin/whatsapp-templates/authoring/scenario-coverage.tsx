@@ -10,7 +10,7 @@ export function ScenarioCoverageSummary({ rows, dynamicLayouts = [] }: { rows: S
     <p className="text-xs text-slate-500">Counts span versions, languages and shops; they do not mean every shop has every language. Review each publication before assigning it.</p>
     <h3 className="font-semibold">AI and human conversations</h3>
     <p className="text-sm text-slate-600">Product answers, ordinary replies and service outcomes use the common dynamic layout within the permitted reply window. They are not additional Meta recovery scenarios.</p>
-    <ul className="text-sm">{dynamicLayouts.map(row => <li key={row.audience}>{row.audience === "SHARED" ? "Shared" : row.audience === "HUMAN" ? "Human" : "AI"}: {row.selection}</li>)}</ul>
-    <a className="text-sm text-blue-800 underline" href="/system-controls/whatsapp-templates/wrappers">Review active AI, human and shared layouts</a>
+    <ul className="text-sm">{dynamicLayouts.map(row => <li key={row.audience}>{row.audience === "ROUTER" ? "Router — before a shop is selected" : row.audience === "SHARED" ? "Shared" : row.audience === "HUMAN" ? "Human" : "AI"}: {row.selection}</li>)}</ul>
+    <a className="text-sm text-blue-800 underline" href="/system-controls/whatsapp-templates/wrappers">Review active router, AI, human and shared layouts</a>
   </section>;
 }

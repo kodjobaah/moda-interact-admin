@@ -13,5 +13,5 @@ export function compileWrapperLocale(ast: WrapperTemplateAst): CompilationCandid
     throw new Error("Prepared wrapper must preserve exactly one response slot.");
   }
   return { record: { schemaVersion: 1, authoring: ast, prepared },
-    contentHash: templateHash(prepared), preview: makeExamplePreview(prepared) };
+    contentHash: templateHash(prepared), preview: makeExamplePreview(prepared, undefined, ast.audience) };
 }

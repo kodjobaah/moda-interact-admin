@@ -1,7 +1,9 @@
+import { neutralRouterProjectionError } from "./router-policy";
 import { VARIABLE_REGISTRY, SHOP_BRAND_VARIABLES } from "../authoring/registry";
 import type { RuntimeToken, SemanticVariable, ShopBrandVariable, WrapperPrepared } from "../authoring/types";
 
 export const EXAMPLE_RESPONSES = {
+  ROUTER: "Which store is your question about? Reply to the message from that store.",
   AI: "Example AI reply: I can help answer questions about these products.",
   HUMAN: "Example human reply: I can help you with your checkout.",
   SHARED: "Example AI or human reply: How can I help?",
@@ -9,6 +11,7 @@ export const EXAMPLE_RESPONSES = {
 
 export type WrapperPreviewContext =
   | { kind: "FICTIONAL" }
+  | { kind: "NEUTRAL" }
   | { kind: "SHOP_SCOPED"; shopBrand: Partial<Record<ShopBrandVariable, string | number | null>>;
       customerFirstName?: string | null; shopName?: string | null; checkoutUrl?: string | null };
 
@@ -30,6 +33,7 @@ export function renderWrapperPreview(prepared: WrapperPrepared, options: {
   context?: WrapperPreviewContext;
 }): RenderedWrapperPreview {
   const context = options.context ?? { kind: "FICTIONAL" };
+  if (context.kind === "NEUTRAL" && neutralRouterProjectionError(prepared)) throw new Error("Refusing unsafe router preview.");
   const disclosures: VariableDisclosure[] = [];
   const shopBrands = new Set<string>(SHOP_BRAND_VARIABLES);
   const variable = (name: SemanticVariable, placement: string): string => {
@@ -42,6 +46,8 @@ export function renderWrapperPreview(prepared: WrapperPrepared, options: {
     if (context.kind === "FICTIONAL") {
       result = info.sample;
       availability = shopBrands.has(name) ? "Example only; live ShopBrand field may be null." : "Illustrative value only.";
+    } else if (context.kind === "NEUTRAL") {
+      throw new Error("Router preview cannot resolve tenant variables.");
     } else {
       const value = shopBrands.has(name)
         ? context.shopBrand[name as ShopBrandVariable]
@@ -65,7 +71,7 @@ export function renderWrapperPreview(prepared: WrapperPrepared, options: {
     return variable(token.name, placement);
   }).join("");
   const conditional = options.checkoutAvailable && (context.kind === "FICTIONAL" ||
-    (typeof context.checkoutUrl === "string" && /^https:\/\//.test(context.checkoutUrl)))
+    (context.kind === "SHOP_SCOPED" && typeof context.checkoutUrl === "string" && /^https:\/\//.test(context.checkoutUrl)))
     ? prepared.conditionals.map((section, i) => tokens(section.tokens, `checkout conditional ${i + 1}`)).join("\n")
     : null;
   return {

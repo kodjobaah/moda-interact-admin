@@ -134,6 +134,8 @@ export function setWrapperProductImage(draft: WrapperTemplateAst, enabled: boole
 }
 export function setWrapperAudience(draft: WrapperTemplateAst, audience: WrapperTemplateAst["audience"]): WrapperTemplateAst {
   const next = { ...draft, audience };
+  // Selecting Router must expose incompatible authored content, never silently discard it.
+  if (audience === "ROUTER") return next;
   if (audience !== "SHARED") delete next.compositeProfile;
   return audience === "AI" ? next : setWrapperProductImage(next, false);
 }

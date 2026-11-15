@@ -7,7 +7,7 @@ export const TEMPLATE_AST_VERSION = 1 as const;
 export type TemplateFamily = "META_RECOVERY" | "MODA_CONVERSATION_WRAPPER";
 export type RecoveryStage = "INITIAL" | "FOLLOW_UP";
 export type OfferType = "NO_OFFER" | "CODE_OFFER" | "AUTOMATIC_OFFER";
-export type WrapperAudience = "SHARED" | "AI" | "HUMAN";
+export type WrapperAudience = "SHARED" | "AI" | "HUMAN" | "ROUTER";
 export type ShopBrandVariable =
   | "shopBrand.brandName" | "shopBrand.logoUrl" | "shopBrand.logoAltText"
   | "shopBrand.logoWidth" | "shopBrand.logoHeight"

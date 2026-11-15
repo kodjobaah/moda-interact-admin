@@ -31,7 +31,7 @@ function savedLocale(record: unknown, contentHash: string | null, family: Templa
       templateHash(verifyFrozenTemplateProjection(saved, contentHash)) !== contentHash) {
     throw new Error("Finalised locale failed content or compilation integrity checks.");
   }
-  return { record: saved, preview: makeExamplePreview(saved.prepared, saved.authoring.family === "META_RECOVERY" ? saved.authoring.commonLayout : undefined) };
+  return { record: saved, preview: makeExamplePreview(saved.prepared, saved.authoring.family === "META_RECOVERY" ? saved.authoring.commonLayout : undefined, saved.authoring.family === "MODA_CONVERSATION_WRAPPER" ? saved.authoring.audience : undefined) };
 }
 
 /** SUPER_ADMIN only; 20 full preview DTOs based on durable English, latest run and saved reviews. */
@@ -52,7 +52,7 @@ export async function getTranslationReviewWorkspace(definitionId: string): Promi
   verifyFrozenTemplateProjection(english, englishRow?.contentHash ?? null);
   const englishDTO: ReviewLocaleDTO = {
     languageTag: "en", providerLanguageCode: providerLanguageCode("en", english.authoring.family),
-    status: "SOURCE", reason: null, preview: makeExamplePreview(english.prepared, english.authoring.family === "META_RECOVERY" ? english.authoring.commonLayout : undefined), authoring: english.authoring,
+    status: "SOURCE", reason: null, preview: makeExamplePreview(english.prepared, english.authoring.family === "META_RECOVERY" ? english.authoring.commonLayout : undefined, english.authoring.family === "MODA_CONVERSATION_WRAPPER" ? english.authoring.audience : undefined), authoring: english.authoring,
     prepared: english.prepared, contentHash: englishRow?.contentHash ?? null, reviewedAt: null, runId: null,
   };
   const run = definition.translationRuns[0];
