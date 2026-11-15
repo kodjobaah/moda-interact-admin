@@ -262,7 +262,7 @@ test("duplicate DRAFT revisions surface a bounded scope conflict without choosin
 
 test("allocates at most one locked draft and copies only published seed provenance", () => {
   assert.match(serviceSource, /CommerceAgentPrompt" WHERE "id" = \$\{lineage\.id\} FOR UPDATE/);
-  assert.match(serviceSource, /const existingDraft = uniqueDraft\(lockedRevisions\)/);
+  assert.match(serviceSource, /const existingDraft = uniqueDraft\(lockedRevisions\.filter\(\(revision\) => !isRoutingPromptRevision\(revision\)\)\)/);
   assert.match(serviceSource, /revisionNumber: \(latest\?\.revisionNumber \?\? 0\) \+ 1/);
   assert.match(serviceSource, /promptText: seed\?\.promptText \?\? ""/);
   assert.match(serviceSource, /sourceTemplateEditVersion: seed\?\.sourceTemplateEditVersion \?\? null/);

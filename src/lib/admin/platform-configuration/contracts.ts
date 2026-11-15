@@ -12,10 +12,13 @@ export type ConfigurationContract = Readonly<{
   fields: readonly FieldContract[]; defaults?: Readonly<Record<string, unknown>>;
   defaultsOnRead?: boolean;
   canReset: boolean; requiredRole: "SUPER_ADMIN";
+  editor?: "routing-agent";
+  /** Server-owned validation for a structured policy; never sent to the browser. */
+  validate?: (input: unknown) => ValidationResult;
   /** A single, server-owned cross-field predicate. Never serialised for browser execution. */
   refine?: (values: Readonly<Record<string, unknown>>) => string | null;
 }>;
-export type PublicContract = Omit<ConfigurationContract, "refine">;
+export type PublicContract = Omit<ConfigurationContract, "refine" | "validate">;
 export type Registry = ReadonlyMap<string, ConfigurationContract>;
 export type ValidationResult = { ok: true; values: Record<string, unknown> } |
   { ok: false; fieldErrors: Record<string, string>; message: string };
@@ -37,6 +40,8 @@ const httpsUrl = (name: string, label: string, description: string): FieldContra
 /** The 120-second preview reservation is defined by Commerce src/commerce/preview/store.ts.
  * Commerce's run-budgets.ts preserves a 30-second terminal-commit margin. */
 export const APPROVED_PREVIEW_SLOT_MS = 120_000;
+
+import { ROUTING_AGENT_CONTRACT } from "./routing-agent-contract";
 
 export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Object.freeze([
   {
@@ -172,6 +177,7 @@ export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Objec
       return new URL(origin).pathname === "/" ? null : "Public origin must not include a path.";
     },
   },
+  ROUTING_AGENT_CONTRACT,
 ]);
 
 /** Dependency injection here is for isolated tests only; production callers use the closed registry. */
@@ -206,6 +212,7 @@ export function publicContracts(registry: Registry = PLATFORM_POLICY_REGISTRY, i
     defaults: contract.defaults ? { ...contract.defaults } : undefined,
     canReset: contract.canReset,
     requiredRole: contract.requiredRole,
+    ...(contract.editor ? { editor: contract.editor } : {}),
   }));
 }
 
@@ -229,6 +236,7 @@ export function validateConfiguration(contract: ConfigurationContract, input: un
   if (contract.kind !== "policy" || !input || typeof input !== "object" || Array.isArray(input)) {
     return { ok: false, fieldErrors: {}, message: "A supported non-secret policy object is required." };
   }
+  if (contract.validate) return contract.validate(input);
   const record = input as Record<string, unknown>;
   const fields = new Map(contract.fields.map((field) => [field.name, field]));
   for (const key of Object.keys(record)) if (!fields.has(key)) errors[key] = "Unrecognised field.";

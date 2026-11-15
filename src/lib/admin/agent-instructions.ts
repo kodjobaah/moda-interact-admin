@@ -1,3 +1,4 @@
+import { isRoutingPromptRevision } from "./platform-configuration/routing-prompt-purpose";
 import { createHash, randomUUID } from "node:crypto";
 import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import type {
@@ -269,7 +270,7 @@ export async function getAgentInstructionsScopeData(tx: Tx | typeof prisma, envi
     "MULTIPLE_CONFIGURATIONS",
     "Multiple Agent configurations exist for this environment and scope.",
   );
-  const revisions = lineage?.revisions ?? [];
+  const revisions = (lineage?.revisions ?? []).filter((revision) => !isRoutingPromptRevision(revision));
   const pendingRevisionId = profile?.pendingPromptRevisionId ?? null;
   const pendingRevision = pendingRevisionId
     ? revisions.find((revision) => revision.id === pendingRevisionId) ?? null
@@ -350,7 +351,7 @@ async function allocateDraft(tx: Tx, input: Extract<PromptMutation, { kind: "cre
       environment, scope: input.scope, shopId: input.shopId, promptId: prompt.id,
     });
   }
-  const preLockDraft = uniqueDraft(lineage.revisions);
+  const preLockDraft = uniqueDraft(lineage.revisions.filter((revision) => !isRoutingPromptRevision(revision)));
   if (preLockDraft) return preLockDraft.id;
 
   const locks = await tx.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "commerce"."CommerceAgentPrompt" WHERE "id" = ${lineage.id} FOR UPDATE`;
@@ -359,18 +360,16 @@ async function allocateDraft(tx: Tx, input: Extract<PromptMutation, { kind: "cre
     where: { promptId: lineage.id },
     orderBy: [{ revisionNumber: "desc" }, { id: "asc" }],
   });
-  const existingDraft = uniqueDraft(lockedRevisions);
+  const existingDraft = uniqueDraft(lockedRevisions.filter((revision) => !isRoutingPromptRevision(revision)));
   if (existingDraft) return existingDraft.id;
   const latest = lockedRevisions[0];
   const currentConfig = await findConfiguration(tx, environment, input.scope, input.shopId);
   let seed = currentConfig?.activePromptRevisionId
     ? await tx.commerceAgentPromptRevision.findUnique({ where: { id: currentConfig.activePromptRevisionId } })
     : null;
+  if (seed && isRoutingPromptRevision(seed)) conflict("Normal commerce configuration must not use a routing prompt.");
   if (seed?.status !== "PUBLISHED" || seed.promptId !== lineage.id) {
-    seed = await tx.commerceAgentPromptRevision.findFirst({
-      where: { promptId: lineage.id, status: "PUBLISHED" },
-      orderBy: [{ revisionNumber: "desc" }, { id: "asc" }],
-    });
+    seed = lockedRevisions.find((revision) => revision.status === "PUBLISHED" && !isRoutingPromptRevision(revision)) ?? null;
   }
   const draft = await tx.commerceAgentPromptRevision.create({
     data: {
@@ -435,7 +434,7 @@ export async function mutateAgentInstructions(tx: Tx, mutation: PromptMutation, 
 
   if (mutation.kind === "update-draft") {
     const revision = await tx.commerceAgentPromptRevision.findUnique({ where: { id: mutation.revisionId }, include: { prompt: true } });
-    if (!revision || revision.status !== "DRAFT" || revision.editVersion !== mutation.expectedEditVersion) conflict();
+    if (!revision || isRoutingPromptRevision(revision) || revision.status !== "DRAFT" || revision.editVersion !== mutation.expectedEditVersion) conflict();
     const updated = await tx.commerceAgentPromptRevision.updateMany({
       where: { id: revision.id, status: "DRAFT", editVersion: mutation.expectedEditVersion },
       data: { promptText: mutation.promptText, editVersion: { increment: 1 } },
@@ -451,7 +450,7 @@ export async function mutateAgentInstructions(tx: Tx, mutation: PromptMutation, 
 
   const revisionId = mutation.kind === "publish" ? mutation.revisionId : mutation.promptRevisionId;
   const revision = await tx.commerceAgentPromptRevision.findUnique({ where: { id: revisionId }, include: { prompt: true } });
-  if (!revision || revision.status !== (mutation.kind === "publish" ? "DRAFT" : "PUBLISHED")) conflict("Prompt revision is unavailable.");
+  if (!revision || isRoutingPromptRevision(revision) || revision.status !== (mutation.kind === "publish" ? "DRAFT" : "PUBLISHED")) conflict("Prompt revision is unavailable.");
   const { scope, shopId } = revision.prompt;
   const configuration = await findConfiguration(tx, environment, scope, shopId);
   const expectedConfigVersion = mutation.expectedConfigurationPromptEditVersion;

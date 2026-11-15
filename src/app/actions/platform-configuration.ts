@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ConfigurationError } from "@/lib/admin/platform-configuration/errors";
 import { PlatformAdminUnauthorizedError } from "@/lib/auth/platform-admin";
-import { updatePlatformConfiguration, resetPlatformConfiguration } from "@/lib/admin/platform-configuration/service";
+import { updatePlatformConfiguration, resetPlatformConfiguration, publishRoutingPrompt } from "@/lib/admin/platform-configuration/service";
 
 export type ConfigurationActionResult =
   | { ok: true; version: number }
@@ -29,5 +29,17 @@ export async function mutatePlatformConfigurationAction(operation: "save" | "res
       return { ok: false, code: cause.code, message: cause.message };
     }
     return { ok: false, code: "DB_UNAVAILABLE", message: "Configuration is temporarily unavailable." };
+  }
+}
+
+export async function publishRoutingPromptAction(input: unknown): Promise<{ ok: true; revisionId: string } | { ok: false; message: string }> {
+  try {
+    const revision = await publishRoutingPrompt(input);
+    revalidatePath("/system-controls/platform-configuration");
+    return { ok: true, revisionId: revision.id };
+  } catch (error) {
+    if (error instanceof PlatformAdminUnauthorizedError) return { ok: false, message: "Platform administrator access is required." };
+    if (error instanceof ConfigurationError) return { ok: false, message: error.message };
+    return { ok: false, message: "Routing prompt publication is temporarily unavailable." };
   }
 }
