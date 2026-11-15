@@ -27,7 +27,7 @@ export function useTemplateAuthoringDraft(source?: TemplateDetail | null) {
   const preview = useMemo<TemplatePreviewDTO | null>(() => {
     if (!checked.ok) return makeDraftExamplePreview(draft);
     const prepared = makeImmutableAuthoringRecord(checked.value).prepared;
-    const result = makeExamplePreview(prepared, checked.value.family === "META_RECOVERY" ? checked.value.commonLayout : undefined);
+    const result = makeExamplePreview(prepared, checked.value.family === "META_RECOVERY" ? checked.value.commonLayout : undefined, checked.value.family === "MODA_CONVERSATION_WRAPPER" ? checked.value.audience : undefined);
     if (checked.value.family === "MODA_CONVERSATION_WRAPPER" && checked.value.audience === "SHARED" && prepared.family === "MODA_CONVERSATION_WRAPPER") {
       try { result.commonLayout = commonPreparedExample(prepared); } catch { /* Existing wrappers with unavailable fixture-only variables retain their original preview. */ }
     }

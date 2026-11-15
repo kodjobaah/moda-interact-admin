@@ -39,8 +39,8 @@ export function WrapperPublicationPanel({ workspace, audience }: { workspace: Wr
         <select aria-label="Preview language" value={selectedLanguage} onChange={(event) => controller.setLanguageTag(event.target.value)}
           className="rounded border p-2">{languages.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
       </label>
-      <label className="flex items-center gap-2"><input type="checkbox" checked={controller.checkoutAvailable}
-        onChange={(event) => controller.setCheckoutAvailable(event.target.checked)} />Example checkout link is available</label>
+      {audience !== "ROUTER" && <label className="flex items-center gap-2"><input type="checkbox" checked={controller.checkoutAvailable}
+        onChange={(event) => controller.setCheckoutAvailable(event.target.checked)} />Example checkout link is available</label>}
     </div>
     <WrapperBeforeAfterPreview current={workspace.current} proposed={workspace.proposed} audience={audience}
       languageTag={selectedLanguage} checkoutAvailable={controller.checkoutAvailable} />

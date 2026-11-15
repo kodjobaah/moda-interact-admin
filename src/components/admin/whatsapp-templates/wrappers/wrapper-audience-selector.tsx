@@ -1,6 +1,7 @@
 import { WRAPPER_AUDIENCES, type Audience } from "@/lib/admin/whatsapp-templates/wrappers/contracts";
 
 const descriptions: Record<Audience, string> = {
+  ROUTER: "Before a shop is selected; neutral platform copy, no fallback",
   SHARED: "Default for AI and human replies without an override",
   AI: "Optional AI-only override; otherwise uses SHARED",
   HUMAN: "Optional human-only override; otherwise uses SHARED",
@@ -14,7 +15,7 @@ export function WrapperAudienceSelector({ selected, onSelect }: {
     <div className="grid gap-2 sm:grid-cols-3">{WRAPPER_AUDIENCES.map((audience) =>
       <button key={audience} type="button" aria-pressed={audience === selected} onClick={() => onSelect(audience)}
         className={`rounded-md border p-3 text-left ${audience === selected ? "border-blue-700 bg-blue-50" : "border-slate-200"}`}>
-        <span className="block font-semibold">{audience}</span><span className="text-xs text-slate-600">{descriptions[audience]}</span>
+        <span className="block font-semibold">{audience === "ROUTER" ? "Router — before a shop is selected" : audience}</span><span className="text-xs text-slate-600">{descriptions[audience]}</span>
       </button>)}</div>
   </section>;
 }

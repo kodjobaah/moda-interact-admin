@@ -1,3 +1,4 @@
+import { neutralRouterProjectionError } from "../wrappers/router-policy";
 import { commonLayoutPolicyError } from "./common-layout-policy";
 import { prepareValidatedTemplateProjection } from "./projection";
 import { compositeProfileError } from "./composite-profile";
@@ -29,6 +30,8 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
     fail("family", "Unknown template family.");
     return { ok: false, issues };
   }
+  const router = raw.family === "MODA_CONVERSATION_WRAPPER" && raw.audience === "ROUTER";
+  if (router && (!Array.isArray(raw.conditionals) || raw.conditionals.length !== 0)) fail("conditionals", "Router templates cannot contain checkout conditionals.");
   const family = raw.family;
   const meta = family === "META_RECOVERY";
   const common = ["schemaVersion", "family", "sourceLanguageTag", "header", "body", "footer"];
@@ -51,7 +54,7 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
     if (!enumMember(raw.offerType, ["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"])) fail("offerType", "Select an offer type.");
     if (raw.promotionTarget !== undefined && !enumMember(raw.promotionTarget, ["CHECKOUT", "ALTERNATIVE_PRODUCT"])) fail("promotionTarget", "Select a supported promotion target.");
     if (raw.offerType === "NO_OFFER" && raw.promotionTarget !== undefined) fail("promotionTarget", "No-offer templates cannot select a promotion target.");
-  } else if (!enumMember(raw.audience, ["SHARED", "AI", "HUMAN"])) fail("audience", "Select a wrapper audience.");
+  } else if (!enumMember(raw.audience, ["SHARED", "AI", "HUMAN", "ROUTER"])) fail("audience", "Select a wrapper audience.");
 
   if (!meta && Object.hasOwn(raw, "productImage")) {
     if (raw.audience !== "AI") fail("productImage", "Optional product images are supported only for AI response wrappers.");
@@ -221,6 +224,10 @@ export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?
   const checked = validateTemplateStructure(raw, options);
   if (!checked.ok) return checked;
   if (checked.value.family === "MODA_CONVERSATION_WRAPPER") {
+    if (checked.value.audience === "ROUTER") {
+      const error = neutralRouterProjectionError(prepareValidatedTemplateProjection(checked.value, []));
+      if (error) return { ok: false, issues: [{ path: "body", message: error }] };
+    }
     if (checked.value.audience === "SHARED" && !checked.value.compositeProfile) return { ok: false, issues: [{ path: "compositeProfile", message: "The current common template requires a saved composite profile. Clone historical content and explicitly define its layout before saving or activating." }] };
     if (checked.value.audience === "SHARED") {
       const prepared = prepareValidatedTemplateProjection(checked.value, []);

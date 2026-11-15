@@ -1,10 +1,10 @@
+import { resolveWrapperSlots } from "./slot-resolution";
 import { requirePlatformAdminRead } from "../../../auth/platform-admin";
 import { prisma } from "../../../prisma";
 import { requireTemplateSuperAdmin } from "../authoring/service";
 import { checkWrapperEligibility } from "./eligibility";
 import { WRAPPER_AUDIENCES, WRAPPER_DEFINITION_ID, type Audience, type WrapperActivationHistory,
-  type WrapperCandidate, type WrapperDefinitionRow, type WrapperPreviewDefinition, type WrapperPublicationWorkspace,
-  type WrapperSlot } from "./contracts";
+  type WrapperCandidate, type WrapperDefinitionRow, type WrapperPreviewDefinition, type WrapperPublicationWorkspace } from "./contracts";
 
 const asMetadata = (input: unknown): Record<string, unknown> =>
   input && typeof input === "object" && !Array.isArray(input) ? input as Record<string, unknown> : {};
@@ -58,27 +58,17 @@ export async function getWrapperPublicationWorkspace(options: {
   });
   const selectedId = requestedId ?? summaries.find((candidate) => candidate.audience === audience && candidate.eligible)?.id ??
     summaries.find((candidate) => candidate.audience === audience)?.id ?? null;
-  const preview = (id: string | null): WrapperPreviewDefinition | null => {
+  const preview = (id: string | null, expectedAudience: Audience = audience): WrapperPreviewDefinition | null => {
     const definition = id ? byId.get(id) : null;
-    if (!definition || !isAudience(definition.audience)) return null;
+    if (!definition || !isAudience(definition.audience) || definition.audience !== expectedAudience) return null;
     const checked = checkWrapperEligibility(definition, definition.audience);
     return checked.eligible ? { id: definition.id, audience: definition.audience,
       sourceHash: definition.sourceHash, publishedAt: definition.publishedAt?.toISOString() ?? null,
       projections: checked.projections } : null;
   };
-  const byAudience = new Map<Audience, { definitionId: string; editVersion: number; updatedAt: Date }>(
-    active.filter((slot) => isAudience(slot.audience)).map((slot) => [slot.audience as Audience, slot]),
-  );
-  const shared = byAudience.get("SHARED");
-  const slots: WrapperSlot[] = WRAPPER_AUDIENCES.map((target) => {
-    const own = byAudience.get(target);
-    const effective = own ?? (target === "SHARED" ? undefined : shared);
-    return { audience: target, definitionId: own?.definitionId ?? null,
-      editVersion: own?.editVersion ?? null, updatedAt: own?.updatedAt?.toISOString() ?? null,
-      effectiveDefinitionId: effective?.definitionId ?? null,
-      effectiveFrom: own ? target : shared && target !== "SHARED" ? "SHARED" : null };
-  });
-  const currentId = slots.find((slot) => slot.audience === audience)?.effectiveDefinitionId ?? null;
+  const slots = resolveWrapperSlots(active, all);
+  const currentSlot = slots.find((slot) => slot.audience === audience);
+  const currentId = currentSlot?.refusalReason ? null : currentSlot?.effectiveDefinitionId ?? null;
   return { candidates: summaries, slots, selectedDefinitionId: selectedId,
-    proposed: preview(selectedId), current: preview(currentId), history };
+    proposed: preview(selectedId), current: preview(currentId, currentSlot?.effectiveFrom ?? audience), history };
 }

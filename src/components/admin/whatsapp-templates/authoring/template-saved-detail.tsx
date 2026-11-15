@@ -11,7 +11,7 @@ export function TemplateSavedDetail({ detail }: { detail: TemplateDetail }) {
   if (detail.english) {
     try {
       const prepared = verifyFrozenTemplateProjection(detail.english, templateHash(detail.english.prepared));
-      preview = makeExamplePreview(prepared, detail.english.authoring.family === "META_RECOVERY" ? detail.english.authoring.commonLayout : undefined);
+      preview = makeExamplePreview(prepared, detail.english.authoring.family === "META_RECOVERY" ? detail.english.authoring.commonLayout : undefined, detail.english.authoring.family === "MODA_CONVERSATION_WRAPPER" ? detail.english.authoring.audience : undefined);
     } catch { /* Historical invalid/tampered sources remain read-only and are never recompiled for display. */ }
   }
   return <article className="space-y-4 rounded-lg border bg-white p-4" aria-label="Saved immutable template">
@@ -25,7 +25,7 @@ export function TemplateSavedDetail({ detail }: { detail: TemplateDetail }) {
       <div><dt className="text-gray-500">Identity</dt><dd className="break-all font-mono text-xs">{detail.id}</dd></div>
       <div><dt className="text-gray-500">Lifecycle</dt><dd>{detail.status}</dd></div>
       <div><dt className="text-gray-500">Family</dt><dd>{detail.kind}</dd></div>
-      <div><dt className="text-gray-500">Purpose / audience</dt><dd>{detail.kind === "META_RECOVERY" ? `${detail.purpose}/${detail.offerType}${detail.english?.authoring.family === "META_RECOVERY" && detail.english.authoring.promotionTarget ? `/${detail.english.authoring.promotionTarget}` : ""}` : detail.audience}</dd></div>
+      <div><dt className="text-gray-500">Purpose / audience</dt><dd>{detail.kind === "META_RECOVERY" ? `${detail.purpose}/${detail.offerType}${detail.english?.authoring.family === "META_RECOVERY" && detail.english.authoring.promotionTarget ? `/${detail.english.authoring.promotionTarget}` : ""}` : detail.audience === "ROUTER" ? "Router — before a shop is selected" : detail.audience}</dd></div>
       <div><dt className="text-gray-500">Source language</dt><dd>{detail.sourceLanguageTag}</dd></div>
       <div><dt className="text-gray-500">Provider name</dt><dd className="break-all">{detail.providerTemplateName || "Not applicable (internal)"}</dd></div>
       <div className="sm:col-span-2"><dt className="text-gray-500">Source SHA-256</dt><dd className="break-all font-mono text-xs">{detail.sourceHash}</dd></div>
