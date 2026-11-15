@@ -1,3 +1,4 @@
+import { readRoutingPromptOptions, publishRoutingPromptWithDependencies } from "./routing-agent-prompts";
 import { prisma } from "@/lib/prisma";
 import { requirePlatformAdminMutation, requirePlatformAdminRead, type PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
 import { getConfigurationEnvironment } from "./environment";
@@ -34,7 +35,9 @@ export async function configurationPageData(key: unknown, cursor?: string) {
   const selected = policy(key, PLATFORM_POLICY_REGISTRY);
   const snapshot = await readConfiguration(prisma, env, selected.key, PLATFORM_POLICY_REGISTRY);
   const history = await readConfigurationHistory(prisma, env, selected.key, cursor);
-  return { contracts: publicContracts(), snapshot, history, environment: env };
+  return { contracts: publicContracts(), snapshot, history, environment: env,
+    ...(selected.key === "recovery.routingAgent" ? { routingPrompts: await readRoutingPromptOptions(prisma) } : {}),
+  };
 }
 export async function readPlatformConfiguration(key: unknown) {
   const principal = await requirePlatformAdminRead();
@@ -63,4 +66,10 @@ async function authorizedMutation(input: unknown, operation: "save" | "reset") {
   return mutateConfigurationWithDependencies(input, operation, {
     principal, environment, actorId, db: prisma, registry: PLATFORM_POLICY_REGISTRY,
   });
+}
+
+export async function publishRoutingPrompt(input: unknown) {
+  const principal = await requirePlatformAdminMutation();
+  requireConfigurationSuperAdmin(principal);
+  return publishRoutingPromptWithDependencies(input, { principal, actorId: await authorId(principal), environment: getConfigurationEnvironment(), db: prisma });
 }

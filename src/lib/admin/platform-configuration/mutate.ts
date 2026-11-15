@@ -1,3 +1,4 @@
+import { validateRoutingAgentReferences } from "./routing-agent-references";
 import type { Registry } from "./contracts";
 import { validateConfiguration } from "./contracts";
 import { ConfigurationError } from "./errors";
@@ -46,5 +47,6 @@ export async function mutateConfigurationWithDependencies(input: unknown, operat
   return writeConfiguration(dependencies.db, {
     environment: dependencies.environment, key: contract.key, expectedVersion,
     values: result.values, actorId: dependencies.actorId, reason: auditReason,
+    validatePolicy: validateRoutingAgentReferences,
   });
 }

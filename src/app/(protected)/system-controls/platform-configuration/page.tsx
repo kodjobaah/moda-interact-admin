@@ -1,3 +1,4 @@
+import { RoutingAgentEditor } from "@/components/admin/platform-configuration/routing-agent-editor";
 import { PreviewStorageControls } from "@/components/admin/platform-configuration/preview-storage-controls";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
@@ -34,6 +35,7 @@ export default async function PlatformConfigurationPage({ searchParams }: {
           <p className="mt-2 text-sm text-gray-600">Validated, revision-controlled platform policies. Deployment: <strong>{data.environment}</strong>. Only this deployment can be edited.</p></header>
         <ConfigurationNavigation contracts={contracts} selectedKey={key}/>
         {isSecret ? <SecretConfigurationEditor key={`${key}:${"status" in data ? data.status.version : 0}`} contract={selected} status={"status" in data ? data.status : { key, version: 0, configured: false, updatedAt: null, updatedBy: null }} />
+          : "snapshot" in data && key === "recovery.routingAgent" ? <RoutingAgentEditor key={`${key}:${data.snapshot.version}`} snapshot={data.snapshot} routingPrompts={data.routingPrompts} />
           : "snapshot" in data ? <ConfigurationEditor key={`${key}:${data.snapshot.version}`} contract={selected} snapshot={data.snapshot} /> : null}
         {key === "commerce.previewStorage" && <PreviewStorageControls environment={data.environment} />}
         <ConfigurationHistoryPanel history={data.history} keyName={key} secret={isSecret}/>
