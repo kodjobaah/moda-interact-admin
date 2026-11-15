@@ -1,3 +1,7 @@
+import { WhatsAppSenderPool } from "@/components/admin/platform-configuration/whatsapp-sender-pool";
+import { readWhatsAppSenderPool } from "@/lib/admin/platform-configuration/whatsapp-sender-pool";
+import { mutateWhatsAppSenderPoolAction } from "@/app/actions/whatsapp-sender-pool";
+import { tAdmin } from "@/i18n";
 import { RoutingAgentEditor } from "@/components/admin/platform-configuration/routing-agent-editor";
 import { PreviewStorageControls } from "@/components/admin/platform-configuration/preview-storage-controls";
 import { notFound } from "next/navigation";
@@ -28,6 +32,11 @@ export default async function PlatformConfigurationPage({ searchParams }: {
   if (!selected) notFound();
   const isSecret = selected.kind === "secret";
   const data = isSecret ? await secretConfigurationPageData(key, params.cursor) : await configurationPageData(key, params.cursor);
+  let senderPool = null;
+  let senderPoolUnavailable = false;
+  if (key === "messaging.sender") {
+    try { senderPool = await readWhatsAppSenderPool(); } catch { senderPoolUnavailable = true; }
+  }
   return <AdminShell active="platform-configuration">
     <div className="flex-1 overflow-auto p-4 sm:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -37,6 +46,8 @@ export default async function PlatformConfigurationPage({ searchParams }: {
         {isSecret ? <SecretConfigurationEditor key={`${key}:${"status" in data ? data.status.version : 0}`} contract={selected} status={"status" in data ? data.status : { key, version: 0, configured: false, updatedAt: null, updatedBy: null }} />
           : "snapshot" in data && key === "recovery.routingAgent" ? <RoutingAgentEditor key={`${key}:${data.snapshot.version}`} snapshot={data.snapshot} routingPrompts={data.routingPrompts} />
           : "snapshot" in data ? <ConfigurationEditor key={`${key}:${data.snapshot.version}`} contract={selected} snapshot={data.snapshot} /> : null}
+        {senderPool && <WhatsAppSenderPool providerAccountId={senderPool.providerAccountId} rows={senderPool.rows} mutateAction={mutateWhatsAppSenderPoolAction} />}
+        {senderPoolUnavailable && <p role="alert">{tAdmin("senderPool.error.DB_UNAVAILABLE")}</p>}
         {key === "commerce.previewStorage" && <PreviewStorageControls environment={data.environment} />}
         <ConfigurationHistoryPanel history={data.history} keyName={key} secret={isSecret}/>
       </div>
