@@ -3,7 +3,6 @@ import { Prisma, type PrismaClient, type WhatsAppPoolSender } from "@prisma/clie
 import type { PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
 import { requireConfigurationSuperAdmin } from "./configuration-authorization";
 import { readSenderSnapshot, sealedDigest, verifyPhoneMembership, type SenderSnapshot } from "./whatsapp-phone-membership";
-import { assertNoLegacySenderUse } from "./whatsapp-sender-pool-preflight";
 import { lockPoolConfiguration, guardFinalDrain } from "./whatsapp-pool-configuration-fence";
 import { SenderPoolError, parsePoolAction, type PoolRow, type SenderSettings } from "./whatsapp-sender-pool-types";
 import { logAdminSecurityEvent } from "@/lib/auth/audit";
@@ -68,7 +67,6 @@ export async function mutateSenderPoolWithDependencies(raw: unknown, deps: PoolD
           if (current.providerAccountId !== proof!.providerAccountId) throw new SenderPoolError("IDENTITY_CONFLICT");
           return current;
         }
-        await assertNoLegacySenderUse(tx, proof!, action.providerPhoneNumberId);
         const created = await tx.whatsAppPoolSender.createMany({ data: [{ providerPhoneNumberId: action.providerPhoneNumberId,
           providerAccountId: proof!.providerAccountId, priority: action.priority, allocationEnabled: false, verifiedAt: new Date() }], skipDuplicates: true });
         const existing = await tx.whatsAppPoolSender.findUniqueOrThrow({ where: { providerPhoneNumberId: action.providerPhoneNumberId } });
