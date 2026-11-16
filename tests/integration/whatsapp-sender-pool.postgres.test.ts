@@ -1,5 +1,3 @@
-import { assertNoLegacySenderUse } from "../../src/lib/admin/platform-configuration/whatsapp-sender-pool-preflight.ts";
-import { readSenderSnapshot } from "../../src/lib/admin/platform-configuration/whatsapp-phone-membership.ts";
 import assert from "node:assert/strict";
 import { test, before, after } from "node:test";
 import { randomUUID } from "node:crypto";
@@ -84,28 +82,45 @@ test("WABA switch vs target drain serializes on the shared environment fence",as
  ]);assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1);
  const snapshot=await readSenderPoolWithDependencies(deps);assert.ok(snapshot.rows.some(row=>row.providerAccountId===snapshot.providerAccountId&&row.allocationEnabled));
 });
-test("legacy recovery cutover uses receipt evidence, inclusive effective expiry, zero/full-int days, and ignores unrelated singleton",async()=>{
- await config("96001","26001");const active=await recovery("26001","96001",1000);await assert.rejects(enrol("26001"),code("LEGACY_SENDER_IN_USE"));assert.equal((await enrol("26002")).allocationEnabled,false);
- await db.checkoutRecovery.update({where:{id:active.basket.id},data:{lastExternalActivityAt:new Date(Date.now()-22*86400000)}});await enrol("26001");
- const expired=await recovery("26003","96001",22*86400000);await enrol("26003");await db.checkoutRecovery.update({where:{id:expired.basket.id},data:{status:"EXPIRED"}});assert.equal((await enrol("26003")).providerPhoneNumberId,"26003");
- await db.backgroundRuntimeConfig.update({where:{id:"default"},data:{checkoutRecoveryLifetimeDays:0}});await recovery("26004","96001",1000);await enrol("26004");
- await db.backgroundRuntimeConfig.update({where:{id:"default"},data:{checkoutRecoveryLifetimeDays:2147483647}});await recovery("26005","96001",100*86400000);await assert.rejects(enrol("26005"),code("LEGACY_SENDER_IN_USE"));
- await db.backgroundRuntimeConfig.update({where:{id:"default"},data:{checkoutRecoveryLifetimeDays:21}});
- const boundary=await recovery("26007","96001",0);const proof=await readSenderSnapshot(db,"test",wrapping);
- await db.$transaction(async tx=>{await tx.$executeRaw`UPDATE commerce."CheckoutRecovery" SET "lastExternalActivityAt"=date_trunc('milliseconds',CURRENT_TIMESTAMP AT TIME ZONE 'UTC')-INTERVAL '21 days' WHERE id=${boundary.basket.id}`;await tx.$executeRaw`SET LOCAL TIME ZONE 'America/Los_Angeles'`;await assertNoLegacySenderUse(tx,proof,"26007");});await enrol("26007");
- const noProof=await recovery("26006","96001",1000);await db.conversationMessage.delete({where:{id:noProof.message.id}});await db.conversationMessage.create({data:{conversationId:noProof.conversation.id,direction:"OUTBOUND",senderType:"AUTOMATION",content:"not dispatched",status:"PENDING",dispatchProviderAccountId:"96001",dispatchProviderPhoneNumberId:"26006"}});await enrol("26006");
+test("pre-launch enrolment accepts historical recoveries regardless of status, receipt evidence or lifetime",async()=>{
+ await config("96001","26001");const active=await recovery("26001","96001",1000);
+ const enrolled=await enrol("26001");assert.equal(enrolled.allocationEnabled,false);
+ assert.equal((await db.checkoutRecovery.findUniqueOrThrow({where:{id:active.basket.id}})).status,"ENGAGED");
+ assert.equal((await db.conversationMessage.findUniqueOrThrow({where:{id:active.message.id}})).status,"SENT");
+ assert.equal((await enrol("26002")).allocationEnabled,false);
+ const expired=await recovery("26003","96001",22*86400000);await enrol("26003");await db.checkoutRecovery.update({where:{id:expired.basket.id},data:{status:"EXPIRED"}});
+ assert.equal((await enrol("26003")).providerPhoneNumberId,"26003");
+ try {
+  await db.backgroundRuntimeConfig.update({where:{id:"default"},data:{checkoutRecoveryLifetimeDays:0}});
+  await recovery("26004","96001",1000);assert.equal((await enrol("26004")).allocationEnabled,false);
+  await db.backgroundRuntimeConfig.update({where:{id:"default"},data:{checkoutRecoveryLifetimeDays:2147483647}});
+  await recovery("26005","96001",100*86400000);assert.equal((await enrol("26005")).allocationEnabled,false);
+ } finally {await db.backgroundRuntimeConfig.update({where:{id:"default"},data:{checkoutRecoveryLifetimeDays:21}});}
+ const pending=await recovery("26006","96001",1000);
+ await db.conversationMessage.delete({where:{id:pending.message.id}});
+ await db.conversationMessage.create({data:{conversationId:pending.conversation.id,direction:"OUTBOUND",senderType:"AUTOMATION",content:"not dispatched",status:"PENDING",dispatchProviderAccountId:"96001",dispatchProviderPhoneNumberId:"26006"}});
+ assert.equal((await enrol("26006")).allocationEnabled,false);
+ assert.equal(await db.conversationMessage.count({where:{conversationId:pending.conversation.id,status:"PENDING"}}),1);
 });
-test("standalone cutover blocks admitted in-flight or recent open traffic, not settled/closed/old history; legacy pair fallback is conservative",async()=>{
- await config("97001","27001");const legacy=await general("27001","97001",1000,false,true);await assert.rejects(enrol("27001"),code("LEGACY_SENDER_IN_USE"));await enrol("27002");await db.conversation.update({where:{id:legacy.conversation.id},data:{outcome:"NO_RESPONSE"}});await enrol("27001");
- const flight=await general("27003","97001",30*86400000,true);await assert.rejects(enrol("27003"),code("LEGACY_SENDER_IN_USE"));await db.conversationMessage.update({where:{id:flight.message.id},data:{status:"SENT",sentAt:new Date(Date.now()-30*86400000),providerMessageId:randomUUID()}});await enrol("27003");
- await general("27004","97001",25*3600000);await enrol("27004");
- const matched=await general("27005","97001",1000);await assert.rejects(enrol("27005"),code("LEGACY_SENDER_IN_USE"));await enrol("27006");await db.conversation.update({where:{id:matched.conversation.id},data:{outcome:"NO_RESPONSE"}});
+test("pre-launch enrolment accepts historical standalone messages without rewriting them",async()=>{
+ await config("97001","27001");const legacy=await general("27001","97001",1000,false,true);
+ assert.equal((await enrol("27001")).allocationEnabled,false);
+ assert.equal((await db.conversation.findUniqueOrThrow({where:{id:legacy.conversation.id}})).outcome,"IN_PROGRESS");
+ const flight=await general("27003","97001",30*86400000,true);
+ assert.equal((await enrol("27003")).allocationEnabled,false);
+ assert.equal((await db.conversationMessage.findUniqueOrThrow({where:{id:flight.message.id}})).status,"PENDING");
+ await general("27004","97001",25*3600000);assert.equal((await enrol("27004")).allocationEnabled,false);
+ const matched=await general("27005","97001",1000);assert.equal((await enrol("27005")).allocationEnabled,false);
+ assert.ok(await db.conversationMessage.findUnique({where:{id:matched.message.id}}));
 });
-test("first admitted non-pooled permit is visible after enrolment waits on the exact membership fence",async()=>{
+test("enrolment retains the membership lock without rejecting a committed pre-launch dispatch",async()=>{
  await config("98001");const conversation=await db.conversation.create({data:{type:"PRODUCT_SUPPORT"}});
  let release!:()=>void,admitted!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);const ready=new Promise<void>(resolve=>admitted=resolve);
  const permit=db.$transaction(async tx=>{await tx.$queryRaw`WITH locked AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtextextended('whatsapp-pool-membership:' || ${"28001"}::text,0))) SELECT count(*)::integer AS locked FROM locked`;await tx.conversationMessage.create({data:{conversationId:conversation.id,direction:"OUTBOUND",senderType:"AGENT",content:"fixture permit",status:"PENDING",providerDispatchKey:randomUUID(),providerDispatchControlRevision:0,providerDispatchAdmittedAt:new Date(),dispatchProviderAccountId:"98001",dispatchProviderPhoneNumberId:"28001"}});admitted();await gate;},{timeout:10000});
- await ready;const request=enrol("28001");await delay(50);release();await permit;await assert.rejects(request,code("LEGACY_SENDER_IN_USE"));assert.equal(await db.whatsAppPoolSender.count({where:{providerPhoneNumberId:"28001"}}),0);
+ await ready;const request=enrol("28001");await delay(50);release();await permit;
+ const enrolled=await request;assert.equal(enrolled.allocationEnabled,false);
+ assert.equal(await db.whatsAppPoolSender.count({where:{providerPhoneNumberId:"28001"}}),1);
+ assert.equal(await db.conversationMessage.count({where:{conversationId:conversation.id,status:"PENDING"}}),1);
  await enrol("28002");await db.$transaction(async tx=>{await tx.$queryRaw`WITH locked AS MATERIALIZED (SELECT pg_advisory_xact_lock(hashtextextended('whatsapp-pool-membership:' || ${"28002"}::text,0))) SELECT count(*)::integer AS locked FROM locked`;assert.ok(await tx.whatsAppPoolSender.findUnique({where:{providerPhoneNumberId:"28002"}}));});
 });
 test("priority and drain preserve the same-shop shared route, both basket memberships and pending clarification",async()=>{
