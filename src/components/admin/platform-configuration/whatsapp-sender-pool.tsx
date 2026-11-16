@@ -32,7 +32,7 @@ export function WhatsAppSenderPool({ providerAccountId, rows: initialRows, mutat
     {error && <p role="alert" className="text-sm text-red-700">{tAdmin(`senderPool.error.${error}`)}</p>}
     {saved && <p role="status" className="text-sm text-green-800">{tAdmin("senderPool.saved")}</p>}
     <form className="flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); submit({ op: "enrol", providerPhoneNumberId: phone, priority: Number(priority) }); }}>
-      <label className="text-sm">{tAdmin("senderPool.phoneId")}<input aria-label={tAdmin("senderPool.phoneId")} className="mt-1 block rounded border p-2" inputMode="numeric" pattern="[0-9]{4,32}" required maxLength={32} value={phone} onChange={event => setPhone(event.target.value)} /></label>
+      <label className="text-sm">{tAdmin("senderPool.phoneId")}<input aria-label={tAdmin("senderPool.phoneId")} className="mt-1 block rounded border p-2" inputMode="numeric" pattern="[0-9]{4,32}" required maxLength={32} value={phone} onChange={event => setPhone(event.target.value.replace(/[\s\u200B-\u200D\uFEFF]/g, ""))} /></label>
       <label className="text-sm">{tAdmin("senderPool.priority")}<input aria-label={tAdmin("senderPool.priority")} className="mt-1 block w-36 rounded border p-2" type="number" min={0} max={2147483647} step={1} required value={priority} onChange={event => setPriority(event.target.value)} /></label>
       <button disabled={pending || !providerAccountId} className="rounded bg-blue-800 px-4 py-2 text-white disabled:opacity-50">{tAdmin("senderPool.enrol")}</button>
     </form>
