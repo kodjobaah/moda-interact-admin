@@ -4,7 +4,7 @@ import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import { adminI18n } from "@/i18n";
 
 export default async function PlatformQueuesPage() {
-  await requirePlatformAdminPage();
+  const principal = await requirePlatformAdminPage();
 
   return (
     <AdminShell active="queues">
@@ -18,7 +18,7 @@ export default async function PlatformQueuesPage() {
               {adminI18n.t("queue.pageDescription")}
             </p>
           </div>
-          <QueueMonitor />
+          <QueueMonitor canRemoveFailedJobs={principal.role === 'SUPER_ADMIN' && !principal.developmentBypass} />
         </div>
       </div>
     </AdminShell>

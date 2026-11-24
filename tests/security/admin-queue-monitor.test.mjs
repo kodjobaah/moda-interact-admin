@@ -37,7 +37,7 @@ const platformQueueDefinitions = [
   { queueName: 'order-events', jobNames: ['order-completed'] },
   {
     queueName: 'pending-recovery-candidates',
-    jobNames: ['evaluate-pending-recovery'],
+    jobNames: ['evaluate-pending-recovery', 'woo-recovery-initial-v1'],
   },
   {
     queueName: 'recovery-capacity-resume',
@@ -57,7 +57,7 @@ const platformQueueDefinitions = [
   },
   {
     queueName: 'whatsapp-events',
-    jobNames: ['message-received', 'message-status', 'process-conversation-turn'],
+    jobNames: ['message-received', 'message-status', 'process-conversation-turn', 'meta-template-status-update', 'continue-recovery-delivery'],
   },
   {
     queueName: 'merchant-communications',
@@ -67,8 +67,20 @@ const platformQueueDefinitions = [
       'translation-batch-poll',
       'translation-batch-results',
       'translation-reconcile',
+      'store-category-translation-batch-submit',
+      'store-category-translation-batch-poll',
+      'store-category-translation-batch-results',
+      'merchant-pricing-translation-batch-submit',
+      'merchant-pricing-translation-batch-poll',
+      'merchant-pricing-translation-batch-results',
+      'whatsapp-template-translation-submit',
+      'whatsapp-template-translation-poll',
+      'whatsapp-template-translation-results',
     ],
   },
+  { queueName: 'woo-checkout-capture-v1', jobNames: ['checkout-updated'] },
+  { queueName: 'woo-order-capture-v1', jobNames: ['order-lifecycle'] },
+  { queueName: 'woo-coupon-sync', jobNames: ['sync-woo-coupons'] },
   { queueName: 'merchant-knowledge', jobNames: ['process-source-revision'] },
 ];
 
@@ -217,6 +229,9 @@ test('queue overview reads active counts for the complete platform queue registr
     { queueName: 'billing-subscription-reconcile', labelKey: 'queue.billingSubscriptionReconcile' },
     { queueName: 'whatsapp-events', labelKey: 'queue.whatsappEvents' },
     { queueName: 'merchant-communications', labelKey: 'queue.merchantCommunications' },
+    { queueName: 'woo-checkout-capture-v1', labelKey: 'queue.wooCheckoutCapture' },
+    { queueName: 'woo-order-capture-v1', labelKey: 'queue.wooOrderCapture' },
+    { queueName: 'woo-coupon-sync', labelKey: 'queue.wooCouponSync' },
     { queueName: 'merchant-knowledge', labelKey: 'queue.merchantKnowledge' },
   ];
   assert.deepEqual(getQueueOverviewDefinitions(), expectedOverview);

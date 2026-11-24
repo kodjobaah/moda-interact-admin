@@ -8,9 +8,10 @@ import {
 
 const HELP = `
 Reset the entire MerchantPricing catalogue in a verified DEVELOPMENT/TEST database.
-This deletes all MerchantPricingPlan records and cascading translations, highlights,
-usage-price definitions/tiers and plan-feature links for ALL shops. It does NOT
-remove BillingPlan, subscriptions, billing operations, charges or merchant records.
+This deletes all MerchantPricingPlan records, their plan-scoped CommerceModelPolicy
+overrides, and cascading translations, highlights, usage-price definitions/tiers
+and plan-feature links for ALL shops. CommerceAuditEvent history is retained.
+It does NOT remove BillingPlan, subscriptions, billing operations, charges or merchant records.
 
 Read-only preview:
   npm run admin:clear-merchant-pricing -- status
@@ -58,7 +59,7 @@ async function main() {
     );
     console.log(JSON.stringify({
       result: 'deleted', ...result,
-      note: 'Only MerchantPricing catalogue and cascading child rows were removed. Operational billing records remain.',
+      note: 'Plan-scoped CommerceModelPolicy overrides and MerchantPricing catalogue child rows were removed. Audit history and operational billing records remain.',
     }, null, 2));
   } finally {
     await prisma.$disconnect();

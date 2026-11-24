@@ -14,6 +14,7 @@ import type { useQueueJobs } from "./use-queue-jobs";
 import type { useResizableDrawer } from "./use-resizable-drawer";
 
 type QueueDetailDrawerProps = {
+  canRemoveFailedJobs: boolean;
   snapshot: QueueMonitorSnapshot;
   selectedQueueName: string;
   queueJobsState: ReturnType<typeof useQueueJobs>;
@@ -61,6 +62,7 @@ function BreadcrumbButton({
 }
 
 export function QueueDetailDrawer({
+  canRemoveFailedJobs,
   snapshot,
   selectedQueueName,
   queueJobsState,
@@ -328,6 +330,12 @@ export function QueueDetailDrawer({
         <QueueJobDetail
           state={jobDetailState}
           showAllJobs={queueJobsState.showAllJobs}
+          canRemoveFailedJobs={canRemoveFailedJobs}
+          onRemoved={() => {
+            jobDetailState.clearSelection();
+            queueJobsState.refreshJobs();
+            void refreshSummary();
+          }}
         />
       </div>
     </aside>

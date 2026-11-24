@@ -5,8 +5,13 @@ records, rather than only deterministic test-seed plans.
 
 Deleting each plan cascades through its translations, feature assignments,
 merchant-facing highlights and translations, usage-event pricing definitions and
-tiers. It does **not** delete `BillingPlan`, subscriptions, billing periods,
-financial operations, refunds, charges, audits, merchant shops or platform features.
+tiers. The reset also explicitly deletes `CommerceModelPolicy` rows whose
+`merchantPricingPlanId` references one of the plans being reset, because that
+foreign key uses `ON DELETE RESTRICT`. Platform-wide and shop-scoped policies
+are not affected. `CommerceAuditEvent` history is retained.
+
+It does **not** delete `BillingPlan`, subscriptions, billing periods, financial
+operations, refunds, charges, audits, merchant shops or platform features.
 
 ## Inspect the target first
 
@@ -16,9 +21,9 @@ npm run admin:clear-merchant-pricing -- status
 ```
 
 The read-only preview prints the PostgreSQL host and database name (never the
-password), total plans, child-table counts, materialized-plan counts and the
-number of linked BillingOperations. It also reports the number of matching
-retained `BillingPlan` records.
+password), total plans, child-table counts, plan-scoped `CommerceModelPolicy`
+counts, materialized-plan counts and the number of linked BillingOperations.
+It also reports the number of matching retained `BillingPlan` records.
 
 ## Delete (verified disposable development/test database only)
 
@@ -44,9 +49,11 @@ entry **blocks the entire reset**. Those operations are protected financial
 records; this script does not delete them, detach their foreign keys or weaken
 constraints. Resolve that separate historical-data decision before retrying.
 
-The script runs within one serializable Prisma transaction and verifies that
-the catalogue becomes empty. PostgreSQL foreign keys and architecture
-validation triggers remain enabled. A failure rolls back the deletion.
+The script runs within one serializable Prisma transaction. It deletes the
+referencing plan-scoped policies first, verifies their deletion count and that
+none remain, then deletes and verifies the empty pricing catalogue. The
+`CommerceAuditEvent` history is not deleted. PostgreSQL foreign keys and
+architecture validation triggers remain enabled. A failure rolls back the deletion.
 
 ## Scope and limitations
 

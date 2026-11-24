@@ -36,4 +36,6 @@ test('incident mutations require platform-admin auth and compare-and-swap revisi
   assert.match(source, /Only super administrators may reassign incidents/);
   assert.match(source, /Take ownership before changing this incident/);
   assert.match(source, /Resolution rationale is required/);
+  assert.match(source, /SHOPIFY_SUBSCRIPTION_BILLING/);
+  assert.match(source, /tx\.subscription\.findUnique/);
 });

@@ -1,0 +1,22 @@
+{
+  "free": {
+    "bronze-top-up-free": 2500,
+    "silver-top-up": 4400,
+    "gold-top-up": 8600
+  },
+  "starter": {
+    "bronze-top-up-free": 2400,
+    "silver-top-up": 4300,
+    "gold-top-up": 8400
+  },
+  "growth": {
+    "bronze-top-up-free": 2300,
+    "silver-top-up": 4200,
+    "gold-top-up": 8400
+  },
+  "scale": {
+    "bronze-top-up-free": 1200,
+    "silver-top-up": 2000,
+    "gold-top-up": 3400
+  }
+}

@@ -1,6 +1,6 @@
 /**
  * Development/test-only MerchantPricing catalogue reset. No merchant, subscription,
- * financial-history or platform configuration rows are deleted by this module.
+ * financial-history, platform-wide policy or unrelated configuration rows are deleted.
  */
 const DELETE_FLAG = '--confirm-delete-all-pricing';
 const TEST_FLAG = '--confirm-test-data';
@@ -103,7 +103,7 @@ export async function pricingCatalogueInventory(db) {
   });
   const [
     translations, highlights, highlightTranslations, usageEvents, usageTiers,
-    features, billingOperationsReferencingPricing, billingPlans,
+    features, billingOperationsReferencingPricing, billingPlans, planScopedCommerceModelPolicies,
   ] = await Promise.all([
     db.merchantPricingPlanTranslation.count(),
     db.merchantPricingPlanHighlight.count(),
@@ -118,6 +118,9 @@ export async function pricingCatalogueInventory(db) {
     plans.length ? db.billingPlan.count({
       where: { shopifyPlanHandle: { in: plans.map((plan) => plan.shopifyPlanHandle) } },
     }) : Promise.resolve(0),
+    plans.length ? db.commerceModelPolicy.count({
+      where: { merchantPricingPlanId: { in: plans.map((plan) => plan.id) } },
+    }) : Promise.resolve(0),
   ]);
   return {
     planCount: plans.length,
@@ -130,6 +133,7 @@ export async function pricingCatalogueInventory(db) {
     features,
     billingOperationsReferencingPricing,
     matchingRetainedBillingPlans: billingPlans,
+    planScopedCommerceModelPolicies,
     plans,
   };
 }
@@ -142,6 +146,26 @@ export async function clearPricingCatalogueWithinTransaction(tx, expectedPlanIds
   if (JSON.stringify(currentIds) !== JSON.stringify(expectedPlanIds)) {
     throw new Error('MerchantPricing catalogue changed after preview; deletion cancelled.');
   }
+  // A plan-scoped CommerceModelPolicy has an ON DELETE RESTRICT foreign key
+  // to MerchantPricingPlan. Remove only policies owned by the plans in this
+  // reset; platform/shop policies and CommerceAuditEvent history are retained.
+  const policyDelete = currentIds.length
+    ? await tx.commerceModelPolicy.deleteMany({
+      where: { merchantPricingPlanId: { in: currentIds } },
+    })
+    : { count: 0 };
+  if (policyDelete.count !== inventory.planScopedCommerceModelPolicies) {
+    throw new Error('CommerceModelPolicy deletion count differed from the preview; transaction cancelled.');
+  }
+  if (currentIds.length > 0) {
+    const remainingPolicies = await tx.commerceModelPolicy.count({
+      where: { merchantPricingPlanId: { in: currentIds } },
+    });
+    if (remainingPolicies !== 0) {
+      throw new Error('Plan-scoped CommerceModelPolicy records remain; transaction cancelled.');
+    }
+  }
+
   const result = await tx.merchantPricingPlan.deleteMany({});
   if (result.count !== inventory.planCount) {
     throw new Error('MerchantPricing deletion count differed from the preview; transaction cancelled.');
@@ -149,7 +173,10 @@ export async function clearPricingCatalogueWithinTransaction(tx, expectedPlanIds
   if (await tx.merchantPricingPlan.count() !== 0) {
     throw new Error('MerchantPricing catalogue is not empty; transaction cancelled.');
   }
-  return { deletedPlans: result.count, deletedChildRowsByCascade: {
+  return {
+    deletedPlans: result.count,
+    deletedDependentRows: { commerceModelPolicies: policyDelete.count },
+    deletedChildRowsByCascade: {
     translations: inventory.translations,
     highlights: inventory.highlights,
     highlightTranslations: inventory.highlightTranslations,

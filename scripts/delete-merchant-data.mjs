@@ -67,6 +67,14 @@ async function main() {
     if (options.command === 'status') return;
 
     validateDeletion(options, shop, inventory, process.env);
+    if (options.prelaunchProductionReset) {
+      // Protect against a misleading URL/connection alias: the live server
+      // must identify itself as the exact, pre-reviewed prelaunch database.
+      const actual = await prisma.$queryRaw`SELECT current_database() AS name`;
+      if (actual.length !== 1 || actual[0].name !== options.confirmDatabase) {
+        throw new Error('Prelaunch database identity changed; deletion refused.');
+      }
+    }
     const deletion = await prisma.$transaction(async (tx) => {
       // Re-read in the transaction; do not delete a different shop if the
       // identity changed between preview and execution.

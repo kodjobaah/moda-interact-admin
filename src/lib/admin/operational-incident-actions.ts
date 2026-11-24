@@ -39,12 +39,26 @@ export async function executeOperationalIncidentTransition(
   await database.$transaction(async tx => {
     const current = await tx.operationalIncident.findUnique({
       where: { incidentKey: input.incidentKey },
-      select: { id: true, status: true, revision: true, ownerPlatformAdminId: true },
+      select: { id: true, status: true, revision: true, ownerPlatformAdminId: true, category: true, resourceKey: true, shopId: true },
     });
     if (!current) throw new Error('Incident not found');
     if (current.status !== 'OPEN') throw new Error('Only open incidents can be changed');
     if (input.action === 'TAKE' && current.ownerPlatformAdminId) throw new IncidentTransitionConflict();
     if ((input.action === 'RELEASE' || input.action === 'RESOLVE') && current.ownerPlatformAdminId !== principal.id) throw new Error('Take ownership before changing this incident');
+    // A resolution note alone cannot prove that Shopify billing is repaired.
+    // Verify the committed subscription state under the same transaction.
+    // This guard does not modify subscriptions, counters, or incident history.
+    if (input.action === 'RESOLVE' && current.category === 'SHOPIFY_SUBSCRIPTION_BILLING') {
+      const subscription = await tx.subscription.findUnique({
+        where: { id: current.resourceKey },
+        select: { shopId: true, status: true, lastSyncErrorCode: true },
+      });
+      if (!subscription || subscription.shopId !== current.shopId
+        || subscription.status === 'UNMAPPED' || subscription.status === 'SYNC_ERROR'
+        || subscription.lastSyncErrorCode !== null) {
+        throw new Error('Shopify billing is not yet verified as repaired. Reconcile the subscription and clear its persisted error before resolving this incident.');
+      }
+    }
     if (input.action === 'REASSIGN') {
       if (current.ownerPlatformAdminId === input.targetAdminId) throw new Error('Already assigned to this administrator');
       const target = await tx.platformAdmin.findUnique({ where: { id: input.targetAdminId! }, select: { active: true } });

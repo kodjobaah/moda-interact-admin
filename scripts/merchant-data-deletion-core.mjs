@@ -1,3 +1,6 @@
+import { statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { deleteImmutableShopPrompts } from './merchant-prompt-cleanup.mjs';
 import {
   commerceAuditEventShopWhere,
@@ -6,7 +9,7 @@ import {
 } from './merchant-audit-cleanup.mjs';
 
 /**
- * Development-only, single-tenant database deletion. The database's actual foreign
+ * Single-tenant database deletion with an explicit prelaunch-production exception. The database's actual foreign
  * keys remain authoritative: an unaccounted-for restriction rolls the transaction
  * back rather than causing broad/unscoped deletion.
  */
@@ -22,6 +25,7 @@ export function parseOptions(argv) {
     '--confirm-immutable-prompt-purge',
     '--confirm-immutable-audit-purge',
     '--confirm-immutable-consent-purge',
+    '--prelaunch-production-reset',
   ]);
   for (let index = 0; index < rest.length; index += 1) {
     const entry = rest[index];
@@ -30,7 +34,7 @@ export function parseOptions(argv) {
       values.set(entry, true);
       continue;
     }
-    const match = /^(--shop|--confirm-shop)(?:=(.*))?$/.exec(entry);
+    const match = /^(--shop|--confirm-shop|--confirm-database|--backup-file)(?:=(.*))?$/.exec(entry);
     if (!match) throw new Error(`Unknown argument: ${entry}`);
     const value = match[2] ?? rest[++index];
     if (!value || value.startsWith('--') || values.has(match[1])) {
@@ -40,7 +44,7 @@ export function parseOptions(argv) {
   }
   const shop = values.get('--shop');
   if (!shop) throw new Error('--shop <domain-or-shop-id> is required.');
-  return {
+  const options = {
     command,
     shop,
     confirmShop: values.get('--confirm-shop'),
@@ -52,6 +56,11 @@ export function parseOptions(argv) {
     confirmImmutableAuditPurge: Boolean(values.get('--confirm-immutable-audit-purge')),
     confirmImmutableConsentPurge: Boolean(values.get('--confirm-immutable-consent-purge')),
   };
+  // Keep ordinary development CLI options backward-compatible.
+  if (values.has('--prelaunch-production-reset')) options.prelaunchProductionReset = true;
+  if (values.has('--confirm-database')) options.confirmDatabase = values.get('--confirm-database');
+  if (values.has('--backup-file')) options.backupFile = values.get('--backup-file');
+  return options;
 }
 
 export function validateDeletion(options, shop, inventory, env) {
@@ -69,19 +78,50 @@ export function validateDeletion(options, shop, inventory, env) {
     env.NODE_ENV, env.MODA_ENVIRONMENT, env.DEPLOYMENT_ENVIRONMENT_NAME,
     env.DEPLOYMENT_ENVIRONMENT, env.RENDER_ENV,
   ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  if (environments.some((value) => value === 'production' || value === 'prod')) {
-    throw new Error('Production merchant deletion is not supported by this development utility.');
-  }
-  if (!env.DATABASE_URL) throw new Error('DATABASE_URL must be set to the development/test database.');
+  const productionEnv = environments.some((value) => value === 'production' || value === 'prod');
+  if (!env.DATABASE_URL) throw new Error('DATABASE_URL must be set to the intended database.');
   let address;
   try { address = new URL(env.DATABASE_URL); }
   catch { throw new Error('DATABASE_URL is not a valid PostgreSQL URL.'); }
   if (!['postgresql:', 'postgres:'].includes(address.protocol)) {
     throw new Error('DATABASE_URL must use PostgreSQL.');
   }
+  const databaseName = decodeURIComponent(address.pathname.replace(/^\//, ''));
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(address.hostname);
-  if (!local && !options.allowRemoteDevelopmentDb) {
-    throw new Error('Remote database refused. Use --allow-remote-development-db only for a verified non-production database.');
+  if (options.prelaunchProductionReset) {
+    // This exception is intentionally narrowly pinned to the known pre-launch
+    // database. It must be removed before the first live merchant is admitted.
+    if (shop.platform !== 'SHOPIFY' || databaseName !== 'moda_interact_postgres_production' ||
+        options.confirmDatabase !== databaseName ||
+        env.MODA_PRELAUNCH_RESET_AUTHORIZATION !== 'PRELAUNCH_TEST_DATA_ONLY') {
+      throw new Error('Prelaunch production Shopify reset refused: shop, database or authorisation mismatch.');
+    }
+    if (!options.backupFile || !isAbsolute(options.backupFile)) {
+      throw new Error('Prelaunch reset requires an absolute --backup-file path.');
+    }
+    let backupSize;
+    try { backupSize = statSync(options.backupFile).size; }
+    catch { throw new Error('Prelaunch reset backup file is unavailable.'); }
+    if (backupSize < 1024) throw new Error('Prelaunch reset backup is empty or incomplete.');
+    let archiveList;
+    try {
+      archiveList = execFileSync('pg_restore', ['--list', options.backupFile], {
+        encoding: 'utf8', timeout: 60_000, maxBuffer: 8 * 1024 * 1024,
+      });
+    } catch {
+      throw new Error('Prelaunch reset backup archive cannot be read by pg_restore.');
+    }
+    if (!archiveList.split('\n').some((line) => /^;\s*dbname:\s*/.test(line) &&
+        line.trim().endsWith(`dbname: ${databaseName}`))) {
+      throw new Error('Prelaunch reset backup does not identify the exact target database.');
+    }
+  } else {
+    if (productionEnv || /(^|[_-])(prod|production)([_-]|$)/i.test(databaseName)) {
+      throw new Error('Production merchant deletion is not supported by this development utility.');
+    }
+    if (!local && !options.allowRemoteDevelopmentDb) {
+      throw new Error('Remote database refused. Use --allow-remote-development-db only for a verified non-production database.');
+    }
   }
   if (inventory.commerceAgentPrompts > 0 && !options.confirmImmutablePromptPurge) {
     throw new Error('Merchant has immutable ARCH-021 prompt records. Inspect the preview, then pass --confirm-immutable-prompt-purge to remove them from a disposable development/test database.');

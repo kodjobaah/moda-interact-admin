@@ -4,11 +4,14 @@ import { useState } from "react";
 import { adminI18n, adminStatusLabel } from "@/i18n";
 
 import { formatQueueJobShop } from "./queue-job-shop";
+import { RemoveFailedJob } from "./remove-failed-job";
 import type { useQueueJobDetail } from "./use-queue-job-detail";
 
 type QueueJobDetailProps = {
   state: ReturnType<typeof useQueueJobDetail>;
   showAllJobs: boolean;
+  canRemoveFailedJobs: boolean;
+  onRemoved(): void;
 };
 
 function formatDateTime(value: string | null) {
@@ -52,7 +55,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function QueueJobDetail({ state, showAllJobs }: QueueJobDetailProps) {
+export function QueueJobDetail({ state, showAllJobs, canRemoveFailedJobs, onRemoved }: QueueJobDetailProps) {
   const {
     selectedJobId,
     jobDetail,
@@ -197,6 +200,9 @@ export function QueueJobDetail({ state, showAllJobs }: QueueJobDetailProps) {
               {formatJobData(jobDetail.data)}
             </pre>
           </div>
+          {canRemoveFailedJobs && jobDetail.status === "failed" ? (
+            <RemoveFailedJob key={jobDetail.id} job={jobDetail} onRemoved={onRemoved} />
+          ) : null}
         </>
       ) : null}
     </section>

@@ -51,6 +51,12 @@ export default async function OperationalIncidentsPage({ searchParams }: { searc
         <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 py-4 text-sm break-all">
           {([['Status', detail.status], ['Severity', detail.severity], ['Shop', detail.shop?.domain ?? 'Platform'], ['Resource', detail.resourceKey], ['Occurrences', String(detail.occurrenceCount)], ['First occurrence', date(detail.firstOccurredAt)], ['Last occurrence', date(detail.lastOccurredAt)], ['Correlation', detail.lastCorrelationId], ['Last error (redacted)', detail.lastErrorMessage ?? '—'], ['Owner ID', detail.ownerPlatformAdminId ?? 'Unassigned'], ['Resolved by ID', detail.resolvedByPlatformAdminId ?? '—'], ['Resolved at', date(detail.resolvedAt)], ['Resolution note', detail.resolutionNote ?? '—']] as const).map(([label, value]) => <div key={label} className="contents"><dt className="font-medium">{label}</dt><dd>{value}</dd></div>)}
         </dl>
+        {detail.category === 'SHOPIFY_SUBSCRIPTION_BILLING' && <div className="rounded border p-3 text-sm space-y-2" aria-label="Shopify billing incident repair instructions">
+          <p className="font-semibold">Shopify billing repair</p>
+          <p>Use the diagnostic reason and last error above to inspect the exact plan in Admin Billing. Resolve any configuration or accounting discrepancy using verified provider and ledger evidence, then rerun subscription reconciliation.</p>
+          <p>Incidents can only be marked resolved after the subscription no longer records an unmapped plan or billing sync error. Closing an incident never changes credits or subscription status.</p>
+          <Link className="underline" href="/billing?view=unmapped">View unmapped Shopify plans</Link>
+        </div>}
         {detail.shop?.merchantSupportThread?.id && <Link className="text-sm underline" href={`/merchant-support?thread=${encodeURIComponent(detail.shop.merchantSupportThread.id)}`}>View merchant support thread</Link>}
         {detail.status === 'OPEN' && <div className="border-t pt-4 space-y-3" aria-label="Incident ownership actions">
           <p className="text-sm font-medium">Incident ownership and resolution</p>

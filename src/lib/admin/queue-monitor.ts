@@ -26,11 +26,28 @@ const RECOVERY_CAPACITY_RESUME_QUEUE = 'recovery-capacity-resume';
 const RESUME_CAPACITY_BLOCKED_RECOVERIES_JOB = 'resume-capacity-blocked-recoveries';
 const RECOVERY_OUTREACH_FOLLOW_UP_QUEUE = 'recovery-outreach-follow-up';
 const RECOVERY_OUTREACH_FOLLOW_UP_JOB = 'recovery-outreach-follow-up';
+const WOO_CHECKOUT_CAPTURE_QUEUE = 'woo-checkout-capture-v1';
+const WOO_ORDER_CAPTURE_QUEUE = 'woo-order-capture-v1';
+const WOO_COUPON_SYNC_QUEUE = 'woo-coupon-sync';
+const WOO_INITIAL_DISPATCH_JOB = 'woo-recovery-initial-v1';
 const WHATSAPP_QUEUE_NAME = 'whatsapp-events';
 const WHATSAPP_JOB_NAMES = [
   'message-received',
   'message-status',
   'process-conversation-turn',
+  'meta-template-status-update',
+  'continue-recovery-delivery',
+] as const;
+const EXTRA_COMMUNICATION_JOB_NAMES = [
+  'store-category-translation-batch-submit',
+  'store-category-translation-batch-poll',
+  'store-category-translation-batch-results',
+  'merchant-pricing-translation-batch-submit',
+  'merchant-pricing-translation-batch-poll',
+  'merchant-pricing-translation-batch-results',
+  'whatsapp-template-translation-submit',
+  'whatsapp-template-translation-poll',
+  'whatsapp-template-translation-results',
 ] as const;
 
 export type QueueMonitorCounts = {
@@ -275,7 +292,7 @@ const queueDefinitions: QueueMonitorDefinition[] = [
   },
   {
     queueName: PENDING_RECOVERY_CANDIDATE_QUEUE,
-    jobNames: [EVALUATE_PENDING_RECOVERY_JOB],
+    jobNames: [EVALUATE_PENDING_RECOVERY_JOB, WOO_INITIAL_DISPATCH_JOB],
     supportedJobNames: [EVALUATE_PENDING_RECOVERY_JOB],
   },
   {
@@ -300,8 +317,11 @@ const queueDefinitions: QueueMonitorDefinition[] = [
   },
   {
     queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
-    jobNames: Object.values(MERCHANT_COMMUNICATIONS_JOB_NAMES),
+    jobNames: [...Object.values(MERCHANT_COMMUNICATIONS_JOB_NAMES), ...EXTRA_COMMUNICATION_JOB_NAMES],
   },
+  { queueName: WOO_CHECKOUT_CAPTURE_QUEUE, jobNames: ['checkout-updated'] },
+  { queueName: WOO_ORDER_CAPTURE_QUEUE, jobNames: ['order-lifecycle'] },
+  { queueName: WOO_COUPON_SYNC_QUEUE, jobNames: ['sync-woo-coupons'] },
   {
     queueName: MERCHANT_KNOWLEDGE_QUEUE_NAME,
     jobNames: [MERCHANT_KNOWLEDGE_PROCESS_JOB_NAME],
@@ -345,6 +365,9 @@ const queueOverviewDefinitions: QueueOverviewDefinition[] = [
     queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
     labelKey: 'queue.merchantCommunications',
   },
+  { queueName: WOO_CHECKOUT_CAPTURE_QUEUE, labelKey: 'queue.wooCheckoutCapture' },
+  { queueName: WOO_ORDER_CAPTURE_QUEUE, labelKey: 'queue.wooOrderCapture' },
+  { queueName: WOO_COUPON_SYNC_QUEUE, labelKey: 'queue.wooCouponSync' },
   {
     queueName: MERCHANT_KNOWLEDGE_QUEUE_NAME,
     labelKey: 'queue.merchantKnowledge',
@@ -615,7 +638,10 @@ export function extractQueueJobShopId(
     queueName === PENDING_RECOVERY_CANDIDATE_QUEUE ||
     queueName === RECOVERY_CAPACITY_RESUME_QUEUE ||
     queueName === BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME ||
-    queueName === MERCHANT_KNOWLEDGE_QUEUE_NAME
+    queueName === MERCHANT_KNOWLEDGE_QUEUE_NAME ||
+    queueName === WOO_CHECKOUT_CAPTURE_QUEUE ||
+    queueName === WOO_ORDER_CAPTURE_QUEUE ||
+    queueName === WOO_COUPON_SYNC_QUEUE
   ) {
     return normalizeShopId(data.shopId);
   }
@@ -854,7 +880,6 @@ export async function readQueueJobSnapshot(
   const limit = parseQueueJobPositiveInteger(options.limit, DEFAULT_QUEUE_JOB_LIMIT, MAX_QUEUE_JOB_LIMIT);
   const direction = parseQueueJobDirection(options.direction);
   const redisUrl = options.redisUrl ?? process.env.REDIS_URL;
-  console.log('Redis URL:', redisUrl);
   if (!redisUrl) throw new QueueMonitorUnavailableError();
 
   try {

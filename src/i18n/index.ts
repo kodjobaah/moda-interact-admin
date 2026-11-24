@@ -80,6 +80,10 @@ export function adminQueueLabel(queueName: string): string {
     "recovery-outreach-follow-up": "queue.recoveryOutreachFollowUp",
     "shopify-discount-sync": "queue.shopifyDiscountSync",
     "billing-subscription-reconcile": "queue.billingSubscriptionReconcile",
+    "woo-checkout-capture-v1": "queue.wooCheckoutCapture",
+    "woo-order-capture-v1": "queue.wooOrderCapture",
+    "woo-coupon-sync": "queue.wooCouponSync",
+
     "whatsapp-events": "queue.whatsappEvents",
     "merchant-communications": "queue.merchantCommunications",
     "merchant-knowledge": "queue.merchantKnowledge",
@@ -97,6 +101,10 @@ export function adminQueueWorkloadLabel(queueName: string): string {
     "shopify-discount-sync": "queue.workloadShopifyDiscounts",
     "billing-subscription-reconcile": "queue.workloadBilling",
     "whatsapp-events": "queue.workloadMessaging",
+    "woo-checkout-capture-v1": "queue.workloadWooCommerce",
+    "woo-order-capture-v1": "queue.workloadWooCommerce",
+    "woo-coupon-sync": "queue.workloadWooCommerce",
+
     "merchant-communications": "queue.workloadMerchantCommunications",
     "merchant-knowledge": "queue.workloadMerchantKnowledge",
   };
