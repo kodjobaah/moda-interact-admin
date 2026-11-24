@@ -3,15 +3,19 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveWhatsAppTemplateDraft } from "@/app/actions/whatsapp-template-authoring";
-import { cloneDraft, newMetaDraft, newWrapperDraft } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
+import { applyCommonLayoutChoice, cloneDraft, newMetaDraft, newWrapperDraft } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
 import { makeImmutableAuthoringRecord } from "@/lib/admin/whatsapp-templates/authoring/compiler";
 import { commonPreparedExample, makeExamplePreview, makeDraftExamplePreview } from "@/lib/admin/whatsapp-templates/authoring/preview";
 import { validateTemplateAst } from "@/lib/admin/whatsapp-templates/authoring/validation";
 import type { TemplateAst, TemplateDetail, TemplatePreviewDTO } from "@/lib/admin/whatsapp-templates/authoring/types";
 
-export function useTemplateAuthoringDraft(source?: TemplateDetail | null) {
+export function useTemplateAuthoringDraft(source?: TemplateDetail | null,
+  activeLayout?: import("@/lib/admin/whatsapp-templates/authoring/common-layout-reads").CommonLayoutChoice) {
   const router = useRouter();
-  const [draft, setDraft] = useState<TemplateAst>(() => source?.english?.authoring ? cloneDraft(source.english.authoring) : newMetaDraft());
+  const [draft, setDraft] = useState<TemplateAst>(() => {
+    const initial = source?.english?.authoring ? cloneDraft(source.english.authoring) : newMetaDraft();
+    return source && activeLayout && initial.family === "META_RECOVERY" ? applyCommonLayoutChoice(initial, activeLayout) : initial;
+  });
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState("");

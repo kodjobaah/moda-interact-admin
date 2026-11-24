@@ -1,10 +1,11 @@
 "use client";
-import type { CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
+import type { CommonLayoutChoice } from "@/lib/admin/whatsapp-templates/authoring/common-layout-reads";
+import { applyCommonLayoutChoice } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
 import type { TemplateAst } from "@/lib/admin/whatsapp-templates/authoring/types";
 import { RECOVERY_SCENARIOS } from "@/lib/admin/whatsapp-templates/authoring/scenarios";
 
 export function CommonLayoutSelector({ draft, choices, onChange }: {
-  draft: TemplateAst; choices: CommonRecoveryLayoutReference[]; onChange: (draft: TemplateAst) => void;
+  draft: TemplateAst; choices: CommonLayoutChoice[]; onChange: (draft: TemplateAst) => void;
 }) {
   if (draft.family !== "META_RECOVERY") return null;
   return <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5" aria-label="Common recovery layout">
@@ -13,10 +14,11 @@ export function CommonLayoutSelector({ draft, choices, onChange }: {
     <label className="block text-sm">Saved common layout
       <select className="mt-1 w-full rounded border p-2" value={draft.commonLayout?.definitionId ?? ""} onChange={event => {
         const selected = choices.find(row => row.definitionId === event.target.value);
-        const { commonLayout: previous, ...rest } = draft;
-        void previous;
-        onChange(selected ? { ...rest, commonLayout: selected, shopBrandMediaRole: draft.shopBrandMediaRole ?? "LOGO" } : rest);
-      }}><option value="">Keep existing layout</option>{choices.map(ref => <option key={ref.definitionId} value={ref.definitionId}>{ref.definitionId.slice(-12)} · 20 reviewed languages</option>)}</select>
+        if (selected) onChange(applyCommonLayoutChoice({ ...draft, shopBrandMediaRole: draft.shopBrandMediaRole ?? "LOGO" }, selected));
+      }}><option value="" disabled>Choose a reviewed common layout</option>
+        {draft.commonLayout && !choices.some(ref => ref.definitionId === draft.commonLayout?.definitionId) &&
+          <option value={draft.commonLayout.definitionId} disabled>Historical layout · {draft.commonLayout.definitionId.slice(-12)} · unavailable for new selection</option>}
+        {choices.map(ref => <option key={ref.definitionId} value={ref.definitionId}>{ref.createdAt} · {ref.active ? "Active · " : ""}{ref.definitionId.slice(-12)} · 20 reviewed languages</option>)}</select>
     </label>
     {!choices.length && <p className="text-sm text-amber-800">No reviewed shared layout is ready. Create a shared wrapper with the shop name in its header, only the response in its body, and the clickable website before the final checkout link in its checkout-aware footer; review all 20 languages.</p>}
     {draft.commonLayout && <p className="text-sm text-slate-600">Review any existing inline checkout link or text header explicitly. Product images remain separate from the shop logo. Meta approval is still required for the final composition.</p>}

@@ -62,10 +62,14 @@ export function checkWrapperEligibility(definition: WrapperDefinitionRow, audien
     const saved = locale.localeAst;
     const storedPrepared = saved.prepared;
     if (!record(storedPrepared)) return fail(`${locale.languageTag}: missing prepared projection.`);
-    const checked = validateTemplateAst(saved.authoring);
-    if (!checked.ok || checked.value.family !== "MODA_CONVERSATION_WRAPPER" ||
-        checked.value.audience !== audience) {
-      return fail(`${locale.languageTag}: invalid wrapper authoring or audience.`);
+    let checked: ReturnType<typeof validateTemplateAst>;
+    try { checked = validateTemplateAst(saved.authoring); }
+    catch (error) { return fail(`${locale.languageTag}: authoring validation failed: ${error instanceof Error ? error.message.slice(0, 500) : "Unknown validation error."}`); }
+    if (!checked.ok) {
+      return fail(`${locale.languageTag}: ${checked.issues.slice(0, 4).map(issue => `${issue.path}: ${issue.message}`).join("; ").slice(0, 600)}`);
+    }
+    if (checked.value.family !== "MODA_CONVERSATION_WRAPPER" || checked.value.audience !== audience) {
+      return fail(`${locale.languageTag}: wrapper family or audience does not match ${audience}.`);
     }
     if (english && templateHash(checked.value) !== definition.sourceHash) {
       return fail("The immutable English source hash has changed.");
@@ -84,8 +88,8 @@ export function checkWrapperEligibility(definition: WrapperDefinitionRow, audien
         return fail(`${locale.languageTag}: immutable compiled projection, digest or response slot mismatch.`);
       }
       projections[locale.languageTag] = prepared;
-    } catch {
-      return fail(`${locale.languageTag}: compilation or runtime-projection integrity check failed.`);
+    } catch (error) {
+      return fail(`${locale.languageTag}: compilation failed: ${error instanceof Error ? error.message.slice(0, 500) : "Unknown compiler error."}`);
     }
   }
   const english = projections.en;

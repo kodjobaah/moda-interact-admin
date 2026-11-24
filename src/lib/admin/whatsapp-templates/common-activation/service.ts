@@ -5,6 +5,7 @@ import { digest, isValidKey, isValidFingerprint, reject } from "../publishing/va
 import { assertFreshPreview } from "../publishing/preview";
 import { activateConversationWrapperInTransaction } from "../wrappers/service";
 import { lockCommonActivation } from "./gates";
+import { persistDefaultReplacements } from "./defaults";
 import { previewCommonActivation } from "./preview";
 import { assertSnapshotSize, parseCommonSelection, readCommonActivationSnapshot, type CommonActivationConfirmation, type CommonActivationResult, type CommonActivationSnapshot } from "./contracts";
 
@@ -31,13 +32,15 @@ export async function activateCommonRecoveryLayout(input:CommonActivationConfirm
     // Row locks also fence non-Admin provider observations and privacy cascade deletes.
     const shopIds=[...new Set(selection.replacements.flatMap(r=>r.shopIds))].sort();
     if(shopIds.length) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "commerce"."Shop" WHERE "id" IN (${Prisma.join(shopIds)}) ORDER BY "id" FOR UPDATE`);
-    const definitionIds=[selection.commonDefinitionId,...selection.replacements.map(r=>r.definitionId)].sort();
+    const definitionIds=[...new Set([selection.commonDefinitionId,...selection.replacements.map(r=>r.definitionId),
+      ...(selection.defaultReplacements ?? []).map(r => r.definitionId)])].sort();
     await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "whatsapp"."WhatsAppTemplateDefinition" WHERE "id" IN (${Prisma.join(definitionIds)}) ORDER BY "id" FOR UPDATE`);
-    const lockedLocales = await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`SELECT "id" FROM "whatsapp"."WhatsAppTemplateLocale" WHERE "definitionId" IN (${Prisma.join(definitionIds)}) ORDER BY "id" LIMIT 141 FOR UPDATE`);
-    if (lockedLocales.length > 140) return reject("BOUNDED_SCOPE", "Unexpected locale rows exceed the complete activation bound.");
+    const lockedLocales = await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`SELECT "id" FROM "whatsapp"."WhatsAppTemplateLocale" WHERE "definitionId" IN (${Prisma.join(definitionIds)}) ORDER BY "id" LIMIT 381 FOR UPDATE`);
+    if (lockedLocales.length > 380) return reject("BOUNDED_SCOPE", "Unexpected locale rows exceed the complete activation bound.");
     const lockedRegistrations = await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`SELECT r."id" FROM "whatsapp"."WhatsAppTemplateMetaRegistration" r JOIN "whatsapp"."WhatsAppTemplateLocale" l ON l."id"=r."localeId" WHERE l."definitionId" IN (${Prisma.join(definitionIds)}) OR r."id" IN (SELECT "metaRegistrationId" FROM "whatsapp"."WhatsAppTemplateVariant" WHERE "enabled"=true AND "status"='APPROVED') ORDER BY r."id" LIMIT 2001 FOR UPDATE OF r`);
     if (lockedRegistrations.length > 2000) return reject("BOUNDED_SCOPE", "Registration locks exceed the complete activation bound.");
     await tx.$queryRaw`SELECT "id" FROM "whatsapp"."WhatsAppTemplateVariant" WHERE "enabled"=true AND "status"='APPROVED' ORDER BY "id" LIMIT 1001 FOR UPDATE`;
+    await tx.$queryRaw`SELECT "id" FROM "whatsapp"."WhatsAppRecoveryTemplateDefault" ORDER BY "id" LIMIT 13 FOR UPDATE`;
     await tx.$queryRaw`SELECT "audience" FROM "whatsapp"."WhatsAppConversationWrapperActiveSlot" ORDER BY "audience" FOR UPDATE`;
     await tx.$queryRaw`SELECT "id" FROM "public"."PlatformConfiguration" WHERE "key"='messaging.sender' FOR SHARE`;
     const manifest=await previewCommonActivation(tx,selection,input.issuedAt);
@@ -72,6 +75,7 @@ export async function activateCommonRecoveryLayout(input:CommonActivationConfirm
       }
       await tx.whatsAppTemplateDefinition.updateMany({where:{id:source.id,publishedAt:null},data:{status:"PUBLISHED",publishedAt:new Date()}});
     }
+    await persistDefaultReplacements(tx, manifest.defaults ?? [], deps.principal.id, coordinator.id, input.reason.trim());
     const activated=await activateConversationWrapperInTransaction({audience:"SHARED",definitionId:selection.commonDefinitionId,expectedDefinitionId:expected?.definitionId??null,expectedVersion:expected?.editVersion??null,reason:input.reason},
       {tx,principal:deps.principal,coordinatedCommonActivation:true,auditMetadata:{commonActivationCoordinatorId:coordinator.id,cohortFingerprint:manifest.fingerprint}});
     if(activated.editVersion!==editVersion)return reject("INTEGRITY","Common pointer version did not match the reviewed activation.");

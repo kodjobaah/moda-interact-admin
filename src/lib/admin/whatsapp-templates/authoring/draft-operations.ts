@@ -75,6 +75,14 @@ export function replaceNode<T extends WrapperNode>(nodes: T[], index: number, re
 export function removeNode<T extends WrapperNode>(nodes: T[], index: number): T[] {
   return nodes.filter((_, pos) => pos !== index);
 }
+/** Choice metadata is presentation-only; never persist it in the immutable reference. */
+export function applyCommonLayoutChoice(draft: MetaTemplateAst,
+  choice: import("./common-layout-reads").CommonLayoutChoice): MetaTemplateAst {
+  const { createdAt, active, ...reference } = choice;
+  void createdAt; void active;
+  return { ...draft, commonLayout: structuredClone(reference) };
+}
+
 export function cloneDraft(value: TemplateAst): TemplateAst {
   const draft = structuredClone(value);
   // Only editable clones are normalized; saved records and compiler hashes stay immutable.

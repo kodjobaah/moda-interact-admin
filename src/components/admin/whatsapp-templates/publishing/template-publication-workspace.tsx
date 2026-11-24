@@ -17,7 +17,7 @@ export function TemplatePublicationWorkspace({ definitionId, initialProgress = n
   const state = useTemplatePublication(definitionId, initialProgress, defaultEligible);
   return <div className="min-w-0 max-w-6xl space-y-5">
     {state.error && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">{state.error}
-      {/common revision|common.layout|coordinated activation/i.test(state.error) && <p className="mt-2"><Link className="underline" href="/system-controls/whatsapp-templates/common-activation">Review coordinated common-layout activation</Link></p>}
+      {/common revision|common.layout|coordinated activation/i.test(state.error) && <p className="mt-2"><Link className="underline" href={`/system-controls/whatsapp-templates?clone=${encodeURIComponent(definitionId)}`}>Clone using active common layout</Link>{" · "}<Link className="underline" href="/system-controls/whatsapp-templates/common-activation">Review coordinated common-layout activation</Link></p>}
     </div>}
     {state.defaultSuccess ? <section role="status" className="rounded border border-green-300 bg-green-50 p-4 text-sm text-green-900">Platform default configured for {state.defaultSuccess}. No existing shop assignments were changed. <Link className="underline" href="/system-controls/whatsapp-templates/defaults">View recovery defaults</Link></section> : state.progress ? <PublicationProgressSummary progress={state.progress} busy={state.busy}
       onContinue={() => void state.advance(false)} onRetry={() => void state.advance(true)} /> : <>

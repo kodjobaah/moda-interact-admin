@@ -19,7 +19,7 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
   return <section className="space-y-5" aria-label="WhatsApp template catalogue">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-lg font-semibold text-slate-900">Template catalogue</h2>
-        <p className="mt-1 text-sm text-slate-500">Browse immutable English sources, or create a new template.</p></div>
+        <p className="mt-1 text-sm text-slate-500">Browse immutable English sources, or create a new template. Layout references are advisory; publication revalidates all content and approvals.</p></div>
       <div className="flex flex-wrap gap-2">
         <Link className="rounded-lg border border-blue-800 px-4 py-2.5 text-sm font-semibold text-blue-800" href="/system-controls/whatsapp-templates/defaults">Recovery defaults</Link>
         <Link className="rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-900" href="/system-controls/whatsapp-templates?create=1">+ Create template</Link>
@@ -64,7 +64,7 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
             <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? "Meta recovery" : "Conversation wrapper"}</td>
             <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? scenarioLabel(entry.purpose, entry.offerType) : entry.audience === "ROUTER" ? "Router — before a shop is selected" : entry.audience}</td>
             <td className="px-4 py-4">{entry.sourceLanguageTag}</td>
-            <td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{visibleLifecycle(entry)}</span>{visibleLifecycle(entry) !== entry.status && <p className="mt-1 text-xs text-slate-500">Stored lifecycle: {entry.status}</p>}{entry.progress && <p className="mt-2 text-xs text-slate-600">Latest translation run: {entry.progress.runStatus}. Translated {entry.progress.translated}/{entry.progress.total}; reviewed {entry.progress.reviewed}/{entry.progress.total}.</p>}</td>
+            <td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{visibleLifecycle(entry)}</span>{visibleLifecycle(entry) !== entry.status && <p className="mt-1 text-xs text-slate-500">Stored lifecycle: {entry.status}</p>}{entry.commonLayoutCoverage && <p className="mt-2 text-xs text-slate-700">{!entry.commonLayoutCoverage.active ? "No active common layout" : entry.commonLayoutCoverage.matchingCount === 20 && entry.commonLayoutCoverage.localeCount === 20 ? "Active layout · 20/20 linked" : entry.commonLayoutCoverage.matchingCount === 0 ? "No active layout reference · review or clone" : `Active layout · ${entry.commonLayoutCoverage.matchingCount}/20 linked; review remaining locales`}</p>}{entry.progress && <p className="mt-2 text-xs text-slate-600">Latest translation run: {entry.progress.runStatus}. Translated {entry.progress.translated}/{entry.progress.total}; reviewed {entry.progress.reviewed}/{entry.progress.total}.</p>}</td>
             <td className="whitespace-nowrap px-4 py-4">{new Date(entry.createdAt).toLocaleDateString("en-GB")}</td>
           </tr>)}
         </tbody>

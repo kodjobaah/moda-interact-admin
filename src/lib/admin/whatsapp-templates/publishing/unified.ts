@@ -44,8 +44,8 @@ export async function previewScopedPublication(db: PrismaClient, principal: Plat
   return db.$transaction(async tx => {
     const wabaId = await configuredSenderWaba(tx);
     if (includesFuture(intent)) return (await defaultScopePreview(tx, input.definitionId, intent, wabaId, issuedAt, input.page)).preview;
-    const state = await computePreview(tx, input.definitionId, intent, wabaId, issuedAt, input.page);
     await assertCommonSourceGate(tx, input.definitionId, "assignment");
+    const state = await computePreview(tx, input.definitionId, intent, wabaId, issuedAt, input.page);
     return publicPreview(state, input.definitionId, input.page, issuedAt);
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30_000 });
 }

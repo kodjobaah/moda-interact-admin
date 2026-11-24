@@ -12,7 +12,10 @@ const ID = /^[a-zA-Z0-9_-]{1,191}$/;
 const BINDING = /^(?:customer\.firstName|shop\.(?:name|categoryName|websiteUrl)|checkout\.(?:url|itemsSummary)|offer\.(?:code|description)|promotion\.(?:productName|productUrl|offerDescription|code)|shopBrand\.(?:brandName|logoUrl|logoAltText|logoWidth|logoHeight|squareLogoUrl|squareLogoAltText|coverImageUrl))$/;
 
 export class PublicationError extends Error {
-  constructor(public readonly code: string, message: string) { super(message); this.name = "PublicationError"; }
+  constructor(public readonly code: string, message: string,
+    public readonly context?: Record<string, string | null>, options?: ErrorOptions) {
+    super(message, options); this.name = "PublicationError";
+  }
 }
 export const reject = (code: string, message: string): never => { throw new PublicationError(code, message); };
 export const digest = (value: unknown): string => createHash("sha256").update(stableJson(value)).digest("hex");

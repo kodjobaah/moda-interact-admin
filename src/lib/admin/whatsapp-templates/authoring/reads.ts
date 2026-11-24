@@ -59,7 +59,23 @@ export async function listDefinitions(page = 1, search = "", filters: { kind?: s
       translationRuns: { orderBy: [{ requestedAt: "desc" }, { id: "desc" }], take: 1, select: { status: true, sourceHash: true, items: { select: { status: true, failureCode: true, resultLocaleId: true }, take: 20 } } } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (safePage - 1) * PAGE_SIZE, take: PAGE_SIZE + 1,
   });
-  return { items: rows.slice(0, PAGE_SIZE).map(row => ({ ...item(row), progress: row.translationRuns[0]?.sourceHash === row.sourceHash ? {
+  const recoveryIds = rows.slice(0, PAGE_SIZE).filter(row => row.kind === "META_RECOVERY").map(row => row.id);
+  const coverage = recoveryIds.length ? await prisma.$queryRaw<Array<{ id: string; active: boolean; localeCount: number; matchingCount: number }>>(Prisma.sql`
+    SELECT d.id, (s."definitionId" IS NOT NULL) AS active, count(l.id)::int AS "localeCount",
+      count(l.id) FILTER (WHERE l."localeAst"#>>'{authoring,commonLayout,definitionId}' = s."definitionId"
+        AND l."localeAst"#>>'{authoring,commonLayout,sourceHash}' = w."sourceHash"
+        AND l."localeAst"#>>'{authoring,commonLayout,localeId}' = wl.id
+        AND l."localeAst"#>>'{authoring,commonLayout,languageTag}' = l."languageTag"
+        AND l."localeAst"#>>'{authoring,commonLayout,contentHash}' = wl."contentHash")::int AS "matchingCount"
+    FROM whatsapp."WhatsAppTemplateDefinition" d
+    LEFT JOIN whatsapp."WhatsAppTemplateLocale" l ON l."definitionId" = d.id
+    LEFT JOIN whatsapp."WhatsAppConversationWrapperActiveSlot" s ON s.audience = 'SHARED'
+    LEFT JOIN whatsapp."WhatsAppTemplateDefinition" w ON w.id = s."definitionId"
+    LEFT JOIN whatsapp."WhatsAppTemplateLocale" wl ON wl."definitionId" = w.id AND wl."languageTag" = l."languageTag"
+    WHERE d.id IN (${Prisma.join(recoveryIds)}) GROUP BY d.id, s."definitionId"
+  `) : [];
+  const coverageById = new Map(coverage.map(({ id, ...facts }) => [id, facts]));
+  return { items: rows.slice(0, PAGE_SIZE).map(row => ({ ...item(row), commonLayoutCoverage: coverageById.get(row.id), progress: row.translationRuns[0]?.sourceHash === row.sourceHash ? {
     runStatus: row.translationRuns[0].status,
     translated: row.translationRuns[0].items.filter(i => ["COMPLETED", "COMPLETE", "SUCCEEDED", "AVAILABLE"].includes(i.status) && !i.failureCode).length,
     reviewed: row.translationRuns[0].items.filter(i => i.resultLocaleId).length,

@@ -23,6 +23,9 @@ export function TranslationReviewWorkspace({ workspace }: { workspace: ReviewWor
       : <p role="status" className="text-sm text-slate-700">All 19 translations must be individually approved before publication eligibility.</p>}
     <div className="flex flex-wrap items-center gap-3 text-sm">
       {workspace.definitionStatus && <span>Stored lifecycle: {workspace.definitionStatus}</span>}
+      {!workspace.readyForPublication && <Link className="rounded border border-blue-700 px-3 py-2 font-medium text-blue-800"
+        href={`/system-controls/whatsapp-templates/${encodeURIComponent(workspace.definitionId)}/translations`}>
+        {workspace.locales.some(locale => locale.runId) ? "View translation progress / retry" : "Start translations"}</Link>}
       {workspace.canSynchroniseLifecycle && <button type="button" disabled={busy} onClick={synchronise}
         className="rounded border border-blue-700 px-3 py-2 font-medium text-blue-800 disabled:opacity-50">Synchronise translation status</button>}
       {workspace.readyForPublication && workspace.family === "META_RECOVERY" && <Link

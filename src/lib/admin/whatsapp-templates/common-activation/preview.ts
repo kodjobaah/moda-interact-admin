@@ -1,12 +1,13 @@
 import type { Prisma } from "@prisma/client";
-import { readSavedCommonLayout } from "../authoring/common-layout-repository";
+import { previewDefaultReplacements } from "./defaults";
+import { readSavedCommonLayoutSet } from "../authoring/common-layout-repository";
 import { requireCommonLayout } from "../authoring/common-layout";
 import { approvedSource } from "../publishing/source";
 import { configuredSenderWaba } from "../publishing/sender";
 import { digest, LANGUAGES, parseBindings, parseComponents, observedMetaContentHash, reject } from "../publishing/validation";
 import { COMMON_ACTIVATION_LIMITS as LIMITS, parseCommonSelection, assertSnapshotSize, type CommonActivationPreview } from "./contracts";
 
-type Reader = Pick<Prisma.TransactionClient, "whatsAppTemplateDefinition" | "whatsAppTemplateVariant" | "whatsAppConversationWrapperActiveSlot" | "shop" | "platformConfiguration" | "whatsAppTemplateMetaEvent">;
+type Reader = Pick<Prisma.TransactionClient, "whatsAppTemplateDefinition" | "whatsAppTemplateVariant" | "whatsAppConversationWrapperActiveSlot" | "shop" | "platformConfiguration" | "whatsAppTemplateMetaEvent" | "whatsAppRecoveryTemplateDefault">;
 const scenarios = ["INITIAL", "FOLLOW_UP"].flatMap(stage=>["NO_OFFER","CODE_OFFER","AUTOMATIC_OFFER"].map(offer=>`${stage}_${offer}`));
 const customerName = (bindings: ReturnType<typeof parseBindings>) => [...bindings.header,...bindings.body].some(b=>b.variable==="customer.firstName");
 export async function previewCommonActivation(db: Reader, raw: unknown, issuedAt = new Date().toISOString()): Promise<CommonActivationPreview> {
@@ -14,8 +15,8 @@ export async function previewCommonActivation(db: Reader, raw: unknown, issuedAt
   const wabaId = await configuredSenderWaba(db);
   const audiencePointers = await db.whatsAppConversationWrapperActiveSlot.findMany({ orderBy: { audience: "asc" }, select: { audience:true,definitionId:true,editVersion:true } });
   const shared = audiencePointers.find(s=>s.audience==="SHARED");
-  const commonRefs = [];
-  for (const tag of LANGUAGES) commonRefs.push(await readSavedCommonLayout(db, selection.commonDefinitionId, tag));
+  const commonRefs = (await readSavedCommonLayoutSet(db, selection.commonDefinitionId)).sort((a,b)=>a.languageTag.localeCompare(b.languageTag));
+  const defaults = await previewDefaultReplacements(db, selection, commonRefs);
   const definitions: CommonActivationPreview["definitions"] = [];
   for (const replacement of selection.replacements) {
     const source = await approvedSource(db, replacement.definitionId, wabaId);
@@ -73,8 +74,8 @@ export async function previewCommonActivation(db: Reader, raw: unknown, issuedAt
     if(!covered.has(`${item.source.id}|${shopId}|${tag}`))return reject("COHORT_MISMATCH","The existing assignment must cover all 20 reviewed locales. Missing slots require a separate reviewed repair.");
   const manifest={schemaVersion:2 as const,kind:"COMMON_RECOVERY_ACTIVATION" as const,selection,issuedAt,wabaId,
     expectedSharedPointer:shared?{definitionId:shared.definitionId,editVersion:shared.editVersion}:null,
-    commonRefs,definitions,shops,variants,audiencePointers,targetCount:definitions.reduce((n,item)=>n+item.shopIds.length*LANGUAGES.length,0),
-    missingScenarios:scenarios.filter(purpose=>!definitions.some(item=>item.source.purpose===purpose))};
+    commonRefs,definitions,shops,variants,audiencePointers,defaults,targetCount:definitions.reduce((n,item)=>n+item.shopIds.length*LANGUAGES.length,0),
+    missingScenarios:scenarios.filter(purpose=>!definitions.some(item=>item.source.purpose===purpose) && !defaults.some(item=>item.purpose===purpose))};
   const result={...manifest,fingerprint:digest(manifest)};
   assertSnapshotSize(result);
   return result;

@@ -1,5 +1,7 @@
 import { lockCommonActivation, assertCommonSourceGate } from "../common-activation/gates";
 import { Prisma } from "@prisma/client";
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
+import { resolveDeploymentEnvironmentName } from "../../../auth/environment";
 import type { PublicationDb, OperationSnapshot } from "./operation";
 import { operationSnapshot, progressForOperation } from "./operation";
 import { eligibleShop } from "./discovery";
@@ -10,6 +12,8 @@ import { PROCESS_PAGE_SIZE } from "./types";
 import type { PublicationProgress } from "./types";
 import { configuredSenderWaba } from "./sender";
 import { assignmentAuditOperationId } from "./audit";
+
+const logger = createLogger({ serviceName: "moda-interact-admin", environment: resolveDeploymentEnvironmentName() });
 
 /** Each shop's 20 languages are saved in a SINGLE serializable transaction.
  * The transaction-scoped advisory lock serialises overlapping ARCH-047 operations
@@ -138,6 +142,10 @@ export async function advancePublication(db: PublicationDb, operationId: string,
       await assignShop(db, operationId, operation.definitionId, operation.requestedByAdminId, snapshot, shopId);
     } catch (error) {
       const code = failureCode(error);
+      // Failure codes remain safe to persist; retain the original error in server logs.
+      logger.error("admin.whatsapp_publication.shop_failed", { operationId, definitionId: operation.definitionId, shopId,
+        wabaId: snapshot.wabaId, purpose: snapshot.purpose, failureCode: code,
+        ...(error instanceof PublicationError ? error.context : {}), error });
       await db.whatsAppTemplatePublicationTarget.updateMany({ where: { operationId, shopId,
         status: { in: ["PENDING", "FAILED"] } }, data: { status: "FAILED", failureCode: code,
         retryCount: { increment: 1 }, processedAt: new Date() } });

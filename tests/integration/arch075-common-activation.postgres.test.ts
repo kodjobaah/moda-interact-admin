@@ -145,3 +145,42 @@ test("empty exact Meta cohort switches only the common pointer with audit and re
  assert.equal(await db.whatsAppTemplatePublicationTarget.count(),before);assert.equal(await db.whatsAppTemplateVariant.count({where:{enabled:true}}),0);
  assert.equal((await activateCommonRecoveryLayout(input,{db,principal})).replay,true);
 });
+
+test("platform defaults require explicit compatible replacements even with no merchant assignments; commit and rollback with SHARED", async () => {
+ const previous = await db.whatsAppConversationWrapperActiveSlot.findUniqueOrThrow({where:{audience:"SHARED"}});
+ const old = await meta(previous.definitionId);
+ const nextCommonId = await common("A new platform defaults layout for ");
+ const next = await meta(nextCommonId);
+ for (const definition of [old, next]) {
+  await db.whatsAppTemplateLocale.updateMany({where:{definitionId:definition.id,languageTag:"en"},data:{status:"REVIEWED",reviewedAt:new Date(),reviewedByAdminId:id}});
+ }
+ await db.whatsAppTemplateDefinition.update({where:{id:old.id},data:{status:"PUBLISHED",publishedAt:new Date()}});
+ const pointer=await db.whatsAppRecoveryTemplateDefault.create({data:{wabaId:waba,purpose:"FOLLOW_UP_NO_OFFER",definitionId:old.id,updatedByAdminId:id}});
+ const bare={commonDefinitionId:nextCommonId,replacements:[]};
+ await assert.rejects(previewCommonActivation(db,bare),/every configured platform default/);
+ await assert.rejects(previewCommonActivation(db,{...bare,defaultReplacements:[{defaultId:pointer.id,definitionId:old.id}]}),/selected common revision/);
+ const selection={...bare,defaultReplacements:[{defaultId:pointer.id,definitionId:next.id}]};
+ const registration=await db.whatsAppTemplateMetaRegistration.findFirstOrThrow({where:{locale:{definitionId:next.id}}});
+ await db.whatsAppTemplateMetaRegistration.update({where:{id:registration.id},data:{providerStatus:"PAUSED"}});
+ await assert.rejects(previewCommonActivation(db,selection),/approval|registration/i);
+ await db.whatsAppTemplateMetaRegistration.update({where:{id:registration.id},data:{providerStatus:"APPROVED"}});
+ const preview=await previewCommonActivation(db,selection);
+ assert.equal(preview.targetCount,0);assert.equal(preview.defaults?.length,1);
+ assert.equal(preview.defaults?.[0].previousDefinitionId,old.id);assert.equal(preview.defaults?.[0].source.id,next.id);
+ const input={selection,issuedAt:preview.issuedAt,fingerprint:preview.fingerprint,operationKey:randomUUID(),reason:"Reviewed all default locales and the new common revision",acknowledgeOverrides:true as const,consumerDeploymentConfirmed:true as const,englishContentReviewed:true as const};
+ const count=await db.whatsAppTemplatePublicationOperation.count();
+ const beforeTargets=await db.whatsAppTemplatePublicationTarget.count();
+ const failDb={$transaction:<T>(work:(tx:Prisma.TransactionClient)=>Promise<T>,options:object)=>db.$transaction(tx=>work(new Proxy(tx,{get(target,key){if(key==="commerceAuditEvent")return {...target.commerceAuditEvent,create:async(args:Prisma.CommerceAuditEventCreateArgs)=>{if(args.data.action==="ACTIVATE_WHATSAPP_CONVERSATION_WRAPPER")throw Error("default rollback fixture");return target.commerceAuditEvent.create(args);}};return Reflect.get(target,key);}})),options)};
+ await assert.rejects(activateCommonRecoveryLayout(input,{db:failDb as unknown as Pick<PrismaClient,"$transaction">,principal}),/default rollback fixture/);
+ assert.deepEqual(await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({where:{id:pointer.id}}),pointer);
+ assert.deepEqual(await db.whatsAppConversationWrapperActiveSlot.findUniqueOrThrow({where:{audience:"SHARED"}}),previous);
+ assert.equal(await db.whatsAppTemplatePublicationOperation.count(),count);
+ const result=await activateCommonRecoveryLayout(input,{db,principal});
+ assert.equal(result.targetCount,0);
+ assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({where:{id:pointer.id}})).definitionId,next.id);
+ assert.equal((await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:next.id}})).status,"PUBLISHED");
+ assert.equal((await db.whatsAppConversationWrapperActiveSlot.findUniqueOrThrow({where:{audience:"SHARED"}})).definitionId,nextCommonId);
+ assert.equal(await db.whatsAppTemplatePublicationTarget.count(),beforeTargets);assert.equal(await db.whatsAppTemplateVariant.count({where:{enabled:true}}),0);
+ const audits=await db.commerceAuditEvent.count();
+ assert.equal((await activateCommonRecoveryLayout(input,{db,principal})).replay,true);assert.equal(await db.commerceAuditEvent.count(),audits);
+});

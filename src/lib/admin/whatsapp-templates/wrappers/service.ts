@@ -44,6 +44,9 @@ export async function activateConversationWrapperInTransaction(input: ActivateWr
   await lockCommonActivation(tx);
   if (input.audience === "SHARED" && !deps.coordinatedCommonActivation) {
     const current = await tx.whatsAppConversationWrapperActiveSlot.findUnique({ where: { audience: "SHARED" } });
+    if (current?.definitionId !== input.definitionId && await tx.whatsAppRecoveryTemplateDefault.count() > 0) {
+      throw new WrapperRequestError("Use coordinated common-layout activation to review and replace configured platform defaults together with existing assignments.");
+    }
     for (const id of new Set([input.definitionId, ...(current ? [current.definitionId] : [])])) {
       let common = false;
       const source = await tx.whatsAppTemplateDefinition.findUnique({ where: { id }, include: { locales: true } });

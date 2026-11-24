@@ -1,6 +1,6 @@
 "use client";
 import { CommonLayoutSelector } from "./common-layout-selector";
-import type { CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
+import type { CommonLayoutChoice } from "@/lib/admin/whatsapp-templates/authoring/common-layout-reads";
 import { useState } from "react";
 import Link from "next/link";
 import type { TemplateDetail } from "@/lib/admin/whatsapp-templates/authoring/types";
@@ -14,8 +14,8 @@ import { useTemplateAuthoringDraft } from "./use-template-authoring-draft";
 import { useShopBrandMediaRole } from "../media/use-shop-brand-media-role";
 
 /** Layout only: all AST mutations, validation, preview and saving live in the controller or pure services. */
-export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [] }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonRecoveryLayoutReference[] }) {
-  const controller = useTemplateAuthoringDraft(cloneFrom);
+export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [] }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonLayoutChoice[] }) {
+  const controller = useTemplateAuthoringDraft(cloneFrom, commonLayouts.find(layout => layout.active));
   const media = useShopBrandMediaRole();
   const [step, setStep] = useState<TemplateEditorStep>("setup");
   const issues = controller.checked.ok ? [] : controller.checked.issues;
@@ -29,6 +29,10 @@ export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [] }: { 
         <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">{controller.savedId ? "Saved" : "Unsaved draft"}</span>
       </div>
     </header>
+    {cloneFrom?.kind === "META_RECOVERY" && commonLayouts.some(layout => layout.active) &&
+      <p role="status" className="rounded border border-blue-200 bg-blue-50 p-3 text-sm">The active common layout is preselected for this unsaved clone. Review the full composition before saving; the original message body, discount and media settings are retained.</p>}
+    {cloneFrom?.kind === "META_RECOVERY" && !commonLayouts.some(layout => layout.active) &&
+      <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">No reviewed active common layout is available for automatic selection. Review the saved layout choices before saving this clone.</p>}
     <CommonLayoutSelector draft={controller.draft} choices={commonLayouts} onChange={controller.updateDraft} />
     <TemplateEditorSteps value={step} onChange={select} issueCount={issues.length} />
     <div id="whatsapp-panel-setup" role="tabpanel" aria-labelledby="whatsapp-tab-setup" hidden={step !== "setup"}

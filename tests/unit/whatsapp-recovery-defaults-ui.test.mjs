@@ -34,7 +34,7 @@ test("one server mutation uses session actor, same default checks and structured
   const unified = read("src/lib/admin/whatsapp-templates/publishing/unified.ts");
   assert.match(action, /await requirePlatformAdminMutation\(\)/);
   assert.match(action, /requireTemplateSuperAdmin\(principal\)/);
-  assert.match(action, /logger.error\([^\n]+\{ error \}/);
+  assert.match(action, /logger.error\([^\n]+\{ \.\.\.context, error \}/);
   assert.match(action, /confirmScopedPublication\(input/);
   assert.doesNotMatch(defaults, /confirmRecoveryTemplateDefault|reviewRecoveryTemplateDefault/);
   assert.match(service, /configuredSenderWaba\(tx\)/);

@@ -83,7 +83,8 @@ test("real editable draft, immutable save, queued translation review, selector a
  assert.equal((await listReviewedCommonLayouts(db)).some(r=>r.definitionId===saved.id),false);
  await reviewTranslation({definitionId:saved.id,runId:run.id,languageTag:tags.at(-1)!,decision:"APPROVE"},{db,principal});
  const reviewed=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id},include:{locales:true}});
- assert.equal(reviewed.status,"TRANSLATION_QUEUED");assert.equal(reviewed.locales.length,20);
+ assert.equal(reviewed.status,"READY_FOR_REVIEW");
+ assert.equal(reviewed.publishedAt,null);assert.equal(reviewed.locales.length,20);
  for(const locale of reviewed.locales){const record=locale.localeAst as unknown as {authoring:{compositeProfile:unknown},prepared:{compositeProfile:unknown,compositeProfileSha256:string}};assert.deepEqual(record.authoring.compositeProfile,leftCompositeProfile);assert.deepEqual(record.prepared.compositeProfile,leftCompositeProfile);assert.equal(typeof record.prepared.compositeProfileSha256,"string");}
  const selected=(await listReviewedCommonLayouts(db)).find(r=>r.definitionId===saved.id);assert.ok(selected);assert.deepEqual(selected.prepared.footer,[]);assert.deepEqual(selected.prepared.compositeProfile,leftCompositeProfile);
  assert.equal(selected.prepared.header.some(t=>t.kind==="variable"&&t.name==="shop.websiteUrl"),false);

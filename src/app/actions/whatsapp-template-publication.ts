@@ -17,12 +17,14 @@ import type { PublicationIntentRequest, PublicationConfirmation, PublicationPrev
 
 type Result<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
 const logger = createLogger({ serviceName: "moda-interact-admin", environment: resolveDeploymentEnvironmentName() });
-const resultError = (error: unknown): Result<never> => {
+const resultError = (error: unknown, operation: string, identity?: string): Result<never> => {
+  const boundedId = typeof identity === "string" ? identity.slice(0, 128) : null;
+  const context = { operation, ...(operation === "advance" || operation === "progress" ? { operationId: boundedId } : { definitionId: boundedId }) };
   if (error instanceof PublicationError) {
-    logger.warn("admin.whatsapp_publication.rejected", { reasonCode: error.code, error });
+    logger.warn("admin.whatsapp_publication.rejected", { ...context, ...error.context, reasonCode: error.code, error, cause: error.cause });
     return { ok: false, code: error.code, message: error.message };
   }
-  logger.error("admin.whatsapp_publication.failed", { error });
+  logger.error("admin.whatsapp_publication.failed", { ...context, error });
   return { ok: false, code: "UNAVAILABLE", message: "Publication data is temporarily unavailable. Review again and check Admin server logs if it persists." };
 };
 
@@ -41,13 +43,13 @@ export async function eligiblePublicationShops(input: { search: string; page: nu
     take: 21, skip: (page - 1) * 20,
     });
     return { ok: true, data: { shops: rows.slice(0, 20), hasNext: rows.length > 20 } };
-  } catch (error) { return resultError(error); }
+  } catch (error) { return resultError(error, "eligible_shops"); }
 }
 export async function previewTemplatePublication(input: { definitionId: string; scope: PublicationIntent; page: number }): Promise<Result<PublicationPreview>> {
   const principal = await requirePlatformAdminRead();
   requireTemplateSuperAdmin(principal);
   try { return { ok: true, data: await previewScopedPublication(prisma, principal, input) }; }
-  catch (error) { return resultError(error); }
+  catch (error) { return resultError(error, "review", input?.definitionId); }
 }
 export async function comparePublicationLanguage(input: { definitionId: string; scope: PublicationIntent;
   shopId: string; languageTag: string }): Promise<Result<LanguageComparison>> {
@@ -56,7 +58,7 @@ export async function comparePublicationLanguage(input: { definitionId: string; 
     const scope = merchantScope(parsePublicationIntent(input.scope));
     const wabaId = await configuredSenderWaba(prisma);
     return { ok: true, data: await languageComparison(prisma, input.definitionId, scope, wabaId, input.shopId, input.languageTag) };
-  } catch (error) { return resultError(error); }
+  } catch (error) { return resultError(error, "compare_language", input?.definitionId); }
 }
 export async function confirmTemplatePublication(input: PublicationIntentRequest): Promise<Result<PublicationConfirmation>> {
   const principal = await requirePlatformAdminMutation();
@@ -68,15 +70,15 @@ export async function confirmTemplatePublication(input: PublicationIntentRequest
     revalidatePath("/system-controls/whatsapp-templates");
     revalidatePath("/system-controls/whatsapp-templates/defaults");
     return { ok: true, data };
-  } catch (error) { return resultError(error); }
+  } catch (error) { return resultError(error, "confirm", input?.definitionId); }
 }
 export async function advanceTemplatePublication(input: { operationId: string; retryFailed?: boolean }): Promise<Result<PublicationProgress>> {
   requireTemplateSuperAdmin(await requirePlatformAdminMutation());
   try { return { ok: true, data: await advancePublication(prisma, input.operationId, input.retryFailed ?? false) }; }
-  catch (error) { return resultError(error); }
+  catch (error) { return resultError(error, "advance", input?.operationId); }
 }
 export async function readTemplatePublicationProgress(operationId: string): Promise<Result<PublicationProgress>> {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
   try { return { ok: true, data: await progressForOperation(prisma, operationId) }; }
-  catch (error) { return resultError(error); }
+  catch (error) { return resultError(error, "progress", operationId); }
 }

@@ -22,6 +22,7 @@ function fake() {
           return { count: row ? 1 : 0 };
         },
       },
+      whatsAppRecoveryTemplateDefault: { count: async () => 0 },
       whatsAppConversationWrapperActiveSlot: {
         findUnique: async ({ where }: {where:{audience:string}}) => state.slots.find((item) => item.audience === where.audience) ?? null,
         create: async ({ data }: { data: Slot }) => {

@@ -36,8 +36,8 @@ export async function readRecoveryDefaults(db: PrismaClient, principal: Principa
 
 export async function verifiedPreview(tx: Prisma.TransactionClient, definitionId: string, wabaId: string, issuedAt: string) {
   // Reuse the existing immutable authoring, 20-locale provider, binding and common-layout gates.
-  const source = await approvedSource(tx, definitionId, wabaId, { requireDefaultEvidence: true });
   await assertCommonSourceGate(tx, definitionId, "assignment");
+  const source = await approvedSource(tx, definitionId, wabaId, { requireDefaultEvidence: true });
   if (!RECOVERY_DEFAULT_PURPOSES.includes(source.purpose as RecoveryDefaultPurpose) ||
       source.promotionTarget === "ALTERNATIVE_PRODUCT") {
     return reject("NOT_READY", "Select a checkout recovery definition, not an alternative-product template, for this platform default.");
