@@ -39,6 +39,8 @@ export type ReviewWorkspaceDTO = {
   locales: ReviewLocaleDTO[];
   approvedCount: number;
   readyForPublication: boolean;
+  definitionStatus?: string;
+  canSynchroniseLifecycle?: boolean;
 };
 export type ReviewDecision = "APPROVE" | "REJECT";
 export type ReviewInput = { definitionId: string; languageTag: string; runId: string; decision: ReviewDecision };

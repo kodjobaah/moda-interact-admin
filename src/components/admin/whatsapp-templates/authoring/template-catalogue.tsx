@@ -2,6 +2,15 @@ import { scenarioLabel } from "@/lib/admin/whatsapp-templates/authoring/scenario
 import Link from "next/link";
 import type { TemplateListItem } from "@/lib/admin/whatsapp-templates/authoring/types";
 
+function visibleLifecycle(entry: TemplateListItem): string {
+  if (entry.status === "PUBLISHED" || entry.status === "RETIRED" || !entry.progress) return entry.status;
+  const run = entry.progress;
+  if (["COMPLETED", "READY_FOR_REVIEW"].includes(run.runStatus) && run.translated === 19 && run.total === 19) return "READY_FOR_REVIEW";
+  if (["FAILED", "PARTIALLY_FAILED"].includes(run.runStatus)) return "PARTIALLY_FAILED";
+  if (["PROCESSING", "TRANSLATING"].includes(run.runStatus)) return "TRANSLATING";
+  return entry.status;
+}
+
 export function TemplateCatalogue({ items, search, page, hasNext, selectedId, kind = "", status = "" }: {
   items: TemplateListItem[]; search: string; page: number; hasNext: boolean;
   selectedId?: string; kind?: string; status?: string;
@@ -55,7 +64,7 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
             <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? "Meta recovery" : "Conversation wrapper"}</td>
             <td className="px-4 py-4">{entry.kind === "META_RECOVERY" ? scenarioLabel(entry.purpose, entry.offerType) : entry.audience === "ROUTER" ? "Router — before a shop is selected" : entry.audience}</td>
             <td className="px-4 py-4">{entry.sourceLanguageTag}</td>
-            <td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{entry.status}</span>{entry.progress && <p className="mt-2 text-xs text-slate-600">Latest translation run: {entry.progress.runStatus}. Translated {entry.progress.translated}/{entry.progress.total}; reviewed {entry.progress.reviewed}/{entry.progress.total}.</p>}</td>
+            <td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{visibleLifecycle(entry)}</span>{visibleLifecycle(entry) !== entry.status && <p className="mt-1 text-xs text-slate-500">Stored lifecycle: {entry.status}</p>}{entry.progress && <p className="mt-2 text-xs text-slate-600">Latest translation run: {entry.progress.runStatus}. Translated {entry.progress.translated}/{entry.progress.total}; reviewed {entry.progress.reviewed}/{entry.progress.total}.</p>}</td>
             <td className="whitespace-nowrap px-4 py-4">{new Date(entry.createdAt).toLocaleDateString("en-GB")}</td>
           </tr>)}
         </tbody>

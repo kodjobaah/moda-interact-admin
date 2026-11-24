@@ -134,3 +134,26 @@ test("shop selection and language selector callbacks address the selected shop/l
   languageSelect[0].props.onChange({ target: { value: "fr" } });
   assert.equal(chosenLanguage, "fr");
 });
+
+test("future scopes use the same selector and confirmation, with no shop picker for future-only", () => {
+  const html = renderToStaticMarkup(<PublicationScopeSelector scope={{ mode: "future" }} onChange={on}
+    options={[]} search="" onSearch={on} loading={false} error="" selectionPage={1} hasNext={false} onSelectionPage={on} />);
+  assert.match(html, /All existing and future shops/);
+  assert.match(html, /Future shops only/);
+  assert.doesNotMatch(html, /Search eligible shops by domain/);
+  const futurePreview: PublicationPreview = { ...preview, totalShops: 0, totalTargets: 0, shops: [],
+    impactCounts: { new: 0, unchanged: 0, replaced: 0, override: 0, conflict: 0 },
+    defaultImpact: { purpose: "INITIAL_NO_OFFER", currentTemplateName: null, proposedTemplateName: "new-template" } };
+  const confirm = renderToStaticMarkup(<><PublicationEligibilitySummary preview={futurePreview} />
+    <PublicationOverrideConfirmation preview={futurePreview} reviewedImpact={true} onReviewedImpact={on}
+      acknowledgeOverrides={false} onAcknowledgement={on} reason="Reviewed default" onReason={on}
+      busy={false} clockNowMs={Date.parse(preview.issuedAt)} onConfirm={on} /></>);
+  assert.match(confirm, /Not configured/); assert.match(confirm, /new-template/);
+  assert.match(confirm, /No existing shop assignments are changed/);
+  assert.match(confirm, /Confirm publication/);
+  assert.doesNotMatch(confirm, /disabled=""/);
+  const alternate = renderToStaticMarkup(<PublicationScopeSelector scope={{ mode: "all" }} onChange={on}
+    defaultEligible={false} options={[]} search="" onSearch={on} loading={false} error="" selectionPage={1} hasNext={false} onSelectionPage={on} />);
+  assert.match(alternate, /All currently eligible shops/);
+  assert.doesNotMatch(alternate, /Future shops only/);
+});

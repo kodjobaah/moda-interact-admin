@@ -2,7 +2,7 @@ import { lockCommonActivation, assertCommonSourceGate } from "../common-activati
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "../authoring/service";
-import { computePreview, assertFreshPreview } from "./preview";
+import { computePreview, assertFreshPreview, type VerifiedPreview } from "./preview";
 import { parseScope, isValidDefinitionId, isValidKey, reasonText, reject } from "./validation";
 import { configuredSenderWaba } from "./sender";
 import type { ConfirmationRequest, PublicationProgress, PublicationScope } from "./types";
@@ -15,6 +15,7 @@ export type OperationSnapshot = {
   schemaVersion: 1; scope: PublicationScope; shopIds: string[]; shopDigests: Record<string, string>;
   wabaId: string; purpose: string; sourceFingerprint: string; previewFingerprint: string;
   registrationIds: Record<string, string>; reason: string; acknowledgeOverrides: boolean;
+  defaultConfigured?: boolean;
 };
 function snapshotFrom(value: unknown): OperationSnapshot {
   if (!value || typeof value !== "object" || Array.isArray(value)) return reject("INTEGRITY", "Invalid saved publication snapshot.");
@@ -26,6 +27,35 @@ function snapshotFrom(value: unknown): OperationSnapshot {
   return v as OperationSnapshot;
 }
 export function operationSnapshot(value: unknown): OperationSnapshot { return snapshotFrom(value); }
+
+/** Persist the reviewed shop operation inside the caller's confirmation transaction. */
+export async function createConfirmedOperation(tx: Prisma.TransactionClient, input: ConfirmationRequest,
+  principal: PlatformAdminPrincipal, preview: VerifiedPreview, scope: PublicationScope,
+  wabaId: string, reason: string, defaultConfigured = false) {
+  const snapshot: OperationSnapshot = {
+    schemaVersion: 1, scope, wabaId, purpose: preview.source.purpose,
+    shopIds: preview.shopIds, shopDigests: preview.shopDigests,
+    sourceFingerprint: preview.source.fingerprint, previewFingerprint: input.previewFingerprint,
+    registrationIds: Object.fromEntries(preview.source.locales.map((l) => [l.languageTag, l.registrationId])),
+    reason, acknowledgeOverrides: input.acknowledgeOverrides,
+    ...(defaultConfigured ? { defaultConfigured: true } : {}),
+  };
+
+  const created = await tx.whatsAppTemplatePublicationOperation.create({ data: {
+    definitionId: input.definitionId, requestedByAdminId: principal.id,
+    operationKey: input.operationKey, scopeSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+    status: "IN_PROGRESS", totalTargets: preview.shopIds.length * EXPECTED_LANGUAGES, nextPageCursor: "0",
+  } });
+  await tx.commerceAuditEvent.create({ data: {
+    actorType: "PLATFORM_ADMIN", actorAdminId: principal.id,
+    action: "PUBLISH_WHATSAPP_TEMPLATE_DEFINITION", operationId: created.id.slice(0, 128), reason,
+    metadata: { definitionId: input.definitionId, publicationOperationId: created.id, scopeMode: scope.mode,
+        ...(defaultConfigured ? { defaultConfigured: true } : {}),
+      shopCount: preview.shopIds.length, targetCount: preview.shopIds.length * EXPECTED_LANGUAGES,
+      previewFingerprint: input.previewFingerprint, overwriteAcknowledged: input.acknowledgeOverrides },
+  } });
+  return created;
+}
 
 export async function confirmPublication(input: ConfirmationRequest, deps: {
   principal: PlatformAdminPrincipal; db: PublicationDb;
@@ -42,7 +72,7 @@ export async function confirmPublication(input: ConfirmationRequest, deps: {
   const previous = await deps.db.whatsAppTemplatePublicationOperation.findUnique({ where: { operationKey: input.operationKey } });
   if (previous) {
     const old = snapshotFrom(previous.scopeSnapshot);
-    if (previous.definitionId !== input.definitionId || previous.requestedByAdminId !== deps.principal.id ||
+    if (old.defaultConfigured || previous.definitionId !== input.definitionId || previous.requestedByAdminId !== deps.principal.id ||
         old.previewFingerprint !== input.previewFingerprint || old.reason !== reason ||
         old.acknowledgeOverrides !== input.acknowledgeOverrides) return reject("COLLISION", "Operation key already belongs to a different publication.");
     return progressForOperation(deps.db, previous.id);
@@ -52,37 +82,18 @@ export async function confirmPublication(input: ConfirmationRequest, deps: {
   if (preview.previewFingerprint !== input.previewFingerprint) return reject("STALE_PREVIEW", "Shop assignments or template approval changed. Review current impact again.");
   if (preview.impactCounts.conflict) return reject("CONFLICT", "Ambiguous approved slots must be resolved before publishing.");
   if (preview.impactCounts.override && !input.acknowledgeOverrides) return reject("OVERRIDE_CONFIRMATION", "Explicitly confirm replacement of merchant overrides.");
-  const snapshot: OperationSnapshot = {
-    schemaVersion: 1, scope, wabaId, purpose: preview.source.purpose,
-    shopIds: preview.shopIds, shopDigests: preview.shopDigests,
-    sourceFingerprint: preview.source.fingerprint, previewFingerprint: input.previewFingerprint,
-    registrationIds: Object.fromEntries(preview.source.locales.map((l) => [l.languageTag, l.registrationId])),
-    reason, acknowledgeOverrides: input.acknowledgeOverrides,
-  };
   try {
     const row = await deps.db.$transaction(async (tx) => {
       await lockCommonActivation(tx);
       await assertCommonSourceGate(tx, input.definitionId, "assignment");
       await deps.ensureActor?.(tx);
-      const created = await tx.whatsAppTemplatePublicationOperation.create({ data: {
-        definitionId: input.definitionId, requestedByAdminId: deps.principal.id,
-        operationKey: input.operationKey, scopeSnapshot: snapshot as unknown as Prisma.InputJsonValue,
-        status: "IN_PROGRESS", totalTargets: preview.shopIds.length * EXPECTED_LANGUAGES, nextPageCursor: "0",
-      } });
-      await tx.commerceAuditEvent.create({ data: {
-        actorType: "PLATFORM_ADMIN", actorAdminId: deps.principal.id,
-        action: "PUBLISH_WHATSAPP_TEMPLATE_DEFINITION", operationId: created.id.slice(0, 128), reason,
-        metadata: { definitionId: input.definitionId, publicationOperationId: created.id, scopeMode: scope.mode,
-          shopCount: preview.shopIds.length, targetCount: preview.shopIds.length * EXPECTED_LANGUAGES,
-          previewFingerprint: input.previewFingerprint, overwriteAcknowledged: input.acknowledgeOverrides },
-      } });
-      return created;
+      return createConfirmedOperation(tx, input, deps.principal, preview, scope, wabaId, reason);
     });
     return progressForOperation(deps.db, row.id);
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
       const replay = await deps.db.whatsAppTemplatePublicationOperation.findUnique({ where: { operationKey: input.operationKey } });
-      if (replay && replay.definitionId === input.definitionId && replay.requestedByAdminId === deps.principal.id &&
+      if (replay && !snapshotFrom(replay.scopeSnapshot).defaultConfigured && replay.definitionId === input.definitionId && replay.requestedByAdminId === deps.principal.id &&
           snapshotFrom(replay.scopeSnapshot).previewFingerprint === input.previewFingerprint &&
           snapshotFrom(replay.scopeSnapshot).reason === reason &&
           snapshotFrom(replay.scopeSnapshot).acknowledgeOverrides === input.acknowledgeOverrides) return progressForOperation(deps.db, replay.id);
@@ -107,5 +118,6 @@ export async function progressForOperation(db: PublicationDb, operationId: strin
     failedShops: Math.floor(failedTargets / EXPECTED_LANGUAGES),
     pendingShops: snapshot.shopIds.length - Math.floor((succeededTargets + failedTargets) / EXPECTED_LANGUAGES),
     totalTargets, succeededTargets, failedTargets, pendingTargets: totalTargets - succeededTargets - failedTargets,
-    nextPageCursor: operation.nextPageCursor, failureCode: operation.failureCode };
+    nextPageCursor: operation.nextPageCursor, failureCode: operation.failureCode,
+    ...(snapshot.defaultConfigured ? { defaultConfigured: true } : {}) };
 }

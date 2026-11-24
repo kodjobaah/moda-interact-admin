@@ -1,14 +1,12 @@
 "use server";
 
 import { createLogger } from "@modainteract/moda-interact-shared/logging";
-import { revalidatePath } from "next/cache";
-import { requirePlatformAdminRead, requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
-import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
+import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
 import { requireTemplateSuperAdmin } from "@/lib/admin/whatsapp-templates/authoring/super-admin";
 import { PublicationError } from "@/lib/admin/whatsapp-templates/publishing/validation";
-import { previewRecoveryDefault, readRecoveryDefaults, setRecoveryDefault } from "@/lib/admin/whatsapp-templates/recovery-defaults/service";
-import type { RecoveryDefaultOverview, RecoveryDefaultPreview, SetRecoveryDefaultInput, SetRecoveryDefaultResult } from "@/lib/admin/whatsapp-templates/recovery-defaults/contracts";
+import { readRecoveryDefaults } from "@/lib/admin/whatsapp-templates/recovery-defaults/service";
+import type { RecoveryDefaultOverview } from "@/lib/admin/whatsapp-templates/recovery-defaults/contracts";
 import { prisma } from "@/lib/prisma";
 
 const logger = createLogger({ serviceName: "moda-interact-admin", environment: resolveDeploymentEnvironmentName() });
@@ -31,23 +29,4 @@ export async function loadRecoveryTemplateDefaults(): Promise<Result<RecoveryDef
   requireTemplateSuperAdmin(principal);
   try { return { ok: true, data: await readRecoveryDefaults(prisma, principal) }; }
   catch (error) { return failure("read", error); }
-}
-export async function reviewRecoveryTemplateDefault(definitionId: string): Promise<Result<RecoveryDefaultPreview>> {
-  const principal = await requirePlatformAdminRead();
-  requireTemplateSuperAdmin(principal);
-  try { return { ok: true, data: await previewRecoveryDefault(prisma, principal, definitionId) }; }
-  catch (error) { return failure("preview", error); }
-}
-export async function confirmRecoveryTemplateDefault(input: SetRecoveryDefaultInput): Promise<Result<SetRecoveryDefaultResult>> {
-  const principal = await requirePlatformAdminMutation();
-  requireTemplateSuperAdmin(principal);
-  try {
-    const data = await setRecoveryDefault(input, { db: prisma, principal,
-      ensureActor: tx => ensureDevelopmentPlatformAdmin(tx, principal) });
-    logger.info("admin.whatsapp_recovery_default.selected", { definitionId: data.definitionId, purpose: data.purpose, unchanged: data.unchanged });
-    revalidatePath("/system-controls/whatsapp-templates");
-    revalidatePath("/system-controls/whatsapp-templates/defaults");
-    revalidatePath(`/system-controls/whatsapp-templates/${data.definitionId}/publish`);
-    return { ok: true, data };
-  } catch (error) { return failure("select", error); }
 }

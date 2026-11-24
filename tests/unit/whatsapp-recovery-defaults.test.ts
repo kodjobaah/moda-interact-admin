@@ -4,11 +4,13 @@ import type { PrismaClient } from "@prisma/client";
 import { ACTOR_ID, WABA } from "../fixtures/arch047-publication.fixture";
 import { recoveryDefaultFixture } from "../fixtures/whatsapp-recovery-defaults.fixture";
 import { previewRecoveryDefault, readRecoveryDefaults, setRecoveryDefault } from "../../src/lib/admin/whatsapp-templates/recovery-defaults/service";
+import { confirmScopedPublication, parsePublicationIntent, previewScopedPublication } from "../../src/lib/admin/whatsapp-templates/publishing/unified";
+import type { PublicationIntent, PublicationPreview } from "../../src/lib/admin/whatsapp-templates/publishing/types";
 import { PublicationError } from "../../src/lib/admin/whatsapp-templates/publishing/validation";
 
 process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = WABA;
 process.env.DEPLOYMENT_ENVIRONMENT_NAME = "test";
-const principal = { id: ACTOR_ID, role: "SUPER_ADMIN" as const };
+const principal = { id: ACTOR_ID, role: "SUPER_ADMIN" as const, developmentBypass: false };
 const code = (expected: string) => (error: unknown) => error instanceof PublicationError && error.code === expected;
 
 function fakeDb() {
@@ -117,4 +119,53 @@ test("server identity only; reject malformed requests, non-SUPER_ADMIN, expired 
   state.actorActive = false;
   await assert.rejects(setRecoveryDefault(confirmation(preview), { db, principal }), code("FORBIDDEN"));
   assert.equal(state.writes, 0); assert.equal(state.audits.length, 0);
+});
+
+const publicationRequest = (preview: PublicationPreview, scope: PublicationIntent) => ({
+  definitionId: preview.definitionId, scope, previewFingerprint: preview.fingerprint, previewIssuedAt: preview.issuedAt,
+  operationKey: "unified-operation-key", reason: "Reviewed unified publication", acknowledgeOverrides: false,
+});
+
+test("future only uses the shared review and write, with no merchant or publication delegate", async () => {
+  const { db, a, state } = fakeDb();
+  const scope = { mode: "future" } as const;
+  const preview = await previewScopedPublication(db, principal, { definitionId: a.id, scope, page: 1 });
+  assert.equal(preview.totalShops, 0); assert.equal(preview.totalTargets, 0);
+  assert.equal(preview.defaultImpact?.currentTemplateName, null);
+  assert.equal(preview.defaultImpact?.proposedTemplateName, a.providerTemplateName);
+  const result = await confirmScopedPublication(publicationRequest(preview, scope), { db, principal });
+  assert.deepEqual(result, { kind: "default_only", purpose: "INITIAL_NO_OFFER" });
+  assert.equal(state.pointer?.definitionId, a.id); assert.equal(state.audits.length, 1);
+  const refreshed = await previewScopedPublication(db, principal, { definitionId: a.id, scope, page: 1 });
+  await confirmScopedPublication(publicationRequest(refreshed, scope), { db, principal });
+  assert.equal(state.audits.length, 1);
+});
+
+test("all existing and future supports zero shops; fingerprints bind the future-only intent", async () => {
+  const { db, a, b, state } = fakeDb();
+  Object.assign(db, { shop: { findMany: async () => [] },
+    whatsAppTemplatePublicationOperation: { findUnique: async () => null } });
+  const scope = { mode: "all_future" } as const;
+  const preview = await previewScopedPublication(db, principal, { definitionId: a.id, scope, page: 1 });
+  assert.equal(preview.totalShops, 0);
+  await assert.rejects(confirmScopedPublication(publicationRequest(preview, { mode: "future" }), { db, principal }), code("STALE_PREVIEW"));
+  assert.equal(Boolean(state.pointer), false);
+  const stale = await previewScopedPublication(db, principal, { definitionId: b.id, scope, page: 1 });
+  assert.deepEqual(await confirmScopedPublication(publicationRequest(preview, scope), { db, principal }), { kind: "default_only", purpose: "INITIAL_NO_OFFER" });
+  await assert.rejects(confirmScopedPublication(publicationRequest(stale, scope), { db, principal }), code("STALE_PREVIEW"));
+  assert.equal(state.pointer?.definitionId, a.id);
+});
+
+test("future publication refuses invalid scope payload, revoked Meta approval and stale common revision", async () => {
+  const { db, a, state } = fakeDb();
+  const scope = { mode: "future" } as const;
+  assert.throws(() => parsePublicationIntent({ mode: "future", shopIds: ["x"] }), code("INPUT"));
+  assert.throws(() => parsePublicationIntent({ mode: "all_future", wabaId: WABA }), code("INPUT"));
+  const preview = await previewScopedPublication(db, principal, { definitionId: a.id, scope, page: 1 });
+  a.locales[0].metaRegistrations[0].providerStatus = "REJECTED";
+  await assert.rejects(confirmScopedPublication(publicationRequest(preview, scope), { db, principal }), code("NOT_READY"));
+  a.locales[0].metaRegistrations[0].providerStatus = "APPROVED";
+  state.sharedLayoutActive = true;
+  await assert.rejects(previewScopedPublication(db, principal, { definitionId: a.id, scope, page: 1 }), code("COMMON_LAYOUT_REQUIRED"));
+  assert.equal(state.writes, 0);
 });

@@ -5,6 +5,7 @@ import { requireTemplateSuperAdmin } from "../authoring/service";
 import type { ReviewInput } from "./contracts";
 import { providerLanguageCode, REVIEW_LANGUAGES } from "./language-codes";
 import { reconstructAndCompile } from "./reconstruction";
+import { lifecycleItems, synchroniseCompletedTranslationLifecycle } from "./translation-lifecycle";
 import { finaliseLocaleTransaction, validateEnglishEnvelope, type ReviewRepository } from "./repository";
 
 export class ReviewRequestError extends Error {
@@ -46,6 +47,7 @@ export async function reviewTranslation(input: ReviewInput, deps: ReviewDependen
       if (!definition || definition.status === "RETIRED") throw new ReviewRequestError("Definition is unavailable for review.");
       const run = await tx.whatsAppTemplateTranslationRun.findFirst({
         where: { definitionId: input.definitionId }, orderBy: [{ requestedAt: "desc" }, { id: "desc" }],
+        include: { items: lifecycleItems },
       });
       if (!run || run.id !== input.runId || run.sourceHash !== definition.sourceHash) {
         throw new ReviewRequestError("Translation run is stale; refresh the review screen.");
@@ -73,11 +75,13 @@ export async function reviewTranslation(input: ReviewInput, deps: ReviewDependen
       if (item.resultLocaleId && (!existing || item.resultLocaleId !== existing.id)) {
         throw new ReviewRequestError("Translation item links to a different finalised locale.");
       }
-      return finaliseLocaleTransaction(tx, {
+      const result = await finaliseLocaleTransaction(tx, {
         definitionId: input.definitionId, languageTag: input.languageTag, providerCode,
         actorId: deps.principal.id, itemId: item.id, decision: input.decision,
         existing, candidate,
       });
+      if (input.decision === "APPROVE") await synchroniseCompletedTranslationLifecycle(tx, definition, run);
+      return result;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 });
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && (error.code === "P2034" || error.code === "P2002")) {
@@ -85,4 +89,27 @@ export async function reviewTranslation(input: ReviewInput, deps: ReviewDependen
     }
     throw error;
   }
+}
+
+/** Explicit repair for historical definitions whose completed run never advanced
+ * the definition lifecycle. No new translation, review or provider operation. */
+export async function synchroniseTranslationLifecycle(definitionId: string, deps: ReviewDependencies): Promise<boolean> {
+  requireTemplateSuperAdmin(deps.principal);
+  if (typeof definitionId !== "string" || !/^wtdef_[a-f0-9]{64}$/.test(definitionId)) throw new ReviewRequestError("Invalid template definition ID.");
+  return deps.db.$transaction(async tx => {
+    await deps.ensureActor?.(tx);
+    const locks = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "whatsapp"."WhatsAppTemplateDefinition" WHERE "id"=${definitionId} FOR UPDATE
+    `);
+    if (locks.length !== 1) throw new ReviewRequestError("Template definition not found.");
+    const actors = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "public"."PlatformAdmin" WHERE "id"=${deps.principal.id} AND "active"=true AND "role"='SUPER_ADMIN' FOR SHARE
+    `);
+    if (actors.length !== 1) throw new ReviewRequestError("An active SUPER_ADMIN is required.");
+    const definition = await tx.whatsAppTemplateDefinition.findUnique({ where: { id: definitionId } });
+    if (!definition) throw new ReviewRequestError("Template definition not found.");
+    const run = await tx.whatsAppTemplateTranslationRun.findFirst({ where: { definitionId },
+      orderBy: [{ requestedAt: "desc" }, { id: "desc" }], include: { items: lifecycleItems } });
+    return synchroniseCompletedTranslationLifecycle(tx, definition, run);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 });
 }

@@ -5,6 +5,15 @@ export type PublicationScope =
   | { mode: "one"; shopId: string }
   | { mode: "selected"; shopIds: string[] }
   | { mode: "all" };
+/** Admin UI intent; durable shop operations retain their historical scope shape. */
+export type PublicationIntent = PublicationScope | { mode: "all_future" } | { mode: "future" };
+export type DefaultPublicationImpact = {
+  purpose: string; currentTemplateName: string | null; proposedTemplateName: string;
+};
+export type PublicationConfirmation =
+  | { kind: "operation"; progress: PublicationProgress; defaultConfigured: boolean }
+  | { kind: "default_only"; purpose: string };
+export type PublicationIntentRequest = Omit<ConfirmationRequest, "scope"> & { scope: PublicationIntent };
 export type ImpactKind = "new" | "unchanged" | "replaced" | "override" | "conflict";
 export type BrandAvailability = "configured" | "missing" | "unverifiable";
 export type BrandIndicator = { key: string; availability: BrandAvailability };
@@ -45,6 +54,7 @@ export type PublicationPreview = {
   impactCounts: Record<ImpactKind, number>;
   brandFields: string[];
   expiresAt: string;
+  defaultImpact?: DefaultPublicationImpact;
 };
 export type ConfirmationRequest = {
   definitionId: string; scope: PublicationScope; previewFingerprint: string; previewIssuedAt: string;
@@ -55,6 +65,7 @@ export type PublicationProgress = {
   totalShops: number; succeededShops: number; failedShops: number; pendingShops: number;
   totalTargets: number; succeededTargets: number; failedTargets: number; pendingTargets: number;
   nextPageCursor: string | null; failureCode: string | null;
+  defaultConfigured?: boolean;
 };
 
 export const SHOP_PAGE_SIZE = 10;

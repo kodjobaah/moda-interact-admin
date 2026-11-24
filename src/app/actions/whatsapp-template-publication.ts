@@ -5,17 +5,26 @@ import { requireTemplateSuperAdmin } from "@/lib/admin/whatsapp-templates/author
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
+import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
+import { confirmScopedPublication, merchantScope, parsePublicationIntent, previewScopedPublication } from "@/lib/admin/whatsapp-templates/publishing/unified";
 import { configuredSenderWaba } from "@/lib/admin/whatsapp-templates/publishing/sender";
-import { computePreview, publicPreview, languageComparison } from "@/lib/admin/whatsapp-templates/publishing/preview";
-import { confirmPublication, progressForOperation } from "@/lib/admin/whatsapp-templates/publishing/operation";
+import { languageComparison } from "@/lib/admin/whatsapp-templates/publishing/preview";
+import { progressForOperation } from "@/lib/admin/whatsapp-templates/publishing/operation";
 import { advancePublication } from "@/lib/admin/whatsapp-templates/publishing/assignment";
-import { isValidDefinitionId, parseScope, PublicationError } from "@/lib/admin/whatsapp-templates/publishing/validation";
-import type { ConfirmationRequest, PublicationPreview, PublicationProgress, LanguageComparison, PublicationScope } from "@/lib/admin/whatsapp-templates/publishing/types";
+import { PublicationError } from "@/lib/admin/whatsapp-templates/publishing/validation";
+import type { PublicationIntentRequest, PublicationConfirmation, PublicationPreview, PublicationProgress, LanguageComparison, PublicationIntent } from "@/lib/admin/whatsapp-templates/publishing/types";
 
 type Result<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
-const resultError = (error: unknown): Result<never> => error instanceof PublicationError
-  ? { ok: false, code: error.code, message: error.message }
-  : { ok: false, code: "UNAVAILABLE", message: "Publication data is temporarily unavailable. Retry later." };
+const logger = createLogger({ serviceName: "moda-interact-admin", environment: resolveDeploymentEnvironmentName() });
+const resultError = (error: unknown): Result<never> => {
+  if (error instanceof PublicationError) {
+    logger.warn("admin.whatsapp_publication.rejected", { reasonCode: error.code, error });
+    return { ok: false, code: error.code, message: error.message };
+  }
+  logger.error("admin.whatsapp_publication.failed", { error });
+  return { ok: false, code: "UNAVAILABLE", message: "Publication data is temporarily unavailable. Review again and check Admin server logs if it persists." };
+};
 
 export async function eligiblePublicationShops(input: { search: string; page: number }): Promise<Result<{
   shops: Array<{ id: string; domain: string; platform: string }>; hasNext: boolean;
@@ -34,34 +43,31 @@ export async function eligiblePublicationShops(input: { search: string; page: nu
     return { ok: true, data: { shops: rows.slice(0, 20), hasNext: rows.length > 20 } };
   } catch (error) { return resultError(error); }
 }
-export async function previewTemplatePublication(input: { definitionId: string; scope: PublicationScope; page: number }): Promise<Result<PublicationPreview>> {
-  requireTemplateSuperAdmin(await requirePlatformAdminRead());
-  try {
-    if (!isValidDefinitionId(input?.definitionId)) throw new PublicationError("INPUT", "Invalid definition.");
-    const scope = parseScope(input.scope);
-    const issuedAt = new Date().toISOString();
-    const wabaId = await configuredSenderWaba(prisma);
-    const state = await computePreview(prisma, input.definitionId, scope, wabaId, issuedAt, input.page);
-    return { ok: true, data: publicPreview(state, input.definitionId, input.page, issuedAt) };
-  } catch (error) { return resultError(error); }
+export async function previewTemplatePublication(input: { definitionId: string; scope: PublicationIntent; page: number }): Promise<Result<PublicationPreview>> {
+  const principal = await requirePlatformAdminRead();
+  requireTemplateSuperAdmin(principal);
+  try { return { ok: true, data: await previewScopedPublication(prisma, principal, input) }; }
+  catch (error) { return resultError(error); }
 }
-export async function comparePublicationLanguage(input: { definitionId: string; scope: PublicationScope;
+export async function comparePublicationLanguage(input: { definitionId: string; scope: PublicationIntent;
   shopId: string; languageTag: string }): Promise<Result<LanguageComparison>> {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
   try {
-    const scope = parseScope(input.scope);
+    const scope = merchantScope(parsePublicationIntent(input.scope));
     const wabaId = await configuredSenderWaba(prisma);
     return { ok: true, data: await languageComparison(prisma, input.definitionId, scope, wabaId, input.shopId, input.languageTag) };
   } catch (error) { return resultError(error); }
 }
-export async function confirmTemplatePublication(input: ConfirmationRequest): Promise<Result<PublicationProgress>> {
+export async function confirmTemplatePublication(input: PublicationIntentRequest): Promise<Result<PublicationConfirmation>> {
   const principal = await requirePlatformAdminMutation();
   requireTemplateSuperAdmin(principal);
   try {
-    const progress = await confirmPublication(input, { db: prisma, principal,
+    const data = await confirmScopedPublication(input, { db: prisma, principal,
       ensureActor: (tx) => ensureDevelopmentPlatformAdmin(tx, principal) });
     revalidatePath(`/system-controls/whatsapp-templates/${input.definitionId}/publish`);
-    return { ok: true, data: progress };
+    revalidatePath("/system-controls/whatsapp-templates");
+    revalidatePath("/system-controls/whatsapp-templates/defaults");
+    return { ok: true, data };
   } catch (error) { return resultError(error); }
 }
 export async function advanceTemplatePublication(input: { operationId: string; retryFailed?: boolean }): Promise<Result<PublicationProgress>> {

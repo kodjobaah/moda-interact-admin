@@ -55,11 +55,11 @@ export async function listDefinitions(page = 1, search = "", filters: { kind?: s
   const rows = await prisma.whatsAppTemplateDefinition.findMany({
     where,
     select: { id: true, kind: true, purpose: true, offerType: true, audience: true,
-      sourceLanguageTag: true, status: true, providerTemplateName: true, createdAt: true,
-      translationRuns: { orderBy: [{ requestedAt: "desc" }, { id: "desc" }], take: 1, select: { status: true, items: { select: { status: true, failureCode: true, resultLocaleId: true }, take: 20 } } } },
+      sourceLanguageTag: true, status: true, providerTemplateName: true, createdAt: true, sourceHash: true,
+      translationRuns: { orderBy: [{ requestedAt: "desc" }, { id: "desc" }], take: 1, select: { status: true, sourceHash: true, items: { select: { status: true, failureCode: true, resultLocaleId: true }, take: 20 } } } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (safePage - 1) * PAGE_SIZE, take: PAGE_SIZE + 1,
   });
-  return { items: rows.slice(0, PAGE_SIZE).map(row => ({ ...item(row), progress: row.translationRuns[0] ? {
+  return { items: rows.slice(0, PAGE_SIZE).map(row => ({ ...item(row), progress: row.translationRuns[0]?.sourceHash === row.sourceHash ? {
     runStatus: row.translationRuns[0].status,
     translated: row.translationRuns[0].items.filter(i => ["COMPLETED", "COMPLETE", "SUCCEEDED", "AVAILABLE"].includes(i.status) && !i.failureCode).length,
     reviewed: row.translationRuns[0].items.filter(i => i.resultLocaleId).length,

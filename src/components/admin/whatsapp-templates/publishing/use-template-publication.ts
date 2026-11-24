@@ -3,23 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { advanceTemplatePublication, comparePublicationLanguage, confirmTemplatePublication,
   eligiblePublicationShops, previewTemplatePublication } from "@/app/actions/whatsapp-template-publication";
-import type { LanguageComparison, PublicationPreview, PublicationProgress, PublicationScope } from "@/lib/admin/whatsapp-templates/publishing/types";
+import type { LanguageComparison, PublicationPreview, PublicationProgress, PublicationIntent } from "@/lib/admin/whatsapp-templates/publishing/types";
 import type { ShopOption } from "./publication-scope-selector";
 
-export function useTemplatePublication(definitionId: string, initialProgress: PublicationProgress | null) {
-  const [scope, setScopeState] = useState<PublicationScope>({ mode: "all" });
+export function useTemplatePublication(definitionId: string, initialProgress: PublicationProgress | null, defaultEligible = true) {
+  const [scope, setScopeState] = useState<PublicationIntent>({ mode: defaultEligible ? "all_future" : "all" });
   const [search, setSearch] = useState(""); const [selectionPage, setSelectionPage] = useState(1);
   // Store responses by query key so a changed filter never displays stale shops.
   // Loading is derived rather than set synchronously within a React effect.
   const [shopResponse, setShopResponse] = useState<{
     key: string; options: ShopOption[]; hasNext: boolean; error: string;
   }>({ key: "", options: [], hasNext: false, error: "" });
+  const selectShops = scope.mode === "one" || scope.mode === "selected";
   const shopQueryKey = JSON.stringify([scope.mode, search, selectionPage]);
-  const shopsLoading = scope.mode !== "all" && shopResponse.key !== shopQueryKey;
-  const options = scope.mode !== "all" && !shopsLoading ? shopResponse.options : [];
-  const shopsHasNext = scope.mode !== "all" && !shopsLoading && shopResponse.hasNext;
-  const shopsError = scope.mode !== "all" && !shopsLoading ? shopResponse.error : "";
+  const shopsLoading = selectShops && shopResponse.key !== shopQueryKey;
+  const options = selectShops && !shopsLoading ? shopResponse.options : [];
+  const shopsHasNext = selectShops && !shopsLoading && shopResponse.hasNext;
+  const shopsError = selectShops && !shopsLoading ? shopResponse.error : "";
   const [preview, setPreview] = useState<PublicationPreview | null>(null);
+  const [defaultSuccess, setDefaultSuccess] = useState<string | null>(null);
   const [progress, setProgress] = useState<PublicationProgress | null>(initialProgress);
   const [shopId, setShopId] = useState<string | null>(null);
   const [language, setLanguage] = useState("en");
@@ -39,13 +41,13 @@ export function useTemplatePublication(definitionId: string, initialProgress: Pu
   const [autoRun, setAutoRun] = useState(!!initialProgress && initialProgress.status === "IN_PROGRESS");
   const operationKey = useRef<string | null>(null);
   const advancing = useRef(false);
-  const setScope = useCallback((next: PublicationScope) => {
-    setScopeState(next); setPreview(null); setShopId(null);
+  const setScope = useCallback((next: PublicationIntent) => {
+    setScopeState(next); setPreview(null); setShopId(null); setDefaultSuccess(null);
     setAcknowledgeOverrides(false); setReviewedImpact(false); setError(""); operationKey.current = null;
   }, []);
 
   useEffect(() => {
-    if (scope.mode === "all") return;
+    if (!selectShops) return;
     let cancelled = false;
     void eligiblePublicationShops({ search, page: selectionPage }).then((reply) => {
       if (cancelled) return;
@@ -56,7 +58,7 @@ export function useTemplatePublication(definitionId: string, initialProgress: Pu
       if (!cancelled) setShopResponse({ key: shopQueryKey, options: [], hasNext: false, error: "Could not search shops." });
     });
     return () => { cancelled = true; };
-  }, [scope.mode, search, selectionPage, shopQueryKey]);
+  }, [selectShops, search, selectionPage, shopQueryKey]);
 
   useEffect(() => {
     if (!preview) return;
@@ -65,7 +67,7 @@ export function useTemplatePublication(definitionId: string, initialProgress: Pu
   }, [preview]);
 
   const refreshPreview = useCallback(async (page = 1) => {
-    setBusy(true); setError(""); setShopId(null);
+    setBusy(true); setError(""); setShopId(null); setPreview(null); setDefaultSuccess(null);
     try {
       const reply = await previewTemplatePublication({ definitionId, scope, page });
       if (!reply.ok) { setPreview(null); setError(reply.message); return; }
@@ -98,9 +100,13 @@ export function useTemplatePublication(definitionId: string, initialProgress: Pu
         previewFingerprint: preview.fingerprint, previewIssuedAt: preview.issuedAt,
         operationKey: operationKey.current, reason, acknowledgeOverrides });
       if (!reply.ok) { setError(reply.message); if (reply.code === "STALE_PREVIEW") setPreview(null); return; }
-      setProgress(reply.data); setAutoRun(true); setPreview(null);
+      setPreview(null);
+      if (reply.data.kind === "default_only") {
+        setDefaultSuccess(reply.data.purpose); setAutoRun(false); return;
+      }
+      setProgress(reply.data.progress); setAutoRun(true);
       // The operation URL is a resumable bookmark, never a browser-authorised identity.
-      const url = new URL(window.location.href); url.searchParams.set("operation", reply.data.operationId);
+      const url = new URL(window.location.href); url.searchParams.set("operation", reply.data.progress.operationId);
       window.history.replaceState(window.history.state, "", url.toString());
     } catch { setError("Could not confirm publication."); }
     finally { setBusy(false); }
@@ -127,7 +133,7 @@ export function useTemplatePublication(definitionId: string, initialProgress: Pu
     scope, setScope, options, shopsLoading, shopsError, shopsHasNext,
     search, setSearch: (value: string) => { setSearch(value); setSelectionPage(1); },
     selectionPage, setSelectionPage,
-    preview, progress, busy, error, refreshPreview, confirm, advance, clockNowMs,
+    preview, progress, defaultSuccess, busy, error, refreshPreview, confirm, advance, clockNowMs,
     shopId, setShopId: (value: string) => { setShopId(value); setLanguage("en"); },
     language, setLanguage, comparison, comparisonLoading, comparisonError,
     reason, setReason, reviewedImpact, setReviewedImpact, acknowledgeOverrides, setAcknowledgeOverrides,

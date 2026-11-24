@@ -6,7 +6,7 @@ import { discoverScope } from "./discovery";
 import { readShopImpacts, comparison } from "./impact";
 import { digest, emptyCounts, isValidDefinitionId, isValidFingerprint, LANGUAGES, reject } from "./validation";
 
-type PreviewReader = Pick<Prisma.TransactionClient, "whatsAppTemplateDefinition" | "shop" | "whatsAppTemplateVariant" | "shopBrand">;
+export type PreviewReader = Pick<Prisma.TransactionClient, "whatsAppTemplateDefinition" | "shop" | "whatsAppTemplateVariant" | "shopBrand">;
 export type VerifiedPreview = {
   source: ApprovedSource;
   shopIds: string[]; shopDigests: Record<string, string>;
@@ -18,10 +18,10 @@ export type VerifiedPreview = {
 /** Derived from server-side shop, slot, registration and reviewed-content state.
  * Never trust browser preview impact summaries when confirming or applying. */
 export async function computePreview(db: PreviewReader, definitionId: string, scope: PublicationScope,
-  wabaId: string, issuedAt: string, page = 1): Promise<VerifiedPreview> {
+  wabaId: string, issuedAt: string, page = 1, options: { source?: ApprovedSource; allowEmpty?: boolean; futureOnly?: boolean; defaultFingerprint?: string } = {}): Promise<VerifiedPreview> {
   if (!isValidDefinitionId(definitionId) || !Number.isSafeInteger(page) || page < 1 || page > 2000) return reject("INPUT", "Invalid preview page.");
-  const source = await approvedSource(db, definitionId, wabaId);
-  const found = await discoverScope(db, scope);
+  const source = options.source ?? await approvedSource(db, definitionId, wabaId);
+  const found = options.futureOnly ? { shops: [], exclusions: [] } : await discoverScope(db, scope, options.allowEmpty);
   const overall = emptyCounts(); const shopDigests: Record<string, string> = Object.create(null);
   const pageItems: PublicationShopImpact[] = []; const offset = (page - 1) * SHOP_PAGE_SIZE;
   for (let start = 0; start < found.shops.length; start += 50) {
@@ -38,7 +38,8 @@ export async function computePreview(db: PreviewReader, definitionId: string, sc
     excludedCount: found.exclusions.reduce((sum, e) => sum + e.count, 0), exclusionReasons: found.exclusions,
     hasNext: offset + SHOP_PAGE_SIZE < shopIds.length,
     previewFingerprint: digest({ issuedAt, scope, definitionId, wabaId,
-      source: source.fingerprint, shopIds, shopDigests }) };
+      source: source.fingerprint, shopIds, shopDigests,
+      ...(options.defaultFingerprint ? { defaultFingerprint: options.defaultFingerprint, futureOnly: !!options.futureOnly } : {}) }) };
 }
 export function publicPreview(state: VerifiedPreview, definitionId: string, page: number, issuedAt: string): PublicationPreview {
   return { definitionId, fingerprint: state.previewFingerprint, totalShops: state.shopIds.length,

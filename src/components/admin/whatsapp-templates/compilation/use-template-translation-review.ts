@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { decideWhatsAppTemplateTranslation } from "@/app/actions/whatsapp-template-compilation";
+import { decideWhatsAppTemplateTranslation, synchroniseWhatsAppTemplateTranslationStatus } from "@/app/actions/whatsapp-template-compilation";
 import type { ReviewDecision, ReviewWorkspaceDTO } from "@/lib/admin/whatsapp-templates/compilation/contracts";
 
 export function useTemplateTranslationReview(workspace: ReviewWorkspaceDTO) {
@@ -29,5 +29,18 @@ export function useTemplateTranslationReview(workspace: ReviewWorkspaceDTO) {
       finally { inFlight.current = false; }
     });
   };
-  return { selected, select, current, busy, message, decide };
+  const synchronise = () => {
+    if (inFlight.current || !workspace.canSynchroniseLifecycle) return;
+    inFlight.current = true;
+    setMessage(null);
+    startTransition(async () => {
+      try {
+        const result = await synchroniseWhatsAppTemplateTranslationStatus(workspace.definitionId);
+        setMessage(result.ok ? result.changed ? "Translation status synchronised. No content or approvals changed." : "No eligible status change; current state refreshed." : result.message);
+        if (result.ok) router.refresh();
+      } catch { setMessage("Status synchronisation failed. Refresh and retry."); }
+      finally { inFlight.current = false; }
+    });
+  };
+  return { selected, select, current, busy, message, decide, synchronise };
 }

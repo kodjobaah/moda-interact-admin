@@ -20,7 +20,7 @@ try {
     catch { if (i === 89) throw new Error("Disposable PostgreSQL startup timed out"); await delay(500); }
   }
   const entries = readdirSync(migrations).filter((name) => /^\d{14}_/.test(name)).sort();
-  assert.ok(entries.some((entry) => entry.includes("arch047_whatsapp_template")), "Missing ARCH-047 database migration");
+  assert.ok(entries.some((entry) => entry.includes("arch047_template_persistence") || entry.includes("arch047_whatsapp_template")), "Missing ARCH-047 database migration");
   for (const entry of entries) docker(["exec", "-i", container, "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", dbName], {
     input: readFileSync(new URL(`${entry}/migration.sql`, migrations), "utf8"),
   });

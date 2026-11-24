@@ -4,6 +4,7 @@ export function PublicationProgressSummary({ progress, busy, onContinue, onRetry
 }) {
   return <section aria-label="Publication progress" className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
     <h2 className="font-semibold">Publication progress — {progress.status}</h2>
+    {progress.defaultConfigured && <p role="status" className="text-sm text-green-800">Platform default was saved at confirmation. Existing-shop processing is reported separately below.</p>}
     <p className="break-all text-xs text-slate-500">Operation: {progress.operationId}</p>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div><h3 className="text-sm font-semibold">Shops ({progress.totalShops})</h3>

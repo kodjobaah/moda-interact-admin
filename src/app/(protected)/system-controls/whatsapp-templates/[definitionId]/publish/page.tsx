@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { RecoveryDefaultSelection } from "@/components/admin/whatsapp-templates/recovery-defaults/default-selection";
 import { TemplatePublicationWorkspace } from "@/components/admin/whatsapp-templates/publishing/template-publication-workspace";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import { getDefinitionDetail } from "@/lib/admin/whatsapp-templates/authoring/reads";
@@ -38,7 +37,7 @@ export default async function WhatsAppTemplatePublishPage({ params, searchParams
         <span>Publish</span>
       </nav>
       <h1 className="mb-2 text-2xl font-bold text-slate-900">Publish Meta-approved recovery template</h1>
-      <p className="mb-6 text-sm text-slate-600">The approved 20-language Moda definition is immutable. Publication changes shop assignments only after review, confirmation and per-shop revalidation.</p>
+      <p className="mb-6 text-sm text-slate-600">The approved 20-language Moda definition is immutable. Choose whether to publish to existing shops, future shops, or both. Approval and common-layout compatibility are revalidated before confirmation.</p>
       <dl className="mb-6 grid grid-cols-2 gap-3 border-y border-slate-200 py-4 text-sm sm:grid-cols-4">
         <div><dt className="text-slate-500">Existing purpose</dt><dd className="font-medium">{detail.purpose}/{detail.offerType}</dd></div>
         <div><dt className="text-slate-500">Promotion target</dt><dd className="font-medium">{detail.english?.authoring.family === "META_RECOVERY"
@@ -46,9 +45,9 @@ export default async function WhatsAppTemplatePublishPage({ params, searchParams
         <div><dt className="text-slate-500">Header format</dt><dd className="font-medium">{headerKind}</dd></div>
         <div><dt className="text-slate-500">Immutable revision</dt><dd className="font-mono text-xs" title={detail.sourceHash}>{detail.sourceHash.slice(0, 12)}</dd></div>
       </dl>
-      <RecoveryDefaultSelection key={definitionId} definitionId={definitionId} />
-      <h2 className="mb-3 text-lg font-semibold text-slate-900">Publish to existing merchants</h2>
-      <TemplatePublicationWorkspace definitionId={definitionId} initialProgress={initialProgress} />
+      <div className="mb-4"><Link className="text-sm text-blue-800 underline" href="/system-controls/whatsapp-templates/defaults">View recovery defaults</Link></div>
+      <TemplatePublicationWorkspace key={definitionId} definitionId={definitionId} initialProgress={initialProgress}
+        defaultEligible={!(detail.english?.authoring.family === "META_RECOVERY" && detail.english.authoring.promotionTarget === "ALTERNATIVE_PRODUCT")} />
     </main>
   </AdminShell>;
 }

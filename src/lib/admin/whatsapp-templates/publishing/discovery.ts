@@ -20,7 +20,7 @@ const asCandidate = (row: {
 
 /** Cursor paging bounds each SQL read and freezes an exact shop ID list at confirmation.
  * The stored list is NOT a live query, so future merchants are never added implicitly. */
-export async function discoverScope(db: ShopReader, scope: PublicationScope): Promise<DiscoveredScope> {
+export async function discoverScope(db: ShopReader, scope: PublicationScope, allowEmpty = false): Promise<DiscoveredScope> {
   const selectedIds = scope.mode === "all" ? null : scope.mode === "one" ? [scope.shopId] : scope.shopIds;
   const shops: ShopCandidate[] = []; const excluded = new Map<string, number>();
   const read = async (cursor?: string) => db.shop.findMany({
@@ -49,6 +49,6 @@ export async function discoverScope(db: ShopReader, scope: PublicationScope): Pr
     const missing = selectedIds.length - found;
     if (missing) excluded.set("Shop not found", missing);
   }
-  if (!shops.length) return reject("NO_TARGETS", "No currently eligible shops were found.");
+  if (!shops.length && !allowEmpty) return reject("NO_TARGETS", "No currently eligible shops were found.");
   return { shops, exclusions: [...excluded].map(([reason, count]) => ({ reason, count })) };
 }

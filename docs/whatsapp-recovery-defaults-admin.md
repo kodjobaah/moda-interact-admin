@@ -1,61 +1,67 @@
-# Admin — platform recovery template defaults
+# Admin — recovery template publication and defaults
 
-Prerequisite: pin `database` to the accepted database migration
-`20261124163000_whatsapp_recovery_template_defaults` (or a later descendant),
-apply it to the target database before deploying Admin, and regenerate Prisma.
-No change to the database submodule is embedded in this Admin patch.
+Prerequisite: Admin already contains the initial recovery-defaults implementation
+and pins the database migration `20261124163000_whatsapp_recovery_template_defaults`
+or a later descendant. This follow-up is Admin-only; no new database migration,
+Shared version or Shopify change is required.
 
 ## Operator workflow
 
-1. System Controls → WhatsApp templates → Recovery defaults shows the six configured
-   slots for the server's configured WABA. Missing rows are explicitly shown as
-   not configured. A pointer is not evidence that Meta approval is still valid.
-2. Open the chosen recovery definition (the existing saved immutable source or Meta
-   approvals screen), then select **Set as default**. This opens the separate
-   platform-default control on the publication page; it does not publish to shops.
-3. **Review as default** checks the current WABA and all 20 locales using the
-   existing approved-source and common-layout gates. It shows the exact proposed
-   provider name, purpose, languages, header format and any current default.
-4. Give the audit reason and select **Set as default** or **Replace default**.
-   Confirmation revalidates the reviewed source and current pointer in a serializable
-   transaction. It is safe with zero merchants. A stale review must be refreshed.
+The existing WhatsApp Templates catalogue links to the six-slot **Recovery defaults**
+overview. Open a recovery definition, or its Meta approvals page, and choose
+**Publish template**. There is one publication screen and one review/confirmation:
 
-A default uses checkout recovery content, not `ALTERNATIVE_PRODUCT` promotion
-content. Its 20 locale rows must be REVIEWED, have the existing reviewed-content
-and provider identity checks, and have reconciled Meta APPROVED observations with
-matching content and MARKETING category. A historical English source that has not
-been reviewed, unverified registration, drift, retired definition or incompatible
-common-layout revision cannot be selected. Use the existing review, Meta
-reconciliation and coordinated common-layout workflow to address the reported
-reason; do not manually change statuses or approval rows.
+- One shop / Selected shops: existing assignments only; leave defaults unchanged.
+- All existing and future shops: set the explicit platform default and create the
+  reviewed existing-shop publication operation. Works with zero shops.
+- Future shops only: set the platform default; no shop discovery, assignments,
+  publication operation or targets. Future inheritance is implemented for Shopify;
+  WooCommerce onboarding does not yet consume defaults.
+
+Alternative-product definitions retain existing-shop scopes only: the six-slot
+platform default contract does not support them. The default overview remains
+read-only. All existing gates, including matching active SHARED common layout,
+provider approval and immutable reviewed content, remain mandatory. Defaults
+require all twenty reviewed and reconciled Meta-approved locales, with the
+existing exact content/identity verification. A different common revision still
+requires the existing coordinated activation workflow. Do not change statuses
+or registration evidence to bypass that workflow.
 
 ## Persistence and concurrency
 
-The one `(wabaId, purpose)` pointer references the existing definition. The first
-successful selection marks a fully verified definition PUBLISHED (preserving its
-first `publishedAt` when present). It writes no frozen content, registrations,
-shop variants, publication operations or publication targets. Replacement leaves
-previous definitions and all current merchant assignments intact. Audit uses the
-existing `PUBLISH_WHATSAPP_TEMPLATE_DEFINITION` action with metadata
-`operation=SET_RECOVERY_TEMPLATE_DEFAULT`, `scopeMode=platform_default`, old/new
-identity, source fingerprint and registration identities; its unique operation ID
-is not a fabricated merchant publication ID.
+The existing `(wabaId, purpose)` pointer references the existing definition. A
+fully verified default is marked PUBLISHED, preserving the first publication
+stamp. Default evidence is reviewed together with any existing-shop impact; the
+fingerprint binds both the current pointer and frozen shop list. On confirmation,
+lock the common activation fence and source/registration rows, revalidate in a
+serializable transaction, and commit the pointer, lifecycle marker, default audit,
+and (if any shops were selected) the durable shop operation together. If operation
+creation fails, no default change commits. No fabricated zero-target operation.
 
-The confirmation acquires the same global advisory lock as common-layout activation
-and merchant publication, locks the candidate definition/locales/registrations,
-and checks current sender, preview and active SUPER_ADMIN before writing. The
-pointer, lifecycle marker and audit are atomic. A fresh repeat of an already
-published default is a no-op. Unexpected failures are logged through the shared
-structured logger and returned as safe client messages.
+Existing-shop operations retain the original durable scope snapshot (`mode: all`)
+and processing/override safeguards. The additional `defaultConfigured` marker
+reports that a default was saved at confirmation, not that it is still current.
+Existing-shop processing remains resumable, independently revalidated and can
+fail after confirmation; this does not undo the default. The UI reports these
+outcomes separately. A replay of a combined operation uses its original key and
+fingerprint. Selecting an already configured default with a fresh review is a
+no-op; a lost default-only response can be refreshed and re-reviewed.
 
-Default selection is deliberately not a merchant repair operation. Existing merchant
-assignments remain unchanged, including a currently onboarded shop with missing
-assignments. The subsequent Shopify consumer must read the pointer, revalidate the
-same eligibility and common-layout compatibility at assignment time, and write
-per-shop publication targets with truthful default provenance. If approval or the
-shared layout changes after selection, the pointer remains configured, but must not
-bypass that revalidation. An administrator can explicitly select a compatible
-replacement; no automatic version selection occurs. Background is unchanged.
+## Translation lifecycle
+
+Background advances the translation run and items, not the definition lifecycle.
+The catalogue projects the latest current-source run stage and shows the stored
+stage when different. This is not a new approval state. On the translation review
+screen, **Synchronise translation status** is offered when the latest completed
+run matches the immutable definition and contains all nineteen distinct available
+translation outputs, with no failures, outstanding batches or missing digests.
+An approval of a locale also synchronises the lifecycle if eligible. The guarded
+write changes only an unpublished, non-retired staging definition to
+`READY_FOR_REVIEW`. It does not modify a translation run, locale, Meta registration,
+merchant assignment, default pointer or publication timestamp. Content verification
+and individual review remain the existing separate checks. After all twenty locale
+contents are ready, **Continue to Meta approvals** leads to the existing provider
+workflow and publication screen. Truly pending/failed runs are not advanced.
 
 ## Validation
 
@@ -66,14 +72,17 @@ npx tsc --noEmit
 npm run test:whatsapp-recovery-defaults:unit
 npm run test:whatsapp-recovery-defaults:postgres
 npm run test:arch047-admin-publication:unit
+node scripts/test-unit.mjs tests/unit/whatsapp-translation-lifecycle.test.ts
+npm run test:arch047-admin-compilation:unit
+npm run test:arch047-admin-compilation:components
+npm run test:arch047-admin-compilation:postgres
 npm run test:arch075-admin-common-activation
 ```
 
-The PostgreSQL suite uses the existing disposable PostgreSQL/pgvector harness,
-with an invocation-owned container and a loopback-only random port. It migrates
-that database, overrides `DATABASE_URL`, runs the focused suite and cleans up its
-container. Do not run the integration source against production. Tests cover zero
-shops, replacement, unchanged assignments and registration bytes, audit rollback,
-stale review, drift, required approval/review evidence and authorization. Manual UI
-verification should also cover the six-slot overview, default confirmation and
-retaining the existing merchant-publication control.
+The integration harnesses start invocation-owned PostgreSQL/pgvector containers,
+apply the database migrations, override DATABASE_URL, and clean up their own
+containers. Never run the integration sources against production. The tests cover
+zero shops, future-only, atomic combined operation creation and rollback, replay,
+existing-only scope, stale/invalid confirmations, approval gates, and guarded
+translation status repair/automatic progression. Verify the single publication
+screen and the review-page next steps manually after deployment.

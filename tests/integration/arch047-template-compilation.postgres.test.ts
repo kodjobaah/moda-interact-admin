@@ -5,7 +5,8 @@ import { PrismaClient, type Prisma } from "@prisma/client";
 import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { saveEnglishTemplate } from "../../src/lib/admin/whatsapp-templates/authoring/service.ts";
-import { reviewTranslation } from "../../src/lib/admin/whatsapp-templates/compilation/service.ts";
+import { REVIEW_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/compilation/language-codes";
+import { reviewTranslation, synchroniseTranslationLifecycle } from "../../src/lib/admin/whatsapp-templates/compilation/service.ts";
 import type { ReviewRepository } from "../../src/lib/admin/whatsapp-templates/compilation/repository.ts";
 import { compilationFixture } from "../fixtures/arch047-translation-fixture.ts";
 
@@ -90,4 +91,34 @@ test("failing audit rolls back a locale and item link in real PostgreSQL", async
     where: { runId_targetLanguageTag: { runId, targetLanguageTag: "es" } },
   })).resultLocaleId, null);
   await assert.rejects(reviewTranslation(review("es", "APPROVE"), { db, principal: { ...principal, role: "ADMIN" } }), /SUPER_ADMIN/);
+});
+
+
+test("a completed 19-language run safely repairs historical queued definition and advances new reviews", async () => {
+  const model = await db.commerceTranslationModelConfiguration.findFirstOrThrow({ where: { provider: "arch047-fixture" } });
+  async function completedDefinition() {
+    const id = (await saveEnglishTemplate({ submissionId: randomUUID(), draft: ast }, { principal, db })).id;
+    await db.whatsAppTemplateDefinition.update({ where: { id }, data: { status: "TRANSLATION_QUEUED" } });
+    const run = await db.whatsAppTemplateTranslationRun.create({ data: {
+      definitionId: id, translationModelConfigurationId: model.id,
+      provider: model.provider, providerModelId: model.providerModelId, modelConfigurationVersion: 1,
+      sourceSchemaVersion: 1, sourceHash: templateHash(ast), sourceSnapshot: { ...fixture.source, definitionId: id },
+      status: "COMPLETED", completedAt: new Date(), requestedByAdminId: adminId,
+      items: { create: REVIEW_LANGUAGES.filter(tag => tag !== "en").map(tag => ({ targetLanguageTag: tag,
+        status: "AVAILABLE", translatedAst: fixture.translated, outputContentHash: templateHash(fixture.translated), completedAt: new Date() })) },
+    } });
+    return { id, runId: run.id };
+  }
+  const historical = await completedDefinition();
+  const before = await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: historical.id }, include: { locales: true, translationRuns: { include: { items: true } } } });
+  assert.equal(await synchroniseTranslationLifecycle(historical.id, { db, principal }), true);
+  const repaired = await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: historical.id }, include: { locales: true, translationRuns: { include: { items: true } } } });
+  assert.equal(repaired.status, "READY_FOR_REVIEW");
+  assert.equal(repaired.publishedAt, null); assert.deepEqual(repaired.locales, before.locales);
+  assert.deepEqual(repaired.translationRuns, before.translationRuns);
+  assert.equal(await db.whatsAppTemplateMetaRegistration.count({ where: { locale: { definitionId: historical.id } } }), 0);
+  assert.equal(await synchroniseTranslationLifecycle(historical.id, { db, principal }), false);
+  const fresh = await completedDefinition();
+  await reviewTranslation({ definitionId: fresh.id, runId: fresh.runId, languageTag: "fr", decision: "APPROVE" }, { db, principal });
+  assert.equal((await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: fresh.id } })).status, "READY_FOR_REVIEW");
 });

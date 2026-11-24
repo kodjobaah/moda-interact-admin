@@ -11,6 +11,7 @@ import { isCompletedTranslationItem } from "./service";
 import type { ReviewLocaleDTO, ReviewWorkspaceDTO } from "./contracts";
 import { reconstructAndCompile } from "./reconstruction";
 import { REVIEW_LANGUAGES, providerLanguageCode } from "./language-codes";
+import { canSynchroniseTranslationLifecycle } from "./translation-lifecycle";
 import { validateEnglishEnvelope } from "./repository";
 
 const DEF_ID = /^wtdef_[a-f0-9]{64}$/;
@@ -95,5 +96,6 @@ export async function getTranslationReviewWorkspace(definitionId: string): Promi
   }));
   const approvedCount = locales.filter((locale) => locale.status === "APPROVED" || locale.status === "SOURCE").length;
   return { definitionId: definition.id, sourceHash: definition.sourceHash, family: english.authoring.family,
-    source: englishDTO, locales, approvedCount, readyForPublication: approvedCount === REVIEW_LANGUAGES.length };
+    source: englishDTO, locales, approvedCount, definitionStatus: definition.status,
+    canSynchroniseLifecycle: canSynchroniseTranslationLifecycle(definition, run), readyForPublication: approvedCount === REVIEW_LANGUAGES.length };
 }
