@@ -4,6 +4,10 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
+const suite = process.argv[2] ?? "postgres";
+if (!["postgres", "recovery-defaults-postgres"].includes(suite) || process.argv.length > 3) {
+  throw new Error("Expected postgres or recovery-defaults-postgres");
+}
 const container = `moda-arch047-publication-${randomUUID()}`;
 const dbName = "arch047_publication_fixture";
 const migrations = new URL("../database/prisma/migrations/", import.meta.url);
@@ -19,12 +23,13 @@ try {
   }
   const ordered = readdirSync(migrations).filter((entry) => /^\d{14}_/.test(entry)).sort();
   assert.ok(ordered.some((entry) => entry.includes("arch047_template_persistence")), "Missing ARCH-047 database migration");
+  if (suite === "recovery-defaults-postgres") assert.ok(ordered.some(entry => entry.endsWith("_whatsapp_recovery_template_defaults")), "Missing recovery-defaults database migration; update the database submodule");
   for (const entry of ordered) docker(["exec", "-i", container, "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", dbName], {
     input: readFileSync(new URL(`${entry}/migration.sql`, migrations), "utf8"),
   });
   const port = docker(["port", container, "5432/tcp"]).trim().match(/:(\d+)$/)?.[1];
   assert.ok(port);
-  execFileSync(process.execPath, ["scripts/run-arch047-admin-publication-tests.mjs", "postgres"], {
+  execFileSync(process.execPath, ["scripts/run-arch047-admin-publication-tests.mjs", suite], {
     env: {
       ...process.env,
       NODE_ENV: "test", DEPLOYMENT_ENVIRONMENT_NAME: "test",
@@ -33,7 +38,7 @@ try {
     },
     stdio: "inherit",
   });
-  console.log("PASS ARCH-047 ADMIN-007 disposable PostgreSQL");
+  console.log(`PASS ${suite} disposable PostgreSQL`);
 } finally {
   if (started) {
     try { docker(["rm", "--force", container]); }

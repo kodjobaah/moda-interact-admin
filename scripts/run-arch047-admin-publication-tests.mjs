@@ -26,6 +26,7 @@ const suites = {
   "compilation-postgres": ["tests/integration/arch047-template-compilation.postgres.test.ts"],
   "meta-postgres": ["tests/integration/arch047-template-meta.postgres.test.ts"],
   postgres: ["tests/integration/arch047-template-publication.postgres.test.ts"],
+  "recovery-defaults-postgres": ["tests/integration/whatsapp-recovery-defaults.postgres.test.ts"],
   "common-activation-postgres": ["tests/integration/arch075-common-activation.postgres.test.ts"],
   "common-layout-postgres": ["tests/integration/arch075-common-layout.postgres.test.ts"],
 };

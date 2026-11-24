@@ -40,6 +40,8 @@ export default async function MetaTemplatePage({ params }: { params: Promise<{ d
       </nav>
       <h1 className="mb-2 text-2xl font-bold">Meta submission and language approvals</h1>
       <p className="mb-6 text-sm text-slate-600">Operator-confirmed, Moda-authored and immutable. Provider decisions do not publish templates to merchants.</p>
+      <Link className="mb-5 inline-block rounded border border-blue-800 px-3 py-2 text-sm font-semibold text-blue-800"
+        href={`/system-controls/whatsapp-templates/${encodeURIComponent(definitionId)}/publish#recovery-default`}>Set as default</Link>
       <MetaTemplateDashboard initial={dashboard} />
     </main>
   </AdminShell>;

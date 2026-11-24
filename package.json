@@ -28,6 +28,8 @@
     "test:arch047-admin-authoring:unit": "node scripts/test-unit.mjs tests/unit/arch047-template-authoring-ast.test.ts tests/unit/arch047-template-authoring-service.test.ts tests/unit/arch047-template-authoring-components.test.tsx",
     "test:arch047-admin-authoring:postgres": "node scripts/test-arch047-admin-authoring-postgres.mjs",
     "test:arch047-admin-publication:unit": "node scripts/run-arch047-admin-publication-tests.mjs unit",
+    "test:whatsapp-recovery-defaults:unit": "node scripts/test-unit.mjs tests/unit/whatsapp-recovery-defaults.test.ts tests/unit/whatsapp-recovery-defaults-ui.test.mjs",
+    "test:whatsapp-recovery-defaults:postgres": "npm run prisma:generate && node scripts/test-arch047-admin-publication-postgres.mjs recovery-defaults-postgres",
     "test:arch047-admin-publication:postgres": "node scripts/test-arch047-admin-publication-postgres.mjs",
     "test:arch047-admin-translations:unit": "node scripts/test-arch047-admin-translations-esm.mjs tests/unit/arch047-template-translations.test.ts tests/unit/arch047-template-translation-components.test.tsx",
     "test:arch047-admin-translations:postgres": "npm run prisma:generate && node scripts/test-arch047-admin-translations-postgres.mjs",

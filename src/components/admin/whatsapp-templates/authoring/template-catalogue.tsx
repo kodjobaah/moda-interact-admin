@@ -11,7 +11,10 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-lg font-semibold text-slate-900">Template catalogue</h2>
         <p className="mt-1 text-sm text-slate-500">Browse immutable English sources, or create a new template.</p></div>
-      <Link className="rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-900" href="/system-controls/whatsapp-templates?create=1">+ Create template</Link>
+      <div className="flex flex-wrap gap-2">
+        <Link className="rounded-lg border border-blue-800 px-4 py-2.5 text-sm font-semibold text-blue-800" href="/system-controls/whatsapp-templates/defaults">Recovery defaults</Link>
+        <Link className="rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-900" href="/system-controls/whatsapp-templates?create=1">+ Create template</Link>
+      </div>
     </div>
     <form action="/system-controls/whatsapp-templates" method="GET" role="search"
       className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_minmax(150px,210px)_minmax(140px,185px)_auto] sm:items-end">

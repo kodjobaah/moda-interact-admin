@@ -11,11 +11,13 @@ export type ApprovedLocale = { languageTag: string; registrationId: string; view
   providerLanguageCode: string; providerTemplateName: string; providerTemplateId: string; brandFields: string[] };
 export type ApprovedSource = { id: string; purpose: string; offerType: string; promotionTarget?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
   headerKind: "NONE" | "TEXT" | "IMAGE"; wabaId: string; name: string;
-  fingerprint: string; locales: ApprovedLocale[]; brandFields: string[] };
+  fingerprint: string; locales: ApprovedLocale[]; brandFields: string[];
+  defaultLifecycle?: { status: string; publishedAt: Date | null } };
 
 /** Content equivalence, Meta approval and provider identity are verified together.
  * Never use provider catalogue listings or an external/legacy template as the source. */
-export async function approvedSource(db: SourceReader, definitionId: string, wabaId: string): Promise<ApprovedSource> {
+export async function approvedSource(db: SourceReader, definitionId: string, wabaId: string,
+  options: { requireDefaultEvidence?: boolean } = {}): Promise<ApprovedSource> {
   if (!isValidDefinitionId(definitionId) || !/^\d{4,32}$/.test(wabaId)) return reject("INPUT", "Invalid template identity.");
   const definition = await db.whatsAppTemplateDefinition.findUnique({ where: { id: definitionId }, include: {
     locales: { include: { metaRegistrations: { where: { wabaId } } } },
@@ -53,6 +55,14 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
     if (!locale || !["SOURCE_SAVED", "REVIEWED", "APPROVED", "READY"].includes(locale.status) ||
         locale.metaRegistrations.length !== 1) return reject("NOT_READY", `No approved registration for ${tag}.`);
     const reg = locale.metaRegistrations[0];
+    // Platform defaults must be ready to provision a future shop without another
+    // review or Meta round trip. Ordinary merchant publication retains its existing gates.
+    if (options.requireDefaultEvidence && (locale.status !== "REVIEWED" ||
+        (tag !== "en" && (!locale.reviewedAt || !locale.reviewedByAdminId)) ||
+        !reg.lastReconciledAt || !Number.isFinite(reg.lastReconciledAt.getTime()) ||
+        !reg.lastObservedContentHash || reg.lastObservedCategory !== "MARKETING")) {
+      return reject("NOT_READY", `Complete review and Meta reconciliation for ${tag} before selecting a default.`);
+    }
     let frozen;
     try { frozen = frozenLocaleSnapshot(locale, definition); }
     catch { return reject("NOT_READY", `Immutable registration snapshot failed for ${tag}.`); }
@@ -89,6 +99,7 @@ export async function approvedSource(db: SourceReader, definitionId: string, wab
   }
   const purpose = `${definition.purpose}_${definition.offerType}`;
   return { id: definitionId, purpose, offerType: definition.offerType!, promotionTarget, headerKind, wabaId, name: definition.providerTemplateName,
+    ...(options.requireDefaultEvidence ? { defaultLifecycle: { status: definition.status, publishedAt: definition.publishedAt } } : {}),
     locales, brandFields: [...new Set(locales.flatMap((locale) => locale.brandFields))].sort(),
     fingerprint: digest({ definition: { id: definition.id, sourceHash: definition.sourceHash, purpose, promotionTarget, headerKind },
       locales: locales.map((item) => [item.languageTag, item.registrationId, item.view]) }) };

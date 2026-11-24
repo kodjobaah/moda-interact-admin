@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { RecoveryDefaultSelection } from "@/components/admin/whatsapp-templates/recovery-defaults/default-selection";
 import { TemplatePublicationWorkspace } from "@/components/admin/whatsapp-templates/publishing/template-publication-workspace";
 import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import { getDefinitionDetail } from "@/lib/admin/whatsapp-templates/authoring/reads";
@@ -45,6 +46,8 @@ export default async function WhatsAppTemplatePublishPage({ params, searchParams
         <div><dt className="text-slate-500">Header format</dt><dd className="font-medium">{headerKind}</dd></div>
         <div><dt className="text-slate-500">Immutable revision</dt><dd className="font-mono text-xs" title={detail.sourceHash}>{detail.sourceHash.slice(0, 12)}</dd></div>
       </dl>
+      <RecoveryDefaultSelection key={definitionId} definitionId={definitionId} />
+      <h2 className="mb-3 text-lg font-semibold text-slate-900">Publish to existing merchants</h2>
       <TemplatePublicationWorkspace definitionId={definitionId} initialProgress={initialProgress} />
     </main>
   </AdminShell>;
