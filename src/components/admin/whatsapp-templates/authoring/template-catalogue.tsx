@@ -1,3 +1,4 @@
+import { workflowHref } from "@/lib/admin/whatsapp-templates/workflow/contracts";
 import { scenarioLabel } from "@/lib/admin/whatsapp-templates/authoring/scenarios";
 import Link from "next/link";
 import type { TemplateListItem } from "@/lib/admin/whatsapp-templates/authoring/types";
@@ -11,11 +12,11 @@ function visibleLifecycle(entry: TemplateListItem): string {
   return entry.status;
 }
 
-export function TemplateCatalogue({ items, search, page, hasNext, selectedId, kind = "", status = "" }: {
+export function TemplateCatalogue({ items, search, page, hasNext, selectedId, kind = "", status = "", scenario = "" }: {
   items: TemplateListItem[]; search: string; page: number; hasNext: boolean;
-  selectedId?: string; kind?: string; status?: string;
+  selectedId?: string; kind?: string; status?: string; scenario?: string;
 }) {
-  const query = (next: number) => new URLSearchParams({ page: String(next), search, ...(kind ? { kind } : {}), ...(status ? { status } : {}) }).toString();
+  const query = (next: number) => new URLSearchParams({ history: "1", page: String(next), search, ...(scenario ? { scenario } : {}), ...(kind ? { kind } : {}), ...(status ? { status } : {}) }).toString();
   return <section className="space-y-5" aria-label="WhatsApp template catalogue">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 className="text-lg font-semibold text-slate-900">Template catalogue</h2>
@@ -27,6 +28,8 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
     </div>
     <form action="/system-controls/whatsapp-templates" method="GET" role="search"
       className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_minmax(150px,210px)_minmax(140px,185px)_auto] sm:items-end">
+      <input type="hidden" name="history" value="1" />
+      {scenario && <input type="hidden" name="scenario" value={scenario} />}
       <label className="block text-sm font-medium text-slate-700">Search
         <input name="search" aria-label="Search template name or ID" maxLength={90} defaultValue={search}
           className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" placeholder="Template name or ID" />
@@ -57,7 +60,7 @@ export function TemplateCatalogue({ items, search, page, hasNext, selectedId, ki
         </tr></thead>
         <tbody className="divide-y divide-slate-100">
           {items.map((entry) => <tr key={entry.id} className="hover:bg-blue-50/40">
-            <td className="max-w-xs px-4 py-4"><Link href={`/system-controls/whatsapp-templates?definition=${encodeURIComponent(entry.id)}&${query(page)}`}
+            <td className="max-w-xs px-4 py-4"><Link href={entry.kind === "META_RECOVERY" ? workflowHref(entry.id) : `/system-controls/whatsapp-templates?definition=${encodeURIComponent(entry.id)}&${query(page)}`}
               aria-current={entry.id === selectedId ? "page" : undefined} className="block break-words font-semibold text-blue-800 underline underline-offset-2">
               {entry.providerTemplateName || `Wrapper · ${entry.audience === "ROUTER" ? "Router — before a shop is selected" : entry.audience || "unknown"}`}</Link>
               <span className="mt-1 block truncate font-mono text-[11px] text-slate-500" title={entry.id}>{entry.id}</span></td>

@@ -6,8 +6,8 @@ import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
-import { reviewTranslation, synchroniseTranslationLifecycle, ReviewRequestError } from "@/lib/admin/whatsapp-templates/compilation/service";
-import type { ReviewInput } from "@/lib/admin/whatsapp-templates/compilation/contracts";
+import { reviewTranslation, approveReviewedTranslations, synchroniseTranslationLifecycle, ReviewRequestError } from "@/lib/admin/whatsapp-templates/compilation/service";
+import type { ReviewInput, ReviewedTranslationBatch } from "@/lib/admin/whatsapp-templates/compilation/contracts";
 
 const logger = createLogger({ serviceName: "moda-interact-admin", environment: resolveDeploymentEnvironmentName() });
 
@@ -22,6 +22,7 @@ export async function decideWhatsAppTemplateTranslation(input: ReviewInput): Pro
       principal, db: prisma, ensureActor: (tx) => ensureDevelopmentPlatformAdmin(tx, principal),
     });
     revalidatePath(`/system-controls/whatsapp-templates/${input.definitionId}/review`);
+    revalidatePath(`/system-controls/whatsapp-templates/${input.definitionId}/workflow`);
     revalidatePath("/system-controls/whatsapp-templates");
     return { ok: true, replay: result.replay };
   } catch (error) {
@@ -42,10 +43,27 @@ export async function synchroniseWhatsAppTemplateTranslationStatus(definitionId:
       ensureActor: tx => ensureDevelopmentPlatformAdmin(tx, principal) });
     logger.info("admin.whatsapp_translation_status.synchronised", { definitionId, changed });
     revalidatePath(`/system-controls/whatsapp-templates/${definitionId}/review`);
+    revalidatePath(`/system-controls/whatsapp-templates/${definitionId}/workflow`);
     revalidatePath("/system-controls/whatsapp-templates");
     return { ok: true, changed };
   } catch (error) {
     logger.error("admin.whatsapp_translation_status.failed", { definitionId, error });
     return { ok: false, message: error instanceof ReviewRequestError ? error.message : "Could not synchronise translation status. Check Admin server logs." };
+  }
+}
+
+export async function approveWhatsAppReviewedTranslations(input: ReviewedTranslationBatch): Promise<{ ok: true; approved: number; replayed: number } | { ok: false; message: string }> {
+  const principal = await requirePlatformAdminMutation();
+  if (principal.role !== "SUPER_ADMIN") throw new Error("SUPER_ADMIN required for WhatsApp template review.");
+  try {
+    const result = await approveReviewedTranslations(input, { principal, db: prisma,
+      ensureActor: tx => ensureDevelopmentPlatformAdmin(tx, principal) });
+    revalidatePath(`/system-controls/whatsapp-templates/${input.definitionId}/workflow`);
+    revalidatePath(`/system-controls/whatsapp-templates/${input.definitionId}/review`);
+    revalidatePath("/system-controls/whatsapp-templates");
+    return { ok: true, ...result };
+  } catch (error) {
+    logger.error("admin.whatsapp_translation_batch_review.failed", { definitionId: input?.definitionId, error });
+    return { ok: false, message: error instanceof ReviewRequestError ? error.message : "Consolidated review did not complete. Refresh the saved language status and retry; see Admin logs for the failure." };
   }
 }

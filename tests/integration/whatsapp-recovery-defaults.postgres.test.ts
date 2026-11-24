@@ -7,6 +7,8 @@ import { previewRecoveryDefault, readRecoveryDefaults, setRecoveryDefault } from
 import { confirmScopedPublication, previewScopedPublication } from "../../src/lib/admin/whatsapp-templates/publishing/unified";
 import { advancePublication } from "../../src/lib/admin/whatsapp-templates/publishing/assignment";
 import type { PublicationIntent, PublicationPreview } from "../../src/lib/admin/whatsapp-templates/publishing/types";
+import { readRecoveryWorkflow } from "../../src/lib/admin/whatsapp-templates/workflow/reads";
+import { readShopAssignments } from "../../src/lib/admin/whatsapp-templates/workflow/shop-assignments";
 import { PublicationError } from "../../src/lib/admin/whatsapp-templates/publishing/validation";
 
 // The owning harness always starts an invocation-owned PostgreSQL container and sets this exact URL.
@@ -147,6 +149,28 @@ test("set and replace with zero merchants, retain immutable content and existing
   assert.equal(shopPreview.defaultImpact, undefined);
   const selected = await confirmScopedPublication(publicationRequest(shopPreview, shopScope, "one-shop"), { db, principal });
   assert.equal(selected.kind, "operation");
+  if (selected.kind !== "operation") throw new Error("Expected shop-only publication");
+  await advancePublication(db, selected.progress.operationId);
   assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({ where })).definitionId, a.id);
+  const assignments = await readShopAssignments(db,principal,"INITIAL_NO_OFFER","default-fixture",1);
+  assert.equal(assignments.rows.length,1);
+  assert.equal(assignments.rows[0].definitionId,b.id);
+  assert.equal(assignments.rows[0].languages,20);
+  assert.equal(assignments.rows[0].isDefault,false);
+  assert.equal(assignments.rows[0].defaultConfigured,true);
+  const overview = await readRecoveryWorkflow(db,principal);
+  const current=overview.facts.find(row=>row.definitionId===a.id);
+  assert.equal(current?.defaultDefinitionId,a.id);
+  assert.equal(current?.assignedShops,0);
+  assert.equal(current?.otherAssignedShops,1);
+  const replacement = await previewScope(a.id,combinedScope);
+  assert.ok(replacement.impactCounts.replaced > 0);
+  const replaceRequest = publicationRequest(replacement,combinedScope,"replace-shop-version");
+  await assert.rejects(confirmScopedPublication(replaceRequest,{db,principal}),code("OVERRIDE_CONFIRMATION"));
+  assert.equal((await readShopAssignments(db,principal,"INITIAL_NO_OFFER","default-fixture",1)).rows[0].definitionId,b.id);
+  const confirmed = await confirmScopedPublication({...replaceRequest,acknowledgeOverrides:true},{db,principal});
+  if(confirmed.kind!=="operation") throw new Error("Expected acknowledged operation");
+  await advancePublication(db,confirmed.progress.operationId);
+  assert.equal((await readShopAssignments(db,principal,"INITIAL_NO_OFFER","default-fixture",1)).rows[0].isDefault,true);
 
 });

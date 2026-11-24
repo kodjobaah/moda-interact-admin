@@ -6,8 +6,8 @@ import { advanceTemplatePublication, comparePublicationLanguage, confirmTemplate
 import type { LanguageComparison, PublicationPreview, PublicationProgress, PublicationIntent } from "@/lib/admin/whatsapp-templates/publishing/types";
 import type { ShopOption } from "./publication-scope-selector";
 
-export function useTemplatePublication(definitionId: string, initialProgress: PublicationProgress | null, defaultEligible = true) {
-  const [scope, setScopeState] = useState<PublicationIntent>({ mode: defaultEligible ? "all_future" : "all" });
+export function useTemplatePublication(definitionId: string, initialProgress: PublicationProgress | null, defaultEligible = true, initialScope?: PublicationIntent) {
+  const [scope, setScopeState] = useState<PublicationIntent>(initialScope ?? { mode: defaultEligible ? "all_future" : "all" });
   const [search, setSearch] = useState(""); const [selectionPage, setSelectionPage] = useState(1);
   // Store responses by query key so a changed filter never displays stale shops.
   // Loading is derived rather than set synchronously within a React effect.
@@ -129,8 +129,15 @@ export function useTemplatePublication(definitionId: string, initialProgress: Pu
     void advance();
   }, [autoRun, progress, advance]);
 
+  const startNew = () => {
+    if (busy || advancing.current || progress?.status === "IN_PROGRESS") return;
+    setAutoRun(false); setProgress(null); setReason("");
+    setScope(initialScope ?? { mode: defaultEligible ? "future" : "all" });
+    const url = new URL(window.location.href); url.searchParams.delete("operation");
+    window.history.replaceState(window.history.state, "", url.toString());
+  };
   return {
-    scope, setScope, options, shopsLoading, shopsError, shopsHasNext,
+    startNew, scope, setScope, options, shopsLoading, shopsError, shopsHasNext,
     search, setSearch: (value: string) => { setSearch(value); setSelectionPage(1); },
     selectionPage, setSelectionPage,
     preview, progress, defaultSuccess, busy, error, refreshPreview, confirm, advance, clockNowMs,

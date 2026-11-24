@@ -13,12 +13,13 @@ export type TranslationServices = {
   ensureActor?: (tx: Prisma.TransactionClient) => Promise<void>;
 };
 
-export async function startWhatsAppTemplateTranslation(definitionId: string, services: TranslationServices): Promise<{
+export async function startWhatsAppTemplateTranslation(definitionId: string, services: TranslationServices,
+  options: { reuseExistingSourceRun?: boolean } = {}): Promise<{
   runId: string; reused: boolean; state: TranslationWorkspaceState;
 }> {
   requireTemplateSuperAdmin(services.principal);
   const result = await insertTranslationRun(services.db, { definitionId,
-    actorId: services.principal.id, ensureActor: services.ensureActor });
+    actorId: services.principal.id, ensureActor: services.ensureActor, ...options });
   return { ...result, state: await readTranslationWorkspace(services.db, definitionId) };
 }
 

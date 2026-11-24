@@ -6,7 +6,8 @@ import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/d
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { saveEnglishTemplate } from "../../src/lib/admin/whatsapp-templates/authoring/service.ts";
 import { REVIEW_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/compilation/language-codes";
-import { reviewTranslation, synchroniseTranslationLifecycle } from "../../src/lib/admin/whatsapp-templates/compilation/service.ts";
+import { approveReviewedTranslations, reviewTranslation, synchroniseTranslationLifecycle } from "../../src/lib/admin/whatsapp-templates/compilation/service.ts";
+import { reconstructAndCompile } from "../../src/lib/admin/whatsapp-templates/compilation/reconstruction";
 import type { ReviewRepository } from "../../src/lib/admin/whatsapp-templates/compilation/repository.ts";
 import { compilationFixture } from "../fixtures/arch047-translation-fixture.ts";
 
@@ -118,6 +119,24 @@ test("a completed 19-language run safely repairs historical queued definition an
   assert.deepEqual(repaired.translationRuns, before.translationRuns);
   assert.equal(await db.whatsAppTemplateMetaRegistration.count({ where: { locale: { definitionId: historical.id } } }), 0);
   assert.equal(await synchroniseTranslationLifecycle(historical.id, { db, principal }), false);
+  const bulk = await completedDefinition();
+  const selections = REVIEW_LANGUAGES.filter(tag => tag !== "en").map(languageTag => ({ languageTag,
+    contentHash: reconstructAndCompile({ definitionId: bulk.id, definitionSourceHash: templateHash(ast), runSourceHash: templateHash(ast), languageTag,
+      english: ast, snapshot: { ...fixture.source, definitionId: bulk.id }, translated: fixture.translated, outputContentHash: templateHash(fixture.translated) }).contentHash,
+  })).sort((a,b) => a.languageTag.localeCompare(b.languageTag));
+  const request = { definitionId: bulk.id, runId: bulk.runId, acknowledged: true as const, locales: selections };
+  // A stale later candidate must roll back even earlier successful writes.
+  await assert.rejects(approveReviewedTranslations({ ...request, locales: selections.map((locale,i) => i === selections.length-1 ? {...locale,contentHash:"0".repeat(64)} : locale) }, { db, principal }), /preview changed/);
+  assert.equal(await db.whatsAppTemplateLocale.count({where:{definitionId:bulk.id}}),1);
+  assert.equal(await db.whatsAppTemplateTranslationItem.count({where:{runId:bulk.runId,resultLocaleId:{not:null}}}),0);
+  assert.equal(await db.commerceAuditEvent.count({where:{action:"REVIEW_WHATSAPP_TEMPLATE_LOCALE",operationId:{startsWith:bulk.id+":"}}}),0);
+  assert.deepEqual(await approveReviewedTranslations(request,{db,principal}),{approved:19,replayed:0});
+  assert.deepEqual(await approveReviewedTranslations(request,{db,principal}),{approved:0,replayed:19});
+  assert.equal(await db.whatsAppTemplateLocale.count({where:{definitionId:bulk.id}}),20);
+  assert.equal(await db.commerceAuditEvent.count({where:{action:"REVIEW_WHATSAPP_TEMPLATE_LOCALE",operationId:{startsWith:bulk.id+":"}}}),19);
+  const reviewed = await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:bulk.id}});
+  assert.equal(reviewed.status,"READY_FOR_REVIEW"); assert.equal(reviewed.publishedAt,null);
+  assert.equal(await db.whatsAppTemplateMetaRegistration.count({where:{locale:{definitionId:bulk.id}}}),0);
   const fresh = await completedDefinition();
   await reviewTranslation({ definitionId: fresh.id, runId: fresh.runId, languageTag: "fr", decision: "APPROVE" }, { db, principal });
   assert.equal((await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: fresh.id } })).status, "READY_FOR_REVIEW");

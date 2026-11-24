@@ -43,6 +43,8 @@ export type ReviewWorkspaceDTO = {
   canSynchroniseLifecycle?: boolean;
 };
 export type ReviewDecision = "APPROVE" | "REJECT";
+export type ReviewedTranslationBatch = { definitionId: string; runId: string; acknowledged: true;
+  locales: Array<{ languageTag: string; contentHash: string }> };
 export type ReviewInput = { definitionId: string; languageTag: string; runId: string; decision: ReviewDecision };
 
 export type SegmentLocation = {

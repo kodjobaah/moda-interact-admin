@@ -26,6 +26,7 @@ export function validateTranslationDefinitionId(id: unknown): asserts id is stri
 /** Database state is the only handoff to Background. No provider or queue operation in this transaction. */
 export async function insertTranslationRun(db: TranslationDatabase, input: {
   definitionId: string; actorId: string;
+  reuseExistingSourceRun?: boolean;
   ensureActor?: (tx: Prisma.TransactionClient) => Promise<void>;
 }): Promise<{ runId: string; reused: boolean }> {
   validateTranslationDefinitionId(input.definitionId);
@@ -34,6 +35,15 @@ export async function insertTranslationRun(db: TranslationDatabase, input: {
     const definition = await tx.whatsAppTemplateDefinition.findUnique({
       where: { id: input.definitionId }, include: { locales: { where: { languageTag: "en" }, take: 1 } },
     });
+    // The save-and-start action may be replayed after a lost response or a
+    // translation model change. Reuse the immutable source's existing run,
+    // rather than create a second translation request on replay.
+    if (input.reuseExistingSourceRun && definition && !definition.retiredAt && definition.status !== "RETIRED") {
+      const existing = await tx.whatsAppTemplateTranslationRun.findFirst({ where: {
+        definitionId: definition.id, sourceHash: definition.sourceHash,
+      }, orderBy: [{ requestedAt: "desc" }, { id: "desc" }], select: { id: true } });
+      if (existing) return { runId: existing.id, reused: true };
+    }
     if (!definition || !["SAVED", "TRANSLATION_QUEUED", "TRANSLATING", "PARTIALLY_FAILED", "READY_FOR_REVIEW"].includes(definition.status)) {
       throw new Error("A saved English template is required before requesting translation.");
     }

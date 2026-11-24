@@ -7,7 +7,7 @@ export function PublicationOverrideConfirmation({ preview, reviewedImpact, onRev
 }) {
   const stale = Date.parse(preview.expiresAt) <= clockNowMs;
   const conflicts = preview.impactCounts.conflict > 0;
-  const override = preview.impactCounts.override > 0;
+  const override = preview.impactCounts.override > 0 || !!preview.defaultImpact && preview.totalShops > 0 && preview.impactCounts.replaced > 0;
   const disabled = busy || stale || conflicts || !reviewedImpact || override && !acknowledgeOverrides || reason.trim().length < 8;
   return <section className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-4" aria-label="Publication confirmation">
     <h2 className="font-semibold">4. Confirm publication and replacement</h2>
@@ -21,7 +21,7 @@ export function PublicationOverrideConfirmation({ preview, reviewedImpact, onRev
     </label>
     {override && <label className="flex items-start gap-2 text-sm">
       <input type="checkbox" checked={acknowledgeOverrides} onChange={(e) => onAcknowledgement(e.target.checked)} />
-      I explicitly authorise replacing existing shop-specific overrides in the reviewed scope.
+      I explicitly authorise replacing existing shop-specific overrides and other assigned versions in the reviewed scope.
     </label>}
     <label className="block text-sm font-medium" htmlFor="publication-reason">Mandatory audit reason</label>
     <textarea id="publication-reason" rows={2} maxLength={1000} value={reason} onChange={(e) => onReason(e.target.value)}

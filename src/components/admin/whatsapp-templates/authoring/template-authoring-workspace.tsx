@@ -3,7 +3,7 @@ import { CommonLayoutSelector } from "./common-layout-selector";
 import type { CommonLayoutChoice } from "@/lib/admin/whatsapp-templates/authoring/common-layout-reads";
 import { useState } from "react";
 import Link from "next/link";
-import type { TemplateDetail } from "@/lib/admin/whatsapp-templates/authoring/types";
+import type { MetaTemplateAst, TemplateDetail } from "@/lib/admin/whatsapp-templates/authoring/types";
 import { TemplateFamilyPurposeSelector } from "./template-family-purpose-selector";
 import { TemplateContentEditor } from "./template-content-editor";
 import { TemplateReadOnlyPreview } from "./template-read-only-preview";
@@ -14,8 +14,8 @@ import { useTemplateAuthoringDraft } from "./use-template-authoring-draft";
 import { useShopBrandMediaRole } from "../media/use-shop-brand-media-role";
 
 /** Layout only: all AST mutations, validation, preview and saving live in the controller or pure services. */
-export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [] }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonLayoutChoice[] }) {
-  const controller = useTemplateAuthoringDraft(cloneFrom, commonLayouts.find(layout => layout.active));
+export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [], initialScenario }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonLayoutChoice[]; initialScenario?: MetaTemplateAst }) {
+  const controller = useTemplateAuthoringDraft(cloneFrom, commonLayouts.find(layout => layout.active), initialScenario);
   const media = useShopBrandMediaRole();
   const [step, setStep] = useState<TemplateEditorStep>("setup");
   const issues = controller.checked.ok ? [] : controller.checked.issues;
@@ -43,7 +43,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [] }: { 
         <p className="mt-2 text-sm leading-6 text-slate-600">{controller.draft.family === "META_RECOVERY"
           ? "An approved Meta recovery template can be used for a checkout recovery outreach, once separately submitted, approved and published."
           : "An internal wrapper formats AI or human conversation replies. It does not create a Meta template."}</p>
-        <p className="mt-4 text-xs text-slate-500">Saved English definitions cannot be edited. Translations and publication are separate workflows.</p>
+        <p className="mt-4 text-xs text-slate-500">Saved English definitions cannot be edited. Recovery templates continue to translation review, Meta approval and publication.</p>
       </aside>
     </div>
     <div id="whatsapp-panel-compose" role="tabpanel" aria-labelledby="whatsapp-tab-compose" hidden={step !== "compose"}
@@ -65,7 +65,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [] }: { 
           mediaDomain={media.media?.label} />
       </div>
       <TemplateSaveControls issues={issues} saving={controller.saving} savedId={controller.savedId}
-        error={controller.error} cloneFromId={cloneFrom?.id} showIssues={false} onSave={controller.submit} />
+        error={controller.error} cloneFromId={cloneFrom?.id} showIssues={false} onSave={controller.submit} startTranslations={controller.draft.family === "META_RECOVERY"} />
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
       <p className="text-xs text-slate-500">Your changes are preserved between tabs. Leaving this page discards an unsaved draft.</p>

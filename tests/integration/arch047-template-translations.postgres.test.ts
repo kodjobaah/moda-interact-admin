@@ -141,3 +141,23 @@ test("no run or audit created before English source has committed", async () => 
   await assert.rejects(startWhatsAppTemplateTranslation(saved.id, { db, principal }), /not committed/);
   assert.equal(await db.whatsAppTemplateTranslationRun.count({ where: { definitionId: saved.id } }), 0);
 });
+
+test("save-and-start replay retains one immutable definition and one run across a model revision", async () => {
+  const request = { submissionId: randomUUID(), draft: newMetaDraft() };
+  const first = await saveEnglishTemplate(request, { db, principal });
+  const started = await startWhatsAppTemplateTranslation(first.id, { db, principal }, { reuseExistingSourceRun: true });
+  await db.commerceTranslationModelConfiguration.update({where:{id:"arch047-disposable-model"},data:{editVersion:{increment:1}}});
+  try {
+    const saved = await saveEnglishTemplate(request, { db, principal });
+    assert.equal(saved.id,first.id);
+    const replayed = await startWhatsAppTemplateTranslation(saved.id, { db, principal }, { reuseExistingSourceRun: true });
+    assert.equal(replayed.runId,started.runId);
+    assert.equal(replayed.reused,true);
+    assert.equal(await db.whatsAppTemplateTranslationRun.count({where:{definitionId:saved.id}}),1);
+    assert.equal(await db.whatsAppTemplateTranslationItem.count({where:{runId:started.runId}}),19);
+    assert.equal(await db.commerceAuditEvent.count({where:{operationId:started.runId}}),1);
+    assert.equal(await db.whatsAppTemplateMetaRegistration.count({where:{locale:{definitionId:saved.id}}}),0);
+  } finally {
+    await db.commerceTranslationModelConfiguration.update({where:{id:"arch047-disposable-model"},data:{editVersion:{decrement:1}}});
+  }
+});

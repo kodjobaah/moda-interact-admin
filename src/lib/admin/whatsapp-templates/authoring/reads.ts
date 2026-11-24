@@ -7,6 +7,7 @@ import { prisma } from "../../../prisma";
 import { templateHash } from "./identifiers";
 
 import { scenarioCoverage, type CoverageRow } from "./coverage";
+import { RECOVERY_SCENARIOS } from "./scenarios";
 const PAGE_SIZE = 20;
 export async function getScenarioCoverage() {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
@@ -41,7 +42,7 @@ function item(row: {
   return { ...row, createdAt: row.createdAt.toISOString() };
 }
 
-export async function listDefinitions(page = 1, search = "", filters: { kind?: string; status?: string } = {}): Promise<{ items: TemplateListItem[]; page: number; hasNext: boolean }> {
+export async function listDefinitions(page = 1, search = "", filters: { kind?: string; status?: string; scenario?: string } = {}): Promise<{ items: TemplateListItem[]; page: number; hasNext: boolean }> {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
   const safePage = Math.min(1000, Math.max(1, Number.isInteger(page) ? page : 1));
   const query = search.trim().slice(0, 90);
@@ -52,6 +53,8 @@ export async function listDefinitions(page = 1, search = "", filters: { kind?: s
   ];
   if (filters.kind && ["META_RECOVERY", "MODA_CONVERSATION_WRAPPER"].includes(filters.kind)) where.kind = filters.kind;
   if (filters.status && ["SAVED", "PUBLISHED", "RETIRED"].includes(filters.status)) where.status = filters.status;
+  const scenario = RECOVERY_SCENARIOS.find(row => row.id === filters.scenario);
+  if (scenario) Object.assign(where, { kind: "META_RECOVERY", purpose: scenario.draft.stage, offerType: scenario.draft.offerType });
   const rows = await prisma.whatsAppTemplateDefinition.findMany({
     where,
     select: { id: true, kind: true, purpose: true, offerType: true, audience: true,

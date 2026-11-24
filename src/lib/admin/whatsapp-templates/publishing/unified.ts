@@ -87,7 +87,9 @@ export async function confirmScopedPublication(input: PublicationIntentRequest, 
     assertFreshPreview(input.previewIssuedAt, input.previewFingerprint);
     if (state.previewFingerprint !== input.previewFingerprint) return reject("STALE_PREVIEW", "Default, approval or shop assignments changed. Review current impact again.");
     if (state.impactCounts.conflict) return reject("CONFLICT", "Ambiguous approved slots must be resolved before publishing.");
-    if (state.impactCounts.override && !input.acknowledgeOverrides) return reject("OVERRIDE_CONFIRMATION", "Explicitly confirm replacement of merchant overrides.");
+    if ((state.impactCounts.override || intent.mode === "all_future" && state.impactCounts.replaced) && !input.acknowledgeOverrides) {
+      return reject("OVERRIDE_CONFIRMATION", "Explicitly confirm replacement of existing merchant template versions, including shop-specific assignments.");
+    }
     const selected = await persistVerifiedDefault(tx, verified, reason, deps);
     if (!state.shopIds.length) return { purpose: selected.purpose } as const;
     const scope = { mode: "all" } as const;
