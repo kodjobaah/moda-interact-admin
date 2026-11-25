@@ -25,7 +25,7 @@ export function useTemplateAuthoringDraft(source?: TemplateDetail | null,
   const pending = useRef(false);
   const submissionId = useRef<string | null>(null);
   const checked = useMemo(() => {
-    const value = validateTemplateAst(draft);
+    const value = validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" });
     if (!value.ok) return value;
     try { makeImmutableAuthoringRecord(value.value); return value; }
     catch (error) { return { ok: false as const, issues: [{ path: "body", message: error instanceof Error ? error.message : "Unable to compile the complete message." }] }; }

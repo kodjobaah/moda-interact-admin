@@ -108,7 +108,52 @@ export const INITIAL_REPLY_INSTRUCTIONS = {
 
 export type InitialReplyLocale = keyof typeof INITIAL_REPLY_INSTRUCTIONS;
 
-export function localizedInitialReplyNodes(languageTag: string, target: PromotionTarget | undefined): ContentNode[] {
+/** Reuse the reviewed sentence, removing only the punctuation that joined it to the merchant name. */
+export function standaloneInitialReplyText(languageTag: string, target: PromotionTarget | undefined): string {
+  const copy = INITIAL_REPLY_INSTRUCTIONS[languageTag as InitialReplyLocale];
+  if (!copy) throw new Error(`Unsupported initial-reply locale: ${languageTag}`);
+  return (target === "ALTERNATIVE_PRODUCT" ? copy.alternativeProduct : copy.checkout).replace(/^[.。]?\s*/u, "");
+}
+
+export type InitialReplyParts = { body: ContentNode[]; reply: ContentNode[]; standalone: boolean };
+
+/** Preserve historical merchant-bound segments byte for byte. A verified common frame
+ * can instead carry the merchant identity, leaving a standalone reviewed Reply paragraph. */
+export function splitInitialReplyBody(body: readonly ContentNode[], target: PromotionTarget | undefined,
+  languageTag: string, allowStandalone: boolean): InitialReplyParts | null {
+  const copy = INITIAL_REPLY_INSTRUCTIONS[languageTag as InitialReplyLocale];
+  if (!Object.hasOwn(INITIAL_REPLY_INSTRUCTIONS, languageTag)) return null;
+  const expected = target === "ALTERNATIVE_PRODUCT" ? copy.alternativeProduct : copy.checkout;
+  const tail = body.slice(-3);
+  if (tail.length === 3 && tail[0]?.type === "text" && typeof tail[0].value === "string" &&
+      tail[0].value.endsWith(copy.from) && tail[1]?.type === "variable" && tail[1].name === "shop.name" &&
+      tail[2]?.type === "text" && tail[2].value === expected) {
+    const prefix = body.slice(0, -3);
+    const preceding = tail[0].value.slice(0, -copy.from.length);
+    if (preceding) prefix.push({ type: "text", value: preceding });
+    return { body: prefix, reply: [{ type: "text", value: copy.from }, tail[1], tail[2]], standalone: false };
+  }
+  if (!allowStandalone) return null;
+  const last = body.at(-1);
+  const standalone = standaloneInitialReplyText(languageTag, target);
+  if (last?.type !== "text" || typeof last.value !== "string" || !last.value.endsWith(standalone)) return null;
+  const prefix = body.slice(0, -1);
+  const preceding = last.value.slice(0, -standalone.length);
+  if (preceding) prefix.push({ type: "text", value: preceding });
+  // Accept the same paragraph whether the editor merged or separated adjacent text nodes.
+  // Do not accept a suffix attached to arbitrary prose or an unseparated variable.
+  let boundary = "";
+  for (let i = prefix.length - 1; i >= 0; i--) {
+    const node = prefix[i];
+    if (node?.type !== "text" || typeof node.value !== "string") break;
+    boundary = node.value + boundary;
+  }
+  if (!/\n[ \t]*$/.test(boundary)) return null;
+  return { body: prefix, reply: [{ type: "text", value: standalone }], standalone: true };
+}
+
+export function localizedInitialReplyNodes(languageTag: string, target: PromotionTarget | undefined, standalone = false): ContentNode[] {
+  if (standalone) return [{ type: "text", value: standaloneInitialReplyText(languageTag, target) }];
   const copy = INITIAL_REPLY_INSTRUCTIONS[languageTag as InitialReplyLocale];
   if (!copy) throw new Error(`Unsupported initial-reply locale: ${languageTag}`);
   return [

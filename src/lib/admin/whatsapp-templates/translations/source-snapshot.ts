@@ -1,6 +1,7 @@
 import { compileTemplateAst } from "../authoring/compiler";
 import { createHash } from "node:crypto";
 import { templateHash } from "../authoring/identifiers";
+import { splitInitialReplyBody } from "../authoring/initial-reply-instructions";
 import { validateTemplateAst } from "../authoring/validation";
 import type { ContentNode, ImmutableAuthoringRecord, TemplateAst, WrapperNode } from "../authoring/types";
 
@@ -51,23 +52,12 @@ export function extractTranslationSegments(definitionId: string, ast: TemplateAs
   };
   addNodes("header.text", ast.header);
   if (ast.family === "META_RECOVERY") {
-    const compliantInitial = ast.stage === "INITIAL" &&
-      validateTemplateAst(ast, { requireInitialReply: true, contentLanguageTag: "en" }).ok;
-    const tail = ast.body.slice(-3);
-    const replyStart = compliantInitial && tail[0]?.type === "text" &&
-      tail[1]?.type === "variable" && tail[1].name === "shop.name" && tail[2]?.type === "text"
-      ? tail[0].value.lastIndexOf("From ") : -1;
-    if (replyStart >= 0) {
-      const bodyPrefix = ast.body.slice(0, -3);
-      const precedingText = tail[0].type === "text" ? tail[0].value.slice(0, replyStart) : "";
-      if (precedingText) bodyPrefix.push({ type: "text", value: precedingText });
-      addNodes("body.text", bodyPrefix);
-      addNodes("body.replyInstruction.text", [
-        { type: "text", value: "From " }, tail[1], tail[2],
-      ]);
-    } else {
-      addNodes("body.text", ast.body);
-    }
+    // Initial sources have already passed the strict admission above. Keep the
+    // historical key/marker identities for merchant-bound Reply instructions.
+    const parts = ast.stage === "INITIAL"
+      ? splitInitialReplyBody(ast.body, ast.promotionTarget, "en", !!ast.commonLayout) : null;
+    addNodes("body.text", parts?.body ?? ast.body);
+    if (parts) addNodes("body.replyInstruction.text", parts.reply);
     addNodes("footer.text", ast.footer);
     ast.buttons.forEach((button, index) => {
       if (button.label.trim()) segments.push({ key: `buttons.${index}.text`, text: button.label, protectedTokens: [] });

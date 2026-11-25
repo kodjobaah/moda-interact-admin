@@ -4,6 +4,7 @@ import {randomUUID} from "node:crypto";
 import {PrismaClient,type Prisma} from "@prisma/client";
 import {layoutAst} from "../fixtures/arch075-common-layout.ts";
 import {saveEnglishTemplate} from "../../src/lib/admin/whatsapp-templates/authoring/service.ts";
+import {splitInitialReplyBody,standaloneInitialReplyText} from "../../src/lib/admin/whatsapp-templates/authoring/initial-reply-instructions.ts";
 import {RECOVERY_SCENARIOS} from "../../src/lib/admin/whatsapp-templates/authoring/scenarios.ts";
 import {readSavedCommonLayout} from "../../src/lib/admin/whatsapp-templates/authoring/common-layout-repository.ts";
 import {compileTemplateAst} from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
@@ -30,7 +31,18 @@ test("real immutable common revision is frozen into new clone; stale caller fail
  assert.equal(stored.clonedFromDefinitionId,original.id);assert.equal(stored.sourceHash,templateHash(draft));
  assert.deepEqual((stored.locales[0].localeAst as unknown as {authoring:{commonLayout:unknown}}).authoring.commonLayout,ref);
  assert.equal(await db.commerceAuditEvent.count({where:{operationId:clone.id}}),1);
+ // Exercise the actual save gate with headerless TEXT and a standalone Reply.
+ const parts=splitInitialReplyBody(draft.body,draft.promotionTarget,"en",false);assert.ok(parts);
+ const textDraft={...draft,shopBrandMediaRole:undefined,body:[...parts.body,{type:"text" as const,value:standaloneInitialReplyText("en",draft.promotionTarget)}]};
+ const textClone=await saveEnglishTemplate({submissionId:randomUUID(),draft:textDraft,cloneFromDefinitionId:clone.id},{db,principal});
+ const textStored=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:textClone.id},include:{locales:true}});
+ const textRecord=textStored.locales[0].localeAst as unknown as import("../../src/lib/admin/whatsapp-templates/authoring/types").ImmutableAuthoringRecord;
+ assert.equal(textRecord.prepared.family,"META_RECOVERY");if(textRecord.prepared.family!=="META_RECOVERY")throw Error("Expected Meta recovery");
+ assert.equal(textRecord.prepared.parameterBindings.body.filter(b=>b.variable==="shop.name").length,1);
+ assert.equal(textRecord.prepared.components.some(c=>c.type==="HEADER"),false);
+ assert.equal(textStored.sourceHash,templateHash(textDraft));
  const count=await db.whatsAppTemplateDefinition.count();
+ await assert.rejects(saveEnglishTemplate({submissionId:randomUUID(),draft:{...textDraft,commonLayout:{...ref,localeId:"forged"}}},{db,principal}),/differs/);
  await assert.rejects(saveEnglishTemplate({submissionId:randomUUID(),draft:{...draft,commonLayout:{...ref,localeId:"forged"}}},{db,principal}),/differs/);
  assert.equal(await db.whatsAppTemplateDefinition.count(),count);
  const french=await readSavedCommonLayout(db,saved.id,"fr",ref.sourceHash);assert.notEqual(french.contentHash,ref.contentHash);

@@ -6,9 +6,9 @@ import { ConversationProductImageBindingSchema } from "@modainteract/moda-intera
 import { requireCommonLayout } from "./common-layout";
 import { metaBodyIssues, projectMetaBody } from "./meta-body";
 import { eligibleHeaderVariables, eligibleVariables } from "./registry";
-import { INITIAL_REPLY_INSTRUCTIONS } from "./initial-reply-instructions";
+import { splitInitialReplyBody } from "./initial-reply-instructions";
 import { RecoveryTemplateHeaderMediaRoleSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
-import type { AuthoringIssue, TemplateAst } from "./types";
+import type { AuthoringIssue, ContentNode, PromotionTarget, TemplateAst } from "./types";
 
 const MAX_JSON_BYTES = 32_768;
 const MAX_NODES = 80;
@@ -41,10 +41,12 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
     const error = compositeProfileError(raw.compositeProfile);
     if (error) fail("compositeProfile", error);
   }
+  let trustedCommonLayout = false;
   if (meta && raw.commonLayout !== undefined) {
     try {
       const ref = requireCommonLayout(raw.commonLayout);
       if (options.contentLanguageTag && ref.languageTag !== options.contentLanguageTag) fail("commonLayout", "Common layout language must match this locale.");
+      else trustedCommonLayout = true;
     } catch { fail("commonLayout", "Select a valid saved common shop layout."); }
     if (!Array.isArray(raw.header) || raw.header.length) fail("header", "Common shop identity belongs in the body. Review and explicitly remove the old text header before using the common layout.");
     if (raw.shopBrandMediaRole !== undefined && !["LOGO", "SQUARE_LOGO"].includes(String(raw.shopBrandMediaRole))) fail("shopBrandMediaRole", "Choose a genuine logo or square logo IMAGE header, or leave the header absent for TEXT fallback.");
@@ -141,29 +143,16 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
       if (bodyVariables.filter((variable) => variable === "checkout.itemsSummary").length !== 1) {
         fail("body", "Initial recovery copy must include exactly one checkout.itemsSummary binding in its visible body.");
       }
-      if (!bodyVariables.includes("shop.name")) fail("body", "Initial recovery copy must identify the merchant with the trusted shop.name binding in its visible body.");
-      if (options.requireInitialReply) {
-        const tail = bodyNodes.slice(-3);
-        const replyLocale = options.contentLanguageTag ?? "en";
-        const localizedFrom = INITIAL_REPLY_INSTRUCTIONS[replyLocale as keyof typeof INITIAL_REPLY_INSTRUCTIONS]?.from;
-        const structuredInstruction = tail.length === 3 && object(tail[0]) && tail[0].type === "text" &&
-          typeof tail[0].value === "string" && typeof localizedFrom === "string" && tail[0].value.endsWith(localizedFrom) &&
-          object(tail[1]) && tail[1].type === "variable" && tail[1].name === "shop.name" &&
-          object(tail[2]) && tail[2].type === "text" && typeof tail[2].value === "string" && tail[2].value.trim().length > 0;
-        if (!structuredInstruction) fail("body", "Initial copy must end with a separate shop.name-bound contextual Reply instruction so each locale can use its reviewed wording.");
-        if ((options.contentLanguageTag === undefined || options.contentLanguageTag === "en") && structuredInstruction) {
-          const targetPhrase = raw.promotionTarget === "ALTERNATIVE_PRODUCT" ? "this offer or your basket" : "this basket";
-          const expected = `From {{shop.name}}. Need help with ${targetPhrase}? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes).`;
-          const actual = `From {{shop.name}}${String(tail[2].value)}`;
-          if (actual !== expected) fail("body", "English initial copy must preserve the specific-message Reply action, text or voice note, and two-minute limit.");
-        } else if (options.contentLanguageTag && options.contentLanguageTag !== "en" && structuredInstruction) {
-          const copy = INITIAL_REPLY_INSTRUCTIONS[options.contentLanguageTag as keyof typeof INITIAL_REPLY_INSTRUCTIONS];
-          const expected = raw.promotionTarget === "ALTERNATIVE_PRODUCT" ? copy?.alternativeProduct : copy?.checkout;
-          if (!expected || tail[2].value !== expected) {
-            fail("body", "Localized initial copy must preserve the reviewed specific-message Reply action, text or voice note, and two-minute limit.");
-          }
-        }
+      if (!trustedCommonLayout && !bodyVariables.includes("shop.name")) {
+        fail("body", "Initial recovery copy must identify the merchant with the trusted shop.name binding in its visible body.");
       }
+      // requireCommonLayout already verifies the digest and requires exactly one trusted
+      // shop.name in the common header, which is compiled into the provider BODY.
+      const reply = splitInitialReplyBody(bodyNodes as ContentNode[], raw.promotionTarget as PromotionTarget | undefined,
+        options.contentLanguageTag ?? "en", trustedCommonLayout);
+      if (!reply) fail("body", trustedCommonLayout
+        ? "Initial copy must end with the reviewed contextual Reply paragraph (specific message, text or voice note, up to 2 minutes). The common layout already identifies the shop."
+        : "Initial copy must end with a separate shop.name-bound contextual Reply instruction with reviewed wording (specific message, text or voice note, up to 2 minutes).");
     }
     if (raw.offerType !== "NO_OFFER" && raw.promotionTarget !== undefined) {
       const required = raw.promotionTarget === "ALTERNATIVE_PRODUCT"

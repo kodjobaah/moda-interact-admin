@@ -1,4 +1,4 @@
-import type { ContentNode, SemanticVariable, TemplateAst } from "../authoring/types";
+import type { ContentNode, MetaTemplateAst, SemanticVariable, TemplateAst } from "../authoring/types";
 import { sourceLocations } from "./locations";
 import { localizedInitialReplyNodes } from "../authoring/initial-reply-instructions";
 import type { SourceSegment, TranslationSegmentResult, TranslationSourceSnapshot } from "./contracts";
@@ -24,6 +24,21 @@ export function restoreProtectedNodes(output: string, segment: SourceSegment): C
   }
   pushText(output.slice(offset));
   return nodes;
+}
+
+/** The verified source segment determines which approved instruction form to restore.
+ * The standalone form must not re-introduce a second merchant binding. */
+function appendLocalizedReply(ast: MetaTemplateAst, segment: SourceSegment, languageTag: string): void {
+  const standalone = segment.protectedTokens.length === 0;
+  if (standalone) {
+    if (!ast.commonLayout) throw new Error("Standalone Reply instruction requires a common shop layout.");
+    // Translation providers may trim trailing whitespace from the preceding segment.
+    // Restore a separate paragraph without modifying the frozen English source.
+    const last = ast.body.at(-1);
+    if (last?.type === "text") last.value = last.value.trimEnd() + "\n\n";
+    else ast.body.push({ type: "text", value: "\n\n" });
+  }
+  ast.body.push(...localizedInitialReplyNodes(languageTag, ast.promotionTarget, standalone));
 }
 
 /** English structure is the anchor; URLs, checkout actions and response slots are never translated. */
@@ -52,7 +67,7 @@ export function reconstructLocaleAst(english: TemplateAst, source: TranslationSo
       else if (button && reconstructed.family === "META_RECOVERY") reconstructed.buttons[Number(button[1])].label = value;
       else if (segment.key === "body.text" && reconstructed.family === "META_RECOVERY") reconstructed.body = nodes;
       else if (segment.key === "body.replyInstruction.text" && reconstructed.family === "META_RECOVERY") {
-        reconstructed.body.push(...localizedInitialReplyNodes(languageTag ?? "en", reconstructed.promotionTarget));
+        appendLocalizedReply(reconstructed, segment, languageTag ?? "en");
       } else throw new Error(`${segment.key}: unsupported translated component.`);
     }
     if (reconstructed.family === "MODA_CONVERSATION_WRAPPER") {
@@ -77,7 +92,7 @@ export function reconstructLocaleAst(english: TemplateAst, source: TranslationSo
     }
     const nodes = restoreProtectedNodes(value, origin);
     if (key === "body.replyInstruction" && reconstructed.family === "META_RECOVERY") {
-      reconstructed.body.push(...localizedInitialReplyNodes(languageTag ?? "en", reconstructed.promotionTarget));
+      appendLocalizedReply(reconstructed, origin, languageTag ?? "en");
     } else if (key === "header") reconstructed.header = nodes;
     else if (key === "footer") reconstructed.footer = nodes as typeof reconstructed.footer;
     else if (key === "body" && reconstructed.family === "META_RECOVERY") reconstructed.body = nodes;
