@@ -8,13 +8,14 @@ import { assertFreshPreview } from "../publishing/preview";
 import { configuredSenderWaba } from "../publishing/sender";
 import { approvedSource } from "../publishing/source";
 import { digest, isValidDefinitionId, LANGUAGES, reasonText, reject } from "../publishing/validation";
-import { RECOVERY_DEFAULT_PURPOSES, type RecoveryDefaultPurpose, type DefaultPointerView,
+import { verifiedDefaultFormat } from "./format";
+import { RECOVERY_DEFAULT_PURPOSES, RECOVERY_DEFAULT_FORMATS, type RecoveryDefaultPurpose, type DefaultPointerView,
   type RecoveryDefaultOverview, type RecoveryDefaultPreview, type SetRecoveryDefaultInput,
   type SetRecoveryDefaultResult } from "./contracts";
 
 type Principal = Pick<PlatformAdminPrincipal, "id" | "role">;
 const pointerSelect = {
-  id: true, purpose: true, definitionId: true, updatedAt: true,
+  id: true, purpose: true, format: true, definitionId: true, updatedAt: true,
   definition: { select: { providerTemplateName: true, status: true, publishedAt: true } },
 } satisfies Prisma.WhatsAppRecoveryTemplateDefaultSelect;
 type Pointer = Prisma.WhatsAppRecoveryTemplateDefaultGetPayload<{ select: typeof pointerSelect }>;
@@ -29,9 +30,9 @@ export async function readRecoveryDefaults(db: PrismaClient, principal: Principa
   requireTemplateSuperAdmin(principal);
   const wabaId = await configuredSenderWaba(db);
   const rows = await db.whatsAppRecoveryTemplateDefault.findMany({ where: { wabaId }, select: pointerSelect });
-  return { wabaId, slots: RECOVERY_DEFAULT_PURPOSES.map(purpose => ({
-    purpose, current: view(rows.find(row => row.purpose === purpose) ?? null),
-  })) };
+  return { wabaId, slots: RECOVERY_DEFAULT_PURPOSES.flatMap(purpose => RECOVERY_DEFAULT_FORMATS.map(format => ({
+    purpose, format, current: view(rows.find(row => row.purpose === purpose && row.format === format) ?? null),
+  }))) };
 }
 
 export async function verifiedPreview(tx: Prisma.TransactionClient, definitionId: string, wabaId: string, issuedAt: string) {
@@ -43,13 +44,14 @@ export async function verifiedPreview(tx: Prisma.TransactionClient, definitionId
     return reject("NOT_READY", "Select a checkout recovery definition, not an alternative-product template, for this platform default.");
   }
   const purpose = source.purpose as RecoveryDefaultPurpose;
+  const format = verifiedDefaultFormat(source);
   const pointer = await tx.whatsAppRecoveryTemplateDefault.findUnique({
-    where: { wabaId_purpose: { wabaId, purpose } }, select: pointerSelect,
+    where: { wabaId_purpose_format: { wabaId, purpose, format } }, select: pointerSelect,
   });
   const preview: RecoveryDefaultPreview = {
-    definitionId, purpose, wabaId, providerTemplateName: source.name, headerKind: source.headerKind,
+    definitionId, purpose, format, wabaId, providerTemplateName: source.name, headerKind: source.headerKind,
     languageTags: source.locales.map(locale => locale.languageTag), current: view(pointer), issuedAt,
-    fingerprint: digest({ definitionId, wabaId, purpose, issuedAt, source: source.fingerprint,
+    fingerprint: digest({ definitionId, wabaId, purpose, format, issuedAt, source: source.fingerprint,
       providerIdentities: source.locales.map(locale => [locale.languageTag, locale.registrationId, locale.providerTemplateId]),
       pointer: pointer ? [pointer.id, pointer.definitionId, pointer.updatedAt.toISOString(), pointer.definition.status, pointer.definition.publishedAt?.toISOString() ?? null] : null }),
   };
@@ -125,8 +127,8 @@ export async function persistVerifiedDefault(tx: Prisma.TransactionClient,
       data: { publishedAt: lifecycle.publishedAt ?? new Date(), status: "PUBLISHED" } });
   }
   const next = await tx.whatsAppRecoveryTemplateDefault.upsert({
-    where: { wabaId_purpose: { wabaId, purpose: preview.purpose } },
-    create: { wabaId, purpose: preview.purpose, definitionId: source.id, updatedByAdminId: deps.principal.id },
+    where: { wabaId_purpose_format: { wabaId, purpose: preview.purpose, format: preview.format } },
+    create: { wabaId, purpose: preview.purpose, format: preview.format, definitionId: source.id, updatedByAdminId: deps.principal.id },
     update: { definitionId: source.id, updatedByAdminId: deps.principal.id },
     select: { id: true },
   });
@@ -134,7 +136,7 @@ export async function persistVerifiedDefault(tx: Prisma.TransactionClient,
     actorType: "PLATFORM_ADMIN", actorAdminId: deps.principal.id,
     action: "PUBLISH_WHATSAPP_TEMPLATE_DEFINITION", operationId: `recovery-default:${randomUUID()}`, reason,
     metadata: { operation: "SET_RECOVERY_TEMPLATE_DEFAULT", scopeMode: "platform_default", defaultId: next.id,
-      definitionId: source.id, previousDefinitionId: pointer?.definitionId ?? null, wabaId, purpose: preview.purpose,
+      definitionId: source.id, previousDefinitionId: pointer?.definitionId ?? null, wabaId, purpose: preview.purpose, format: preview.format,
       sourceFingerprint: source.fingerprint, registrationIds: Object.fromEntries(source.locales.map(locale => [locale.languageTag, locale.registrationId])),
       languageCount: source.locales.length },
   } });

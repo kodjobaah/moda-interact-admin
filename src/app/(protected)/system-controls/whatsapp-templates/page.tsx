@@ -15,7 +15,7 @@ import { getDefinitionDetail, listDefinitions, getScenarioCoverage, getDynamicLa
 
 export const dynamic = "force-dynamic";
 type SearchParams = { definition?: string | string[]; clone?: string | string[]; create?: string | string[];
-  search?: string | string[]; page?: string | string[]; kind?: string | string[]; status?: string | string[]; history?: string | string[]; scenario?: string | string[] };
+  search?: string | string[]; page?: string | string[]; kind?: string | string[]; status?: string | string[]; history?: string | string[]; scenario?: string | string[]; format?: string | string[] };
 const first = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
 
 /** The catalogue is a dedicated view; authoring/editing cannot share its narrow sidebar. */
@@ -25,6 +25,8 @@ export default async function WhatsAppTemplatesPage({ searchParams }: { searchPa
   const params = await searchParams;
   const selectedId = first(params.definition);
   const cloneId = first(params.clone);
+  const requestedFormat = first(params.format);
+  const initialFormat = requestedFormat === "TEXT" || requestedFormat === "IMAGE" ? requestedFormat : undefined;
   const creating = first(params.create) === "1" || !!cloneId;
   const search = (first(params.search) || "").slice(0, 90);
   const rawPage = Number(first(params.page) || "1");
@@ -59,7 +61,7 @@ export default async function WhatsAppTemplatesPage({ searchParams }: { searchPa
       {selected ? <div className="mx-auto max-w-5xl space-y-4">
         <Link href="/system-controls/whatsapp-templates" className="text-sm font-medium text-blue-800 underline">← Recovery scenarios</Link>
         <TemplateSavedDetail detail={selected} />
-      </div> : creating ? <TemplateAuthoringWorkspace key={cloneFrom?.id || scenario?.id || "new"} cloneFrom={cloneFrom} commonLayouts={commonLayouts} initialScenario={scenario?.draft} />
+      </div> : creating ? <TemplateAuthoringWorkspace key={`${cloneFrom?.id || scenario?.id || "new"}:${initialFormat ?? "original"}`} cloneFrom={cloneFrom} commonLayouts={commonLayouts} initialScenario={scenario?.draft} initialFormat={initialFormat} />
         : overview ? <RecoveryScenariosDashboard overview={overview} />
         : catalogue ? <div className="space-y-6"><Link className="text-sm text-blue-800 underline" href="/system-controls/whatsapp-templates">← Recovery scenarios</Link>{!scenario && <ScenarioCoverageSummary rows={coverage} dynamicLayouts={dynamicLayouts} />}<TemplateCatalogue {...catalogue} search={search} kind={kind} status={status} scenario={scenario?.id} /></div> : null}
     </div>

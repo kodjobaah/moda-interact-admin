@@ -35,8 +35,8 @@ export async function activateCommonRecoveryLayout(input:CommonActivationConfirm
     const definitionIds=[...new Set([selection.commonDefinitionId,...selection.replacements.map(r=>r.definitionId),
       ...(selection.defaultReplacements ?? []).map(r => r.definitionId)])].sort();
     await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "whatsapp"."WhatsAppTemplateDefinition" WHERE "id" IN (${Prisma.join(definitionIds)}) ORDER BY "id" FOR UPDATE`);
-    const lockedLocales = await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`SELECT "id" FROM "whatsapp"."WhatsAppTemplateLocale" WHERE "definitionId" IN (${Prisma.join(definitionIds)}) ORDER BY "id" LIMIT 381 FOR UPDATE`);
-    if (lockedLocales.length > 380) return reject("BOUNDED_SCOPE", "Unexpected locale rows exceed the complete activation bound.");
+    const lockedLocales = await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`SELECT "id" FROM "whatsapp"."WhatsAppTemplateLocale" WHERE "definitionId" IN (${Prisma.join(definitionIds)}) ORDER BY "id" LIMIT 501 FOR UPDATE`);
+    if (lockedLocales.length > 500) return reject("BOUNDED_SCOPE", "Unexpected locale rows exceed the complete activation bound.");
     const lockedRegistrations = await tx.$queryRaw<Array<{id:string}>>(Prisma.sql`SELECT r."id" FROM "whatsapp"."WhatsAppTemplateMetaRegistration" r JOIN "whatsapp"."WhatsAppTemplateLocale" l ON l."id"=r."localeId" WHERE l."definitionId" IN (${Prisma.join(definitionIds)}) OR r."id" IN (SELECT "metaRegistrationId" FROM "whatsapp"."WhatsAppTemplateVariant" WHERE "enabled"=true AND "status"='APPROVED') ORDER BY r."id" LIMIT 2001 FOR UPDATE OF r`);
     if (lockedRegistrations.length > 2000) return reject("BOUNDED_SCOPE", "Registration locks exceed the complete activation bound.");
     await tx.$queryRaw`SELECT "id" FROM "whatsapp"."WhatsAppTemplateVariant" WHERE "enabled"=true AND "status"='APPROVED' ORDER BY "id" LIMIT 1001 FOR UPDATE`;

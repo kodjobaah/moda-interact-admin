@@ -58,9 +58,11 @@ export async function previewCommonActivation(db: Reader, raw: unknown, issuedAt
     const old=parseBindings(row.metaRegistration.parameterBindingsSnapshot);
     const oldComponents=parseComponents(row.metaRegistration.componentsSnapshot);
     const oldTarget=old.promotionTarget??(row.purpose.endsWith("NO_OFFER")?"NONE":"CHECKOUT");
+    const oldFormat=oldComponents.headerFormat === "IMAGE" ? "IMAGE" : "TEXT";
     const matches=definitions.filter(item=>item.shopIds.includes(row.shopId)&&item.source.purpose===row.purpose&&
+      (item.source.headerKind === "IMAGE" ? "IMAGE" : "TEXT")===oldFormat&&
       (item.source.promotionTarget??"NONE")===oldTarget&&customerName(item.source.locales[0].view.bindings!)===customerName(old));
-    if(matches.length!==1)return reject("COHORT_MISMATCH","Every current target and greeting must map to exactly one reviewed equivalent replacement; offer eligibility cannot be widened.");
+    if(matches.length!==1)return reject("COHORT_MISMATCH","Every current format, target and greeting must map to exactly one reviewed equivalent replacement; offer eligibility cannot be widened.");
     const replacement=matches[0];
     covered.add(`${replacement.source.id}|${row.shopId}|${row.languageTag}`);
     variants.push({id:row.id,shopId:row.shopId,purpose:row.purpose,languageTag:row.languageTag,registrationId:row.metaRegistration.id,

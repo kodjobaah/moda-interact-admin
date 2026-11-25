@@ -19,6 +19,7 @@ try {
   }
   const entries = readdirSync(migrations).filter((name) => /^\d{14}_/.test(name)).sort();
   assert.ok(entries.some((name) => name.includes("arch047_whatsapp_template")), "Admin DB submodule lacks ARCH-047 migration");
+  assert.ok(entries.some(entry => entry.endsWith("_whatsapp_recovery_default_formats")), "Update database submodule to dual-format recovery defaults migration");
   for (const entry of entries) docker(["exec", "-i", container, "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", dbName], {
     input: readFileSync(new URL(`${entry}/migration.sql`, migrations), "utf8"),
   });

@@ -102,7 +102,7 @@ export function useTemplatePublication(definitionId: string, initialProgress: Pu
       if (!reply.ok) { setError(reply.message); if (reply.code === "STALE_PREVIEW") setPreview(null); return; }
       setPreview(null);
       if (reply.data.kind === "default_only") {
-        setDefaultSuccess(reply.data.purpose); setAutoRun(false); return;
+        setDefaultSuccess(`${reply.data.purpose}${preview.defaultImpact ? ` · ${preview.defaultImpact.format}` : ""}`); setAutoRun(false); return;
       }
       setProgress(reply.data.progress); setAutoRun(true);
       // The operation URL is a resumable bookmark, never a browser-authorised identity.

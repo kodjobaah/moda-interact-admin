@@ -12,9 +12,10 @@ export const ACTOR_ID = "arch047-publication-admin";
 export const PROVIDER_NAME = "moda_initial_no_offer_arch047_fixture";
 
 /** Direct, independently approved Database fixtures; no ADMIN-004/005/006 dependency. */
-export function definitionFixture(withBrand = true) {
+export function definitionFixture(withBrand = true, image = false) {
   const draft = newMetaDraft();
   if (withBrand) draft.header = [{ type: "text", value: "From " }, { type: "variable", name: "shopBrand.brandName" }];
+  if (image) { draft.header = []; draft.shopBrandMediaRole = "LOGO"; }
   const record = makeImmutableAuthoringRecord(draft);
   const prepared = record.prepared;
   if (prepared.family !== "META_RECOVERY") throw new Error("Expected Meta fixture");

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { recoveryFormat } from "../recovery-defaults/contracts";
 import type { ApprovedSource } from "./source";
 import type { BrandIndicator, ImpactKind, LanguageComparison, PublicationShopImpact } from "./types";
 import { brandAvailability, classify, digest, emptyCounts, makeTemplateView, unavailableHistory } from "./validation";
@@ -42,7 +43,7 @@ function matchesSelectedVariant(variant: Variant, source: ApprovedSource, locale
   const components = Array.isArray(registration.componentsSnapshot) ? registration.componentsSnapshot as Array<Record<string, unknown>> : [];
   const header = components.find((component) => component.type === "HEADER");
   const headerKind = header?.format === "IMAGE" ? "IMAGE" : header?.format === "TEXT" ? "TEXT" : "NONE";
-  if (headerKind !== source.headerKind) return false;
+  if (recoveryFormat(headerKind) !== recoveryFormat(source.headerKind)) return false;
   // Publishing the other initial greeting must preserve the current assignment.
   return !source.purpose.startsWith("INITIAL_") ||
     usesCustomerName(bindings) === usesCustomerName(locale.view.bindings);

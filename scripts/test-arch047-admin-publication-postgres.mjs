@@ -24,6 +24,7 @@ try {
   const ordered = readdirSync(migrations).filter((entry) => /^\d{14}_/.test(entry)).sort();
   assert.ok(ordered.some((entry) => entry.includes("arch047_template_persistence")), "Missing ARCH-047 database migration");
   if (suite === "recovery-defaults-postgres") assert.ok(ordered.some(entry => entry.endsWith("_whatsapp_recovery_template_defaults")), "Missing recovery-defaults database migration; update the database submodule");
+  if (suite === "recovery-defaults-postgres") assert.ok(ordered.some(entry => entry.endsWith("_whatsapp_recovery_default_formats")), "Update database submodule to dual-format recovery defaults migration");
   for (const entry of ordered) docker(["exec", "-i", container, "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", dbName], {
     input: readFileSync(new URL(`${entry}/migration.sql`, migrations), "utf8"),
   });

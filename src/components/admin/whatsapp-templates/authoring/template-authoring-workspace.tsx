@@ -14,8 +14,8 @@ import { useTemplateAuthoringDraft } from "./use-template-authoring-draft";
 import { useShopBrandMediaRole } from "../media/use-shop-brand-media-role";
 
 /** Layout only: all AST mutations, validation, preview and saving live in the controller or pure services. */
-export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [], initialScenario }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonLayoutChoice[]; initialScenario?: MetaTemplateAst }) {
-  const controller = useTemplateAuthoringDraft(cloneFrom, commonLayouts.find(layout => layout.active), initialScenario);
+export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [], initialScenario, initialFormat }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonLayoutChoice[]; initialScenario?: MetaTemplateAst; initialFormat?: import("@/lib/admin/whatsapp-templates/recovery-defaults/contracts").RecoveryDefaultFormat }) {
+  const controller = useTemplateAuthoringDraft(cloneFrom, commonLayouts.find(layout => layout.active), initialScenario, initialFormat);
   const media = useShopBrandMediaRole();
   const [step, setStep] = useState<TemplateEditorStep>("setup");
   const issues = controller.checked.ok ? [] : controller.checked.issues;
@@ -30,7 +30,7 @@ export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [], init
       </div>
     </header>
     {cloneFrom?.kind === "META_RECOVERY" && commonLayouts.some(layout => layout.active) &&
-      <p role="status" className="rounded border border-blue-200 bg-blue-50 p-3 text-sm">The active common layout is preselected for this unsaved clone. Review the full composition before saving; the original message body, discount and media settings are retained.</p>}
+      <p role="status" className="rounded border border-blue-200 bg-blue-50 p-3 text-sm">The active common layout is preselected for this unsaved clone. Review the full composition before saving; the original message body and discount are retained. {initialFormat === "TEXT" ? "The IMAGE binding is removed from this unsaved TEXT clone." : "Review the selected media settings."}</p>}
     {cloneFrom?.kind === "META_RECOVERY" && !commonLayouts.some(layout => layout.active) &&
       <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">No reviewed active common layout is available for automatic selection. Review the saved layout choices before saving this clone.</p>}
     <CommonLayoutSelector draft={controller.draft} choices={commonLayouts} onChange={controller.updateDraft} />

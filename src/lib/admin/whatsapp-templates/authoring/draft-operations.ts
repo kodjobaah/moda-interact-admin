@@ -83,6 +83,14 @@ export function applyCommonLayoutChoice(draft: MetaTemplateAst,
   return { ...draft, commonLayout: structuredClone(reference) };
 }
 
+/** Set only the unsaved media/header fields. Preserve the scenario, message, CTA and source history. */
+export function draftWithRecoveryFormat(draft: MetaTemplateAst, format: import("../recovery-defaults/contracts").RecoveryDefaultFormat): MetaTemplateAst {
+  const next = structuredClone(draft);
+  if (format === "TEXT") delete next.shopBrandMediaRole;
+  else { next.shopBrandMediaRole ??= "LOGO"; next.header = []; }
+  return next;
+}
+
 export function cloneDraft(value: TemplateAst): TemplateAst {
   const draft = structuredClone(value);
   // Only editable clones are normalized; saved records and compiler hashes stay immutable.

@@ -2,11 +2,11 @@ import type { CommonRecoveryLayoutReference } from "@modainteract/moda-interact-
 import type { ApprovedSource } from "../publishing/source";
 import { isValidDefinitionId, isValidKey, reject } from "../publishing/validation";
 
-export const COMMON_ACTIVATION_LIMITS = { definitions: 6, defaults: 12, shops: 50, targets: 1000, variants: 1000, bytes: 1024 * 1024 } as const;
+export const COMMON_ACTIVATION_LIMITS = { definitions: 12, defaults: 12, shops: 50, targets: 1000, variants: 1000, bytes: 1024 * 1024 } as const;
 export type DefaultReplacementSelection = { defaultId: string; definitionId: string };
 export type CommonActivationSelection = { commonDefinitionId: string; replacements: Array<{ definitionId: string; shopIds: string[] }>;
   defaultReplacements?: DefaultReplacementSelection[] };
-export type DefaultActivationImpact = { defaultId: string; wabaId: string; purpose: string; previousDefinitionId: string;
+export type DefaultActivationImpact = { defaultId: string; wabaId: string; purpose: string; format: string; previousDefinitionId: string;
   previousTemplateName: string | null; previousUpdatedAt: string; source: Omit<ApprovedSource, "defaultLifecycle">;
   status: string; publishedAt: string | null; evidenceFingerprint: string };
 export type CommonPointer = { definitionId: string; editVersion: number } | null;
@@ -33,7 +33,7 @@ export type CommonActivationSnapshot = { schemaVersion: 2; kind: "COMMON_RECOVER
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 export function parseCommonSelection(raw: unknown): CommonActivationSelection {
   if (!record(raw) || !["commonDefinitionId,replacements", "commonDefinitionId,defaultReplacements,replacements"].includes(Object.keys(raw).sort().join()) || !isValidDefinitionId(raw.commonDefinitionId) ||
-    !Array.isArray(raw.replacements) || raw.replacements.length > COMMON_ACTIVATION_LIMITS.definitions) return reject("INPUT", "Choose a common revision and up to six existing scenario replacements.");
+    !Array.isArray(raw.replacements) || raw.replacements.length > COMMON_ACTIVATION_LIMITS.definitions) return reject("INPUT", "Choose a common revision and up to twelve existing format-specific scenario replacements.");
   const replacements = raw.replacements.map(item => {
     if (!record(item) || Object.keys(item).sort().join() !== "definitionId,shopIds" || !isValidDefinitionId(item.definitionId) ||
       !Array.isArray(item.shopIds) || !item.shopIds.length || item.shopIds.length > COMMON_ACTIVATION_LIMITS.shops ||

@@ -4,6 +4,7 @@ export type WorkflowStage = "compose" | "translate" | "meta" | "publish";
 export type RecoveryWorkflowFacts = {
   definitionId: string;
   purpose: string;
+  format: import("../recovery-defaults/contracts").RecoveryDefaultFormat;
   providerTemplateName: string | null;
   status: string;
   createdAt: Date;

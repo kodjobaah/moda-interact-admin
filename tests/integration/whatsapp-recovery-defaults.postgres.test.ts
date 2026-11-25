@@ -29,8 +29,8 @@ const publicationRequest = (preview: PublicationPreview, scope: PublicationInten
   operationKey: key, reason: "Reviewed unified publication", acknowledgeOverrides: false,
 });
 const previewScope = (definitionId: string, scope: PublicationIntent) => previewScopedPublication(db, principal, { definitionId, scope, page: 1 });
-async function seedDefinition(suffix: string) {
-  const f = recoveryDefaultFixture(suffix);
+async function seedDefinition(suffix: string, image = false) {
+  const f = recoveryDefaultFixture(suffix, image);
   await db.whatsAppTemplateDefinition.create({ data: {
     id: f.id, kind: f.kind, purpose: f.purpose, offerType: f.offerType, providerTemplateName: f.providerTemplateName,
     sourceLanguageTag: "en", astSchemaVersion: 1, sourceHash: f.sourceHash, category: "MARKETING",
@@ -95,7 +95,7 @@ test("set and replace with zero merchants, retain immutable content and existing
     await db.$executeRawUnsafe(`DROP TRIGGER test_default_audit_failure ON commerce."CommerceAuditEvent"`);
     await db.$executeRawUnsafe(`DROP FUNCTION commerce.test_default_audit_failure()`);
   }
-  const where = { wabaId_purpose: { wabaId: WABA, purpose: "INITIAL_NO_OFFER" } };
+  const where = { wabaId_purpose_format: { wabaId: WABA, purpose: "INITIAL_NO_OFFER", format: "TEXT" } };
   assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({ where })).definitionId, a.id);
   assert.equal((await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: b.id } })).status, "TRANSLATION_QUEUED");
   const futureScope = { mode: "future" } as const;
@@ -172,5 +172,35 @@ test("set and replace with zero merchants, retain immutable content and existing
   if(confirmed.kind!=="operation") throw new Error("Expected acknowledged operation");
   await advancePublication(db,confirmed.progress.operationId);
   assert.equal((await readShopAssignments(db,principal,"INITIAL_NO_OFFER","default-fixture",1)).rows[0].isDefault,true);
+
+  // The optional IMAGE pointer and its full assignment must coexist with the TEXT baseline.
+  const c = await seedDefinition("c", true);
+  const imagePreview = await previewScope(c.id, combinedScope);
+  assert.equal(imagePreview.defaultImpact?.format, "IMAGE");
+  assert.equal(imagePreview.defaultImpact?.currentTemplateName, null);
+  assert.equal(imagePreview.impactCounts.replaced, 0);
+  const imagePublication = await confirmScopedPublication(publicationRequest(imagePreview, combinedScope, "image-coexists"), { db, principal });
+  if (imagePublication.kind !== "operation") throw new Error("Expected IMAGE publication");
+  assert.equal((await advancePublication(db, imagePublication.progress.operationId)).succeededTargets, 20);
+  assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({ where })).definitionId, a.id);
+  const imageWhere = { wabaId_purpose_format: { wabaId: WABA, purpose: "INITIAL_NO_OFFER", format: "IMAGE" } };
+  assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({ where: imageWhere })).definitionId, c.id);
+  const inventory = await readShopAssignments(db, principal, "INITIAL_NO_OFFER", "default-fixture", 1);
+  assert.deepEqual(inventory.rows.map(row => [row.format, row.definitionId, row.languages, row.isDefault]).sort(),
+    [["IMAGE", c.id, 20, true], ["TEXT", a.id, 20, true]]);
+  const dual = (await readRecoveryWorkflow(db, principal)).facts.filter(row => row.definitionId === row.defaultDefinitionId);
+  assert.deepEqual(dual.map(row => [row.format, row.definitionId, row.assignedShops, row.otherAssignedShops]).sort(),
+    [["IMAGE", c.id, 1, 0], ["TEXT", a.id, 1, 0]]);
+  const imageBefore = await db.whatsAppTemplateVariant.findMany({ where: { providerTemplateName: c.providerTemplateName }, orderBy: { id: "asc" } });
+  assert.equal(imageBefore.length, 20);
+  const onlyText = await previewScope(b.id, shopScope);
+  const textPublication = await confirmScopedPublication(publicationRequest(onlyText, shopScope, "text-override-preserves-image"), { db, principal });
+  if (textPublication.kind !== "operation") throw new Error("Expected TEXT shop assignment");
+  await advancePublication(db, textPublication.progress.operationId);
+  assert.deepEqual(await db.whatsAppTemplateVariant.findMany({ where: { providerTemplateName: c.providerTemplateName }, orderBy: { id: "asc" } }), imageBefore);
+  assert.equal(await db.whatsAppTemplateVariant.count({ where: { shopId: "default-fixture-shop", enabled: true, status: "APPROVED" } }), 40);
+  assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({ where })).definitionId, a.id);
+  assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({ where: imageWhere })).definitionId, c.id);
+
 
 });

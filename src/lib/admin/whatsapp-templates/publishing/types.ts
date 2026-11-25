@@ -8,7 +8,7 @@ export type PublicationScope =
 /** Admin UI intent; durable shop operations retain their historical scope shape. */
 export type PublicationIntent = PublicationScope | { mode: "all_future" } | { mode: "future" };
 export type DefaultPublicationImpact = {
-  purpose: string; currentTemplateName: string | null; proposedTemplateName: string;
+  purpose: string; format: import("../recovery-defaults/contracts").RecoveryDefaultFormat; currentTemplateName: string | null; proposedTemplateName: string;
 };
 export type PublicationConfirmation =
   | { kind: "operation"; progress: PublicationProgress; defaultConfigured: boolean }

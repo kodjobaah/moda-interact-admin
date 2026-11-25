@@ -3,7 +3,8 @@ export function PublicationEligibilitySummary({ preview }: { preview: Publicatio
   return <section aria-label="Eligibility summary" className="rounded-lg border border-slate-200 bg-white p-4">
     <h2 className="font-semibold text-slate-900">2. Eligible scope and impact</h2>
     {preview.defaultImpact && <div className="mb-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm">
-      <p className="font-semibold">Platform default — {preview.defaultImpact.purpose}</p>
+      <p className="font-semibold">Platform default — {preview.defaultImpact.purpose} · {preview.defaultImpact.format}</p>
+      <p>Only this format’s default changes. The other format is preserved.</p>
       <p className="break-all">Current: {preview.defaultImpact.currentTemplateName ?? "Not configured"}</p>
       <p className="break-all">Proposed: {preview.defaultImpact.proposedTemplateName}</p>
       <p>All 20 language registrations verified. Future Shopify onboarding inherits the selected version.</p>

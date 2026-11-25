@@ -6,6 +6,8 @@ import { recoveryDefaultFixture } from "../fixtures/whatsapp-recovery-defaults.f
 import { previewRecoveryDefault, readRecoveryDefaults, setRecoveryDefault } from "../../src/lib/admin/whatsapp-templates/recovery-defaults/service";
 import { confirmScopedPublication, parsePublicationIntent, previewScopedPublication } from "../../src/lib/admin/whatsapp-templates/publishing/unified";
 import type { PublicationIntent, PublicationPreview } from "../../src/lib/admin/whatsapp-templates/publishing/types";
+import { verifiedDefaultFormat } from "../../src/lib/admin/whatsapp-templates/recovery-defaults/format";
+import type { ApprovedSource } from "../../src/lib/admin/whatsapp-templates/publishing/source";
 import { PublicationError } from "../../src/lib/admin/whatsapp-templates/publishing/validation";
 
 process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = WABA;
@@ -15,7 +17,7 @@ const code = (expected: string) => (error: unknown) => error instanceof Publicat
 
 function fakeDb() {
   const a = recoveryDefaultFixture(), b = recoveryDefaultFixture("b");
-  const state = { pointer: null as null | { id: string; purpose: string; definitionId: string; updatedAt: Date },
+  const state = { pointer: null as null | { id: string; purpose: string; format: string; definitionId: string; updatedAt: Date },
     audits: [] as unknown[], actorActive: true, sharedLayoutActive: false, writes: 0 };
   const definition = (id: string) => [a, b].find(item => item.id === id);
   const pointer = () => state.pointer ? { ...state.pointer, definition: definition(state.pointer.definitionId)! } : null;
@@ -41,8 +43,8 @@ function fakeDb() {
     whatsAppRecoveryTemplateDefault: {
       findUnique: async () => pointer(),
       findMany: async () => state.pointer ? [pointer()] : [],
-      upsert: async ({ create, update }: { create: { definitionId: string; purpose: string }; update: { definitionId: string } }) => {
-        state.pointer = { id: "default-id", purpose: create.purpose, definitionId: state.pointer ? update.definitionId : create.definitionId, updatedAt: new Date() };
+      upsert: async ({ create, update }: { create: { definitionId: string; purpose: string; format: string }; update: { definitionId: string } }) => {
+        state.pointer = { id: "default-id", purpose: create.purpose, format: create.format, definitionId: state.pointer ? update.definitionId : create.definitionId, updatedAt: new Date() };
         state.writes++; return state.pointer;
       },
     },
@@ -54,10 +56,10 @@ const confirmation = (preview: Awaited<ReturnType<typeof previewRecoveryDefault>
   definitionId: preview.definitionId, fingerprint: preview.fingerprint, issuedAt: preview.issuedAt, reason: "Reviewed recovery default",
 });
 
-test("six independent slots; set and replace without any merchant delegate; preserve first publication and audit", async () => {
+test("twelve independent slots; set and replace without any merchant delegate; preserve first publication and audit", async () => {
   const { db, a, b, state } = fakeDb();
   const overview = await readRecoveryDefaults(db, principal);
-  assert.equal(overview.wabaId, WABA); assert.equal(overview.slots.length, 6);
+  assert.equal(overview.wabaId, WABA); assert.equal(overview.slots.length, 12);
   assert.ok(overview.slots.every(slot => slot.current === null));
   const first = await previewRecoveryDefault(db, principal, a.id);
   assert.equal(first.languageTags.length, 20); assert.equal(first.current, null);
@@ -168,4 +170,12 @@ test("future publication refuses invalid scope payload, revoked Meta approval an
   state.sharedLayoutActive = true;
   await assert.rejects(previewScopedPublication(db, principal, { definitionId: a.id, scope, page: 1 }), code("COMMON_LAYOUT_REQUIRED"));
   assert.equal(state.writes, 0);
+});
+
+
+test("TEXT defaults cannot require merchant branding or a mixed IMAGE registration", () => {
+ const source = {headerKind:"NONE",locales:[{languageTag:"en",view:{},brandFields:[]}]} as unknown as ApprovedSource;
+ assert.equal(verifiedDefaultFormat(source),"TEXT");
+ assert.throws(()=>verifiedDefaultFormat({...source,locales:[{...source.locales[0],brandFields:["shopBrand.brandName"]}]}),code("NOT_READY"));
+ assert.throws(()=>verifiedDefaultFormat({...source,locales:[{...source.locales[0],view:{...source.locales[0].view,headerFormat:"IMAGE"}}]}),code("CONTENT"));
 });

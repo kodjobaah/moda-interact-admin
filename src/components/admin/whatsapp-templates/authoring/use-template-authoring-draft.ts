@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveWhatsAppTemplateDraft, saveWhatsAppTemplateAndStartTranslations } from "@/app/actions/whatsapp-template-authoring";
-import { applyCommonLayoutChoice, cloneDraft, newMetaDraft, newWrapperDraft } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
+import { applyCommonLayoutChoice, cloneDraft, draftWithRecoveryFormat, newMetaDraft, newWrapperDraft } from "@/lib/admin/whatsapp-templates/authoring/draft-operations";
 import { makeImmutableAuthoringRecord } from "@/lib/admin/whatsapp-templates/authoring/compiler";
 import { commonPreparedExample, makeExamplePreview, makeDraftExamplePreview } from "@/lib/admin/whatsapp-templates/authoring/preview";
 import { validateTemplateAst } from "@/lib/admin/whatsapp-templates/authoring/validation";
@@ -11,10 +11,11 @@ import { workflowHref } from "@/lib/admin/whatsapp-templates/workflow/contracts"
 import type { MetaTemplateAst, TemplateAst, TemplateDetail, TemplatePreviewDTO } from "@/lib/admin/whatsapp-templates/authoring/types";
 
 export function useTemplateAuthoringDraft(source?: TemplateDetail | null,
-  activeLayout?: import("@/lib/admin/whatsapp-templates/authoring/common-layout-reads").CommonLayoutChoice, initialScenario?: MetaTemplateAst) {
+  activeLayout?: import("@/lib/admin/whatsapp-templates/authoring/common-layout-reads").CommonLayoutChoice, initialScenario?: MetaTemplateAst, initialFormat?: import("@/lib/admin/whatsapp-templates/recovery-defaults/contracts").RecoveryDefaultFormat) {
   const router = useRouter();
   const [draft, setDraft] = useState<TemplateAst>(() => {
-    const initial = source?.english?.authoring ? cloneDraft(source.english.authoring) : initialScenario ? structuredClone(initialScenario) : newMetaDraft();
+    let initial = source?.english?.authoring ? cloneDraft(source.english.authoring) : initialScenario ? structuredClone(initialScenario) : newMetaDraft();
+    if (initial.family === "META_RECOVERY" && initialFormat) initial = draftWithRecoveryFormat(initial, initialFormat);
     return activeLayout && initial.family === "META_RECOVERY" ? applyCommonLayoutChoice(initial, activeLayout) : initial;
   });
   const [saving, setSaving] = useState(false);

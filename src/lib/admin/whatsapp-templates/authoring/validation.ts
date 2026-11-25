@@ -47,7 +47,11 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
       if (options.contentLanguageTag && ref.languageTag !== options.contentLanguageTag) fail("commonLayout", "Common layout language must match this locale.");
     } catch { fail("commonLayout", "Select a valid saved common shop layout."); }
     if (!Array.isArray(raw.header) || raw.header.length) fail("header", "Common shop identity belongs in the body. Review and explicitly remove the old text header before using the common layout.");
-    if (!["LOGO", "SQUARE_LOGO"].includes(String(raw.shopBrandMediaRole))) fail("shopBrandMediaRole", "Common layouts require a genuine logo or square logo IMAGE header; product media remains separate.");
+    if (raw.shopBrandMediaRole !== undefined && !["LOGO", "SQUARE_LOGO"].includes(String(raw.shopBrandMediaRole))) fail("shopBrandMediaRole", "Choose a genuine logo or square logo IMAGE header, or leave the header absent for TEXT fallback.");
+    if (raw.shopBrandMediaRole === undefined && Array.isArray(raw.body) && raw.body.some(node =>
+        node && typeof node === "object" && node.type === "variable" && typeof node.name === "string" && node.name.startsWith("shopBrand."))) {
+      fail("body", "A TEXT fallback must not depend on merchant branding. Use shop.name instead of shopBrand variables.");
+    }
   }
   if (meta) {
     if (!enumMember(raw.stage, ["INITIAL", "FOLLOW_UP"])) fail("stage", "Select a recovery stage.");

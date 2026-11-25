@@ -24,9 +24,11 @@ export function TemplateContentEditor({ draft, onChange, issues = [], media }: {
           checked={!draft.shopBrandMediaRole} onChange={() => onChange({ ...draft, shopBrandMediaRole: undefined })} />Text or no header</label>
         <p className="text-xs text-slate-600">Choose a ShopBrand role or product image role below. Product images are selected from verified recovery preparation, not from this editor.</p>
       </div>
-      {!draft.shopBrandMediaRole && <TemplateHeaderEditor nodes={draft.header} issues={forField("header")} variables={eligibleHeaderVariables(draft)}
+      {!draft.shopBrandMediaRole && !draft.commonLayout && <TemplateHeaderEditor nodes={draft.header} issues={forField("header")} variables={eligibleHeaderVariables(draft)}
         helpText="Meta text headers allow one short text variable (including brand names), with a maximum of 60 characters."
         onChange={(header) => onChange({ ...draft, header: header.filter((node): node is ContentNode => node.type !== "slot") })} />}
+      {draft.commonLayout && !draft.shopBrandMediaRole && <p className="text-xs text-slate-600">The common layout already supplies shop identity in the body. TEXT fallback has no separate header.</p>}
+      {draft.commonLayout && draft.header.length > 0 && <button type="button" className="text-sm underline" onClick={() => onChange({ ...draft, header: [] })}>Remove old text header</button>}
       {media && <ShopBrandMediaHeaderSection controller={media} selectedRole={draft.shopBrandMediaRole}
         allowProductImage={draft.offerType !== "NO_OFFER" && draft.promotionTarget !== undefined}
         onSelect={(shopBrandMediaRole) => onChange({ ...draft, header: [], shopBrandMediaRole })} />}

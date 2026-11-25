@@ -161,6 +161,14 @@ test("same-purpose assignments are selected by immutable target and header kind,
   const ambiguous = (await readShopImpacts(duplicateMatch.db as any, source, [candidate], false))[0];
   assert.equal(ambiguous.variantsByLanguage.get("en")?.length, 2);
   assert.equal(ambiguous.public.counts.conflict, 1);
+  const headerless = {...alternativeText, id: "headerless", metaRegistration: {...alternativeText.metaRegistration,
+    componentsSnapshot: [{type:"BODY",text:"variant"}]}};
+  const nonImage = fixtureDatabase({variants:[headerless, alternativeImage]});
+  const nonImageImpact = (await readShopImpacts(nonImage.db as any, source, [candidate], false))[0];
+  assert.deepEqual(nonImageImpact.variantsByLanguage.get("en")?.map(row=>row.id),["headerless"]);
+  const sameFamily = fixtureDatabase({variants:[headerless, alternativeText, alternativeImage]});
+  const conflict = (await readShopImpacts(sameFamily.db as any, source, [candidate], false))[0];
+  assert.equal(conflict.public.counts.conflict,1);
 });
 
 test("a linked registration with wrong persisted Meta identity is not treated as an unchanged assignment", async () => {

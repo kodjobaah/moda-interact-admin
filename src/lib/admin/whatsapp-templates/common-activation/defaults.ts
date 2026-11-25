@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type { CommonRecoveryLayoutReference } from "@modainteract/moda-interact-shared/commerce/presentation";
 import { requireCommonLayout } from "../authoring/common-layout";
+import { verifiedDefaultFormat } from "../recovery-defaults/format";
 import { approvedSource } from "../publishing/source";
 import { digest, observedMetaContentHash, reject } from "../publishing/validation";
 import { COMMON_ACTIVATION_LIMITS as LIMITS, type CommonActivationSelection, type DefaultActivationImpact } from "./contracts";
@@ -12,7 +13,7 @@ type Reader = Pick<Prisma.TransactionClient, "whatsAppRecoveryTemplateDefault" |
 export async function previewDefaultReplacements(db: Reader, selection: CommonActivationSelection,
   commonRefs: CommonRecoveryLayoutReference[]): Promise<DefaultActivationImpact[]> {
   const pointers = await db.whatsAppRecoveryTemplateDefault.findMany({ orderBy: { id: "asc" }, take: LIMITS.defaults + 1,
-    select: { id: true, wabaId: true, purpose: true, definitionId: true, updatedAt: true,
+    select: { id: true, wabaId: true, purpose: true, format: true, definitionId: true, updatedAt: true,
       definition: { select: { providerTemplateName: true } } } });
   if (pointers.length > LIMITS.defaults) return reject("BOUNDED_SCOPE", "The configured platform defaults exceed the coordinated review bound.");
   const requested = selection.defaultReplacements ?? [];
@@ -23,8 +24,8 @@ export async function previewDefaultReplacements(db: Reader, selection: CommonAc
   for (const pointer of pointers) {
     const replacement = requested.find(item => item.defaultId === pointer.id)!;
     const source = await approvedSource(db, replacement.definitionId, pointer.wabaId, { requireDefaultEvidence: true });
-    if (source.purpose !== pointer.purpose || source.promotionTarget === "ALTERNATIVE_PRODUCT") {
-      return reject("DEFAULT_COHORT_MISMATCH", `Platform default ${pointer.purpose} requires a checkout recovery replacement of the same purpose and WABA.`);
+    if (source.purpose !== pointer.purpose || source.promotionTarget === "ALTERNATIVE_PRODUCT" || verifiedDefaultFormat(source) !== pointer.format) {
+      return reject("DEFAULT_COHORT_MISMATCH", `Platform default ${pointer.purpose} requires a checkout recovery replacement of the same purpose, format and WABA.`);
     }
     const definition = await db.whatsAppTemplateDefinition.findUniqueOrThrow({ where: { id: source.id },
       include: { locales: { include: { metaRegistrations: { where: { wabaId: pointer.wabaId } } } } } });
@@ -52,7 +53,7 @@ export async function previewDefaultReplacements(db: Reader, selection: CommonAc
     // Store plain JSON rather than Date objects in the immutable activation manifest.
     const { defaultLifecycle, ...approved } = source;
     if (!defaultLifecycle) return reject("INTEGRITY", "Default replacement lifecycle evidence missing.");
-    result.push({ defaultId: pointer.id, wabaId: pointer.wabaId, purpose: pointer.purpose,
+    result.push({ defaultId: pointer.id, wabaId: pointer.wabaId, purpose: pointer.purpose, format: pointer.format,
       previousDefinitionId: pointer.definitionId, previousTemplateName: pointer.definition.providerTemplateName,
       previousUpdatedAt: pointer.updatedAt.toISOString(), source: approved, status: defaultLifecycle.status,
       publishedAt: defaultLifecycle.publishedAt?.toISOString() ?? null, evidenceFingerprint: digest(evidence) });
@@ -73,14 +74,14 @@ export async function persistDefaultReplacements(tx: Prisma.TransactionClient, d
       OR: [{ publishedAt: null }, { status: { not: "PUBLISHED" } }] },
       data: { status: "PUBLISHED", publishedAt: item.publishedAt ? new Date(item.publishedAt) : new Date() } });
     const updated = await tx.whatsAppRecoveryTemplateDefault.updateMany({ where: { id: item.defaultId,
-      wabaId: item.wabaId, purpose: item.purpose, definitionId: item.previousDefinitionId, updatedAt: new Date(item.previousUpdatedAt) },
+      wabaId: item.wabaId, purpose: item.purpose, format: item.format, definitionId: item.previousDefinitionId, updatedAt: new Date(item.previousUpdatedAt) },
       data: { definitionId: item.source.id, updatedByAdminId: actorId } });
     if (updated.count !== 1) return reject("STALE_PREVIEW", "A platform default changed during activation. Review again.");
     await tx.commerceAuditEvent.create({ data: { actorType: "PLATFORM_ADMIN", actorAdminId: actorId,
       action: "PUBLISH_WHATSAPP_TEMPLATE_DEFINITION", operationId: `common-default:${digest([coordinatorId, item.defaultId])}`, reason,
       metadata: { operation: "SET_RECOVERY_TEMPLATE_DEFAULT", scopeMode: "platform_default", coordinatorId,
         defaultId: item.defaultId, previousDefinitionId: item.previousDefinitionId, definitionId: item.source.id,
-        wabaId: item.wabaId, purpose: item.purpose, sourceFingerprint: item.source.fingerprint,
+        wabaId: item.wabaId, purpose: item.purpose, format: item.format, sourceFingerprint: item.source.fingerprint,
         registrationIds: Object.fromEntries(item.source.locales.map(locale => [locale.languageTag, locale.registrationId])) } } });
   }
 }

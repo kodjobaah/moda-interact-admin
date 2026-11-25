@@ -24,18 +24,19 @@ export async function readRecoveryWorkflow(db: PrismaClient, principal: Platform
       select: { definition: { select: { id: true, createdAt: true } } } }),
     db.$queryRaw<RecoveryWorkflowFacts[]>(Prisma.sql`
       WITH latest AS (
-        SELECT DISTINCT ON (d."purpose", d."offerType") d.id
+        SELECT DISTINCT ON (d."purpose", d."offerType", (CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END)) d.id
         FROM whatsapp."WhatsAppTemplateDefinition" d
         JOIN whatsapp."WhatsAppTemplateLocale" e ON e."definitionId"=d.id AND e."languageTag"='en'
         WHERE d.kind='META_RECOVERY' AND d."retiredAt" IS NULL AND d.status<>'RETIRED'
           AND d."purpose" IN ('INITIAL','FOLLOW_UP') AND d."offerType" IN ('NO_OFFER','CODE_OFFER','AUTOMATIC_OFFER')
           AND COALESCE(e."localeAst"#>>'{authoring,promotionTarget}', 'CHECKOUT')='CHECKOUT'
-        ORDER BY d."purpose", d."offerType", d."createdAt" DESC, d.id DESC
+        ORDER BY d."purpose", d."offerType", (CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END), d."createdAt" DESC, d.id DESC
       ), wanted AS (
         ${definitionId ? Prisma.sql`SELECT ${definitionId}::text AS id` : Prisma.sql`
           SELECT id FROM latest UNION SELECT p."definitionId" FROM whatsapp."WhatsAppRecoveryTemplateDefault" p WHERE p."wabaId"=${wabaId}`}
       ), assigned AS (
-        SELECT DISTINCT v.purpose, v."shopId", l."definitionId"
+        SELECT DISTINCT v.purpose, v."shopId", l."definitionId",
+          CASE WHEN r.id IS NULL THEN 'UNKNOWN' WHEN r."componentsSnapshot" @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END AS format
         FROM whatsapp."WhatsAppTemplateVariant" v
         LEFT JOIN whatsapp."WhatsAppTemplateMetaRegistration" r ON r.id=v."metaRegistrationId"
         LEFT JOIN whatsapp."WhatsAppTemplateLocale" l ON l.id=r."localeId"
@@ -44,15 +45,16 @@ export async function readRecoveryWorkflow(db: PrismaClient, principal: Platform
           ${definitionId ? Prisma.sql`AND v.purpose=(SELECT d."purpose" || '_' || d."offerType" FROM whatsapp."WhatsAppTemplateDefinition" d WHERE d.id=${definitionId})` : Prisma.empty}
           AND v.purpose IN ('INITIAL_NO_OFFER','INITIAL_CODE_OFFER','INITIAL_AUTOMATIC_OFFER','FOLLOW_UP_NO_OFFER','FOLLOW_UP_CODE_OFFER','FOLLOW_UP_AUTOMATIC_OFFER')
       ), version_assignments AS (
-        SELECT purpose, "definitionId", count(DISTINCT "shopId")::int AS shops
-        FROM assigned GROUP BY purpose, "definitionId"
+        SELECT purpose, format, "definitionId", count(DISTINCT "shopId")::int AS shops
+        FROM assigned GROUP BY purpose, format, "definitionId"
       ), other_assignments AS (
-        SELECT a.purpose, count(DISTINCT a."shopId")::int AS shops FROM assigned a
-        LEFT JOIN whatsapp."WhatsAppRecoveryTemplateDefault" p ON p."wabaId"=${wabaId} AND p.purpose=a.purpose
+        SELECT a.purpose, a.format, count(DISTINCT a."shopId")::int AS shops FROM assigned a
+        LEFT JOIN whatsapp."WhatsAppRecoveryTemplateDefault" p ON p."wabaId"=${wabaId} AND p.purpose=a.purpose AND p.format=a.format
         WHERE p."definitionId" IS NULL OR a."definitionId" IS DISTINCT FROM p."definitionId"
-        GROUP BY a.purpose
+        GROUP BY a.purpose, a.format
       )
       SELECT d.id AS "definitionId", d."purpose" || '_' || d."offerType" AS purpose,
+        CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END AS format,
         d."providerTemplateName", d.status, d."createdAt", (d."retiredAt" IS NOT NULL OR d.status='RETIRED') AS retired,
         COALESCE(e."localeAst"#>>'{authoring,promotionTarget}', 'CHECKOUT')='CHECKOUT' AS "checkoutTarget",
         w.id AS "activeLayoutId",
@@ -66,10 +68,13 @@ export async function readRecoveryWorkflow(db: PrismaClient, principal: Platform
         op.id AS "publicationId", op.status AS "publicationStatus"
       FROM wanted JOIN whatsapp."WhatsAppTemplateDefinition" d ON d.id=wanted.id AND d.kind='META_RECOVERY'
       LEFT JOIN latest ON latest.id=d.id
-      LEFT JOIN version_assignments va ON va."definitionId"=d.id AND va.purpose=d."purpose" || '_' || d."offerType"
-      LEFT JOIN other_assignments oa ON oa.purpose=d."purpose" || '_' || d."offerType"
       LEFT JOIN whatsapp."WhatsAppTemplateLocale" e ON e."definitionId"=d.id AND e."languageTag"='en'
+      LEFT JOIN version_assignments va ON va."definitionId"=d.id AND va.purpose=d."purpose" || '_' || d."offerType"
+        AND va.format=CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END
+      LEFT JOIN other_assignments oa ON oa.purpose=d."purpose" || '_' || d."offerType"
+        AND oa.format=CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END
       LEFT JOIN whatsapp."WhatsAppRecoveryTemplateDefault" p ON p."wabaId"=${wabaId} AND p.purpose=d."purpose" || '_' || d."offerType"
+        AND p.format=CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END
       LEFT JOIN whatsapp."WhatsAppConversationWrapperActiveSlot" s ON s.audience='SHARED'
       LEFT JOIN whatsapp."WhatsAppTemplateDefinition" w ON w.id=s."definitionId"
       LEFT JOIN LATERAL (

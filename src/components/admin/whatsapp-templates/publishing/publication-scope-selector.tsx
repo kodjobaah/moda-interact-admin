@@ -17,7 +17,7 @@ export function PublicationScopeSelector({ scope, onChange, options, search, onS
         {mode === "one" ? "One shop" : mode === "selected" ? "Selected shops (up to 200)" : mode === "all_future" ? "All existing and future shops" : mode === "future" ? "Future shops only" : "All currently eligible shops"}
       </label>)}
     </fieldset>
-    {scope.mode === "all_future" ? <p className="text-sm text-slate-600">Sets the platform default and publishes to the reviewed existing shops. Existing overrides require explicit confirmation. Works even when there are no shops. Future inheritance is currently implemented for Shopify.</p>
+    {scope.mode === "all_future" ? <p className="text-sm text-slate-600">Sets the platform default for this format and publishes to the reviewed existing shops. Existing overrides require explicit confirmation. Works even when there are no shops. Future inheritance is currently implemented for Shopify.</p>
     : scope.mode === "future" ? <p className="text-sm text-slate-600">Sets the default for future Shopify onboarding. Existing shop assignments will not change. No existing shop is required.</p>
     : scope.mode === "all" ? <p className="text-sm text-slate-600">Publishes only to currently eligible shops; alternative-product templates cannot be platform recovery defaults.</p> : <>
       <p className="text-sm text-slate-600">Assign this version only to the selected shop(s). The platform default and all other shops remain unchanged.</p>

@@ -14,14 +14,14 @@ export function CommonLayoutSelector({ draft, choices, onChange }: {
     <label className="block text-sm">Saved common layout
       <select className="mt-1 w-full rounded border p-2" value={draft.commonLayout?.definitionId ?? ""} onChange={event => {
         const selected = choices.find(row => row.definitionId === event.target.value);
-        if (selected) onChange(applyCommonLayoutChoice({ ...draft, shopBrandMediaRole: draft.shopBrandMediaRole ?? "LOGO" }, selected));
+        if (selected) onChange(applyCommonLayoutChoice(draft, selected));
       }}><option value="" disabled>Choose a reviewed common layout</option>
         {draft.commonLayout && !choices.some(ref => ref.definitionId === draft.commonLayout?.definitionId) &&
           <option value={draft.commonLayout.definitionId} disabled>Historical layout · {draft.commonLayout.definitionId.slice(-12)} · unavailable for new selection</option>}
         {choices.map(ref => <option key={ref.definitionId} value={ref.definitionId}>{ref.createdAt} · {ref.active ? "Active · " : ""}{ref.definitionId.slice(-12)} · 20 reviewed languages</option>)}</select>
     </label>
     {!choices.length && <p className="text-sm text-amber-800">No reviewed shared layout is ready. Create a shared wrapper with the shop name in its header, only the response in its body, and the clickable website before the final checkout link in its checkout-aware footer; review all 20 languages.</p>}
-    {draft.commonLayout && <p className="text-sm text-slate-600">Review any existing inline checkout link or text header explicitly. Product images remain separate from the shop logo. Meta approval is still required for the final composition.</p>}
+    {draft.commonLayout && <p className="text-sm text-slate-600">Review any existing inline checkout link or text header explicitly. Use no header for TEXT fallback, or select a genuine logo for IMAGE. Product images remain separate from the shop logo. Meta approval is still required for the final composition.</p>}
     <label className="block text-sm">Start from a reviewed scenario body
       <select className="mt-1 w-full rounded border p-2" value="" onChange={event => {
         const selected = RECOVERY_SCENARIOS.find(row => row.id === event.target.value);

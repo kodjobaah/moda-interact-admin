@@ -33,10 +33,11 @@ async function common(label="Welcome to "){
   await db.whatsAppTemplateLocale.create({data:{definitionId:saved.id,languageTag,localeAst:json({schemaVersion:1,authoring:ast,prepared}),contentHash:templateHash(prepared),status:"REVIEWED",reviewedAt:new Date(),reviewedByAdminId:id}});
  }return saved.id;
 }
-async function meta(commonId?:string){
+async function meta(commonId?:string, image=true){
  const draft:MetaTemplateAst=structuredClone(RECOVERY_SCENARIOS.find(s=>s.draft.stage==="FOLLOW_UP"&&s.draft.offerType==="NO_OFFER")!.draft);
  draft.footer=[{type:"text",value:"Reply STOP to opt out."}];
- if(commonId){draft.commonLayout=await readSavedCommonLayout(db,commonId,"en");draft.shopBrandMediaRole="LOGO";draft.header=[];}
+ if(commonId)draft.commonLayout=await readSavedCommonLayout(db,commonId,"en");
+ if(image){draft.shopBrandMediaRole="LOGO";draft.header=[];}
  const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft},{db,principal});
  for(const tag of REVIEW_LANGUAGES.filter(t=>t!=="en")){
   const ast=structuredClone(draft);if(tag==="fr")ast.body.unshift({type:"text",value:"Boutique\u00a0: Exemple\nPanier\u00a0: "});if(commonId)ast.commonLayout=await readSavedCommonLayout(db,commonId,tag);const prepared=compileTemplateAst(ast);
@@ -151,33 +152,38 @@ test("platform defaults require explicit compatible replacements even with no me
  const old = await meta(previous.definitionId);
  const nextCommonId = await common("A new platform defaults layout for ");
  const next = await meta(nextCommonId);
- for (const definition of [old, next]) {
+ const oldText = await meta(previous.definitionId, false), nextText = await meta(nextCommonId, false);
+ for (const definition of [old, next, oldText, nextText]) {
   await db.whatsAppTemplateLocale.updateMany({where:{definitionId:definition.id,languageTag:"en"},data:{status:"REVIEWED",reviewedAt:new Date(),reviewedByAdminId:id}});
  }
- await db.whatsAppTemplateDefinition.update({where:{id:old.id},data:{status:"PUBLISHED",publishedAt:new Date()}});
- const pointer=await db.whatsAppRecoveryTemplateDefault.create({data:{wabaId:waba,purpose:"FOLLOW_UP_NO_OFFER",definitionId:old.id,updatedByAdminId:id}});
+ await db.whatsAppTemplateDefinition.updateMany({where:{id:{in:[old.id,oldText.id]}},data:{status:"PUBLISHED",publishedAt:new Date()}});
+ const pointer=await db.whatsAppRecoveryTemplateDefault.create({data:{wabaId:waba,purpose:"FOLLOW_UP_NO_OFFER",format:"IMAGE",definitionId:old.id,updatedByAdminId:id}});
+ const textPointer=await db.whatsAppRecoveryTemplateDefault.create({data:{wabaId:waba,purpose:"FOLLOW_UP_NO_OFFER",format:"TEXT",definitionId:oldText.id,updatedByAdminId:id}});
  const bare={commonDefinitionId:nextCommonId,replacements:[]};
  await assert.rejects(previewCommonActivation(db,bare),/every configured platform default/);
- await assert.rejects(previewCommonActivation(db,{...bare,defaultReplacements:[{defaultId:pointer.id,definitionId:old.id}]}),/selected common revision/);
- const selection={...bare,defaultReplacements:[{defaultId:pointer.id,definitionId:next.id}]};
+ await assert.rejects(previewCommonActivation(db,{...bare,defaultReplacements:[{defaultId:pointer.id,definitionId:old.id},{defaultId:textPointer.id,definitionId:nextText.id}]}),/selected common revision/);
+ await assert.rejects(previewCommonActivation(db,{...bare,defaultReplacements:[{defaultId:pointer.id,definitionId:nextText.id},{defaultId:textPointer.id,definitionId:nextText.id}]}),/same purpose, format and WABA/);
+ const selection={...bare,defaultReplacements:[{defaultId:pointer.id,definitionId:next.id},{defaultId:textPointer.id,definitionId:nextText.id}]};
  const registration=await db.whatsAppTemplateMetaRegistration.findFirstOrThrow({where:{locale:{definitionId:next.id}}});
  await db.whatsAppTemplateMetaRegistration.update({where:{id:registration.id},data:{providerStatus:"PAUSED"}});
  await assert.rejects(previewCommonActivation(db,selection),/approval|registration/i);
  await db.whatsAppTemplateMetaRegistration.update({where:{id:registration.id},data:{providerStatus:"APPROVED"}});
  const preview=await previewCommonActivation(db,selection);
- assert.equal(preview.targetCount,0);assert.equal(preview.defaults?.length,1);
- assert.equal(preview.defaults?.[0].previousDefinitionId,old.id);assert.equal(preview.defaults?.[0].source.id,next.id);
+ assert.equal(preview.targetCount,0);assert.equal(preview.defaults?.length,2);
+ assert.deepEqual(preview.defaults?.map(d=>[d.format,d.previousDefinitionId,d.source.id]).sort(),[["IMAGE",old.id,next.id],["TEXT",oldText.id,nextText.id]]);
  const input={selection,issuedAt:preview.issuedAt,fingerprint:preview.fingerprint,operationKey:randomUUID(),reason:"Reviewed all default locales and the new common revision",acknowledgeOverrides:true as const,consumerDeploymentConfirmed:true as const,englishContentReviewed:true as const};
  const count=await db.whatsAppTemplatePublicationOperation.count();
  const beforeTargets=await db.whatsAppTemplatePublicationTarget.count();
  const failDb={$transaction:<T>(work:(tx:Prisma.TransactionClient)=>Promise<T>,options:object)=>db.$transaction(tx=>work(new Proxy(tx,{get(target,key){if(key==="commerceAuditEvent")return {...target.commerceAuditEvent,create:async(args:Prisma.CommerceAuditEventCreateArgs)=>{if(args.data.action==="ACTIVATE_WHATSAPP_CONVERSATION_WRAPPER")throw Error("default rollback fixture");return target.commerceAuditEvent.create(args);}};return Reflect.get(target,key);}})),options)};
  await assert.rejects(activateCommonRecoveryLayout(input,{db:failDb as unknown as Pick<PrismaClient,"$transaction">,principal}),/default rollback fixture/);
  assert.deepEqual(await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({where:{id:pointer.id}}),pointer);
+ assert.deepEqual(await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({where:{id:textPointer.id}}),textPointer);
  assert.deepEqual(await db.whatsAppConversationWrapperActiveSlot.findUniqueOrThrow({where:{audience:"SHARED"}}),previous);
  assert.equal(await db.whatsAppTemplatePublicationOperation.count(),count);
  const result=await activateCommonRecoveryLayout(input,{db,principal});
  assert.equal(result.targetCount,0);
  assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({where:{id:pointer.id}})).definitionId,next.id);
+ assert.equal((await db.whatsAppRecoveryTemplateDefault.findUniqueOrThrow({where:{id:textPointer.id}})).definitionId,nextText.id);
  assert.equal((await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:next.id}})).status,"PUBLISHED");
  assert.equal((await db.whatsAppConversationWrapperActiveSlot.findUniqueOrThrow({where:{audience:"SHARED"}})).definitionId,nextCommonId);
  assert.equal(await db.whatsAppTemplatePublicationTarget.count(),beforeTargets);assert.equal(await db.whatsAppTemplateVariant.count({where:{enabled:true}}),0);

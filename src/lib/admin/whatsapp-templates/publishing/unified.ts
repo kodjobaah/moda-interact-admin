@@ -28,7 +28,7 @@ async function defaultScopePreview(tx: Prisma.TransactionClient, definitionId: s
     source: verified.source, allowEmpty: true, futureOnly: intent.mode === "future", defaultFingerprint: verified.preview.fingerprint,
   });
   return { verified, state, preview: { ...publicPreview(state, definitionId, page, issuedAt), defaultImpact: {
-    purpose: verified.preview.purpose, currentTemplateName: verified.preview.current?.providerTemplateName ?? null,
+    purpose: verified.preview.purpose, format: verified.preview.format, currentTemplateName: verified.preview.current?.providerTemplateName ?? null,
     proposedTemplateName: verified.preview.providerTemplateName,
   } } };
 }

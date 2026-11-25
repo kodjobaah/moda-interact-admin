@@ -143,7 +143,7 @@ test("future scopes use the same selector and confirmation, with no shop picker 
   assert.doesNotMatch(html, /Search eligible shops by domain/);
   const futurePreview: PublicationPreview = { ...preview, totalShops: 0, totalTargets: 0, shops: [],
     impactCounts: { new: 0, unchanged: 0, replaced: 0, override: 0, conflict: 0 },
-    defaultImpact: { purpose: "INITIAL_NO_OFFER", currentTemplateName: null, proposedTemplateName: "new-template" } };
+    defaultImpact: { purpose: "INITIAL_NO_OFFER", format: "TEXT", currentTemplateName: null, proposedTemplateName: "new-template" } };
   const confirm = renderToStaticMarkup(<><PublicationEligibilitySummary preview={futurePreview} />
     <PublicationOverrideConfirmation preview={futurePreview} reviewedImpact={true} onReviewedImpact={on}
       acknowledgeOverrides={false} onAcknowledgement={on} reason="Reviewed default" onReason={on}

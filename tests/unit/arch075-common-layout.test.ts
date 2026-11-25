@@ -6,6 +6,7 @@ import {createElement} from "react";
 import {renderPreparedWrapper} from "@modainteract/moda-interact-shared/commerce/presentation";
 import {commonRef,commonDefinition,templateHash} from "../fixtures/arch075-common-layout.ts";
 import {RECOVERY_SCENARIOS} from "../../src/lib/admin/whatsapp-templates/authoring/scenarios.ts";
+import {draftWithRecoveryFormat} from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import {validateTemplateAst} from "../../src/lib/admin/whatsapp-templates/authoring/validation.ts";
 import {compileTemplateAst} from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
 import {makeExamplePreview} from "../../src/lib/admin/whatsapp-templates/authoring/preview.ts";
@@ -73,4 +74,23 @@ test("unavailable common source produces a bounded Meta preview issue, preservin
  const {MetaSubmissionError}=await import("../../src/lib/admin/whatsapp-templates/meta/contracts.ts");
  const reader={whatsAppTemplateDefinition:{findUnique:async({where}:{where:{id:string}})=>where.id==="meta-fixture"?{locales:[{localeAst:{authoring:{commonLayout:commonRef()}}}]}:null}} as unknown as Parameters<typeof readMetaPlan>[0];
  await assert.rejects(readMetaPlan(reader,"meta-fixture","fixture-waba"),error=>error instanceof MetaSubmissionError&&error.message.includes("registration history is preserved"));
+});
+
+
+test("all six IMAGE scenarios clone to headerless TEXT without changing the common body or checkout semantics", () => {
+ for (const scenario of RECOVERY_SCENARIOS) {
+  const image: MetaTemplateAst = {...structuredClone(scenario.draft),commonLayout:commonRef(),shopBrandMediaRole:"LOGO",footer:[{type:"text",value:"Reply STOP to opt out."}]};
+  const original = JSON.stringify(image);
+  const text = draftWithRecoveryFormat(image,"TEXT");
+  const a = compileTemplateAst(image), b = compileTemplateAst(text);
+  if (a.family !== "META_RECOVERY" || b.family !== "META_RECOVERY") throw Error("Expected recovery projections");
+  assert.equal(JSON.stringify(image),original);
+  assert.equal(text.shopBrandMediaRole,undefined);
+  assert.deepEqual(text.body,image.body);assert.deepEqual(text.commonLayout,image.commonLayout);
+  assert.deepEqual(b.components,a.components.filter(c=>c.type!=="HEADER"));
+  assert.deepEqual(b.parameterBindings.body,a.parameterBindings.body);
+  assert.equal(b.parameterBindings.headerMediaRole,undefined);
+  assert.notEqual(templateHash(text),templateHash(image));
+  assert.equal(validateTemplateAst({...text,body:[{type:"variable",name:"shopBrand.brandName"},...text.body]}).ok,false);
+ }
 });

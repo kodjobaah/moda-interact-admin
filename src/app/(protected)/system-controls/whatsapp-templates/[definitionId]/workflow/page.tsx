@@ -83,10 +83,10 @@ export default async function RecoveryWorkflowPage({ params, searchParams }: {
     const scope = initialPublicationScope(requestedScope, defaultEligible);
     body = <div className="space-y-4">
       <div className="rounded-lg border bg-white p-4 text-sm">
-        <p className="font-semibold">Platform default and shop-specific assignments</p>
-        <p>{!overview.wabaId ? "Default unknown — sender unavailable." : !facts.defaultDefinitionId ? "No default configured for this purpose." : facts.defaultDefinitionId === definitionId ? "This version is the configured default for future Shopify shops." : "A different version is configured as the default."}</p>
+        <p className="font-semibold">Platform default and shop-specific assignments — {facts.format}</p>
+        <p>{!overview.wabaId ? "Default unknown — sender unavailable." : !facts.defaultDefinitionId ? "No default configured for this purpose and format." : facts.defaultDefinitionId === definitionId ? "This version is the configured default for future Shopify shops." : "A different version is configured as the default."}</p>
         {overview.wabaId && <p>{facts.assignedShops} shops have stored approved/enabled variants linked to this version. Publication review shows the exact impact for each shop and language.</p>}
-        <p className="mt-2">Default-only publication preserves all existing assignments. Shop-only publication does not change the default. Replacing shop-specific overrides requires explicit confirmation.</p>
+        <p className="mt-2">Publication affects this format only. Default-only publication preserves all existing assignments. Shop-only publication does not change the default. Replacing shop-specific overrides requires explicit confirmation.</p>
         {facts.publicationId && !explicitOperation && <p className="mt-2"><Link className="text-blue-800 underline" href={workflowHref(definitionId,"publish",false,undefined,facts.publicationId)}>View or resume publication ({facts.publicationStatus})</Link></p>}
       </div>
       <TemplatePublicationWorkspace key={`${definitionId}:${requestedScope ?? ""}:${explicitOperation ?? ""}`} definitionId={definitionId} initialProgress={initialProgress} defaultEligible={defaultEligible} initialScope={scope} integrated />
@@ -95,7 +95,7 @@ export default async function RecoveryWorkflowPage({ params, searchParams }: {
   return <AdminShell active="whatsapp-templates"><main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
     <div className="mx-auto max-w-7xl space-y-5">
       <Link href={WORKFLOW_ROOT} className="text-sm text-blue-800 underline">← Recovery scenarios</Link>
-      <header><h1 className="text-2xl font-bold">{scenarioLabel(detail.purpose,detail.offerType)}</h1>
+      <header><h1 className="text-2xl font-bold">{scenarioLabel(detail.purpose,detail.offerType)} · {facts.format}</h1>
         <p className="mt-1 break-all text-sm text-slate-600">{detail.providerTemplateName ?? definitionId}</p>
         <p className="text-sm text-slate-600">{layoutLabel(facts)} · {facts.checkoutTarget ? "Checkout recovery" : "Alternative product"}</p>
         {facts.retired && <p role="status">Retired version — read only.</p>}

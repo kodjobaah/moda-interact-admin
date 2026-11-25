@@ -81,6 +81,7 @@ export type ImmutableAuthoringRecord = {
   prepared: PreparedTemplate;
 };
 export type TemplateListItem = {
+  recoveryFormat?: "IMAGE" | "TEXT";
   commonLayoutCoverage?: { active: boolean; localeCount: number; matchingCount: number };
   progress?: { runStatus: string; translated: number; reviewed: number; total: number };
   id: string;

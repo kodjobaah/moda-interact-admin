@@ -6,7 +6,7 @@ import { parseReviewedTranslationBatch } from "../../src/lib/admin/whatsapp-temp
 import { REVIEW_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/compilation/language-codes";
 
 const id = `wtdef_${"a".repeat(64)}`;
-const facts: RecoveryWorkflowFacts = { definitionId:id, purpose:"INITIAL_NO_OFFER", providerTemplateName:"example", status:"SAVED", createdAt:new Date(), retired:false, checkoutTarget:true, activeLayoutId:"active", sourceMatchesActive:true, localeCount:1, matchingCount:1, reviewedCount:1, translatedCount:0, translationRunStatus:null, registeredCount:0, approvedCount:0, defaultDefinitionId:null, latestCandidate:true, assignedShops:0, otherAssignedShops:0, publicationId:null, publicationStatus:null };
+const facts: RecoveryWorkflowFacts = { definitionId:id, purpose:"INITIAL_NO_OFFER", format:"TEXT", providerTemplateName:"example", status:"SAVED", createdAt:new Date(), retired:false, checkoutTarget:true, activeLayoutId:"active", sourceMatchesActive:true, localeCount:1, matchingCount:1, reviewedCount:1, translatedCount:0, translationRunStatus:null, registeredCount:0, approvedCount:0, defaultDefinitionId:null, latestCandidate:true, assignedShops:0, otherAssignedShops:0, publicationId:null, publicationStatus:null };
 
 test("resumption follows persisted progress, historical definitions cannot imply readiness", () => {
   assert.equal(resumeStage(facts),"translate");

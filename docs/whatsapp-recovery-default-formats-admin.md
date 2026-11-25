@@ -1,0 +1,11 @@
+# Recovery defaults: independent TEXT and IMAGE formats
+
+Requires the database submodule with `20261125010000_whatsapp_recovery_default_formats`. Do not deploy this Admin revision alone against the old production schema. Coordinate the database migration with compatible Admin, Shopify and Background consumers.
+
+The six checkout scenarios each have a required operational TEXT baseline and optional IMAGE default. Existing IMAGE-only configurations remain manageable during transition; missing TEXT is displayed, never synthesized. The default writer derives the format from verified immutable content and approved registration evidence, not a caller-supplied format. TEXT includes headerless and text-header templates; a platform TEXT default cannot depend on ShopBrand variables or image media.
+
+The dashboard groups versions, default pointers and assignment counts by purpose and format. Clone the existing IMAGE version as TEXT to preserve the body, checkout offer target, common layout and opt-out copy. The clone remains an unsaved draft until explicit save; new translations, reviews and Meta approvals are required. With a common layout, a TEXT template has no separate header. Both formats use the same verified common body composition. A common layout upgrade requires explicit replacement of every existing format-specific default and assignment; cross-format replacements fail review.
+
+Future-only publication changes only the matching format pointer. Shop-only publication does not change either pointer. Existing+future publication affects matching format and the existing target/greeting dimensions; other known formats remain enabled. No variants, translations, approvals or pointers are mutated by deploying Admin alone. The existing legacy-assignment conflict rules remain unchanged. The dashboard describes persisted observations, not proof of current send eligibility.
+
+Validation: run Prisma validate/generate and TypeScript checking against the updated submodule; run the authoring, compilation, translations, Meta, publication, recovery-defaults and common-layout/activation suites, including disposable PostgreSQL recovery-defaults and common-activation integration. Shopify auto-provisioning of both formats and runtime IMAGE-to-TEXT fallback are separate consumer changes and must be validated before production rollout.

@@ -39,7 +39,9 @@ function item(row: {
   audience: string | null; sourceLanguageTag: string; status: string;
   providerTemplateName: string | null; createdAt: Date;
 }): TemplateListItem {
-  return { ...row, createdAt: row.createdAt.toISOString() };
+  return { id: row.id, kind: row.kind, purpose: row.purpose, offerType: row.offerType,
+    audience: row.audience, sourceLanguageTag: row.sourceLanguageTag, status: row.status,
+    providerTemplateName: row.providerTemplateName, createdAt: row.createdAt.toISOString() };
 }
 
 export async function listDefinitions(page = 1, search = "", filters: { kind?: string; status?: string; scenario?: string } = {}): Promise<{ items: TemplateListItem[]; page: number; hasNext: boolean }> {
@@ -59,6 +61,7 @@ export async function listDefinitions(page = 1, search = "", filters: { kind?: s
     where,
     select: { id: true, kind: true, purpose: true, offerType: true, audience: true,
       sourceLanguageTag: true, status: true, providerTemplateName: true, createdAt: true, sourceHash: true,
+      locales: { where: { languageTag: "en" }, take: 1, select: { localeAst: true } },
       translationRuns: { orderBy: [{ requestedAt: "desc" }, { id: "desc" }], take: 1, select: { status: true, sourceHash: true, items: { select: { status: true, failureCode: true, resultLocaleId: true }, take: 20 } } } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (safePage - 1) * PAGE_SIZE, take: PAGE_SIZE + 1,
   });
@@ -78,7 +81,7 @@ export async function listDefinitions(page = 1, search = "", filters: { kind?: s
     WHERE d.id IN (${Prisma.join(recoveryIds)}) GROUP BY d.id, s."definitionId"
   `) : [];
   const coverageById = new Map(coverage.map(({ id, ...facts }) => [id, facts]));
-  return { items: rows.slice(0, PAGE_SIZE).map(row => ({ ...item(row), commonLayoutCoverage: coverageById.get(row.id), progress: row.translationRuns[0]?.sourceHash === row.sourceHash ? {
+  return { items: rows.slice(0, PAGE_SIZE).map(row => ({ ...item(row), ...(row.kind === "META_RECOVERY" && row.locales[0]?.localeAst ? { recoveryFormat: ((row.locales[0].localeAst as { authoring?: { shopBrandMediaRole?: string } }).authoring?.shopBrandMediaRole ? "IMAGE" : "TEXT") as "IMAGE" | "TEXT" } : {}), commonLayoutCoverage: coverageById.get(row.id), progress: row.translationRuns[0]?.sourceHash === row.sourceHash ? {
     runStatus: row.translationRuns[0].status,
     translated: row.translationRuns[0].items.filter(i => ["COMPLETED", "COMPLETE", "SUCCEEDED", "AVAILABLE"].includes(i.status) && !i.failureCode).length,
     reviewed: row.translationRuns[0].items.filter(i => i.resultLocaleId).length,
