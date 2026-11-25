@@ -171,6 +171,7 @@ function TabForm({
       ? [
           ["Billing", ["billingReconciliationIntervalSeconds", "billingReconciliationShopBatchSize", "shopifyUsagePublishBatchSize"]],
           ["Recovery", ["recoveryRepairIntervalSeconds", "recoveryRepairShopBatchSize", "recoveryResumeBatchSize", "checkoutRecoveryLifetimeDays"]],
+          ["Recovery delivery retries", ["recoveryDeliveryTemporaryRetryDelayMinutes", "recoveryDeliveryRateLimitRetryDelayMinutes", "recoveryDeliveryMarketingRetryDelayMinutes", "recoveryDeliveryMaxRetries"]],
           ["Merchant communications", ["translationReconciliationIntervalSeconds", "translationBatchMaxRequests"]],
           ["Messaging", ["conversationQuietWindowMs", "conversationMaxSettleWindowMs"]],
         ]
@@ -203,7 +204,7 @@ function TabForm({
           draft={draft}
           canMutate={canMutate}
           onChange={updateDraft}
-          intro={title === "Worker throughput" ? "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap." : title === "Recovery" ? "Checkout recovery lifetime is a platform-wide control, defaults to 21 days, and changes the cutoff used by the next expiry scans. Zero expires eligible recoveries immediately and may prevent recovery outreach. Expiry retains recovery, conversation, and message history; later checkout activity can start a new recovery generation." : undefined}
+          intro={title === "Worker throughput" ? "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap." : title === "Recovery" ? "Checkout recovery lifetime is a platform-wide control, defaults to 21 days, and changes the cutoff used by the next expiry scans. Zero expires eligible recoveries immediately and may prevent recovery outreach. Expiry retains recovery, conversation, and message history; later checkout activity can start a new recovery generation." : title === "Recovery delivery retries" ? "Platform-wide for Shopify and WooCommerce. These settings govern retry decisions; automatic resend execution is not enabled yet. Failed delivery credit correction is independent of recycling. The marketing delay does not establish provider clearance." : undefined}
         />
       ))}
       {section === "OPERATIONAL" ? (

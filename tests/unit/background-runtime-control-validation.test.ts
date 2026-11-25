@@ -13,7 +13,7 @@ const componentSource = readFileSync(new URL("../../src/components/admin/backgro
 
 test("covers every DATABASE-004 editable field exactly once", () => {
   const keys = ALL_RUNTIME_FIELDS.map((field) => field.key);
-  assert.equal(keys.length, 42);
+  assert.equal(keys.length, 46);
   assert.equal(new Set(keys).size, keys.length);
 });
 
@@ -136,4 +136,27 @@ test("adds convergence copy only when queue concurrency changed", () => {
   assert.match(queueMessage, /Fleet-wide queue limits converge without redeploying workers\./);
   assert.doesNotMatch(nonQueueMessage, /Fleet-wide queue limits converge without redeploying workers\./);
   assert.match(nonQueueMessage, /Runtime controls updated\. The committed values are shared by all worker replicas\./);
+});
+
+
+test("validates configurable delivery retry values without affecting credit compensation policy", () => {
+  const current = Object.fromEntries(ALL_RUNTIME_FIELDS.map((field) => [field.key, field.defaultValue]));
+  const form = new FormData();
+  for (const field of ALL_RUNTIME_FIELDS) {
+    form.set(field.key, String(field.displayMultiplier ? current[field.key] / field.displayMultiplier : current[field.key]));
+  }
+  const values = { recoveryDeliveryTemporaryRetryDelayMinutes: 7, recoveryDeliveryRateLimitRetryDelayMinutes: 29,
+    recoveryDeliveryMarketingRetryDelayMinutes: 2880, recoveryDeliveryMaxRetries: 0 };
+  for (const [key, value] of Object.entries(values)) form.set(key, String(value));
+  const result = parseRuntimeControlsForm(form, "OPERATIONAL", current);
+  for (const [key, value] of Object.entries(values)) assert.equal(result[key], value);
+  for (const [key, invalid] of Object.entries({ recoveryDeliveryTemporaryRetryDelayMinutes: "0", recoveryDeliveryRateLimitRetryDelayMinutes: "1.5",
+    recoveryDeliveryMarketingRetryDelayMinutes: "1439", recoveryDeliveryMaxRetries: "-1" })) {
+    form.set(key, invalid);
+    assert.throws(() => parseRuntimeControlsForm(form, "OPERATIONAL", current));
+    form.set(key, String(values[key as keyof typeof values]));
+  }
+  form.set("recoveryDeliveryMaxRetries", "2147483648");
+  assert.throws(() => parseRuntimeControlsForm(form, "OPERATIONAL", current));
+  assert.match(componentSource, /Recovery delivery retries/);
 });

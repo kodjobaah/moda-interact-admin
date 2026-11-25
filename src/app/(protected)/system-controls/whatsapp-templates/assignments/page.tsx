@@ -26,7 +26,7 @@ export default async function ShopAssignmentsPage({searchParams}:{searchParams:P
   return <AdminShell active="whatsapp-templates"><main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8"><div className="mx-auto max-w-7xl space-y-5">
     <Link className="text-sm text-blue-800 underline" href={WORKFLOW_ROOT}>← Recovery scenarios</Link>
     <h1 className="text-2xl font-bold">Shop assignments — {scenario.label}</h1>
-    <p className="text-sm text-slate-600">Stored approved and enabled variants for the configured sender. A version different from today's default is not necessarily a manual override. Counts do not establish current Meta or send eligibility.</p>
+    <p className="text-sm text-slate-600">Stored approved and enabled variants for the configured sender. A version different from today&apos;s default is not necessarily a manual override. Counts do not establish current Meta or send eligibility.</p>
     <Link className="inline-block rounded bg-blue-800 px-3 py-2 text-sm font-semibold text-white" href={`${WORKFLOW_ROOT}?history=1&scenario=${scenario.id}`}>Choose a template to assign to shops</Link>
     <form className="flex flex-wrap items-end gap-3" action={`${WORKFLOW_ROOT}/assignments`} method="GET"><input type="hidden" name="scenario" value={scenario.id}/><label className="text-sm">Shop domain<input className="ml-2 rounded border p-2" maxLength={90} name="search" defaultValue={search}/></label><button type="submit" className="rounded border px-3 py-2 text-sm">Search</button></form>
     {!data ? <p role="alert" className="rounded border p-3 text-sm">Assignment inventory unavailable. Verify the sender configuration and check Admin logs.</p> : <>

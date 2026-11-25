@@ -191,3 +191,23 @@ test("documents expired promotion cleanup on the existing reconciliation control
   assert.doesNotMatch(validation, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
   assert.doesNotMatch(component, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
 });
+
+
+test("SUPER_ADMIN saves and audits all delivery retry controls through the operational section", async () => {
+  const fixture = actionFixture();
+  const before = fixture.snapshot(fixture.stored);
+  const overrides = { recoveryDeliveryTemporaryRetryDelayMinutes: "7", recoveryDeliveryRateLimitRetryDelayMinutes: "29",
+    recoveryDeliveryMarketingRetryDelayMinutes: "2880", recoveryDeliveryMaxRetries: "0" };
+  await fixture.action(fixture.form(overrides));
+  for (const [key, value] of Object.entries(overrides)) {
+    assert.equal(fixture.stored[key], Number(value));
+    assert.equal(fixture.updates[0].data[key], Number(value));
+    assert.equal(fixture.audits[0].afterValue[key], Number(value));
+  }
+  assert.deepEqual(fixture.audits[0].beforeValue, before);
+  assert.equal(fixture.stored.version, 8);
+  const invalid = actionFixture();
+  await assert.rejects(invalid.action(invalid.form({ recoveryDeliveryMarketingRetryDelayMinutes: "1439" })), /Marketing restriction retry delay/);
+  assert.equal(invalid.updates.length, 0);
+  assert.equal(invalid.audits.length, 0);
+});
