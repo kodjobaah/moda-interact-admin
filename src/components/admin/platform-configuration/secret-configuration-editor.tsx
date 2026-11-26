@@ -5,6 +5,7 @@ import { mutatePlatformSecretAction, revealPlatformSecretFieldAction } from "@/a
 import type { PublicContract } from "@/lib/admin/platform-configuration/contracts";
 import type { SecretStatus, SecretOperation } from "@/lib/admin/platform-configuration/secret-service";
 import { ConfigurationField } from "./configuration-field";
+import { secretEditorFields } from "@/lib/admin/platform-configuration/secrets-contracts";
 
 const ROTATION_REASONS = [
   { value: "scheduled-rotation", label: "Routine credential replacement" },
@@ -28,6 +29,7 @@ export function SecretConfigurationEditor({ contract, status }: { contract: Publ
   const [revealingField, setRevealingField] = useState<string | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const fields = secretEditorFields(contract, status.configured);
   const changedFields = Object.keys(edits);
   const hasCredentialEdits = changedFields.some((name) =>
     contract.fields.find((field) => field.name === name)?.kind === "secret" && contract.key !== "commerce.bootstrap");
@@ -98,7 +100,7 @@ export function SecretConfigurationEditor({ contract, status }: { contract: Publ
     <p className="mt-2 text-sm text-gray-600">Use Show to check newly entered or previously saved values. Hidden saved fields are left unchanged when you save. Reveal access is audited separately from revision changes.</p>
     <form onSubmit={submit} className="mt-4 space-y-4" noValidate>
       <fieldset disabled={busy} className="space-y-4 disabled:opacity-60">
-        {contract.fields.map((field) => <div key={field.name}>
+        {fields.map((field) => <div key={field.name}>
           <ConfigurationField field={field} disabled={busy} error={errors[field.name]}
             secretRequired={!status.configured && !("optional" in field && field.optional)} secretVisible={Boolean(visible[field.name])}
             onToggleSecretVisibility={field.kind === "secret" ? () => { void reveal(field.name); } : undefined}

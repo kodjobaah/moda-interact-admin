@@ -46,10 +46,10 @@ export const PLATFORM_SECRET_CONTRACTS: readonly ConfigurationContract[] = Objec
   { key: "shopify.appEvents", title: "Shopify App Events credentials", description: "Dedicated App Events API identity, separate from Shopify OAuth and Partner billing.",
     kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
     fields: [withEnvironmentReference(secret("clientId", "App Events client ID"), "SHOPIFY_APP_EVENTS_CLIENT_ID"), withEnvironmentReference(secret("clientSecret", "App Events client secret"), "SHOPIFY_APP_EVENTS_CLIENT_SECRET")] },
-  { key: "messaging.sender", title: "WhatsApp outbound sender", description: "Outbound sender token and Meta sender IDs; not webhook verification credentials.",
+  { key: "messaging.sender", title: "WhatsApp outbound sender", description: "Shared WhatsApp access token and Business Account ID. Recovery phone numbers are managed in the verified sender pool; not webhook verification credentials.",
     kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
     fields: [withEnvironmentReference(secret("accessToken", "WhatsApp access token"), "WHATSAPP_ACCESS_TOKEN"),
-      withEnvironmentReference({ name: "phoneNumberId", kind: "string", label: "Phone number ID", maxLength: 32, description: "Required Meta phone number ID." }, "WHATSAPP_PHONE_NUMBER_ID"),
+      withEnvironmentReference({ name: "phoneNumberId", kind: "string", label: "Phone number ID", maxLength: 32, description: "Required for legacy sender compatibility during initial setup only." }, "WHATSAPP_PHONE_NUMBER_ID"),
       withEnvironmentReference({ name: "businessAccountId", kind: "string", label: "Business account ID", maxLength: 32, description: "Required WhatsApp Business Account ID." }, "WHATSAPP_BUSINESS_ACCOUNT_ID")] },
   { key: "ai.providers", title: "AI provider API keys", description: "API keys for AI service providers such as Groq and OpenAI. ",
     kind: "secret", requiredRole: "SUPER_ADMIN", canReset: false,
@@ -60,3 +60,10 @@ export type SecretPurpose = "auth.admin" | "auth.commerce" | "commerce.bootstrap
 export const SECRET_PURPOSES = new Set<string>(PLATFORM_SECRET_CONTRACTS.map((entry) => entry.key));
 export const SECRET_REASONS = ["initial-setup", "configuration-update", "scheduled-rotation", "credential-compromise", "decommission"] as const;
 export type SecretReason = typeof SECRET_REASONS[number];
+
+/** Keep the legacy stored sender ID for existing consumers, without asking operators to edit it during rotation. */
+export function secretEditorFields(contract: Pick<ConfigurationContract, "key" | "fields">, configured: boolean): readonly FieldContract[] {
+  return contract.key === "messaging.sender" && configured
+    ? contract.fields.filter((field) => field.name !== "phoneNumberId")
+    : contract.fields;
+}

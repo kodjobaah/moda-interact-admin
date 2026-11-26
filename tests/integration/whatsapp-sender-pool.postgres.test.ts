@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { PrismaClient } from "@prisma/client";
 import { mutateSenderPoolWithDependencies, readSenderPoolWithDependencies, type PoolDependencies } from "../../src/lib/admin/platform-configuration/whatsapp-sender-pool-core.ts";
-import { createConfigUnsealKeyring, sealSecret, DISABLED_SECRET } from "../../src/lib/admin/platform-configuration/seal.ts";
+import { createConfigUnsealKeyring, sealSecret, unsealSecret, DISABLED_SECRET } from "../../src/lib/admin/platform-configuration/seal.ts";
 import { mutateSecretWithDependencies } from "../../src/lib/admin/platform-configuration/secret-service.ts";
 import { SenderPoolError, type PoolRow } from "../../src/lib/admin/platform-configuration/whatsapp-sender-pool-types.ts";
 if(process.env.ARCH076_SENDER_POOL_DISPOSABLE_POSTGRES!=="1")throw new Error("Refusing non-disposable database");
@@ -137,11 +137,14 @@ test("priority and drain preserve the same-shop shared route, both basket member
 });
 
 test("sender credential rotation preserves CAS/redacted audit and explicit revoke-set bootstrap",async()=>{
- await config("99901");await inventory("29901","99901");
+ await config("99901");const originalSender=await inventory("29901","99901");
  const current=await db.platformConfiguration.findUniqueOrThrow({where:{environment_key:{environment:"test",key:"messaging.sender"}}});
  const before=await db.platformConfigurationAudit.count();
  const rotated=await mutateSecretWithDependencies({key:"messaging.sender",operation:"rotate",expectedVersion:current.version,values:{accessToken:"rotated-fixture-token"},reason:"scheduled-rotation",confirmation:"ROTATE"},{db,environment:"test",principal,wrapping});
  assert.equal(rotated.version,current.version+1);assert.equal(await db.platformConfigurationAudit.count(),before+1);
+ const saved=await db.platformConfiguration.findUniqueOrThrow({where:{environment_key:{environment:"test",key:"messaging.sender"}}});
+ assert.deepEqual(JSON.parse(unsealSecret({environment:"test",key:"messaging.sender",version:saved.version,value:saved.value,wrapping})),{accessToken:"rotated-fixture-token",phoneNumberId:"20000",businessAccountId:"99901"});
+ assert.deepEqual(await db.whatsAppPoolSender.findUniqueOrThrow({where:{providerPhoneNumberId:"29901"}}),originalSender);
  const audit=await db.platformConfigurationAudit.findFirstOrThrow({where:{resultingVersion:rotated.version,key:"messaging.sender"},orderBy:{createdAt:"desc"}});
  assert.equal(audit.actorId,principal.id);assert.equal(audit.reason,"scheduled-rotation");assert.doesNotMatch(JSON.stringify(audit),/rotated-fixture-token|fixture-only-token|accessToken|businessAccountId/);
  await assert.rejects(mutateSecretWithDependencies({key:"messaging.sender",operation:"update",expectedVersion:current.version,values:{businessAccountId:"99902"}},{db,environment:"test",principal,wrapping}),/Configuration changed/);
