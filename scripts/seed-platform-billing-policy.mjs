@@ -197,21 +197,24 @@ function validatePolicy(policy) {
     throw new Error("Default outbound hard limit must be at least 2.");
   }
   if (policy.defaultOutboundSoftLimit > policy.defaultOutboundHardLimit) {
-    throw new Error("Default outbound soft limit must not exceed the hard limit.");
+    throw new Error(
+      "Default outbound soft limit must not exceed the hard limit.",
+    );
   }
   if (policy.defaultOutboundHardLimit > policy.absoluteOutboundHardLimit) {
-    throw new Error("Default outbound hard limit must not exceed the absolute hard limit.");
+    throw new Error(
+      "Default outbound hard limit must not exceed the absolute hard limit.",
+    );
   }
   if (policy.terminalMessageReservedSlots < 1) {
     throw new Error("Terminal message reserved slots must be at least 1.");
   }
   if (policy.terminalMessageReservedSlots >= policy.defaultOutboundHardLimit) {
-    throw new Error("Terminal message reserved slots must be lower than the default outbound hard limit.");
+    throw new Error(
+      "Terminal message reserved slots must be lower than the default outbound hard limit.",
+    );
   }
-  if (
-    policy.defaultWarningPercent < 0 ||
-    policy.defaultWarningPercent > 100
-  ) {
+  if (policy.defaultWarningPercent < 0 || policy.defaultWarningPercent > 100) {
     throw new Error("Warning threshold must be between 0 and 100 percent.");
   }
   if (policy.lifetimeFreeRecoveryAllowance < 0) {
@@ -279,32 +282,29 @@ async function seed(profileName) {
   await ensureSnapshot();
   const values = buildPolicy(profileName);
 
-  return prisma.$transaction(
-    async (transaction) => {
-      const before = await transaction.platformBillingPolicy.findUnique({
-        where: { id: "default" },
-      });
+  return prisma.$transaction(async (transaction) => {
+    const before = await transaction.platformBillingPolicy.findUnique({
+      where: { id: "default" },
+    });
 
-      const after = await transaction.platformBillingPolicy.upsert({
-        where: { id: "default" },
-        create: {
-          id: "default",
-          ...values,
-          version: 0,
-        },
-        update: {
-          ...values,
-          version: { increment: 1 },
-        },
-      });
+    const after = await transaction.platformBillingPolicy.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        ...values,
+        version: 0,
+      },
+      update: {
+        ...values,
+        version: { increment: 1 },
+      },
+    });
 
-      return {
-        before: serializablePolicy(before),
-        after: serializablePolicy(after),
-      };
-    },
-    TRANSACTION_OPTIONS,
-  );
+    return {
+      before: serializablePolicy(before),
+      after: serializablePolicy(after),
+    };
+  }, TRANSACTION_OPTIONS);
 }
 
 async function restore() {
@@ -316,63 +316,70 @@ async function restore() {
     );
   }
 
-  const result = await prisma.$transaction(
-    async (transaction) => {
-      const before = await transaction.platformBillingPolicy.findUnique({
+  const result = await prisma.$transaction(async (transaction) => {
+    const before = await transaction.platformBillingPolicy.findUnique({
+      where: { id: "default" },
+    });
+
+    if (!snapshot.existed) {
+      await transaction.platformBillingPolicy.deleteMany({
         where: { id: "default" },
       });
-
-      if (!snapshot.existed) {
-        await transaction.platformBillingPolicy.deleteMany({
-          where: { id: "default" },
-        });
-        return {
-          before: serializablePolicy(before),
-          after: null,
-        };
-      }
-
-      if (!snapshot.policy) {
-        throw new Error("Snapshot says a policy existed but contains no policy data.");
-      }
-
-      const original = snapshot.policy;
-      const restoreValues = {
-        globalPauseNewRecoveries: original.globalPauseNewRecoveries,
-        globalPauseAutomatedWhatsapp: original.globalPauseAutomatedWhatsapp,
-        lifetimeFreeRecoveryAllowance: original.lifetimeFreeRecoveryAllowance,
-        minimumUpgradePremiumBps: original.minimumUpgradePremiumBps,
-        absoluteOutboundHardLimit: original.absoluteOutboundHardLimit,
-        defaultWarningPercent: original.defaultWarningPercent,
-        defaultOutboundSoftLimit: original.defaultOutboundSoftLimit,
-        defaultOutboundHardLimit: original.defaultOutboundHardLimit,
-        terminalMessageReservedSlots: original.terminalMessageReservedSlots,
-        version: original.version,
-      };
-      validatePolicy(restoreValues);
-
-      const after = await transaction.platformBillingPolicy.upsert({
-        where: { id: "default" },
-        create: {
-          id: "default",
-          ...restoreValues,
-          ...(original.createdAt ? { createdAt: new Date(original.createdAt) } : {}),
-          ...(original.updatedAt ? { updatedAt: new Date(original.updatedAt) } : {}),
-        },
-        update: {
-          ...restoreValues,
-          ...(original.createdAt ? { createdAt: new Date(original.createdAt) } : {}),
-          ...(original.updatedAt ? { updatedAt: new Date(original.updatedAt) } : {}),
-        },
-      });
-
       return {
         before: serializablePolicy(before),
-        after: serializablePolicy(after),
+        after: null,
       };
-    },
-    TRANSACTION_OPTIONS,
-  );
+    }
+
+    if (!snapshot.policy) {
+      throw new Error(
+        "Snapshot says a policy existed but contains no policy data.",
+      );
+    }
+
+    const original = snapshot.policy;
+    const restoreValues = {
+      globalPauseNewRecoveries: original.globalPauseNewRecoveries,
+      globalPauseAutomatedWhatsapp: original.globalPauseAutomatedWhatsapp,
+      lifetimeFreeRecoveryAllowance: original.lifetimeFreeRecoveryAllowance,
+      minimumUpgradePremiumBps: original.minimumUpgradePremiumBps,
+      absoluteOutboundHardLimit: original.absoluteOutboundHardLimit,
+      defaultWarningPercent: original.defaultWarningPercent,
+      defaultOutboundSoftLimit: original.defaultOutboundSoftLimit,
+      defaultOutboundHardLimit: original.defaultOutboundHardLimit,
+      terminalMessageReservedSlots: original.terminalMessageReservedSlots,
+      version: original.version,
+    };
+    validatePolicy(restoreValues);
+
+    const after = await transaction.platformBillingPolicy.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        ...restoreValues,
+        ...(original.createdAt
+          ? { createdAt: new Date(original.createdAt) }
+          : {}),
+        ...(original.updatedAt
+          ? { updatedAt: new Date(original.updatedAt) }
+          : {}),
+      },
+      update: {
+        ...restoreValues,
+        ...(original.createdAt
+          ? { createdAt: new Date(original.createdAt) }
+          : {}),
+        ...(original.updatedAt
+          ? { updatedAt: new Date(original.updatedAt) }
+          : {}),
+      },
+    });
+
+    return {
+      before: serializablePolicy(before),
+      after: serializablePolicy(after),
+    };
+  }, TRANSACTION_OPTIONS);
 
   await fs.rm(SNAPSHOT_PATH, { force: true });
   return result;
@@ -387,21 +394,18 @@ async function deletePolicy() {
   }
 
   await ensureSnapshot();
-  return prisma.$transaction(
-    async (transaction) => {
-      const before = await transaction.platformBillingPolicy.findUnique({
-        where: { id: "default" },
-      });
-      const deleted = await transaction.platformBillingPolicy.deleteMany({
-        where: { id: "default" },
-      });
-      return {
-        deleted: deleted.count,
-        before: serializablePolicy(before),
-      };
-    },
-    TRANSACTION_OPTIONS,
-  );
+  return prisma.$transaction(async (transaction) => {
+    const before = await transaction.platformBillingPolicy.findUnique({
+      where: { id: "default" },
+    });
+    const deleted = await transaction.platformBillingPolicy.deleteMany({
+      where: { id: "default" },
+    });
+    return {
+      deleted: deleted.count,
+      before: serializablePolicy(before),
+    };
+  }, TRANSACTION_OPTIONS);
 }
 
 function printPolicy(title, policy) {

@@ -1,64 +1,181 @@
 import type { SemanticVariable, ShopBrandVariable, TemplateAst } from "./types";
 
-type VariableDefinition = { label: string; sample: string; sourceField?: string };
+type VariableDefinition = {
+  label: string;
+  sample: string;
+  sourceField?: string;
+};
 
 /** Only merchant-display attributes are exposed, never ShopBrand row IDs or audit timestamps.
  * Image URLs are inserted as URL *text*, not WhatsApp media/image attachments.
  * Background must resolve each value for the sending shop and fail closed when absent.
  */
 export const SHOP_BRAND_VARIABLES = [
-  "shopBrand.brandName", "shopBrand.logoUrl", "shopBrand.logoAltText",
-  "shopBrand.logoWidth", "shopBrand.logoHeight", "shopBrand.squareLogoUrl",
-  "shopBrand.squareLogoAltText", "shopBrand.coverImageUrl",
+  "shopBrand.brandName",
+  "shopBrand.logoUrl",
+  "shopBrand.logoAltText",
+  "shopBrand.logoWidth",
+  "shopBrand.logoHeight",
+  "shopBrand.squareLogoUrl",
+  "shopBrand.squareLogoAltText",
+  "shopBrand.coverImageUrl",
 ] as const satisfies readonly ShopBrandVariable[];
 
 export const VARIABLE_REGISTRY: Record<SemanticVariable, VariableDefinition> = {
   "customer.firstName": { label: "Customer's first name", sample: "Alex" },
-  "shop.websiteUrl": { label: "Shop website", sample: "https://www.example.com" },
+  "shop.websiteUrl": {
+    label: "Shop website",
+    sample: "https://www.example.com",
+  },
   "shop.name": { label: "Shop name", sample: "Example Shop" },
-  "shop.categoryName": { label: "What the shop sells (active store category)", sample: "outdoor clothing and accessories", sourceField: "CommerceShopProfile.activeCategory.displayName" },
-  "checkout.url": { label: "Checkout link", sample: "https://www.example.com/checkout/demo" },
-  "checkout.itemsSummary": { label: "Abandoned basket summary", sample: "1 Trail Jacket, 2 Water Bottles", sourceField: "CheckoutRecovery.itemsSummary" },
+  "shop.categoryName": {
+    label: "What the shop sells (active store category)",
+    sample: "outdoor clothing and accessories",
+    sourceField: "CommerceShopProfile.activeCategory.displayName",
+  },
+  "checkout.url": {
+    label: "Checkout link",
+    sample: "https://www.example.com/checkout/demo",
+  },
+  "checkout.itemsSummary": {
+    label: "Abandoned basket summary",
+    sample: "1 Trail Jacket, 2 Water Bottles",
+    sourceField: "CheckoutRecovery.itemsSummary",
+  },
   "offer.code": { label: "Verified offer code", sample: "SAMPLE10" },
-  "offer.codes": { label: "Verified possible checkout codes (up to three)", sample: "SAVE10, SHIPFREE" },
-  "offer.description": { label: "Verified offer description", sample: "an example discount" },
-  "promotion.productName": { label: "Verified alternative product", sample: "Trail Running Jacket", sourceField: "promotion.productName" },
-  "promotion.productUrl": { label: "Verified alternative product link", sample: "https://www.example.com/products/trail-running-jacket", sourceField: "promotion.productUrl" },
-  "promotion.offerDescription": { label: "Verified alternative-product offer", sample: "a current sale price", sourceField: "promotion.offerDescription" },
-  "promotion.code": { label: "Verified alternative-product code", sample: "TRAIL15", sourceField: "promotion.code" },
-  "shopBrand.brandName": { label: "Brand name", sample: "Example Brand", sourceField: "ShopBrand.brandName" },
-  "shopBrand.logoUrl": { label: "Logo URL (text)", sample: "https://example.com/brand/logo.png", sourceField: "ShopBrand.logoUrl" },
-  "shopBrand.logoAltText": { label: "Logo alt text", sample: "Example Brand logo", sourceField: "ShopBrand.logoAltText" },
-  "shopBrand.logoWidth": { label: "Logo width", sample: "240", sourceField: "ShopBrand.logoWidth" },
-  "shopBrand.logoHeight": { label: "Logo height", sample: "120", sourceField: "ShopBrand.logoHeight" },
-  "shopBrand.squareLogoUrl": { label: "Square logo URL (text)", sample: "https://example.com/brand/square.png", sourceField: "ShopBrand.squareLogoUrl" },
-  "shopBrand.squareLogoAltText": { label: "Square logo alt text", sample: "Example Brand square logo", sourceField: "ShopBrand.squareLogoAltText" },
-  "shopBrand.coverImageUrl": { label: "Cover image URL (text)", sample: "https://example.com/brand/cover.jpg", sourceField: "ShopBrand.coverImageUrl" },
+  "offer.codes": {
+    label: "Verified possible checkout codes (up to three)",
+    sample: "SAVE10, SHIPFREE",
+  },
+  "offer.description": {
+    label: "Verified offer description",
+    sample: "an example discount",
+  },
+  "promotion.productName": {
+    label: "Verified alternative product",
+    sample: "Trail Running Jacket",
+    sourceField: "promotion.productName",
+  },
+  "promotion.productUrl": {
+    label: "Verified alternative product link",
+    sample: "https://www.example.com/products/trail-running-jacket",
+    sourceField: "promotion.productUrl",
+  },
+  "promotion.offerDescription": {
+    label: "Verified alternative-product offer",
+    sample: "a current sale price",
+    sourceField: "promotion.offerDescription",
+  },
+  "promotion.code": {
+    label: "Verified alternative-product code",
+    sample: "TRAIL15",
+    sourceField: "promotion.code",
+  },
+  "shopBrand.brandName": {
+    label: "Brand name",
+    sample: "Example Brand",
+    sourceField: "ShopBrand.brandName",
+  },
+  "shopBrand.logoUrl": {
+    label: "Logo URL (text)",
+    sample: "https://example.com/brand/logo.png",
+    sourceField: "ShopBrand.logoUrl",
+  },
+  "shopBrand.logoAltText": {
+    label: "Logo alt text",
+    sample: "Example Brand logo",
+    sourceField: "ShopBrand.logoAltText",
+  },
+  "shopBrand.logoWidth": {
+    label: "Logo width",
+    sample: "240",
+    sourceField: "ShopBrand.logoWidth",
+  },
+  "shopBrand.logoHeight": {
+    label: "Logo height",
+    sample: "120",
+    sourceField: "ShopBrand.logoHeight",
+  },
+  "shopBrand.squareLogoUrl": {
+    label: "Square logo URL (text)",
+    sample: "https://example.com/brand/square.png",
+    sourceField: "ShopBrand.squareLogoUrl",
+  },
+  "shopBrand.squareLogoAltText": {
+    label: "Square logo alt text",
+    sample: "Example Brand square logo",
+    sourceField: "ShopBrand.squareLogoAltText",
+  },
+  "shopBrand.coverImageUrl": {
+    label: "Cover image URL (text)",
+    sample: "https://example.com/brand/cover.jpg",
+    sourceField: "ShopBrand.coverImageUrl",
+  },
 };
 
 export function eligibleVariables(draft: TemplateAst): SemanticVariable[] {
-  if (draft.family === "MODA_CONVERSATION_WRAPPER" && draft.audience === "ROUTER") return [];
+  if (
+    draft.family === "MODA_CONVERSATION_WRAPPER" &&
+    draft.audience === "ROUTER"
+  )
+    return [];
   // Taxonomy-backed store category is a Meta recovery-body binding only.
   // It requires an active category for the destination shop when the message is prepared.
-  const base: SemanticVariable[] = ["customer.firstName", "shop.name", "shop.websiteUrl", "checkout.url",
+  const base: SemanticVariable[] = [
+    "customer.firstName",
+    "shop.name",
+    "shop.websiteUrl",
+    "checkout.url",
     ...(draft.family === "META_RECOVERY" ? ["shop.categoryName" as const] : []),
-    ...(draft.family === "META_RECOVERY" && draft.stage === "INITIAL" ? ["checkout.itemsSummary" as const] : []),
-    ...SHOP_BRAND_VARIABLES];
-  if (draft.family === "MODA_CONVERSATION_WRAPPER" || draft.offerType === "NO_OFFER") return base;
-  if (draft.promotionTarget === "ALTERNATIVE_PRODUCT") return [
-    ...base, "promotion.productName", "promotion.productUrl", "promotion.offerDescription",
-    ...(draft.offerType === "CODE_OFFER" ? ["promotion.code" as const] : []),
+    ...(draft.family === "META_RECOVERY" && draft.stage === "INITIAL"
+      ? ["checkout.itemsSummary" as const]
+      : []),
+    ...SHOP_BRAND_VARIABLES,
   ];
-  return [...base, ...(draft.promotionTarget && draft.stage !== "INITIAL" ? ["checkout.itemsSummary" as const] : []),
-    ...(draft.offerType === "AUTOMATIC_OFFER" ? [] : ["offer.code" as const,
-      ...(draft.stage === "INITIAL" && draft.promotionTarget === "CHECKOUT" ? ["offer.codes" as const] : [])]), "offer.description"];
+  if (
+    draft.family === "MODA_CONVERSATION_WRAPPER" ||
+    draft.offerType === "NO_OFFER"
+  )
+    return base;
+  if (draft.promotionTarget === "ALTERNATIVE_PRODUCT")
+    return [
+      ...base,
+      "promotion.productName",
+      "promotion.productUrl",
+      "promotion.offerDescription",
+      ...(draft.offerType === "CODE_OFFER" ? ["promotion.code" as const] : []),
+    ];
+  return [
+    ...base,
+    ...(draft.promotionTarget && draft.stage !== "INITIAL"
+      ? ["checkout.itemsSummary" as const]
+      : []),
+    ...(draft.offerType === "AUTOMATIC_OFFER"
+      ? []
+      : [
+          "offer.code" as const,
+          ...(draft.stage === "INITIAL" && draft.promotionTarget === "CHECKOUT"
+            ? ["offer.codes" as const]
+            : []),
+        ]),
+    "offer.description",
+  ];
 }
 
 /** Meta permits at most one text header parameter, but not dynamic footer parameters.
  * Long image URLs and numerical sizing metadata are inappropriate as text headers.
  * Wrapper headers do not have the one-parameter Meta limitation.
  */
-export function eligibleHeaderVariables(draft: TemplateAst): SemanticVariable[] {
-  if (draft.family !== "META_RECOVERY") return eligibleVariables(draft).filter((name) => name !== "checkout.url");
-  return ["customer.firstName", "shop.name", "shopBrand.brandName", "shopBrand.logoAltText", "shopBrand.squareLogoAltText"];
+export function eligibleHeaderVariables(
+  draft: TemplateAst,
+): SemanticVariable[] {
+  if (draft.family !== "META_RECOVERY")
+    return eligibleVariables(draft).filter((name) => name !== "checkout.url");
+  return [
+    "customer.firstName",
+    "shop.name",
+    "shopBrand.brandName",
+    "shopBrand.logoAltText",
+    "shopBrand.squareLogoAltText",
+  ];
 }

@@ -38,64 +38,112 @@ const TRANSLATION_COPY = {
     description: (name) =>
       `${name} je testovací cenový plán určený k ověření stránkování, filtrování a úprav v administračním rozhraní.`,
     highlights: [
-      ["Předvídatelná cena", "Jasná testovací cena pro ověření zobrazení plánu."],
-      ["Flexibilní kredity", "Různé limity kreditů pomáhají testovat řazení a ekonomiku portfolia."],
+      [
+        "Předvídatelná cena",
+        "Jasná testovací cena pro ověření zobrazení plánu.",
+      ],
+      [
+        "Flexibilní kredity",
+        "Různé limity kreditů pomáhají testovat řazení a ekonomiku portfolia.",
+      ],
     ],
   },
   da: {
     description: (name) =>
       `${name} er en testprisplan til validering af paginering, filtrering og redigering i administrationsgrænsefladen.`,
     highlights: [
-      ["Forudsigelig pris", "En tydelig testpris til kontrol af planvisningen."],
-      ["Fleksible kreditter", "Forskellige kreditgrænser hjælper med at teste sortering og porteføljeøkonomi."],
+      [
+        "Forudsigelig pris",
+        "En tydelig testpris til kontrol af planvisningen.",
+      ],
+      [
+        "Fleksible kreditter",
+        "Forskellige kreditgrænser hjælper med at teste sortering og porteføljeøkonomi.",
+      ],
     ],
   },
   de: {
     description: (name) =>
       `${name} ist ein Testtarif zur Prüfung von Seitennavigation, Filtern und Bearbeitung in der Administrationsoberfläche.`,
     highlights: [
-      ["Planbare Preise", "Ein klarer Testpreis zur Überprüfung der Tarifdarstellung."],
-      ["Flexible Guthaben", "Unterschiedliche Guthabenmengen helfen beim Testen von Sortierung und Portfolioökonomie."],
+      [
+        "Planbare Preise",
+        "Ein klarer Testpreis zur Überprüfung der Tarifdarstellung.",
+      ],
+      [
+        "Flexible Guthaben",
+        "Unterschiedliche Guthabenmengen helfen beim Testen von Sortierung und Portfolioökonomie.",
+      ],
     ],
   },
   en: {
     description: (name) =>
       `${name} is a test pricing plan for validating pagination, filtering and editing flows in the admin interface.`,
     highlights: [
-      ["Predictable pricing", "A clear test price for validating plan presentation."],
-      ["Flexible credits", "Different credit allowances help exercise sorting and portfolio economics."],
+      [
+        "Predictable pricing",
+        "A clear test price for validating plan presentation.",
+      ],
+      [
+        "Flexible credits",
+        "Different credit allowances help exercise sorting and portfolio economics.",
+      ],
     ],
   },
   es: {
     description: (name) =>
       `${name} es un plan de precios de prueba para validar la paginación, los filtros y los flujos de edición en la interfaz de administración.`,
     highlights: [
-      ["Precio predecible", "Un precio de prueba claro para validar la presentación del plan."],
-      ["Créditos flexibles", "Distintas asignaciones de créditos ayudan a probar el orden y la economía de la cartera."],
+      [
+        "Precio predecible",
+        "Un precio de prueba claro para validar la presentación del plan.",
+      ],
+      [
+        "Créditos flexibles",
+        "Distintas asignaciones de créditos ayudan a probar el orden y la economía de la cartera.",
+      ],
     ],
   },
   fi: {
     description: (name) =>
       `${name} on testihinnoittelupaketti sivutuksen, suodatuksen ja muokkauspolkujen tarkistamiseen hallintaliittymässä.`,
     highlights: [
-      ["Ennakoitava hinnoittelu", "Selkeä testihinta suunnitelman esityksen tarkistamiseen."],
-      ["Joustavat krediitit", "Eri krediittimäärät auttavat testaamaan järjestystä ja portfolioekonomiaa."],
+      [
+        "Ennakoitava hinnoittelu",
+        "Selkeä testihinta suunnitelman esityksen tarkistamiseen.",
+      ],
+      [
+        "Joustavat krediitit",
+        "Eri krediittimäärät auttavat testaamaan järjestystä ja portfolioekonomiaa.",
+      ],
     ],
   },
   fr: {
     description: (name) =>
       `${name} est une offre tarifaire de test destinée à valider la pagination, les filtres et les parcours de modification dans l’interface d’administration.`,
     highlights: [
-      ["Tarification prévisible", "Un tarif de test clair pour vérifier la présentation de l’offre."],
-      ["Crédits flexibles", "Des allocations de crédits variées permettent de tester le tri et l’économie du portefeuille."],
+      [
+        "Tarification prévisible",
+        "Un tarif de test clair pour vérifier la présentation de l’offre.",
+      ],
+      [
+        "Crédits flexibles",
+        "Des allocations de crédits variées permettent de tester le tri et l’économie du portefeuille.",
+      ],
     ],
   },
   it: {
     description: (name) =>
       `${name} è un piano tariffario di test per verificare paginazione, filtri e flussi di modifica nell’interfaccia di amministrazione.`,
     highlights: [
-      ["Prezzo prevedibile", "Un prezzo di test chiaro per verificare la presentazione del piano."],
-      ["Crediti flessibili", "Diverse quantità di crediti aiutano a testare ordinamento ed economia del portafoglio."],
+      [
+        "Prezzo prevedibile",
+        "Un prezzo di test chiaro per verificare la presentazione del piano.",
+      ],
+      [
+        "Crediti flessibili",
+        "Diverse quantità di crediti aiutano a testare ordinamento ed economia del portafoglio.",
+      ],
     ],
   },
   ja: {
@@ -103,63 +151,108 @@ const TRANSLATION_COPY = {
       `${name} は、管理画面のページネーション、フィルター、編集フローを検証するためのテスト料金プランです。`,
     highlights: [
       ["分かりやすい料金", "プラン表示を検証するための明確なテスト料金です。"],
-      ["柔軟なクレジット", "異なるクレジット数で並び順やポートフォリオ経済性をテストできます。"],
+      [
+        "柔軟なクレジット",
+        "異なるクレジット数で並び順やポートフォリオ経済性をテストできます。",
+      ],
     ],
   },
   ko: {
     description: (name) =>
       `${name}은(는) 관리자 화면의 페이지네이션, 필터링 및 편집 흐름을 검증하기 위한 테스트 요금제입니다.`,
     highlights: [
-      ["예측 가능한 가격", "요금제 표시를 검증하기 위한 명확한 테스트 가격입니다."],
-      ["유연한 크레딧", "서로 다른 크레딧 제공량으로 정렬과 포트폴리오 경제성을 테스트할 수 있습니다."],
+      [
+        "예측 가능한 가격",
+        "요금제 표시를 검증하기 위한 명확한 테스트 가격입니다.",
+      ],
+      [
+        "유연한 크레딧",
+        "서로 다른 크레딧 제공량으로 정렬과 포트폴리오 경제성을 테스트할 수 있습니다.",
+      ],
     ],
   },
   nb: {
     description: (name) =>
       `${name} er en testprisplan for å validere paginering, filtrering og redigeringsflyt i administrasjonsgrensesnittet.`,
     highlights: [
-      ["Forutsigbar pris", "En tydelig testpris for å kontrollere presentasjonen av planen."],
-      ["Fleksible kreditter", "Ulike kredittmengder gjør det mulig å teste sortering og porteføljeøkonomi."],
+      [
+        "Forutsigbar pris",
+        "En tydelig testpris for å kontrollere presentasjonen av planen.",
+      ],
+      [
+        "Fleksible kreditter",
+        "Ulike kredittmengder gjør det mulig å teste sortering og porteføljeøkonomi.",
+      ],
     ],
   },
   nl: {
     description: (name) =>
       `${name} is een testprijsplan voor het valideren van paginering, filters en bewerkingsstromen in de beheerinterface.`,
     highlights: [
-      ["Voorspelbare prijs", "Een duidelijke testprijs om de weergave van het plan te controleren."],
-      ["Flexibele credits", "Verschillende creditlimieten helpen bij het testen van sortering en portfolio-economie."],
+      [
+        "Voorspelbare prijs",
+        "Een duidelijke testprijs om de weergave van het plan te controleren.",
+      ],
+      [
+        "Flexibele credits",
+        "Verschillende creditlimieten helpen bij het testen van sortering en portfolio-economie.",
+      ],
     ],
   },
   pl: {
     description: (name) =>
       `${name} to testowy plan cenowy służący do sprawdzania paginacji, filtrowania i edycji w panelu administracyjnym.`,
     highlights: [
-      ["Przewidywalna cena", "Czytelna cena testowa do sprawdzania prezentacji planu."],
-      ["Elastyczne kredyty", "Różne limity kredytów pomagają testować sortowanie i ekonomię portfela."],
+      [
+        "Przewidywalna cena",
+        "Czytelna cena testowa do sprawdzania prezentacji planu.",
+      ],
+      [
+        "Elastyczne kredyty",
+        "Różne limity kredytów pomagają testować sortowanie i ekonomię portfela.",
+      ],
     ],
   },
   "pt-BR": {
     description: (name) =>
       `${name} é um plano de preços de teste para validar paginação, filtros e fluxos de edição na interface administrativa.`,
     highlights: [
-      ["Preço previsível", "Um preço de teste claro para validar a apresentação do plano."],
-      ["Créditos flexíveis", "Diferentes quantidades de créditos ajudam a testar ordenação e economia do portfólio."],
+      [
+        "Preço previsível",
+        "Um preço de teste claro para validar a apresentação do plano.",
+      ],
+      [
+        "Créditos flexíveis",
+        "Diferentes quantidades de créditos ajudam a testar ordenação e economia do portfólio.",
+      ],
     ],
   },
   "pt-PT": {
     description: (name) =>
       `${name} é um plano de preços de teste para validar paginação, filtros e fluxos de edição na interface de administração.`,
     highlights: [
-      ["Preço previsível", "Um preço de teste claro para validar a apresentação do plano."],
-      ["Créditos flexíveis", "Diferentes quantidades de créditos ajudam a testar ordenação e economia do portefólio."],
+      [
+        "Preço previsível",
+        "Um preço de teste claro para validar a apresentação do plano.",
+      ],
+      [
+        "Créditos flexíveis",
+        "Diferentes quantidades de créditos ajudam a testar ordenação e economia do portefólio.",
+      ],
     ],
   },
   sv: {
     description: (name) =>
       `${name} är en testprisplan för att validera sidindelning, filtrering och redigeringsflöden i administratörsgränssnittet.`,
     highlights: [
-      ["Förutsägbar prissättning", "Ett tydligt testpris för att kontrollera hur planen presenteras."],
-      ["Flexibla krediter", "Olika kreditnivåer hjälper till att testa sortering och portföljekonomi."],
+      [
+        "Förutsägbar prissättning",
+        "Ett tydligt testpris för att kontrollera hur planen presenteras.",
+      ],
+      [
+        "Flexibla krediter",
+        "Olika kreditnivåer hjälper till att testa sortering och portföljekonomi.",
+      ],
     ],
   },
   th: {
@@ -167,15 +260,24 @@ const TRANSLATION_COPY = {
       `${name} เป็นแผนราคาสำหรับทดสอบการแบ่งหน้า การกรอง และขั้นตอนการแก้ไขในหน้าผู้ดูแลระบบ`,
     highlights: [
       ["ราคาที่คาดเดาได้", "ราคาทดสอบที่ชัดเจนสำหรับตรวจสอบการแสดงผลของแผน"],
-      ["เครดิตยืดหยุ่น", "จำนวนเครดิตที่แตกต่างกันช่วยทดสอบการเรียงลำดับและเศรษฐศาสตร์ของพอร์ตโฟลิโอ"],
+      [
+        "เครดิตยืดหยุ่น",
+        "จำนวนเครดิตที่แตกต่างกันช่วยทดสอบการเรียงลำดับและเศรษฐศาสตร์ของพอร์ตโฟลิโอ",
+      ],
     ],
   },
   tr: {
     description: (name) =>
       `${name}, yönetici arayüzündeki sayfalama, filtreleme ve düzenleme akışlarını doğrulamak için hazırlanmış bir test fiyatlandırma planıdır.`,
     highlights: [
-      ["Öngörülebilir fiyat", "Plan sunumunu doğrulamak için net bir test fiyatı."],
-      ["Esnek krediler", "Farklı kredi miktarları sıralama ve portföy ekonomisini test etmeye yardımcı olur."],
+      [
+        "Öngörülebilir fiyat",
+        "Plan sunumunu doğrulamak için net bir test fiyatı.",
+      ],
+      [
+        "Esnek krediler",
+        "Farklı kredi miktarları sıralama ve portföy ekonomisini test etmeye yardımcı olur.",
+      ],
     ],
   },
   "zh-Hans": {
@@ -258,8 +360,7 @@ function buildHighlights(name) {
 
         return {
           locale,
-          merchantTitle:
-            highlightIndex === 0 ? title : `${title} · ${name}`,
+          merchantTitle: highlightIndex === 0 ? title : `${title} · ${name}`,
           merchantDescription: description,
         };
       }),
@@ -393,7 +494,9 @@ async function main() {
   // Idempotent re-seed: only rows created by this script are removed.
   const deleted = await deleteSeededPlans();
   if (deleted > 0) {
-    console.log(`Removed ${deleted} previous merchant-pricing pagination seed plans.`);
+    console.log(
+      `Removed ${deleted} previous merchant-pricing pagination seed plans.`,
+    );
   }
 
   const existingPlans = await prisma.merchantPricingPlan.findMany({

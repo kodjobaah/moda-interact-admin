@@ -51,7 +51,10 @@ test("parses Redis Search taxonomy documents into the Admin category contract", 
     parentId: "gid://shopify/TaxonomyCategory/aa-1",
     hasChildren: false,
     ancestors: [
-      { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
+      {
+        id: "gid://shopify/TaxonomyCategory/aa",
+        name: "Apparel & Accessories",
+      },
       { id: "gid://shopify/TaxonomyCategory/aa-1", name: "Clothing" },
     ],
   });
@@ -86,7 +89,6 @@ test("validates the active Redis taxonomy metadata contract", () => {
   assert.equal(metadata.topLevelCount, 26);
   assert.equal(metadata.subcategoryCount, 5000);
 });
-
 
 test("uses the same compact taxonomy embedding dimensions for Admin queries", () => {
   const config = loadShopifyTaxonomyEmbeddingConfig({
@@ -155,7 +157,10 @@ test("distinguishes invalid active index embedding metadata from a missing crede
           embeddingDimensions: 2048,
           embeddingIndexVersion: "v1",
         },
-        { NODE_ENV: "test", EMBEDDING_API_KEY: "test-key" } as NodeJS.ProcessEnv,
+        {
+          NODE_ENV: "test",
+          EMBEDDING_API_KEY: "test-key",
+        } as NodeJS.ProcessEnv,
       ),
     (error: unknown) => {
       assert.ok(error instanceof ShopifyTaxonomyEmbeddingConfigurationError);
@@ -164,7 +169,6 @@ test("distinguishes invalid active index embedding metadata from a missing crede
     },
   );
 });
-
 
 test("uses the database runtime embedding configuration when it matches the active Redis index", () => {
   const config = loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime(

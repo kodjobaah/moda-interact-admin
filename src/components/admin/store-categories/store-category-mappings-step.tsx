@@ -76,15 +76,14 @@ export function StoreCategoryMappingsStep({
     });
   }
 
-  const mappings: StoreCategoryMappingWorkspaceItem[] = session.shopifyMappings.map(
-    (mapping) => ({
+  const mappings: StoreCategoryMappingWorkspaceItem[] =
+    session.shopifyMappings.map((mapping) => ({
       id: mapping.clientId,
       taxonomy: mapping.taxonomy,
       conditionKey: mapping.conditionKey,
       displayName: mapping.displayName,
       weight: mapping.weight,
-    }),
-  );
+    }));
 
   return (
     <section aria-labelledby="author-mappings-title">
@@ -97,8 +96,9 @@ export function StoreCategoryMappingsStep({
             Category mappings
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Add merchant-selectable mappings before authoring the prompt. Each mapping
-            gets a stable condition key that the conditional prompt can reference.
+            Add merchant-selectable mappings before authoring the prompt. Each
+            mapping gets a stable condition key that the conditional prompt can
+            reference.
           </p>
         </div>
         <StoreCategoryAuthoringSectionStatus valid={validation.valid} />

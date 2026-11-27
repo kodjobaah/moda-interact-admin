@@ -5,9 +5,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import type { PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
-import {
-  CREDENTIAL_ENCRYPTION_UNAVAILABLE,
-} from "./shared-credential-keyring.ts";
+import { CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "./shared-credential-keyring.ts";
 import { loadActiveSharedCredentialKeyring } from "./shared-credential-keyring.ts";
 import { sealOpenRouterCredential } from "./openrouter-credential-crypto.ts";
 import { resolveCommerceEnvironment } from "./openrouter-credential-environment.ts";

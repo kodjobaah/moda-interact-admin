@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 export const SHOPIFY_TAXONOMY_TOP_ALIAS = "idx:moda:shopify-taxonomy:top";
-export const SHOPIFY_TAXONOMY_SUBCATEGORY_ALIAS = "idx:moda:shopify-taxonomy:sub";
+export const SHOPIFY_TAXONOMY_SUBCATEGORY_ALIAS =
+  "idx:moda:shopify-taxonomy:sub";
 export const SHOPIFY_TAXONOMY_METADATA_KEY = "moda:shopify-taxonomy:metadata";
 export const DEFAULT_SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS = 256;
 const MAX_SHOPIFY_TAXONOMY_EMBEDDING_DIMENSIONS = 512;
@@ -39,11 +40,15 @@ export function vectorToFloat32Buffer(vector, dimensions) {
   if (
     !Array.isArray(vector) ||
     vector.length !== dimensions ||
-    !vector.every((value) => typeof value === "number" && Number.isFinite(value))
+    !vector.every(
+      (value) => typeof value === "number" && Number.isFinite(value),
+    )
   ) {
     throw new Error("Embedding provider returned an invalid taxonomy vector.");
   }
-  const buffer = Buffer.allocUnsafe(dimensions * Float32Array.BYTES_PER_ELEMENT);
+  const buffer = Buffer.allocUnsafe(
+    dimensions * Float32Array.BYTES_PER_ELEMENT,
+  );
   vector.forEach((value, index) => buffer.writeFloatLE(value, index * 4));
   return buffer;
 }
@@ -76,7 +81,9 @@ export async function embedTaxonomyTexts(
     if (!Array.isArray(payload?.data) || payload.data.length !== batch.length) {
       throw new Error("Embedding provider returned an unexpected batch size.");
     }
-    const sorted = [...payload.data].sort((left, right) => left.index - right.index);
+    const sorted = [...payload.data].sort(
+      (left, right) => left.index - right.index,
+    );
     for (const item of sorted) {
       output.push(vectorToFloat32Buffer(item.embedding, config.dimensions));
     }
@@ -119,7 +126,9 @@ export function buildTaxonomyIndexDocuments(categories) {
   }
 
   if (topLevel.length === 0 || subcategories.length === 0) {
-    throw new Error("Shopify taxonomy distribution must contain roots and subcategories.");
+    throw new Error(
+      "Shopify taxonomy distribution must contain roots and subcategories.",
+    );
   }
   return { topLevel, subcategories };
 }
@@ -138,7 +147,12 @@ export function taxonomyDocumentKey(prefix, categoryId) {
   return `${prefix}${Buffer.from(categoryId, "utf8").toString("base64url")}`;
 }
 
-export function indexCreateArguments({ indexName, prefix, dimensions, algorithm }) {
+export function indexCreateArguments({
+  indexName,
+  prefix,
+  dimensions,
+  algorithm,
+}) {
   return [
     "FT.CREATE",
     indexName,
@@ -213,7 +227,9 @@ export function estimateRawVectorBytes(documentCount, dimensions) {
     !Number.isSafeInteger(dimensions) ||
     dimensions <= 0
   ) {
-    throw new Error("Taxonomy vector storage estimate requires valid counts and dimensions.");
+    throw new Error(
+      "Taxonomy vector storage estimate requires valid counts and dimensions.",
+    );
   }
   return documentCount * dimensions * Float32Array.BYTES_PER_ELEMENT;
 }
@@ -268,7 +284,9 @@ export function redisPipelineFailure(replies, documents, start) {
   for (let offset = 0; offset < replies.length; offset += 1) {
     const [error] = replies[offset] ?? [];
     if (!error) continue;
-    const rawMessage = String(error?.message ?? error).replace(/\s+/g, " ").trim();
+    const rawMessage = String(error?.message ?? error)
+      .replace(/\s+/g, " ")
+      .trim();
     return {
       categoryId: documents[start + offset]?.categoryId ?? "unknown",
       message: rawMessage.slice(0, 600) || "Redis rejected the document",

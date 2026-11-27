@@ -48,7 +48,11 @@ export type MerchantPricingPlanDraftAction =
   | { type: "set-step"; step: number }
   | { type: "set-name"; value: string }
   | { type: "set-handle"; value: string }
-  | { type: "set-plan-kind"; value: "FREE" | "PAID_METERED"; createPlacement: string }
+  | {
+      type: "set-plan-kind";
+      value: "FREE" | "PAID_METERED";
+      createPlacement: string;
+    }
   | { type: "set-active"; value: boolean }
   | { type: "set-featured"; value: boolean }
   | { type: "set-commerce-model"; value: string }
@@ -69,16 +73,32 @@ export type MerchantPricingPlanDraftAction =
   | { type: "add-event"; event: BuilderEvent }
   | { type: "remove-event"; index: number }
   | { type: "move-event"; index: number; direction: -1 | 1 }
-  | { type: "update-event"; index: number; update: Partial<Omit<BuilderEvent, "clientKey">> }
+  | {
+      type: "update-event";
+      index: number;
+      update: Partial<Omit<BuilderEvent, "clientKey">>;
+    }
   | { type: "add-tier"; eventIndex: number }
   | { type: "remove-tier"; eventIndex: number; tierIndex: number }
-  | { type: "update-tier"; eventIndex: number; tierIndex: number; update: Partial<NonNullable<BuilderEvent["tiers"]>[number]> }
+  | {
+      type: "update-tier";
+      eventIndex: number;
+      tierIndex: number;
+      update: Partial<NonNullable<BuilderEvent["tiers"]>[number]>;
+    }
   | { type: "add-highlight"; highlight: MerchantPricingBuilderHighlight }
   | { type: "remove-highlight"; index: number }
   | { type: "move-highlight"; index: number; direction: -1 | 1 }
-  | { type: "update-highlight"; index: number; update: Partial<Omit<MerchantPricingBuilderHighlight, "contentKey">> };
+  | {
+      type: "update-highlight";
+      index: number;
+      update: Partial<Omit<MerchantPricingBuilderHighlight, "contentKey">>;
+    };
 
-export function sourceTypeKey(purposeKey: string, dataFormatKey: string): string {
+export function sourceTypeKey(
+  purposeKey: string,
+  dataFormatKey: string,
+): string {
   return `${purposeKey}\u001f${dataFormatKey}`;
 }
 
@@ -88,8 +108,9 @@ export function retainInitialMerchantKnowledgeConfiguration(
   activeSourceTypeKeys: ReadonlySet<string>,
 ): MerchantKnowledgeFeatureConfiguration | null {
   if (mappingCount !== 1 || !parsedConfiguration) return null;
-  return parsedConfiguration.allowedSourceTypes.every(({ purposeKey, dataFormatKey }) =>
-    activeSourceTypeKeys.has(sourceTypeKey(purposeKey, dataFormatKey)),
+  return parsedConfiguration.allowedSourceTypes.every(
+    ({ purposeKey, dataFormatKey }) =>
+      activeSourceTypeKeys.has(sourceTypeKey(purposeKey, dataFormatKey)),
   )
     ? parsedConfiguration
     : null;
@@ -106,7 +127,8 @@ export function selectUnavailableCommerceModelId(
   commerceModelId: string,
   modelOptions: readonly { id: string }[],
 ): string | null {
-  return commerceModelId && !modelOptions.some(({ id }) => id === commerceModelId)
+  return commerceModelId &&
+    !modelOptions.some(({ id }) => id === commerceModelId)
     ? commerceModelId
     : null;
 }
@@ -185,8 +207,9 @@ export function createMerchantPricingPlanDraft({
       ? String(initialKnowledgeConfiguration.maxContentUnitsPerSource)
       : "",
     allowedSourceTypeKeys:
-      initialKnowledgeConfiguration?.allowedSourceTypes.map(({ purposeKey, dataFormatKey }) =>
-        sourceTypeKey(purposeKey, dataFormatKey),
+      initialKnowledgeConfiguration?.allowedSourceTypes.map(
+        ({ purposeKey, dataFormatKey }) =>
+          sourceTypeKey(purposeKey, dataFormatKey),
       ) ?? [],
     credits: plan?.includedRecoveryCredits ?? 0,
     recoveryUsageEventHandle: plan?.shopifyRecoveryUsageEventHandle ?? "",
@@ -195,7 +218,9 @@ export function createMerchantPricingPlanDraft({
         .map(({ feature }) => feature.key)
         .filter((key) => key !== MERCHANT_KNOWLEDGE_FEATURE_KEY) ?? [],
     currency: plan?.currency ?? "USD",
-    recurring: plan ? `${Math.floor(plan.recurringAmountMinor / 100)}.${String(plan.recurringAmountMinor % 100).padStart(2, "0")}` : "0",
+    recurring: plan
+      ? `${Math.floor(plan.recurringAmountMinor / 100)}.${String(plan.recurringAmountMinor % 100).padStart(2, "0")}`
+      : "0",
     placement: plan ? "UNCHANGED" : initialPlacement,
     description:
       plan?.translations.find((translation) => translation.locale === "en")
@@ -210,7 +235,12 @@ export function createMerchantPricingPlanDraft({
 
 function moveAt<T>(items: T[], index: number, direction: -1 | 1): T[] {
   const nextIndex = index + direction;
-  if (index < 0 || index >= items.length || nextIndex < 0 || nextIndex >= items.length) {
+  if (
+    index < 0 ||
+    index >= items.length ||
+    nextIndex < 0 ||
+    nextIndex >= items.length
+  ) {
     return items;
   }
   const next = [...items];
@@ -284,9 +314,15 @@ export function merchantPricingPlanDraftReducer(
         ? state
         : { ...state, events: [...state.events, action.event] };
     case "remove-event":
-      return { ...state, events: state.events.filter((_, index) => index !== action.index) };
+      return {
+        ...state,
+        events: state.events.filter((_, index) => index !== action.index),
+      };
     case "move-event":
-      return { ...state, events: moveAt(state.events, action.index, action.direction) };
+      return {
+        ...state,
+        events: moveAt(state.events, action.index, action.direction),
+      };
     case "update-event":
       return {
         ...state,
@@ -298,12 +334,19 @@ export function merchantPricingPlanDraftReducer(
       return {
         ...state,
         events: state.events.map((event, index) => {
-          if (index !== action.eventIndex || event.pricingMode === "FIXED" || (event.tiers?.length ?? 0) >= 6) {
+          if (
+            index !== action.eventIndex ||
+            event.pricingMode === "FIXED" ||
+            (event.tiers?.length ?? 0) >= 6
+          ) {
             return event;
           }
           return {
             ...event,
-            tiers: [...(event.tiers ?? []), { upTo: null, amountPerUnit: "0", flatAmount: "0" }],
+            tiers: [
+              ...(event.tiers ?? []),
+              { upTo: null, amountPerUnit: "0", flatAmount: "0" },
+            ],
           };
         }),
       };
@@ -312,7 +355,12 @@ export function merchantPricingPlanDraftReducer(
         ...state,
         events: state.events.map((event, index) =>
           index === action.eventIndex
-            ? { ...event, tiers: (event.tiers ?? []).filter((_, tierIndex) => tierIndex !== action.tierIndex) }
+            ? {
+                ...event,
+                tiers: (event.tiers ?? []).filter(
+                  (_, tierIndex) => tierIndex !== action.tierIndex,
+                ),
+              }
             : event,
         ),
       };
@@ -324,7 +372,9 @@ export function merchantPricingPlanDraftReducer(
             ? {
                 ...event,
                 tiers: (event.tiers ?? []).map((tier, tierIndex) =>
-                  tierIndex === action.tierIndex ? { ...tier, ...action.update } : tier,
+                  tierIndex === action.tierIndex
+                    ? { ...tier, ...action.update }
+                    : tier,
                 ),
               }
             : event,
@@ -333,14 +383,24 @@ export function merchantPricingPlanDraftReducer(
     case "add-highlight":
       return { ...state, highlights: [...state.highlights, action.highlight] };
     case "remove-highlight":
-      return { ...state, highlights: state.highlights.filter((_, index) => index !== action.index) };
+      return {
+        ...state,
+        highlights: state.highlights.filter(
+          (_, index) => index !== action.index,
+        ),
+      };
     case "move-highlight":
-      return { ...state, highlights: moveAt(state.highlights, action.index, action.direction) };
+      return {
+        ...state,
+        highlights: moveAt(state.highlights, action.index, action.direction),
+      };
     case "update-highlight":
       return {
         ...state,
         highlights: state.highlights.map((highlight, index) =>
-          index === action.index ? { ...highlight, ...action.update } : highlight,
+          index === action.index
+            ? { ...highlight, ...action.update }
+            : highlight,
         ),
       };
   }
@@ -372,15 +432,25 @@ export function merchantPricingPlanSaveBlockers(input: {
   const { draft } = input;
 
   if (!draft.handle.trim()) {
-    blockers.push({ step: 0, message: "Step 1 Plan: Shopify plan handle is required." });
-  }
-  if (!draft.name.trim()) {
-    blockers.push({ step: 0, message: "Step 1 Plan: Display name is required." });
-  }
-  if (!Number.isSafeInteger(Number(draft.credits)) || Number(draft.credits) < 0) {
     blockers.push({
       step: 0,
-      message: "Step 1 Plan: Included recovery credits must be a non-negative whole number.",
+      message: "Step 1 Plan: Shopify plan handle is required.",
+    });
+  }
+  if (!draft.name.trim()) {
+    blockers.push({
+      step: 0,
+      message: "Step 1 Plan: Display name is required.",
+    });
+  }
+  if (
+    !Number.isSafeInteger(Number(draft.credits)) ||
+    Number(draft.credits) < 0
+  ) {
+    blockers.push({
+      step: 0,
+      message:
+        "Step 1 Plan: Included recovery credits must be a non-negative whole number.",
     });
   }
   if (!input.merchantKnowledgeConfigurationValid) {
@@ -396,16 +466,21 @@ export function merchantPricingPlanSaveBlockers(input: {
       message: "Step 3 Shopify pricing: Currency must be a 3-letter code.",
     });
   }
-  if (draft.planKind === "PAID_METERED" && !draft.recoveryUsageEventHandle.trim()) {
+  if (
+    draft.planKind === "PAID_METERED" &&
+    !draft.recoveryUsageEventHandle.trim()
+  ) {
     blockers.push({
       step: 2,
-      message: "Step 3 Shopify pricing: Recovery usage-event handle is required for a paid plan.",
+      message:
+        "Step 3 Shopify pricing: Recovery usage-event handle is required for a paid plan.",
     });
   }
   if (draft.planKind === "FREE" && draft.recoveryUsageEventHandle.trim()) {
     blockers.push({
       step: 2,
-      message: "Step 3 Shopify pricing: Recovery usage-event handle must be empty for a FREE plan.",
+      message:
+        "Step 3 Shopify pricing: Recovery usage-event handle must be empty for a FREE plan.",
     });
   }
 
@@ -422,7 +497,10 @@ export function merchantPricingPlanSaveBlockers(input: {
         message: `Step 4 Usage events: Usage event ${index + 1} needs an event handle.`,
       });
     }
-    if (!Number.isSafeInteger(event.creditsGrantedPerUnit) || event.creditsGrantedPerUnit < 1) {
+    if (
+      !Number.isSafeInteger(event.creditsGrantedPerUnit) ||
+      event.creditsGrantedPerUnit < 1
+    ) {
       blockers.push({
         step: 3,
         message: `Step 4 Usage events: Usage event ${index + 1} credits per event must be at least 1.`,
@@ -434,12 +512,14 @@ export function merchantPricingPlanSaveBlockers(input: {
   if (!description) {
     blockers.push({
       step: 4,
-      message: "Step 5 Merchant content: English merchant description is required.",
+      message:
+        "Step 5 Merchant content: English merchant description is required.",
     });
   } else if (description.length > 2000) {
     blockers.push({
       step: 4,
-      message: "Step 5 Merchant content: English merchant description must be 2000 characters or fewer.",
+      message:
+        "Step 5 Merchant content: English merchant description must be 2000 characters or fewer.",
     });
   }
   draft.highlights.forEach((highlight, index) => {
@@ -472,7 +552,8 @@ export function merchantPricingPlanSaveBlockers(input: {
   if (!input.economicsSatisfied) {
     blockers.push({
       step: 5,
-      message: "Step 6 Portfolio economics: Resolve the economics validation or provide a valid override.",
+      message:
+        "Step 6 Portfolio economics: Resolve the economics validation or provide a valid override.",
     });
   }
 
@@ -485,7 +566,8 @@ export function merchantPricingPlanSaveBlockers(input: {
   } else if (reason.length > 2000) {
     blockers.push({
       step: 7,
-      message: "Step 8 Translations & review: Admin reason must be 2000 characters or fewer.",
+      message:
+        "Step 8 Translations & review: Admin reason must be 2000 characters or fewer.",
     });
   }
 

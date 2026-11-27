@@ -23,7 +23,15 @@ async function readSession(token: string, secret: string) {
 }
 
 async function newSession(secret: string, maxAge = 60 * 60) {
-  return encode({ token: { sub: "platform-admin-fixture", providerSubject: "google-subject-fixture" }, secret, salt, maxAge });
+  return encode({
+    token: {
+      sub: "platform-admin-fixture",
+      providerSubject: "google-subject-fixture",
+    },
+    secret,
+    salt,
+    maxAge,
+  });
 }
 
 async function credentialsFromDatabase(version: number, values: typeof first) {
@@ -32,7 +40,9 @@ async function credentialsFromDatabase(version: number, values: typeof first) {
     isProductionNode: false,
     read: async () => ({ version, value: { kind: "sealed" } }),
     decode: () => values,
-    environmentCredentials: () => { throw new Error("Environment fallback must not be evaluated"); },
+    environmentCredentials: () => {
+      throw new Error("Environment fallback must not be evaluated");
+    },
   });
 }
 
@@ -48,7 +58,10 @@ test("Auth.js JWT round trip uses the resolved database signing secret", async (
 test("rotating AUTH_SECRET invalidates prior JWTs and signs new sessions only with the new key", async () => {
   const before = await credentialsFromDatabase(2, first);
   const oldToken = await newSession(before.authSecret);
-  const after = await credentialsFromDatabase(3, { ...first, authSecret: rotatedSecret });
+  const after = await credentialsFromDatabase(3, {
+    ...first,
+    authSecret: rotatedSecret,
+  });
   assert.equal(after.version, 3);
   assert.equal(await readSession(oldToken, after.authSecret), null);
   assert.ok(await readSession(oldToken, before.authSecret));
@@ -79,7 +92,9 @@ test("switching from absent-row environment credentials to DB credentials does n
     environment: "development",
     isProductionNode: false,
     read: async () => null,
-    decode: () => { throw new Error("Absent row must not be decoded"); },
+    decode: () => {
+      throw new Error("Absent row must not be decoded");
+    },
     environmentCredentials: () => ({ ...first, authSecret: rotatedSecret }),
   });
   assert.equal(environment.source, "environment");

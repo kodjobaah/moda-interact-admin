@@ -145,7 +145,11 @@ function TranslationCredentialForm({
           </button>
         ) : null}
       </div>
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-gray-700">
+      <p
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-sm text-gray-700"
+      >
         {pending ? "Saving OpenAI translation credential…" : message}
       </p>
     </form>
@@ -243,7 +247,11 @@ function RemoveTranslationCredentialForm({
           </button>
         ) : null}
       </div>
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-gray-700">
+      <p
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-sm text-gray-700"
+      >
         {pending ? "Removing OpenAI translation credential…" : message}
       </p>
     </form>
@@ -280,7 +288,9 @@ export function TranslationProviderCredential({
           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             Environment
           </dt>
-          <dd className="mt-1 font-medium text-gray-900">{status.environment}</dd>
+          <dd className="mt-1 font-medium text-gray-900">
+            {status.environment}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -292,7 +302,9 @@ export function TranslationProviderCredential({
           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             Model profiles
           </dt>
-          <dd className="mt-1 font-medium text-gray-900">{status.modelCount}</dd>
+          <dd className="mt-1 font-medium text-gray-900">
+            {status.modelCount}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">

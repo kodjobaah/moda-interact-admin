@@ -1,53 +1,54 @@
-import { Queue, type JobType } from 'bullmq';
-import Redis from 'ioredis';
+import { Queue, type JobType } from "bullmq";
+import Redis from "ioredis";
 
 import {
   BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME,
   BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME,
-} from '@modainteract/moda-interact-shared/billing';
+} from "@modainteract/moda-interact-shared/billing";
 import {
   MERCHANT_COMMUNICATIONS_JOB_NAMES,
   MERCHANT_COMMUNICATIONS_QUEUE_NAME,
-} from '@modainteract/moda-interact-shared/merchant-communications';
+} from "@modainteract/moda-interact-shared/merchant-communications";
 import {
   MERCHANT_KNOWLEDGE_PROCESS_JOB_NAME,
   MERCHANT_KNOWLEDGE_QUEUE_NAME,
-} from '@modainteract/moda-interact-shared/merchant-knowledge';
-import { SHOPIFY_WEBHOOK_QUEUE_CONTRACTS } from '@modainteract/moda-interact-shared/shopify';
+} from "@modainteract/moda-interact-shared/merchant-knowledge";
+import { SHOPIFY_WEBHOOK_QUEUE_CONTRACTS } from "@modainteract/moda-interact-shared/shopify";
 
 const QUEUE_OPERATION_TIMEOUT_MS = 2_500;
 
 // These queue names are currently owned by moda-interact-background and are not
 // yet published as Shared runtime contracts. Keep them centralized here so the
 // Admin operational registry has one bounded source for every platform queue.
-const PENDING_RECOVERY_CANDIDATE_QUEUE = 'pending-recovery-candidates';
-const EVALUATE_PENDING_RECOVERY_JOB = 'evaluate-pending-recovery';
-const RECOVERY_CAPACITY_RESUME_QUEUE = 'recovery-capacity-resume';
-const RESUME_CAPACITY_BLOCKED_RECOVERIES_JOB = 'resume-capacity-blocked-recoveries';
-const RECOVERY_OUTREACH_FOLLOW_UP_QUEUE = 'recovery-outreach-follow-up';
-const RECOVERY_OUTREACH_FOLLOW_UP_JOB = 'recovery-outreach-follow-up';
-const WOO_CHECKOUT_CAPTURE_QUEUE = 'woo-checkout-capture-v1';
-const WOO_ORDER_CAPTURE_QUEUE = 'woo-order-capture-v1';
-const WOO_COUPON_SYNC_QUEUE = 'woo-coupon-sync';
-const WOO_INITIAL_DISPATCH_JOB = 'woo-recovery-initial-v1';
-const WHATSAPP_QUEUE_NAME = 'whatsapp-events';
+const PENDING_RECOVERY_CANDIDATE_QUEUE = "pending-recovery-candidates";
+const EVALUATE_PENDING_RECOVERY_JOB = "evaluate-pending-recovery";
+const RECOVERY_CAPACITY_RESUME_QUEUE = "recovery-capacity-resume";
+const RESUME_CAPACITY_BLOCKED_RECOVERIES_JOB =
+  "resume-capacity-blocked-recoveries";
+const RECOVERY_OUTREACH_FOLLOW_UP_QUEUE = "recovery-outreach-follow-up";
+const RECOVERY_OUTREACH_FOLLOW_UP_JOB = "recovery-outreach-follow-up";
+const WOO_CHECKOUT_CAPTURE_QUEUE = "woo-checkout-capture-v1";
+const WOO_ORDER_CAPTURE_QUEUE = "woo-order-capture-v1";
+const WOO_COUPON_SYNC_QUEUE = "woo-coupon-sync";
+const WOO_INITIAL_DISPATCH_JOB = "woo-recovery-initial-v1";
+const WHATSAPP_QUEUE_NAME = "whatsapp-events";
 const WHATSAPP_JOB_NAMES = [
-  'message-received',
-  'message-status',
-  'process-conversation-turn',
-  'meta-template-status-update',
-  'continue-recovery-delivery',
+  "message-received",
+  "message-status",
+  "process-conversation-turn",
+  "meta-template-status-update",
+  "continue-recovery-delivery",
 ] as const;
 const EXTRA_COMMUNICATION_JOB_NAMES = [
-  'store-category-translation-batch-submit',
-  'store-category-translation-batch-poll',
-  'store-category-translation-batch-results',
-  'merchant-pricing-translation-batch-submit',
-  'merchant-pricing-translation-batch-poll',
-  'merchant-pricing-translation-batch-results',
-  'whatsapp-template-translation-submit',
-  'whatsapp-template-translation-poll',
-  'whatsapp-template-translation-results',
+  "store-category-translation-batch-submit",
+  "store-category-translation-batch-poll",
+  "store-category-translation-batch-results",
+  "merchant-pricing-translation-batch-submit",
+  "merchant-pricing-translation-batch-poll",
+  "merchant-pricing-translation-batch-results",
+  "whatsapp-template-translation-submit",
+  "whatsapp-template-translation-poll",
+  "whatsapp-template-translation-results",
 ] as const;
 
 export type QueueMonitorCounts = {
@@ -75,8 +76,8 @@ export type QueueMonitorSnapshot = {
   queues: QueueMonitorQueue[];
 };
 
-export type FailedJobSort = 'failedAt' | 'attemptsMade' | 'name' | 'id';
-export type FailedJobDirection = 'asc' | 'desc';
+export type FailedJobSort = "failedAt" | "attemptsMade" | "name" | "id";
+export type FailedJobDirection = "asc" | "desc";
 
 export type FailedJobSummary = {
   id: string;
@@ -127,8 +128,8 @@ export type QueueJobDetail = {
   data: unknown;
 };
 
-export type QueueJobStatus = 'failed' | 'active' | 'waiting' | 'delayed';
-export type QueueJobDirection = 'asc' | 'desc';
+export type QueueJobStatus = "failed" | "active" | "waiting" | "delayed";
+export type QueueJobDirection = "asc" | "desc";
 
 export type QueueJobSummary = {
   id: string;
@@ -143,7 +144,8 @@ export type QueueJobSummary = {
   failedReason: string;
 };
 
-export type QueueJobAttribution = 'known' | 'identified' | 'unresolved' | 'orphan';
+export type QueueJobAttribution =
+  "known" | "identified" | "unresolved" | "orphan";
 
 export type QueueJobFacets = {
   shops: Array<{ value: string; label: string }>;
@@ -189,36 +191,36 @@ export type QueueOverviewSnapshot = {
 
 export class QueueMonitorUnavailableError extends Error {
   constructor() {
-    super('Queue monitor unavailable');
-    this.name = 'QueueMonitorUnavailableError';
+    super("Queue monitor unavailable");
+    this.name = "QueueMonitorUnavailableError";
   }
 }
 
 export class InvalidFailedJobQueryError extends Error {
   constructor() {
-    super('Invalid failed job query');
-    this.name = 'InvalidFailedJobQueryError';
+    super("Invalid failed job query");
+    this.name = "InvalidFailedJobQueryError";
   }
 }
 
 export class FailedJobNotFoundError extends Error {
   constructor() {
-    super('Failed job not found');
-    this.name = 'FailedJobNotFoundError';
+    super("Failed job not found");
+    this.name = "FailedJobNotFoundError";
   }
 }
 
 export class QueueJobNotFoundError extends Error {
   constructor() {
-    super('Queue job not found');
-    this.name = 'QueueJobNotFoundError';
+    super("Queue job not found");
+    this.name = "QueueJobNotFoundError";
   }
 }
 
 export class InvalidQueueJobQueryError extends Error {
   constructor() {
-    super('Invalid queue job query');
-    this.name = 'InvalidQueueJobQueryError';
+    super("Invalid queue job query");
+    this.name = "InvalidQueueJobQueryError";
   }
 }
 
@@ -265,7 +267,7 @@ type RedisReader = {
     key: string,
     end: string,
     start: string,
-    countToken: 'COUNT',
+    countToken: "COUNT",
     count: string,
   ) => Promise<unknown>;
 };
@@ -317,11 +319,14 @@ const queueDefinitions: QueueMonitorDefinition[] = [
   },
   {
     queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
-    jobNames: [...Object.values(MERCHANT_COMMUNICATIONS_JOB_NAMES), ...EXTRA_COMMUNICATION_JOB_NAMES],
+    jobNames: [
+      ...Object.values(MERCHANT_COMMUNICATIONS_JOB_NAMES),
+      ...EXTRA_COMMUNICATION_JOB_NAMES,
+    ],
   },
-  { queueName: WOO_CHECKOUT_CAPTURE_QUEUE, jobNames: ['checkout-updated'] },
-  { queueName: WOO_ORDER_CAPTURE_QUEUE, jobNames: ['order-lifecycle'] },
-  { queueName: WOO_COUPON_SYNC_QUEUE, jobNames: ['sync-woo-coupons'] },
+  { queueName: WOO_CHECKOUT_CAPTURE_QUEUE, jobNames: ["checkout-updated"] },
+  { queueName: WOO_ORDER_CAPTURE_QUEUE, jobNames: ["order-lifecycle"] },
+  { queueName: WOO_COUPON_SYNC_QUEUE, jobNames: ["sync-woo-coupons"] },
   {
     queueName: MERCHANT_KNOWLEDGE_QUEUE_NAME,
     jobNames: [MERCHANT_KNOWLEDGE_PROCESS_JOB_NAME],
@@ -331,46 +336,49 @@ const queueDefinitions: QueueMonitorDefinition[] = [
 const queueOverviewDefinitions: QueueOverviewDefinition[] = [
   {
     queueName: SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_EVENTS.queueName,
-    labelKey: 'queue.checkoutEvents',
+    labelKey: "queue.checkoutEvents",
   },
   {
     queueName: SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.ORDER_EVENTS.queueName,
-    labelKey: 'queue.orderEvents',
+    labelKey: "queue.orderEvents",
   },
   {
     queueName: PENDING_RECOVERY_CANDIDATE_QUEUE,
-    labelKey: 'queue.pendingRecoveries',
+    labelKey: "queue.pendingRecoveries",
   },
   {
     queueName: RECOVERY_CAPACITY_RESUME_QUEUE,
-    labelKey: 'queue.recoveryCapacityResume',
+    labelKey: "queue.recoveryCapacityResume",
   },
   {
     queueName: RECOVERY_OUTREACH_FOLLOW_UP_QUEUE,
-    labelKey: 'queue.recoveryOutreachFollowUp',
+    labelKey: "queue.recoveryOutreachFollowUp",
   },
   {
     queueName: SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName,
-    labelKey: 'queue.shopifyDiscountSync',
+    labelKey: "queue.shopifyDiscountSync",
   },
   {
     queueName: BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME,
-    labelKey: 'queue.billingSubscriptionReconcile',
+    labelKey: "queue.billingSubscriptionReconcile",
   },
   {
     queueName: WHATSAPP_QUEUE_NAME,
-    labelKey: 'queue.whatsappEvents',
+    labelKey: "queue.whatsappEvents",
   },
   {
     queueName: MERCHANT_COMMUNICATIONS_QUEUE_NAME,
-    labelKey: 'queue.merchantCommunications',
+    labelKey: "queue.merchantCommunications",
   },
-  { queueName: WOO_CHECKOUT_CAPTURE_QUEUE, labelKey: 'queue.wooCheckoutCapture' },
-  { queueName: WOO_ORDER_CAPTURE_QUEUE, labelKey: 'queue.wooOrderCapture' },
-  { queueName: WOO_COUPON_SYNC_QUEUE, labelKey: 'queue.wooCouponSync' },
+  {
+    queueName: WOO_CHECKOUT_CAPTURE_QUEUE,
+    labelKey: "queue.wooCheckoutCapture",
+  },
+  { queueName: WOO_ORDER_CAPTURE_QUEUE, labelKey: "queue.wooOrderCapture" },
+  { queueName: WOO_COUPON_SYNC_QUEUE, labelKey: "queue.wooCouponSync" },
   {
     queueName: MERCHANT_KNOWLEDGE_QUEUE_NAME,
-    labelKey: 'queue.merchantKnowledge',
+    labelKey: "queue.merchantKnowledge",
   },
 ];
 
@@ -388,7 +396,9 @@ export function getQueueMonitorDefinitions(): QueueMonitorDefinition[] {
 }
 
 function getQueueDefinition(queueName: string) {
-  return queueDefinitions.find((definition) => definition.queueName === queueName);
+  return queueDefinitions.find(
+    (definition) => definition.queueName === queueName,
+  );
 }
 
 export function getQueueOverviewDefinitions(): QueueOverviewDefinition[] {
@@ -419,8 +429,8 @@ function createRedis(redisUrl: string): RedisReader {
 
   return {
     waitUntilReady: async () => {
-      if (redis.status === 'ready') return;
-      if (redis.status === 'wait' || redis.status === 'end') {
+      if (redis.status === "ready") return;
+      if (redis.status === "wait" || redis.status === "end") {
         await redis.connect();
         return;
       }
@@ -435,12 +445,12 @@ function createRedis(redisUrl: string): RedisReader {
           reject(error);
         };
         const cleanup = () => {
-          redis.off('ready', onReady);
-          redis.off('error', onError);
+          redis.off("ready", onReady);
+          redis.off("error", onError);
         };
 
-        redis.once('ready', onReady);
-        redis.once('error', onError);
+        redis.once("ready", onReady);
+        redis.once("error", onError);
       });
     },
     xrevrange: (...args) => redis.xrevrange(...args),
@@ -455,7 +465,8 @@ function getQueueReaders(redisUrl: string, options: QueueMonitorOptions) {
   cachedQueues = new Map(
     queueDefinitions.map((definition) => [
       definition.queueName,
-      options.queueFactory?.(definition.queueName, redisUrl) ?? createQueue(definition.queueName, redisUrl),
+      options.queueFactory?.(definition.queueName, redisUrl) ??
+        createQueue(definition.queueName, redisUrl),
     ]),
   );
   cachedRedis = options.redisFactory?.(redisUrl) ?? createRedis(redisUrl);
@@ -470,7 +481,10 @@ function clearQueueReaders(redisUrl: string) {
   cachedRedisUrl = undefined;
 }
 
-function getOverviewQueueReaders(redisUrl: string, options: QueueMonitorOptions) {
+function getOverviewQueueReaders(
+  redisUrl: string,
+  options: QueueMonitorOptions,
+) {
   if (cachedOverviewQueues && cachedOverviewQueueUrl === redisUrl) {
     return { queues: cachedOverviewQueues };
   }
@@ -478,7 +492,8 @@ function getOverviewQueueReaders(redisUrl: string, options: QueueMonitorOptions)
   cachedOverviewQueues = new Map(
     queueOverviewDefinitions.map((definition) => [
       definition.queueName,
-      options.queueFactory?.(definition.queueName, redisUrl) ?? createQueue(definition.queueName, redisUrl),
+      options.queueFactory?.(definition.queueName, redisUrl) ??
+        createQueue(definition.queueName, redisUrl),
     ]),
   );
   cachedOverviewQueueUrl = redisUrl;
@@ -487,7 +502,10 @@ function getOverviewQueueReaders(redisUrl: string, options: QueueMonitorOptions)
 
 function withTimeout<T>(operation: Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new QueueMonitorUnavailableError()), QUEUE_OPERATION_TIMEOUT_MS);
+    const timer = setTimeout(
+      () => reject(new QueueMonitorUnavailableError()),
+      QUEUE_OPERATION_TIMEOUT_MS,
+    );
     operation.then(
       (value) => {
         clearTimeout(timer);
@@ -502,31 +520,45 @@ function withTimeout<T>(operation: Promise<T>): Promise<T> {
 }
 
 function parseLatestActivity(result: unknown): QueueMonitorActivity | null {
-  if (!Array.isArray(result) || result.length === 0 || !Array.isArray(result[0])) return null;
+  if (
+    !Array.isArray(result) ||
+    result.length === 0 ||
+    !Array.isArray(result[0])
+  )
+    return null;
   const entry = result[0] as [unknown, unknown];
-  const id = typeof entry[0] === 'string' ? entry[0] : '';
+  const id = typeof entry[0] === "string" ? entry[0] : "";
   const fields = Array.isArray(entry[1]) ? entry[1] : [];
-  const eventIndex = fields.findIndex((field) => field === 'event');
-  const event = eventIndex >= 0 && typeof fields[eventIndex + 1] === 'string'
-    ? fields[eventIndex + 1]
-    : null;
-  const timestamp = Number(id.split('-')[0]);
+  const eventIndex = fields.findIndex((field) => field === "event");
+  const event =
+    eventIndex >= 0 && typeof fields[eventIndex + 1] === "string"
+      ? fields[eventIndex + 1]
+      : null;
+  const timestamp = Number(id.split("-")[0]);
 
   if (!event || !Number.isFinite(timestamp)) return null;
   return { event, observedAt: new Date(timestamp).toISOString() };
 }
 
 async function readLatestActivity(queue: QueueReader, redis: RedisReader) {
-  const result = await withTimeout(redis.xrevrange(queue.toKey('events'), '+', '-', 'COUNT', '1'));
+  const result = await withTimeout(
+    redis.xrevrange(queue.toKey("events"), "+", "-", "COUNT", "1"),
+  );
   return parseLatestActivity(result);
 }
 
-async function readQueue(queue: QueueReader, definition: QueueMonitorDefinition, redis: RedisReader) {
-  const [counts, workers, lastActivity] = await withTimeout(Promise.all([
-    queue.getJobCounts('waiting', 'active', 'delayed', 'failed'),
-    queue.getWorkersCount(),
-    readLatestActivity(queue, redis),
-  ]));
+async function readQueue(
+  queue: QueueReader,
+  definition: QueueMonitorDefinition,
+  redis: RedisReader,
+) {
+  const [counts, workers, lastActivity] = await withTimeout(
+    Promise.all([
+      queue.getJobCounts("waiting", "active", "delayed", "failed"),
+      queue.getWorkersCount(),
+      readLatestActivity(queue, redis),
+    ]),
+  );
 
   return {
     queueName: definition.queueName,
@@ -542,7 +574,11 @@ async function readQueue(queue: QueueReader, definition: QueueMonitorDefinition,
   };
 }
 
-function parsePositiveInteger(value: string | undefined, fallback: number, maximum: number) {
+function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number,
+  maximum: number,
+) {
   if (value === undefined) return fallback;
   if (!/^\d+$/.test(value)) throw new InvalidFailedJobQueryError();
   const parsed = Number(value);
@@ -553,24 +589,27 @@ function parsePositiveInteger(value: string | undefined, fallback: number, maxim
 }
 
 function normalizeTimestamp(value: number | undefined) {
-  return typeof value === 'number' && Number.isFinite(value)
+  return typeof value === "number" && Number.isFinite(value)
     ? new Date(value).toISOString()
     : null;
 }
 
 function normalizeShopValue(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
+  if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
   if (normalized.length === 0 || normalized.length > 253) return null;
-  const labels = normalized.split('.');
-  if (labels.length < 2 || labels.some((label) => !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label))) {
+  const labels = normalized.split(".");
+  if (
+    labels.length < 2 ||
+    labels.some((label) => !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label))
+  ) {
     return null;
   }
   return normalized;
 }
 
 function normalizeShopId(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
+  if (typeof value !== "string") return null;
   const normalized = value.trim();
   if (normalized.length === 0 || normalized.length > 128) return null;
   if (/[^\x21-\x7e]/.test(normalized)) return null;
@@ -582,7 +621,7 @@ function isWhatsAppQueue(queueName: string) {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function extractQueueJobShop(
@@ -594,11 +633,13 @@ export function extractQueueJobShop(
     queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.CHECKOUT_EVENTS.queueName ||
     queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.ORDER_EVENTS.queueName;
   const isShopifyDiscountSyncQueue =
-    queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName;
+    queueName ===
+    SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName;
   if (!isRecord(data)) return null;
 
   const definition = getQueueDefinition(queueName);
-  const supportedJobNames = definition?.supportedJobNames ?? definition?.jobNames ?? [];
+  const supportedJobNames =
+    definition?.supportedJobNames ?? definition?.jobNames ?? [];
   if (!supportedJobNames.includes(jobName)) return null;
   if (isShopifyQueue) {
     if (!isRecord(data.tenant)) return null;
@@ -613,7 +654,6 @@ export function extractQueueJobShop(
   return null;
 }
 
-
 export function extractQueueJobShopId(
   queueName: string,
   jobName: string,
@@ -622,7 +662,8 @@ export function extractQueueJobShopId(
   if (!isRecord(data)) return null;
 
   const definition = getQueueDefinition(queueName);
-  const supportedJobNames = definition?.supportedJobNames ?? definition?.jobNames ?? [];
+  const supportedJobNames =
+    definition?.supportedJobNames ?? definition?.jobNames ?? [];
   if (!supportedJobNames.includes(jobName)) return null;
 
   if (
@@ -634,7 +675,8 @@ export function extractQueueJobShopId(
   }
 
   if (
-    queueName === SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName ||
+    queueName ===
+      SHOPIFY_WEBHOOK_QUEUE_CONTRACTS.SHOPIFY_DISCOUNT_SYNC.queueName ||
     queueName === PENDING_RECOVERY_CANDIDATE_QUEUE ||
     queueName === RECOVERY_CAPACITY_RESUME_QUEUE ||
     queueName === BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME ||
@@ -653,53 +695,69 @@ function classifyQueueJob(
   queueName: string,
   jobName: string,
   data: unknown,
-): { shop: string | null; shopDomain: string | null; attribution: QueueJobAttribution } {
+): {
+  shop: string | null;
+  shopDomain: string | null;
+  attribution: QueueJobAttribution;
+} {
   const shop = extractQueueJobShop(queueName, jobName, data);
-  if (shop) return { shop, shopDomain: shop, attribution: 'known' };
+  if (shop) return { shop, shopDomain: shop, attribution: "known" };
 
   const shopId = extractQueueJobShopId(queueName, jobName, data);
-  if (shopId) return { shop: shopId, shopDomain: null, attribution: 'identified' };
+  if (shopId)
+    return { shop: shopId, shopDomain: null, attribution: "identified" };
 
   return {
     shop: null,
     shopDomain: null,
-    attribution: isWhatsAppQueue(queueName) ? 'unresolved' : 'orphan',
+    attribution: isWhatsAppQueue(queueName) ? "unresolved" : "orphan",
   };
 }
 
 function parseFailedJobSort(value: string | undefined): FailedJobSort {
-  if (!value) return 'failedAt';
-  if (value === 'failedAt' || value === 'attemptsMade' || value === 'name' || value === 'id') return value;
+  if (!value) return "failedAt";
+  if (
+    value === "failedAt" ||
+    value === "attemptsMade" ||
+    value === "name" ||
+    value === "id"
+  )
+    return value;
   throw new InvalidFailedJobQueryError();
 }
 
-function parseFailedJobDirection(value: string | undefined): FailedJobDirection {
-  if (!value) return 'desc';
-  if (value === 'asc' || value === 'desc') return value;
+function parseFailedJobDirection(
+  value: string | undefined,
+): FailedJobDirection {
+  if (!value) return "desc";
+  if (value === "asc" || value === "desc") return value;
   throw new InvalidFailedJobQueryError();
 }
 
 function parseQueueJobStatus(value: string | undefined): QueueJobStatus {
-  if (value === undefined || value === 'failed') return 'failed';
-  if (value === 'active' || value === 'waiting' || value === 'delayed') return value;
+  if (value === undefined || value === "failed") return "failed";
+  if (value === "active" || value === "waiting" || value === "delayed")
+    return value;
   throw new InvalidQueueJobQueryError();
 }
 
-function parseRequiredQueueJobStatus(value: string | undefined): QueueJobStatus {
+function parseRequiredQueueJobStatus(
+  value: string | undefined,
+): QueueJobStatus {
   if (value === undefined) throw new InvalidQueueJobQueryError();
   return parseQueueJobStatus(value);
 }
 
 function parseQueueJobDirection(value: string | undefined): QueueJobDirection {
-  if (value === undefined || value === 'desc') return 'desc';
-  if (value === 'asc') return 'asc';
+  if (value === undefined || value === "desc") return "desc";
+  if (value === "asc") return "asc";
   throw new InvalidQueueJobQueryError();
 }
 
 function parseQueueJobShop(value: string | undefined): string {
-  if (value === undefined || value === '*') return '*';
-  if (value === '__orphan__' || value === '__unresolved__') return value;
-  if (value.startsWith('id:')) {
+  if (value === undefined || value === "*") return "*";
+  if (value === "__orphan__" || value === "__unresolved__") return value;
+  if (value.startsWith("id:")) {
     const shopId = normalizeShopId(value.slice(3));
     if (!shopId) throw new InvalidQueueJobQueryError();
     return `id:${shopId}`;
@@ -724,16 +782,22 @@ function parseQueueJobPositiveInteger(
 }
 
 function queueJobEventAt(job: QueueJob, status: QueueJobStatus) {
-  if (status === 'failed') {
-    return normalizeTimestamp(job.finishedOn)
-      ?? normalizeTimestamp(job.processedOn)
-      ?? normalizeTimestamp(job.timestamp);
+  if (status === "failed") {
+    return (
+      normalizeTimestamp(job.finishedOn) ??
+      normalizeTimestamp(job.processedOn) ??
+      normalizeTimestamp(job.timestamp)
+    );
   }
-  if (status === 'active') {
-    return normalizeTimestamp(job.processedOn) ?? normalizeTimestamp(job.timestamp);
+  if (status === "active") {
+    return (
+      normalizeTimestamp(job.processedOn) ?? normalizeTimestamp(job.timestamp)
+    );
   }
-  if (status === 'delayed') {
-    return normalizeTimestamp((job.timestamp ?? 0) + Math.max(job.delay ?? 0, 0));
+  if (status === "delayed") {
+    return normalizeTimestamp(
+      (job.timestamp ?? 0) + Math.max(job.delay ?? 0, 0),
+    );
   }
   return normalizeTimestamp(job.timestamp);
 }
@@ -745,31 +809,36 @@ function toQueueJobSummary(
 ): QueueJobSummary {
   const attribution = classifyQueueJob(queueName, job.name, job.data);
   return {
-    id: job.id ?? '',
+    id: job.id ?? "",
     queueName,
     name: job.name,
     status,
     ...attribution,
     attemptsMade: job.attemptsMade,
     eventAt: queueJobEventAt(job, status),
-    failedReason: status === 'failed' ? job.failedReason ?? '' : '',
+    failedReason: status === "failed" ? (job.failedReason ?? "") : "",
   };
 }
 
 function matchesQueueJobShop(job: QueueJobSummary, filter: string) {
-  if (filter === '*') return true;
-  if (filter === '__orphan__') return job.attribution === 'orphan';
-  if (filter === '__unresolved__') return job.attribution === 'unresolved';
-  if (filter.startsWith('id:')) {
-    return job.attribution === 'identified' && job.shop === filter.slice(3);
+  if (filter === "*") return true;
+  if (filter === "__orphan__") return job.attribution === "orphan";
+  if (filter === "__unresolved__") return job.attribution === "unresolved";
+  if (filter.startsWith("id:")) {
+    return job.attribution === "identified" && job.shop === filter.slice(3);
   }
-  return job.attribution === 'known' && job.shop === filter;
+  return job.attribution === "known" && job.shop === filter;
 }
 
-function compareQueueJobs(left: QueueJobSummary, right: QueueJobSummary, direction: QueueJobDirection) {
-  const eventResult = (left.eventAt ?? '').localeCompare(right.eventAt ?? '');
-  const result = eventResult === 0 ? left.id.localeCompare(right.id) : eventResult;
-  return direction === 'asc' ? result : result * -1;
+function compareQueueJobs(
+  left: QueueJobSummary,
+  right: QueueJobSummary,
+  direction: QueueJobDirection,
+) {
+  const eventResult = (left.eventAt ?? "").localeCompare(right.eventAt ?? "");
+  const result =
+    eventResult === 0 ? left.id.localeCompare(right.id) : eventResult;
+  return direction === "asc" ? result : result * -1;
 }
 
 function buildQueueJobFacets(
@@ -779,30 +848,36 @@ function buildQueueJobFacets(
   const shops = summaries
     .flatMap((job) => {
       if (!job.shop) return [];
-      if (job.attribution === 'identified') {
+      if (job.attribution === "identified") {
         return [{ value: `id:${job.shop}`, label: `Shop ID · ${job.shop}` }];
       }
-      if (job.attribution === 'known') {
+      if (job.attribution === "known") {
         return [{ value: job.shop, label: job.shop }];
       }
       return [];
     })
     .filter(
       (shop, index, items) =>
-        items.findIndex((candidate) => candidate.value === shop.value) === index,
+        items.findIndex((candidate) => candidate.value === shop.value) ===
+        index,
     )
     .sort((left, right) => left.label.localeCompare(right.label));
   return {
     shops,
-    hasOrphans: summaries.some((job) => job.attribution === 'orphan'),
-    hasUnresolved: summaries.some((job) => job.attribution === 'unresolved'),
+    hasOrphans: summaries.some((job) => job.attribution === "orphan"),
+    hasUnresolved: summaries.some((job) => job.attribution === "unresolved"),
     scanTruncated,
   };
 }
 
-function compareFailedJobs(left: FailedJobSummary, right: FailedJobSummary, sort: FailedJobSort) {
-  if (sort === 'attemptsMade') return left.attemptsMade - right.attemptsMade;
-  if (sort === 'failedAt') return (left.failedAt ?? '').localeCompare(right.failedAt ?? '');
+function compareFailedJobs(
+  left: FailedJobSummary,
+  right: FailedJobSummary,
+  sort: FailedJobSort,
+) {
+  if (sort === "attemptsMade") return left.attemptsMade - right.attemptsMade;
+  if (sort === "failedAt")
+    return (left.failedAt ?? "").localeCompare(right.failedAt ?? "");
   return left[sort].localeCompare(right[sort]);
 }
 
@@ -820,7 +895,11 @@ export async function readFailedJobSnapshot(
   if (!definition) throw new InvalidFailedJobQueryError();
 
   const page = parsePositiveInteger(options.page, 1, MAX_FAILED_JOB_PAGE);
-  const limit = parsePositiveInteger(options.limit, DEFAULT_FAILED_JOB_LIMIT, MAX_FAILED_JOB_LIMIT);
+  const limit = parsePositiveInteger(
+    options.limit,
+    DEFAULT_FAILED_JOB_LIMIT,
+    MAX_FAILED_JOB_LIMIT,
+  );
   const sort = parseFailedJobSort(options.sort);
   const direction = parseFailedJobDirection(options.direction);
   const redisUrl = options.redisUrl ?? process.env.REDIS_URL;
@@ -831,19 +910,26 @@ export async function readFailedJobSnapshot(
     const queue = queues.get(definition.queueName);
     if (!queue) throw new QueueMonitorUnavailableError();
     await withTimeout(queue.waitUntilReady());
-    const jobs = await withTimeout(queue.getJobs('failed', 0, MAX_FAILED_JOB_SCAN - 1, false));
+    const jobs = await withTimeout(
+      queue.getJobs("failed", 0, MAX_FAILED_JOB_SCAN - 1, false),
+    );
     const summaries = jobs.map((job) => ({
-      id: job.id ?? '',
+      id: job.id ?? "",
       queueName: definition.queueName,
       name: job.name,
       attemptsMade: job.attemptsMade,
-      failedAt: typeof job.finishedOn === 'number' ? new Date(job.finishedOn).toISOString() : null,
-      failedReason: job.failedReason ?? '',
+      failedAt:
+        typeof job.finishedOn === "number"
+          ? new Date(job.finishedOn).toISOString()
+          : null,
+      failedReason: job.failedReason ?? "",
     }));
-    const multiplier = direction === 'asc' ? 1 : -1;
+    const multiplier = direction === "asc" ? 1 : -1;
     summaries.sort((left, right) => {
       const result = compareFailedJobs(left, right, sort);
-      return result === 0 ? left.id.localeCompare(right.id) : result * multiplier;
+      return result === 0
+        ? left.id.localeCompare(right.id)
+        : result * multiplier;
     });
     const start = (page - 1) * limit;
     return {
@@ -876,8 +962,16 @@ export async function readQueueJobSnapshot(
 
   const status = parseQueueJobStatus(options.status);
   const shop = parseQueueJobShop(options.shop);
-  const page = parseQueueJobPositiveInteger(options.page, 1, MAX_QUEUE_JOB_PAGE);
-  const limit = parseQueueJobPositiveInteger(options.limit, DEFAULT_QUEUE_JOB_LIMIT, MAX_QUEUE_JOB_LIMIT);
+  const page = parseQueueJobPositiveInteger(
+    options.page,
+    1,
+    MAX_QUEUE_JOB_PAGE,
+  );
+  const limit = parseQueueJobPositiveInteger(
+    options.limit,
+    DEFAULT_QUEUE_JOB_LIMIT,
+    MAX_QUEUE_JOB_LIMIT,
+  );
   const direction = parseQueueJobDirection(options.direction);
   const redisUrl = options.redisUrl ?? process.env.REDIS_URL;
   if (!redisUrl) throw new QueueMonitorUnavailableError();
@@ -888,14 +982,17 @@ export async function readQueueJobSnapshot(
     if (!queue) throw new QueueMonitorUnavailableError();
     await withTimeout(queue.waitUntilReady());
 
-    const otherStatuses = (['failed', 'active', 'waiting', 'delayed'] as QueueJobStatus[])
-      .filter((candidate) => candidate !== status);
-    const [selectedScan, ...facetScans] = await withTimeout(Promise.all([
-      queue.getJobs(status, 0, MAX_QUEUE_JOB_SCAN - 1, false),
-      ...otherStatuses.map((candidate) =>
-        queue.getJobs(candidate, 0, MAX_QUEUE_JOB_SCAN - 1, false),
-      ),
-    ]));
+    const otherStatuses = (
+      ["failed", "active", "waiting", "delayed"] as QueueJobStatus[]
+    ).filter((candidate) => candidate !== status);
+    const [selectedScan, ...facetScans] = await withTimeout(
+      Promise.all([
+        queue.getJobs(status, 0, MAX_QUEUE_JOB_SCAN - 1, false),
+        ...otherStatuses.map((candidate) =>
+          queue.getJobs(candidate, 0, MAX_QUEUE_JOB_SCAN - 1, false),
+        ),
+      ]),
+    );
     const selectedSummaries = selectedScan.map((job) =>
       toQueueJobSummary(definition.queueName, status, job),
     );
@@ -960,13 +1057,16 @@ export async function readQueueJobDetail(
     const queue = queues.get(definition.queueName);
     if (!queue) throw new QueueMonitorUnavailableError();
     await withTimeout(queue.waitUntilReady());
-    const [job, state] = await withTimeout(Promise.all([
-      queue.getJob(jobId),
-      queue.getJobState(jobId),
-    ]));
+    const [job, state] = await withTimeout(
+      Promise.all([queue.getJob(jobId), queue.getJobState(jobId)]),
+    );
     if (!job || state !== status) throw new QueueJobNotFoundError();
 
-    const attribution = classifyQueueJob(definition.queueName, job.name, job.data);
+    const attribution = classifyQueueJob(
+      definition.queueName,
+      job.name,
+      job.data,
+    );
     return {
       id: job.id ?? jobId,
       queueName: definition.queueName,
@@ -977,12 +1077,15 @@ export async function readQueueJobDetail(
       timestamp: normalizeTimestamp(job.timestamp),
       processedOn: normalizeTimestamp(job.processedOn),
       finishedOn: normalizeTimestamp(job.finishedOn),
-      failedReason: status === 'failed' ? job.failedReason ?? '' : '',
+      failedReason: status === "failed" ? (job.failedReason ?? "") : "",
       stacktrace: Array.isArray(job.stacktrace) ? [...job.stacktrace] : [],
       data: job.data ?? null,
     };
   } catch (error) {
-    if (error instanceof InvalidQueueJobQueryError || error instanceof QueueJobNotFoundError) {
+    if (
+      error instanceof InvalidQueueJobQueryError ||
+      error instanceof QueueJobNotFoundError
+    ) {
       throw error;
     }
     throw new QueueMonitorUnavailableError();
@@ -1007,11 +1110,10 @@ export async function readFailedJobDetail(
     const queue = queues.get(definition.queueName);
     if (!queue) throw new QueueMonitorUnavailableError();
     await withTimeout(queue.waitUntilReady());
-    const [job, state] = await withTimeout(Promise.all([
-      queue.getJob(jobId),
-      queue.getJobState(jobId),
-    ]));
-    if (!job || state !== 'failed') throw new FailedJobNotFoundError();
+    const [job, state] = await withTimeout(
+      Promise.all([queue.getJob(jobId), queue.getJobState(jobId)]),
+    );
+    if (!job || state !== "failed") throw new FailedJobNotFoundError();
 
     return {
       id: job.id ?? jobId,
@@ -1022,12 +1124,15 @@ export async function readFailedJobDetail(
       timestamp: normalizeTimestamp(job.timestamp),
       processedOn: normalizeTimestamp(job.processedOn),
       finishedOn: normalizeTimestamp(job.finishedOn),
-      failedReason: job.failedReason ?? '',
+      failedReason: job.failedReason ?? "",
       stacktrace: Array.isArray(job.stacktrace) ? [...job.stacktrace] : [],
       data: job.data ?? null,
     };
   } catch (error) {
-    if (error instanceof InvalidFailedJobQueryError || error instanceof FailedJobNotFoundError) {
+    if (
+      error instanceof InvalidFailedJobQueryError ||
+      error instanceof FailedJobNotFoundError
+    ) {
       throw error;
     }
     throw new QueueMonitorUnavailableError();
@@ -1042,14 +1147,16 @@ export async function readQueueMonitorSnapshot(
 
   try {
     const { queues, redis } = getQueueReaders(redisUrl, options);
-    await withTimeout(Promise.all([
-      redis.waitUntilReady(),
-      ...queueDefinitions.map((definition) => {
-        const queue = queues.get(definition.queueName);
-        if (!queue) throw new QueueMonitorUnavailableError();
-        return queue.waitUntilReady();
-      }),
-    ]));
+    await withTimeout(
+      Promise.all([
+        redis.waitUntilReady(),
+        ...queueDefinitions.map((definition) => {
+          const queue = queues.get(definition.queueName);
+          if (!queue) throw new QueueMonitorUnavailableError();
+          return queue.waitUntilReady();
+        }),
+      ]),
+    );
     const queuesSnapshot = await Promise.all(
       queueDefinitions.map((definition) => {
         const queue = queues.get(definition.queueName);
@@ -1075,18 +1182,20 @@ export async function readQueueOverviewSnapshot(
 
   try {
     const { queues } = getOverviewQueueReaders(redisUrl, options);
-    const overview = await withTimeout(Promise.all(
-      queueOverviewDefinitions.map(async (definition) => {
-        const queue = queues.get(definition.queueName);
-        if (!queue) throw new QueueMonitorUnavailableError();
-        await withTimeout(queue.waitUntilReady());
-        const counts = await queue.getJobCounts('active');
-        return {
-          ...definition,
-          active: counts.active ?? 0,
-        };
-      }),
-    ));
+    const overview = await withTimeout(
+      Promise.all(
+        queueOverviewDefinitions.map(async (definition) => {
+          const queue = queues.get(definition.queueName);
+          if (!queue) throw new QueueMonitorUnavailableError();
+          await withTimeout(queue.waitUntilReady());
+          const counts = await queue.getJobCounts("active");
+          return {
+            ...definition,
+            active: counts.active ?? 0,
+          };
+        }),
+      ),
+    );
 
     return {
       observedAt: (options.now ?? (() => new Date()))().toISOString(),

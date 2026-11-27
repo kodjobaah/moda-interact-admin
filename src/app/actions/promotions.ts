@@ -53,9 +53,7 @@ function requireSuperAdmin(
 }
 
 export type PromotionCampaignReactivationActionState =
-  | { ok: true }
-  | { ok: false; message: string }
-  | null;
+  { ok: true } | { ok: false; message: string } | null;
 
 export async function reactivatePromotionCampaignAction(
   _previousState: PromotionCampaignReactivationActionState,
@@ -345,5 +343,6 @@ export async function mutatePromotionCampaignAction(
     });
   });
   revalidatePath("/promotions");
-  if (createdId) redirect(`/promotions?campaignId=${encodeURIComponent(createdId)}`);
+  if (createdId)
+    redirect(`/promotions?campaignId=${encodeURIComponent(createdId)}`);
 }

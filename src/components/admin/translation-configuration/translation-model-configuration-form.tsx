@@ -146,7 +146,11 @@ export function TranslationModelConfigurationForm({
         </button>
         {refreshRequired ? <RefreshButton /> : null}
       </div>
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-gray-700">
+      <p
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-sm text-gray-700"
+      >
         {pending ? "Saving translation model configuration…" : message}
       </p>
     </form>
@@ -180,7 +184,8 @@ export function TranslationModelEnabledForm({
       setMessage(null);
     });
     try {
-      const result = await setTranslationModelConfigurationEnabledAction(formData);
+      const result =
+        await setTranslationModelConfigurationEnabledAction(formData);
       if (result.ok) {
         formRef.current?.reset();
         setMessage(
@@ -236,7 +241,11 @@ export function TranslationModelEnabledForm({
         </button>
         {refreshRequired ? <RefreshButton /> : null}
       </div>
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-gray-700">
+      <p
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-sm text-gray-700"
+      >
         {disableBlocked
           ? "Choose another automatic-default translation model before disabling this model."
           : pending

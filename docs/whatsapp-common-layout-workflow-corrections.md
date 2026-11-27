@@ -7,27 +7,27 @@ against the accepted database gitlink. There is no new migration or gitlink edit
 
 ## Operator behaviour
 
-* Publication rejects references to a different active SHARED revision before
+- Publication rejects references to a different active SHARED revision before
   parsing or recompiling the historical wrapper. It explains how to clone with
   the active layout or review coordinated activation. Matching references are
   still checked against the exact immutable saved locale, and all review,
   provider approval, content and assignment checks still apply. A valid
   reviewed staging layout remains available for **submission** (preparing a
   future activation); it cannot be assigned before activation.
-* Validation returns specific fields and messages for invalid wrapper authoring.
+- Validation returns specific fields and messages for invalid wrapper authoring.
   Structured server logs include operation and definition/operation ID; common
   validation failures include provider template name, language, active and
   referenced revision IDs and original validation error when present. Unexpected
   database/provider errors are not presented as authoring failures. Per-shop
   publication failures retain their safe failure codes and log original errors.
-* A recovery clone preselects the reviewed active layout if available. Its
+- A recovery clone preselects the reviewed active layout if available. Its
   original body, offer target, variables, footer and media settings are kept;
   a layout requiring an incompatible header or duplicate checkout link still
   needs an explicit editor correction. Nothing is saved until the administrator
   reviews and saves the new immutable source. The dropdown shows UTC creation
   time, active marker, short ID and reviewed-language count. If no reviewed active
   layout is available, the UI says so rather than choosing a different revision.
-* The catalogue displays reference coverage for the active layout, **not**
+- The catalogue displays reference coverage for the active layout, **not**
   guaranteed Meta eligibility. The translation review links to the existing
   translation request/progress page. It does not create a second translation run.
 

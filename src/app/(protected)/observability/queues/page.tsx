@@ -18,7 +18,11 @@ export default async function PlatformQueuesPage() {
               {adminI18n.t("queue.pageDescription")}
             </p>
           </div>
-          <QueueMonitor canRemoveFailedJobs={principal.role === 'SUPER_ADMIN' && !principal.developmentBypass} />
+          <QueueMonitor
+            canRemoveFailedJobs={
+              principal.role === "SUPER_ADMIN" && !principal.developmentBypass
+            }
+          />
         </div>
       </div>
     </AdminShell>

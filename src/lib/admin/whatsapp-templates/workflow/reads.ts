@@ -7,21 +7,32 @@ import { REVIEW_LANGUAGES } from "../compilation/language-codes";
 import { configuredSenderWaba } from "../publishing/sender";
 import type { RecoveryWorkflowFacts, WorkflowOverview } from "./contracts";
 
-const logger = createLogger({ serviceName: "moda-interact-admin", environment: resolveDeploymentEnvironmentName() });
+const logger = createLogger({
+  serviceName: "moda-interact-admin",
+  environment: resolveDeploymentEnvironmentName(),
+});
 const languages = Prisma.join([...REVIEW_LANGUAGES]);
 
 /** Return counts per immutable definition, never sums across saved versions.
  * Only current-WABA observations count. This deliberately does not recompile
  * every definition or claim that a stored APPROVED observation proves eligibility. */
-export async function readRecoveryWorkflow(db: PrismaClient, principal: PlatformAdminPrincipal,
-  definitionId?: string): Promise<WorkflowOverview> {
+export async function readRecoveryWorkflow(
+  db: PrismaClient,
+  principal: PlatformAdminPrincipal,
+  definitionId?: string,
+): Promise<WorkflowOverview> {
   requireTemplateSuperAdmin(principal);
   let wabaId: string | null = null;
-  try { wabaId = await configuredSenderWaba(db); }
-  catch (error) { logger.error("admin.whatsapp_workflow.sender_unavailable", { error }); }
+  try {
+    wabaId = await configuredSenderWaba(db);
+  } catch (error) {
+    logger.error("admin.whatsapp_workflow.sender_unavailable", { error });
+  }
   const [active, facts] = await Promise.all([
-    db.whatsAppConversationWrapperActiveSlot.findUnique({ where: { audience: "SHARED" },
-      select: { definition: { select: { id: true, createdAt: true } } } }),
+    db.whatsAppConversationWrapperActiveSlot.findUnique({
+      where: { audience: "SHARED" },
+      select: { definition: { select: { id: true, createdAt: true } } },
+    }),
     db.$queryRaw<RecoveryWorkflowFacts[]>(Prisma.sql`
       WITH latest AS (
         SELECT DISTINCT ON (d."purpose", d."offerType", (CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END)) d.id
@@ -32,8 +43,12 @@ export async function readRecoveryWorkflow(db: PrismaClient, principal: Platform
           AND COALESCE(e."localeAst"#>>'{authoring,promotionTarget}', 'CHECKOUT')='CHECKOUT'
         ORDER BY d."purpose", d."offerType", (CASE WHEN (e."localeAst"#>'{prepared,components}') @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END), d."createdAt" DESC, d.id DESC
       ), wanted AS (
-        ${definitionId ? Prisma.sql`SELECT ${definitionId}::text AS id` : Prisma.sql`
-          SELECT id FROM latest UNION SELECT p."definitionId" FROM whatsapp."WhatsAppRecoveryTemplateDefault" p WHERE p."wabaId"=${wabaId}`}
+        ${
+          definitionId
+            ? Prisma.sql`SELECT ${definitionId}::text AS id`
+            : Prisma.sql`
+          SELECT id FROM latest UNION SELECT p."definitionId" FROM whatsapp."WhatsAppRecoveryTemplateDefault" p WHERE p."wabaId"=${wabaId}`
+        }
       ), assigned AS (
         SELECT DISTINCT v.purpose, v."shopId", l."definitionId",
           CASE WHEN r.id IS NULL THEN 'UNKNOWN' WHEN r."componentsSnapshot" @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END AS format
@@ -115,5 +130,14 @@ export async function readRecoveryWorkflow(db: PrismaClient, principal: Platform
       ) op ON true
     `),
   ]);
-  return { wabaId, activeLayout: active ? { id: active.definition.id, createdAt: active.definition.createdAt.toISOString() } : null, facts };
+  return {
+    wabaId,
+    activeLayout: active
+      ? {
+          id: active.definition.id,
+          createdAt: active.definition.createdAt.toISOString(),
+        }
+      : null,
+    facts,
+  };
 }

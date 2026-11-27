@@ -12,9 +12,12 @@ export function MerchantPricingAutomaticTranslationStatus({
     return (
       <section className="rounded-md border border-green-200 bg-green-50 p-4 text-sm">
         <h3 className="font-semibold text-green-900">Translations</h3>
-        <p className="mt-1 font-medium text-green-800">20 / 20 languages ready</p>
+        <p className="mt-1 font-medium text-green-800">
+          20 / 20 languages ready
+        </p>
         <p className="mt-1 text-green-800">
-          Existing translations remain valid because the English merchant content has not changed.
+          Existing translations remain valid because the English merchant
+          content has not changed.
         </p>
       </section>
     );
@@ -35,21 +38,30 @@ export function MerchantPricingAutomaticTranslationStatus({
     <section className="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm">
       <h3 className="font-semibold text-gray-900">Translations</h3>
       <p className="mt-1 text-gray-600">
-        Moda Interact automatically translates the English merchant content into all supported languages.
+        Moda Interact automatically translates the English merchant content into
+        all supported languages.
       </p>
 
       {run ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-md bg-white p-3 ring-1 ring-gray-200">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Model</p>
-            <p className="mt-1 font-medium text-gray-900">{run.modelDisplayName}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Model
+            </p>
+            <p className="mt-1 font-medium text-gray-900">
+              {run.modelDisplayName}
+            </p>
           </div>
           <div className="rounded-md bg-white p-3 ring-1 ring-gray-200">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Status
+            </p>
             <p className="mt-1 font-medium text-gray-900">{statusLabel}</p>
           </div>
           <div className="rounded-md bg-white p-3 ring-1 ring-gray-200">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Languages</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Languages
+            </p>
             <p className="mt-1 font-medium text-gray-900">
               {run.completeLocaleCount} / {run.localeCount} ready
             </p>
@@ -59,7 +71,8 @@ export function MerchantPricingAutomaticTranslationStatus({
 
       {!run && !requestPending && !error ? (
         <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-blue-800">
-          Translation has not started. Save the draft to persist the plan and start automatic translation.
+          Translation has not started. Save the draft to persist the plan and
+          start automatic translation.
         </p>
       ) : null}
 
@@ -71,13 +84,16 @@ export function MerchantPricingAutomaticTranslationStatus({
 
       {run && (run.status === "PENDING" || run.status === "PROCESSING") ? (
         <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-blue-800">
-          Translation is in progress for this saved draft. The plan remains inactive until automatic translation and finalisation finish.
+          Translation is in progress for this saved draft. The plan remains
+          inactive until automatic translation and finalisation finish.
         </p>
       ) : null}
 
       {run?.status === "READY_TO_APPLY" ? (
         <p className="mt-4 rounded-md bg-green-50 px-3 py-2 font-medium text-green-800">
-          {run.completeLocaleCount} / {run.localeCount} languages are ready. Save any unsaved changes; the persisted draft will be finalized automatically and will remain inactive until an admin activates it.
+          {run.completeLocaleCount} / {run.localeCount} languages are ready.
+          Save any unsaved changes; the persisted draft will be finalized
+          automatically and will remain inactive until an admin activates it.
         </p>
       ) : null}
 
@@ -102,7 +118,8 @@ export function MerchantPricingAutomaticTranslationStatus({
 
       {run?.status === "APPLIED" ? (
         <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-amber-900">
-          This translation run has already been applied. Reload the plan to see its current publication state.
+          This translation run has already been applied. Reload the plan to see
+          its current publication state.
         </p>
       ) : null}
 
@@ -111,10 +128,13 @@ export function MerchantPricingAutomaticTranslationStatus({
           <p>{error}</p>
           {configurationRequired ? (
             <p className="mt-2">
-              <Link className="font-semibold underline" href="/system-controls/translations">
+              <Link
+                className="font-semibold underline"
+                href="/system-controls/translations"
+              >
                 Open System Controls / Translations
-              </Link>
-              {" "}to configure the automatic translation model.
+              </Link>{" "}
+              to configure the automatic translation model.
             </p>
           ) : (
             <button

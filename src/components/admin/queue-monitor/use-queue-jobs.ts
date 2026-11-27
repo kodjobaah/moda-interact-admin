@@ -10,10 +10,7 @@ import type {
 } from "./queue-monitor.types.ts";
 
 export type QueueJobsSelectionInvalidationReason =
-  | "queue-selection"
-  | "filter-change"
-  | "view-all"
-  | "jobs-replaced";
+  "queue-selection" | "filter-change" | "view-all" | "jobs-replaced";
 
 export type QueueJobsState = {
   queueJobs: QueueJobSnapshot | null;

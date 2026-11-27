@@ -1,7 +1,4 @@
-import type {
-  CommerceEnvironment,
-  Prisma,
-} from "@prisma/client";
+import type { CommerceEnvironment, Prisma } from "@prisma/client";
 import { resolveCommerceEnvironment } from "./openrouter-credential-environment.ts";
 import { TRANSLATION_PROVIDER } from "./translation-configuration-validation.ts";
 
@@ -81,14 +78,12 @@ export const translationModelSelect = {
 
 export function translationCredentialStatus(
   environment: CommerceEnvironment,
-  row:
-    | {
-        editVersion: number;
-        updatedAt: Date;
-        updatedByAdminId: string;
-        _count: { models: number };
-      }
-    | null,
+  row: {
+    editVersion: number;
+    updatedAt: Date;
+    updatedByAdminId: string;
+    _count: { models: number };
+  } | null,
 ): TranslationProviderCredentialStatus {
   return {
     environment,

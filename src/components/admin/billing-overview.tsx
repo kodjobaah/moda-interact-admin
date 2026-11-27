@@ -166,7 +166,14 @@ export function BillingLedger({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {["billing.shop", "billing.metric", "billing.quantity", "billing.reportStateLabel", "billing.occurredAt", "billing.viewDetails"].map((key) => (
+                {[
+                  "billing.shop",
+                  "billing.metric",
+                  "billing.quantity",
+                  "billing.reportStateLabel",
+                  "billing.occurredAt",
+                  "billing.viewDetails",
+                ].map((key) => (
                   <th
                     key={key}
                     className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase"
@@ -195,7 +202,14 @@ export function BillingLedger({
                     {adminI18n.formatDateTime(item.occurredAt)}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-sm">
-                    <Link className="font-semibold text-[var(--brand-700)] hover:underline" href={buildUrl("/billing", { ...params, view: "events", eventId: item.id })}>
+                    <Link
+                      className="font-semibold text-[var(--brand-700)] hover:underline"
+                      href={buildUrl("/billing", {
+                        ...params,
+                        view: "events",
+                        eventId: item.id,
+                      })}
+                    >
                       {adminI18n.t("billing.viewDetails")}
                     </Link>
                   </td>

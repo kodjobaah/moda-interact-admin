@@ -32,7 +32,10 @@ export async function AdminShell({
   children: ReactNode;
 }) {
   const principal = await getPlatformAdminPrincipal();
-  const grafanaNavigation = principal?.role === "SUPER_ADMIN" ? await getPlatformGrafanaNavigation() : getGrafanaNavigation();
+  const grafanaNavigation =
+    principal?.role === "SUPER_ADMIN"
+      ? await getPlatformGrafanaNavigation()
+      : getGrafanaNavigation();
   const grafanaHref = grafanaNavigation.links[0]?.href ?? "/observability";
 
   return (

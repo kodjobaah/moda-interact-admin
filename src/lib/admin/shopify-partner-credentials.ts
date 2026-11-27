@@ -39,7 +39,8 @@ export async function resolveShopifyPartnerCredentialsWithDependencies(
 ): Promise<ShopifyPartnerCredentials> {
   if (
     !VALID_ENVIRONMENTS.has(dependencies.environment) ||
-    (dependencies.isProductionNode && dependencies.environment === "development")
+    (dependencies.isProductionNode &&
+      dependencies.environment === "development")
   ) {
     throw new Error("Invalid Shopify Partner configuration environment.");
   }

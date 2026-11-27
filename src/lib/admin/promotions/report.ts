@@ -1,4 +1,8 @@
-import type { Prisma, PromotionCampaignStatus, PromotionTargetScope } from "@prisma/client";
+import type {
+  Prisma,
+  PromotionCampaignStatus,
+  PromotionTargetScope,
+} from "@prisma/client";
 import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import {
@@ -118,8 +122,12 @@ export async function getPromotionReport(
     }),
     Promise.all([
       prisma.promotionalCreditGrant.count({ where: { campaignId } }),
-      prisma.promotionalCreditGrant.count({ where: { campaignId, firstUsedAt: { not: null } } }),
-      prisma.promotionalCreditGrant.count({ where: { campaignId, exhaustedAt: { not: null } } }),
+      prisma.promotionalCreditGrant.count({
+        where: { campaignId, firstUsedAt: { not: null } },
+      }),
+      prisma.promotionalCreditGrant.count({
+        where: { campaignId, exhaustedAt: { not: null } },
+      }),
     ]),
   ]);
 
@@ -131,10 +139,15 @@ export async function getPromotionReport(
       merchantsExhausted: summaryCounts[2],
       totalCreditsCommitted: aggregate._sum.committedQuantity ?? 0,
     },
-    merchants: grants.map((grant) => projectPromotionMerchantRow({ ...grant, shopLabel: grant.shop.domain })),
+    merchants: grants.map((grant) =>
+      projectPromotionMerchantRow({ ...grant, shopLabel: grant.shop.domain }),
+    ),
     page,
     pageSize: PROMOTION_REPORT_PAGE_SIZE,
     totalMerchants,
-    totalPages: Math.max(1, Math.ceil(totalMerchants / PROMOTION_REPORT_PAGE_SIZE)),
+    totalPages: Math.max(
+      1,
+      Math.ceil(totalMerchants / PROMOTION_REPORT_PAGE_SIZE),
+    ),
   };
 }

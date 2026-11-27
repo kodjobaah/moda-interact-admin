@@ -5,18 +5,37 @@ import { RECOVERY_SCENARIOS } from "../authoring/scenarios";
 import { REVIEW_LANGUAGES } from "../compilation/language-codes";
 import { configuredSenderWaba } from "../publishing/sender";
 
-export type ShopAssignmentRow = { shopId: string; domain: string; platform: string; shopStatus: string;
-  format: string; definitionId: string | null; templateName: string; languages: number; variants: number; isDefault: boolean; defaultConfigured: boolean };
+export type ShopAssignmentRow = {
+  shopId: string;
+  domain: string;
+  platform: string;
+  shopStatus: string;
+  format: string;
+  definitionId: string | null;
+  templateName: string;
+  languages: number;
+  variants: number;
+  isDefault: boolean;
+  defaultConfigured: boolean;
+};
 
 /** The current sender is resolved on the server. This is a read-only inventory,
  * not a publication eligibility check or inferred override provenance. */
-export async function readShopAssignments(db: PrismaClient, principal: PlatformAdminPrincipal,
-  purpose: string, search: string, page: number) {
+export async function readShopAssignments(
+  db: PrismaClient,
+  principal: PlatformAdminPrincipal,
+  purpose: string,
+  search: string,
+  page: number,
+) {
   requireTemplateSuperAdmin(principal);
-  if (!RECOVERY_SCENARIOS.some(scenario => scenario.id === purpose)) throw new Error("Invalid recovery scenario.");
+  if (!RECOVERY_SCENARIOS.some((scenario) => scenario.id === purpose))
+    throw new Error("Invalid recovery scenario.");
   const pageSize = 20;
-  const safePage = Number.isSafeInteger(page) ? Math.max(1, Math.min(1000,page)) : 1;
-  const query = search.trim().slice(0,90);
+  const safePage = Number.isSafeInteger(page)
+    ? Math.max(1, Math.min(1000, page))
+    : 1;
+  const query = search.trim().slice(0, 90);
   const wabaId = await configuredSenderWaba(db);
   const result = await db.$queryRaw<ShopAssignmentRow[]>(Prisma.sql`
     SELECT s.id AS "shopId", s.domain, s.platform::text AS platform, s.status::text AS "shopStatus",
@@ -36,7 +55,12 @@ export async function readShopAssignments(db: PrismaClient, principal: PlatformA
     GROUP BY s.id,l."definitionId",v."providerTemplateName",p."definitionId",
       CASE WHEN r.id IS NULL THEN 'UNKNOWN' WHEN r."componentsSnapshot" @> '[{"type":"HEADER","format":"IMAGE"}]'::jsonb THEN 'IMAGE' ELSE 'TEXT' END
     ORDER BY s.domain,s.id,format,v."providerTemplateName",l."definitionId" NULLS FIRST
-    LIMIT ${pageSize+1} OFFSET ${(safePage-1)*pageSize}
+    LIMIT ${pageSize + 1} OFFSET ${(safePage - 1) * pageSize}
   `);
-  return { rows: result.slice(0,pageSize), hasNext: result.length>pageSize, page: safePage, wabaId };
+  return {
+    rows: result.slice(0, pageSize),
+    hasNext: result.length > pageSize,
+    page: safePage,
+    wabaId,
+  };
 }

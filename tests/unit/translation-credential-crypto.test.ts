@@ -16,9 +16,11 @@ const environment: CommerceEnvironment = "TEST";
 const provider = "openai";
 const keyId = "arch029-test-key";
 const key = new Uint8Array(Buffer.alloc(32, 29));
-const keyring = parseCredentialKeyring(JSON.stringify({
-  [keyId]: Buffer.from(key).toString("base64"),
-}));
+const keyring = parseCredentialKeyring(
+  JSON.stringify({
+    [keyId]: Buffer.from(key).toString("base64"),
+  }),
+);
 const secret = "  exact translation credential-é  ";
 
 function decrypt(
@@ -57,16 +59,29 @@ test("translation credential sealer interoperates with Shared AAD", () => {
   assert.equal(sealed.authTag.byteLength, 16);
   assert.equal(sealed.keyId, keyId);
   assert.equal(decrypt(sealed), secret);
-  assert.equal(decryptCredential({
-    keyring,
-    envelope: sealed,
-    aad: createCommerceTranslationProviderCredentialAad({ environment, provider, keyId }),
-  }), secret);
-  assert.throws(() => decryptCredential({
-    keyring,
-    envelope: sealed,
-    aad: createCommerceTranslationProviderCredentialAad({ environment, provider: "wrong", keyId }),
-  }));
+  assert.equal(
+    decryptCredential({
+      keyring,
+      envelope: sealed,
+      aad: createCommerceTranslationProviderCredentialAad({
+        environment,
+        provider,
+        keyId,
+      }),
+    }),
+    secret,
+  );
+  assert.throws(() =>
+    decryptCredential({
+      keyring,
+      envelope: sealed,
+      aad: createCommerceTranslationProviderCredentialAad({
+        environment,
+        provider: "wrong",
+        keyId,
+      }),
+    }),
+  );
   assert.throws(() => decrypt(sealed, "PRODUCTION"));
   assert.throws(() => decrypt(sealed, environment, "other-provider"));
   assert.throws(() => decrypt(sealed, environment, provider, "another-key"));
@@ -83,5 +98,8 @@ test("production translation sealer uses Shared AAD and never decrypts", async (
   assert.match(source, /createCommerceTranslationProviderCredentialAad\(/);
   assert.match(source, /provider: input\.provider/);
   assert.match(source, /encryptCredential\(/);
-  assert.doesNotMatch(source, /createCipheriv|createDecipheriv|randomBytes|console\.|fingerprint|digest\(/i);
+  assert.doesNotMatch(
+    source,
+    /createCipheriv|createDecipheriv|randomBytes|console\.|fingerprint|digest\(/i,
+  );
 });

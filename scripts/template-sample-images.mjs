@@ -3,7 +3,8 @@ import { deflateSync } from "node:zlib";
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
   let value = index;
-  for (let i = 0; i < 8; i++) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  for (let i = 0; i < 8; i++)
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
   return value >>> 0;
 });
 function crc32(bytes) {
@@ -13,14 +14,18 @@ function crc32(bytes) {
 }
 function chunk(type, data) {
   const name = Buffer.from(type, "ascii");
-  const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
-  const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([name, data])));
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([name, data])));
   return Buffer.concat([length, name, data, crc]);
 }
 function png(width, height, pixel) {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4);
-  header[8] = 8; header[9] = 2; // 8-bit true-colour RGB
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 2; // 8-bit true-colour RGB
   const raw = Buffer.alloc((width * 3 + 1) * height);
   for (let y = 0; y < height; y++) {
     const row = y * (width * 3 + 1);
@@ -33,8 +38,10 @@ function png(width, height, pixel) {
     }
   }
   return Buffer.concat([
-    Buffer.from("89504e470d0a1a0a", "hex"), chunk("IHDR", header),
-    chunk("IDAT", deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0)),
+    Buffer.from("89504e470d0a1a0a", "hex"),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(raw, { level: 9 })),
+    chunk("IEND", Buffer.alloc(0)),
   ]);
 }
 function pixelFor(role, x, y) {
@@ -59,19 +66,42 @@ function pixelFor(role, x, y) {
   if (stripe && x > 0.39) return [31, 105 + x * 34, 94];
   return [245, 250, 248];
 }
-const DIMENSIONS = Object.freeze({ LOGO: [1200, 630], SQUARE_LOGO: [512, 512], COVER_IMAGE: [1200, 630] });
+const DIMENSIONS = Object.freeze({
+  LOGO: [1200, 630],
+  SQUARE_LOGO: [512, 512],
+  COVER_IMAGE: [1200, 630],
+});
 export function generateTemplateSamples() {
-  return Object.fromEntries(Object.entries(DIMENSIONS).map(([role, [width, height]]) => [role, {
-    bytes: png(width, height, (x, y) => pixelFor(role, x, y)), width, height,
-  }]));
+  return Object.fromEntries(
+    Object.entries(DIMENSIONS).map(([role, [width, height]]) => [
+      role,
+      {
+        bytes: png(width, height, (x, y) => pixelFor(role, x, y)),
+        width,
+        height,
+      },
+    ]),
+  );
 }
 /** Validate optional user-supplied PNGs without trusting file extensions or ImageMagick. */
 export function inspectPng(bytes) {
-  if (bytes.length < 45 || !bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")) ||
-      bytes.toString("ascii", 12, 16) !== "IHDR" || bytes.readUInt32BE(8) !== 13 ||
-      bytes[24] !== 8 || ![2, 6].includes(bytes[25])) throw new Error("Expected an 8-bit RGB/RGBA PNG (not JPEG/SVG).");
-  const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
-  if (width < 1 || height < 1 || width * height > 40_000_000 || bytes.length > 4 * 1024 * 1024) {
+  if (
+    bytes.length < 45 ||
+    !bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")) ||
+    bytes.toString("ascii", 12, 16) !== "IHDR" ||
+    bytes.readUInt32BE(8) !== 13 ||
+    bytes[24] !== 8 ||
+    ![2, 6].includes(bytes[25])
+  )
+    throw new Error("Expected an 8-bit RGB/RGBA PNG (not JPEG/SVG).");
+  const width = bytes.readUInt32BE(16),
+    height = bytes.readUInt32BE(20);
+  if (
+    width < 1 ||
+    height < 1 ||
+    width * height > 40_000_000 ||
+    bytes.length > 4 * 1024 * 1024
+  ) {
     throw new Error("Sample image dimensions or bytes exceed approved limits.");
   }
   return { width, height };

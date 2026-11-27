@@ -3,10 +3,17 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { AgentInstructionsStaleMutationError, getAgentInstructionsScopeData, mutateAgentInstructions, validatePromptText } from "../../src/lib/admin/agent-instructions.ts";
+import {
+  AgentInstructionsStaleMutationError,
+  getAgentInstructionsScopeData,
+  mutateAgentInstructions,
+  validatePromptText,
+} from "../../src/lib/admin/agent-instructions.ts";
 import { resolveAdminCommerceEnvironment } from "../../src/lib/admin/commerce-environment.ts";
 
-function makePromotionTransaction(options: { configurationConflict?: boolean; profileConflict?: boolean } = {}) {
+function makePromotionTransaction(
+  options: { configurationConflict?: boolean; profileConflict?: boolean } = {},
+) {
   const state = {
     revision: {
       id: "shop-revision-2",
@@ -43,7 +50,10 @@ function makePromotionTransaction(options: { configurationConflict?: boolean; pr
     },
     audits: [] as Array<Record<string, unknown>>,
   };
-  const apply = (target: Record<string, unknown>, data: Record<string, unknown>) => {
+  const apply = (
+    target: Record<string, unknown>,
+    data: Record<string, unknown>,
+  ) => {
     for (const [key, value] of Object.entries(data)) {
       if (typeof value === "object" && value !== null && "increment" in value) {
         target[key] = Number(target[key]) + Number(value.increment);
@@ -55,24 +65,57 @@ function makePromotionTransaction(options: { configurationConflict?: boolean; pr
   const tx = {
     commerceAgentPromptRevision: {
       findUnique: async () => state.revision,
-      updateMany: async ({ where, data }: { where: { status: string; editVersion: number }; data: Record<string, unknown> }) => {
-        if (state.revision.status !== where.status || state.revision.editVersion !== where.editVersion) return { count: 0 };
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { status: string; editVersion: number };
+        data: Record<string, unknown>;
+      }) => {
+        if (
+          state.revision.status !== where.status ||
+          state.revision.editVersion !== where.editVersion
+        )
+          return { count: 0 };
         apply(state.revision, data);
         return { count: 1 };
       },
     },
     commerceAgentConfiguration: {
       findMany: async () => [state.configuration],
-      updateMany: async ({ where, data }: { where: { promptEditVersion: number }; data: Record<string, unknown> }) => {
-        if (options.configurationConflict || state.configuration.promptEditVersion !== where.promptEditVersion) return { count: 0 };
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { promptEditVersion: number };
+        data: Record<string, unknown>;
+      }) => {
+        if (
+          options.configurationConflict ||
+          state.configuration.promptEditVersion !== where.promptEditVersion
+        )
+          return { count: 0 };
         apply(state.configuration, data);
         return { count: 1 };
       },
     },
     commerceShopProfile: {
       findUnique: async () => state.profile,
-      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-        if (options.profileConflict || Object.entries(where).some(([key, value]) => state.profile[key as keyof typeof state.profile] !== value)) return { count: 0 };
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        if (
+          options.profileConflict ||
+          Object.entries(where).some(
+            ([key, value]) =>
+              state.profile[key as keyof typeof state.profile] !== value,
+          )
+        )
+          return { count: 0 };
         apply(state.profile, data);
         return { count: 1 };
       },
@@ -84,7 +127,9 @@ function makePromotionTransaction(options: { configurationConflict?: boolean; pr
       },
     },
   };
-  const transaction = async <T>(callback: (client: typeof tx) => Promise<T>): Promise<T> => {
+  const transaction = async <T>(
+    callback: (client: typeof tx) => Promise<T>,
+  ): Promise<T> => {
     const before = structuredClone(state);
     try {
       return await callback(tx);
@@ -96,7 +141,9 @@ function makePromotionTransaction(options: { configurationConflict?: boolean; pr
   return { state, transaction };
 }
 
-async function withProductionEnvironment<T>(callback: () => Promise<T>): Promise<T> {
+async function withProductionEnvironment<T>(
+  callback: () => Promise<T>,
+): Promise<T> {
   const previous = process.env.DEPLOYMENT_ENVIRONMENT_NAME;
   process.env.DEPLOYMENT_ENVIRONMENT_NAME = "production";
   try {
@@ -145,18 +192,28 @@ test("accepts exactly 32,000 prompt characters and rejects 32,001 before databas
     message: "Prompt text must be non-empty and at most 32,000 characters.",
   });
   await withProductionEnvironment(async () => {
-    const noDatabaseAccess = new Proxy({}, {
-      get() {
-        throw new Error("Database access occurred before prompt validation.");
+    const noDatabaseAccess = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error("Database access occurred before prompt validation.");
+        },
       },
-    });
-    await assert.rejects(mutateAgentInstructions(noDatabaseAccess as never, {
-      kind: "update-draft",
-      revisionId: "revision-1",
-      expectedEditVersion: 1,
-      promptText: "x".repeat(32_001),
-      reason: "Reject oversized prompt",
-    }, "admin-1"), /at most 32,000 characters/);
+    );
+    await assert.rejects(
+      mutateAgentInstructions(
+        noDatabaseAccess as never,
+        {
+          kind: "update-draft",
+          revisionId: "revision-1",
+          expectedEditVersion: 1,
+          promptText: "x".repeat(32_001),
+          reason: "Reject oversized prompt",
+        },
+        "admin-1",
+      ),
+      /at most 32,000 characters/,
+    );
   });
 });
 
@@ -166,7 +223,11 @@ test("new lineage and draft audit rows receive distinct operation IDs", async ()
     const tx = {
       commerceAgentPrompt: {
         findMany: async () => [],
-        create: async () => ({ id: "platform-prompt", scope: "PLATFORM", shopId: null }),
+        create: async () => ({
+          id: "platform-prompt",
+          scope: "PLATFORM",
+          shopId: null,
+        }),
       },
       commerceAgentPromptRevision: {
         findMany: async () => [],
@@ -182,14 +243,26 @@ test("new lineage and draft audit rows receive distinct operation IDs", async ()
         },
       },
     };
-    await mutateAgentInstructions(tx as never, {
-      kind: "create-draft",
-      scope: "PLATFORM",
-      shopId: null,
-      reason: "Create Platform draft",
-    }, "admin-1");
-    assert.deepEqual(audits.map((event) => event.action), ["CREATE_AGENT_PROMPT", "CREATE_AGENT_PROMPT_DRAFT"]);
-    assert.ok(audits.every((event) => typeof event.operationId === "string" && event.operationId.length > 0));
+    await mutateAgentInstructions(
+      tx as never,
+      {
+        kind: "create-draft",
+        scope: "PLATFORM",
+        shopId: null,
+        reason: "Create Platform draft",
+      },
+      "admin-1",
+    );
+    assert.deepEqual(
+      audits.map((event) => event.action),
+      ["CREATE_AGENT_PROMPT", "CREATE_AGENT_PROMPT_DRAFT"],
+    );
+    assert.ok(
+      audits.every(
+        (event) =>
+          typeof event.operationId === "string" && event.operationId.length > 0,
+      ),
+    );
     assert.notEqual(audits[0]?.operationId, audits[1]?.operationId);
   });
 });
@@ -199,19 +272,31 @@ const serviceSource = await readFile(
   "utf8",
 );
 const routeSource = await readFile(
-  new URL("../../src/app/(protected)/system-controls/agent-instructions/page.tsx", import.meta.url),
+  new URL(
+    "../../src/app/(protected)/system-controls/agent-instructions/page.tsx",
+    import.meta.url,
+  ),
   "utf8",
 );
 const consoleSource = await readFile(
-  new URL("../../src/components/admin/agent-instructions/agent-instructions-console.tsx", import.meta.url),
+  new URL(
+    "../../src/components/admin/agent-instructions/agent-instructions-console.tsx",
+    import.meta.url,
+  ),
   "utf8",
 );
 const agentInstructionsTabsSource = await readFile(
-  new URL("../../src/components/admin/agent-instructions/agent-instructions-tabs.tsx", import.meta.url),
+  new URL(
+    "../../src/components/admin/agent-instructions/agent-instructions-tabs.tsx",
+    import.meta.url,
+  ),
   "utf8",
 );
 const promptCodeEditorSource = await readFile(
-  new URL("../../src/components/admin/agent-instructions/prompt-code-editor.tsx", import.meta.url),
+  new URL(
+    "../../src/components/admin/agent-instructions/prompt-code-editor.tsx",
+    import.meta.url,
+  ),
   "utf8",
 );
 const packageJsonSource = await readFile(
@@ -229,19 +314,45 @@ test("fails closed for duplicate prompt lineages and configurations", () => {
   assert.match(serviceSource, /Multiple Agent configurations exist/);
   assert.match(serviceSource, /Multiple DRAFT revisions exist/);
   assert.match(serviceSource, /assertUnique\(/);
-  assert.match(serviceSource, /admin\.agent_instructions\.configuration_conflict/);
+  assert.match(
+    serviceSource,
+    /admin\.agent_instructions\.configuration_conflict/,
+  );
   assert.match(consoleSource, /Agent Instructions configuration conflict/);
-  assert.match(consoleSource, /This scope is read-only until the persisted configuration is reconciled/);
+  assert.match(
+    consoleSource,
+    /This scope is read-only until the persisted configuration is reconciled/,
+  );
 });
 
 test("duplicate DRAFT revisions surface a bounded scope conflict without choosing a draft", async () => {
   const revisions = [
-    { id: "draft-1", promptId: "platform-prompt", revisionNumber: 1, status: "DRAFT", editVersion: 1, promptText: "One", sourceTemplateId: null, sourceTemplateEditVersion: null },
-    { id: "draft-2", promptId: "platform-prompt", revisionNumber: 2, status: "DRAFT", editVersion: 1, promptText: "Two", sourceTemplateId: null, sourceTemplateEditVersion: null },
+    {
+      id: "draft-1",
+      promptId: "platform-prompt",
+      revisionNumber: 1,
+      status: "DRAFT",
+      editVersion: 1,
+      promptText: "One",
+      sourceTemplateId: null,
+      sourceTemplateEditVersion: null,
+    },
+    {
+      id: "draft-2",
+      promptId: "platform-prompt",
+      revisionNumber: 2,
+      status: "DRAFT",
+      editVersion: 1,
+      promptText: "Two",
+      sourceTemplateId: null,
+      sourceTemplateEditVersion: null,
+    },
   ];
   const tx = {
     commerceAgentPrompt: {
-      findMany: async () => [{ id: "platform-prompt", scope: "PLATFORM", shopId: null, revisions }],
+      findMany: async () => [
+        { id: "platform-prompt", scope: "PLATFORM", shopId: null, revisions },
+      ],
     },
     commerceAgentConfiguration: { findMany: async () => [] },
   };
@@ -249,10 +360,17 @@ test("duplicate DRAFT revisions surface a bounded scope conflict without choosin
   await assert.rejects(
     getAgentInstructionsScopeData(tx as never, "DEVELOPMENT", "PLATFORM", null),
     (error: unknown) => {
-      assert.equal((error as { name?: string }).name, "AgentInstructionsConfigurationConflict");
-      assert.equal((error as { code?: string }).code, "MULTIPLE_DRAFT_REVISIONS");
+      assert.equal(
+        (error as { name?: string }).name,
+        "AgentInstructionsConfigurationConflict",
+      );
+      assert.equal(
+        (error as { code?: string }).code,
+        "MULTIPLE_DRAFT_REVISIONS",
+      );
       assert.deepEqual(
-        (error as { details?: { draftRevisionIds?: string[] } }).details?.draftRevisionIds,
+        (error as { details?: { draftRevisionIds?: string[] } }).details
+          ?.draftRevisionIds,
         ["draft-1", "draft-2"],
       );
       return true;
@@ -261,27 +379,56 @@ test("duplicate DRAFT revisions surface a bounded scope conflict without choosin
 });
 
 test("allocates at most one locked draft and copies only published seed provenance", () => {
-  assert.match(serviceSource, /CommerceAgentPrompt" WHERE "id" = \$\{lineage\.id\} FOR UPDATE/);
-  assert.match(serviceSource, /const existingDraft = uniqueDraft\(lockedRevisions\.filter\(\(revision\) => !isRoutingPromptRevision\(revision\)\)\)/);
-  assert.match(serviceSource, /revisionNumber: \(latest\?\.revisionNumber \?\? 0\) \+ 1/);
+  assert.match(
+    serviceSource,
+    /CommerceAgentPrompt" WHERE "id" = \$\{lineage\.id\} FOR UPDATE/,
+  );
+  assert.match(
+    serviceSource,
+    /const existingDraft = uniqueDraft\(lockedRevisions\.filter\(\(revision\) => !isRoutingPromptRevision\(revision\)\)\)/,
+  );
+  assert.match(
+    serviceSource,
+    /revisionNumber: \(latest\?\.revisionNumber \?\? 0\) \+ 1/,
+  );
   assert.match(serviceSource, /promptText: seed\?\.promptText \?\? ""/);
-  assert.match(serviceSource, /sourceTemplateEditVersion: seed\?\.sourceTemplateEditVersion \?\? null/);
+  assert.match(
+    serviceSource,
+    /sourceTemplateEditVersion: seed\?\.sourceTemplateEditVersion \?\? null/,
+  );
 });
 
 test("draft save is CAS-protected and publish hashes exact prompt text", () => {
-  assert.match(serviceSource, /status: "DRAFT", editVersion: mutation\.expectedEditVersion/);
-  assert.match(serviceSource, /promptText: mutation\.promptText, editVersion: \{ increment: 1 \}/);
-  assert.match(serviceSource, /createHash\("sha256"\)\.update\(revision\.promptText, "utf8"\)\.digest\("hex"\)/);
+  assert.match(
+    serviceSource,
+    /status: "DRAFT", editVersion: mutation\.expectedEditVersion/,
+  );
+  assert.match(
+    serviceSource,
+    /promptText: mutation\.promptText, editVersion: \{ increment: 1 \}/,
+  );
+  assert.match(
+    serviceSource,
+    /createHash\("sha256"\)\.update\(revision\.promptText, "utf8"\)\.digest\("hex"\)/,
+  );
   assert.match(serviceSource, /status: "PUBLISHED"[\s\S]*?contentHash:/);
-  assert.match(serviceSource, /revision\.status !== \(mutation\.kind === "publish" \? "DRAFT" : "PUBLISHED"\)/);
+  assert.match(
+    serviceSource,
+    /revision\.status !== \(mutation\.kind === "publish" \? "DRAFT" : "PUBLISHED"\)/,
+  );
 });
 
 test("ordinary publish atomically updates the environment-scoped pointer and audits both changes", () => {
   assert.match(serviceSource, /action: "PUBLISH_AGENT_PROMPT_REVISION"/);
   assert.match(serviceSource, /action: "SET_AGENT_PROMPT"/);
   assert.match(serviceSource, /promptEditVersion: \{ increment: 1 \}/);
-  const updateStart = serviceSource.indexOf("const updated = await tx.commerceAgentConfiguration.updateMany");
-  const updateEnd = serviceSource.indexOf("if (updated.count !== 1)", updateStart);
+  const updateStart = serviceSource.indexOf(
+    "const updated = await tx.commerceAgentConfiguration.updateMany",
+  );
+  const updateEnd = serviceSource.indexOf(
+    "if (updated.count !== 1)",
+    updateStart,
+  );
   const pointerUpdate = serviceSource.slice(updateStart, updateEnd);
   assert.match(pointerUpdate, /activePromptRevisionId: input\.revisionId/);
   assert.doesNotMatch(pointerUpdate, /modelId|modelEditVersion/);
@@ -289,27 +436,55 @@ test("ordinary publish atomically updates the environment-scoped pointer and aud
 });
 
 test("pending category publish promotes only its exact revision and retains the generation counter", () => {
-  assert.match(serviceSource, /profile\?\.pendingPromptRevisionId === revision\.id/);
-  assert.doesNotMatch(serviceSource, /pendingCategory\?\.defaultTemplateId\s*===\s*revision\.sourceTemplateId/);
+  assert.match(
+    serviceSource,
+    /profile\?\.pendingPromptRevisionId === revision\.id/,
+  );
+  assert.doesNotMatch(
+    serviceSource,
+    /pendingCategory\?\.defaultTemplateId\s*===\s*revision\.sourceTemplateId/,
+  );
   assert.match(serviceSource, /sourceTemplateEditVersion !== null/);
   assert.match(serviceSource, /changeKind: "PENDING_STORE_CATEGORY_PROMOTION"/);
-  assert.match(serviceSource, /pendingSelectionGeneration: profile\.pendingSelectionGeneration/);
+  assert.match(
+    serviceSource,
+    /pendingSelectionGeneration: profile\.pendingSelectionGeneration/,
+  );
   assert.match(serviceSource, /activeCategoryId: profile\.pendingCategoryId/);
-  assert.doesNotMatch(serviceSource, /commercePromptTemplate\.(find|findUnique|findFirst)/);
+  assert.doesNotMatch(
+    serviceSource,
+    /commercePromptTemplate\.(find|findUnique|findFirst)/,
+  );
 });
 
 test("historical activation is constrained to the selected scope and changes only the prompt pointer", () => {
-  assert.match(serviceSource, /revision\.prompt\.scope !== mutation\.scope \|\| revision\.prompt\.shopId !== mutation\.shopId/);
-  assert.match(serviceSource, /activePromptRevisionId: input\.revisionId, promptEditVersion: \{ increment: 1 \}/);
-  const activationStart = serviceSource.indexOf('if (mutation.kind === "activate")');
-  const activationEnd = serviceSource.indexOf('if (revision.editVersion !== mutation.expectedRevisionEditVersion');
-  assert.doesNotMatch(serviceSource.slice(activationStart, activationEnd), /activeCategoryId:/);
+  assert.match(
+    serviceSource,
+    /revision\.prompt\.scope !== mutation\.scope \|\| revision\.prompt\.shopId !== mutation\.shopId/,
+  );
+  assert.match(
+    serviceSource,
+    /activePromptRevisionId: input\.revisionId, promptEditVersion: \{ increment: 1 \}/,
+  );
+  const activationStart = serviceSource.indexOf(
+    'if (mutation.kind === "activate")',
+  );
+  const activationEnd = serviceSource.indexOf(
+    "if (revision.editVersion !== mutation.expectedRevisionEditVersion",
+  );
+  assert.doesNotMatch(
+    serviceSource.slice(activationStart, activationEnd),
+    /activeCategoryId:/,
+  );
 });
 
 test("protected page and navigation expose the Agent Instructions workflow", () => {
   assert.match(routeSource, /requirePlatformAdminPage\(\)/);
   assert.match(routeSource, /getAgentInstructionsData/);
-  assert.match(routeSource, /initialTab=\{params\.tab === "shop" \|\| params\.shop \? "shop" : "platform"\}/);
+  assert.match(
+    routeSource,
+    /initialTab=\{params\.tab === "shop" \|\| params\.shop \? "shop" : "platform"\}/,
+  );
   assert.match(sidebarSource, /href="\/system-controls\/agent-instructions"/);
   assert.match(sidebarSource, /Agent Instructions/);
   assert.match(agentInstructionsTabsSource, /role="tablist"/);
@@ -319,30 +494,50 @@ test("protected page and navigation expose the Agent Instructions workflow", () 
   assert.match(agentInstructionsTabsSource, /Shop Instructions/);
   assert.match(consoleSource, /role="tabpanel"/);
   assert.match(consoleSource, /name="tab" value="shop"/);
-  assert.match(consoleSource, /Publishing this draft will activate the pending Store Category/);
+  assert.match(
+    consoleSource,
+    /Publishing this draft will activate the pending Store Category/,
+  );
   assert.match(consoleSource, /disabled=\{!canPublish\}/);
 });
-
 
 test("Agent Instructions edits drafts through CodeMirror while preserving form submission semantics", () => {
   assert.match(packageJsonSource, /"codemirror": "\^6\.0\.2"/);
   assert.match(packageJsonSource, /"@codemirror\/lang-markdown": "\^6\.5\.2"/);
-  assert.match(promptCodeEditorSource, /import \{ basicSetup, EditorView \} from "codemirror"/);
-  assert.match(promptCodeEditorSource, /import \{ markdown \} from "@codemirror\/lang-markdown"/);
+  assert.match(
+    promptCodeEditorSource,
+    /import \{ basicSetup, EditorView \} from "codemirror"/,
+  );
+  assert.match(
+    promptCodeEditorSource,
+    /import \{ markdown \} from "@codemirror\/lang-markdown"/,
+  );
   assert.match(promptCodeEditorSource, /EditorView\.lineWrapping/);
   assert.match(promptCodeEditorSource, /EditorView\.inputHandler\.of/);
   assert.match(promptCodeEditorSource, /nextLength > maxLength/);
   assert.match(promptCodeEditorSource, /EditorView\.updateListener\.of/);
   assert.match(consoleSource, /<PromptCodeEditor/);
-  assert.match(consoleSource, /<input type="hidden" name="promptText" value=\{promptText\} \/>/);
+  assert.match(
+    consoleSource,
+    /<input type="hidden" name="promptText" value=\{promptText\} \/>/,
+  );
   assert.match(consoleSource, /disabled=\{!canSave\}/);
   assert.doesNotMatch(consoleSource, /<textarea[\s\S]*name="promptText"/);
 });
 
 test("Agent Instructions explains draft dirty state and publish readiness", () => {
-  assert.match(consoleSource, /const hasUnsavedChanges = promptText !== savedText/);
-  assert.match(consoleSource, /const canSave = hasPrompt && hasUnsavedChanges && !saving/);
-  assert.match(consoleSource, /const canPublish = hasPrompt && !hasUnsavedChanges && !saving && !publishing && !publishConflict/);
+  assert.match(
+    consoleSource,
+    /const hasUnsavedChanges = promptText !== savedText/,
+  );
+  assert.match(
+    consoleSource,
+    /const canSave = hasPrompt && hasUnsavedChanges && !saving/,
+  );
+  assert.match(
+    consoleSource,
+    /const canPublish = hasPrompt && !hasUnsavedChanges && !saving && !publishing && !publishConflict/,
+  );
   assert.match(consoleSource, /● Unsaved changes/);
   assert.match(consoleSource, /✓ Draft saved/);
   assert.match(consoleSource, /Save the current draft before publishing\./);
@@ -352,13 +547,31 @@ test("Agent Instructions explains draft dirty state and publish readiness", () =
   assert.match(consoleSource, /setSavedText\(promptText\)/);
   assert.match(consoleSource, /router\.refresh\(\)/);
   // A server refresh after saving must not remount the editor and mark it dirty again.
-  assert.match(consoleSource, /name="expectedEditVersion" value=\{draft\.editVersion\}/);
-  assert.match(consoleSource, /key=\{data\.platform\.draft\?\.id \?\? "none"\}/);
-  assert.match(consoleSource, /key=\{`\$\{selected\.id\}:\$\{data\.shopData\.draft\?\.id \?\? "none"\}`\}/);
-  assert.doesNotMatch(consoleSource, /key=\{`\$\{data\.platform\.draft\?\.id.*editVersion/);
-  assert.doesNotMatch(consoleSource, /key=\{`\$\{selected\.id\}:\$\{data\.shopData\.draft\?\.id.*editVersion/);
+  assert.match(
+    consoleSource,
+    /name="expectedEditVersion" value=\{draft\.editVersion\}/,
+  );
+  assert.match(
+    consoleSource,
+    /key=\{data\.platform\.draft\?\.id \?\? "none"\}/,
+  );
+  assert.match(
+    consoleSource,
+    /key=\{`\$\{selected\.id\}:\$\{data\.shopData\.draft\?\.id \?\? "none"\}`\}/,
+  );
+  assert.doesNotMatch(
+    consoleSource,
+    /key=\{`\$\{data\.platform\.draft\?\.id.*editVersion/,
+  );
+  assert.doesNotMatch(
+    consoleSource,
+    /key=\{`\$\{selected\.id\}:\$\{data\.shopData\.draft\?\.id.*editVersion/,
+  );
   // Server-driven CodeMirror updates must not be counted as user edits.
-  assert.match(promptCodeEditorSource, /if \(!update\.docChanged \|\| syncingValueRef\.current\) return/);
+  assert.match(
+    promptCodeEditorSource,
+    /if \(!update\.docChanged \|\| syncingValueRef\.current\) return/,
+  );
   assert.match(promptCodeEditorSource, /syncingValueRef\.current = true/);
   assert.match(promptCodeEditorSource, /syncingValueRef\.current = false/);
 });
@@ -366,26 +579,47 @@ test("Agent Instructions explains draft dirty state and publish readiness", () =
 test("pending category publish atomically promotes the exact edited prompt and preserves selection generation", async () => {
   await withProductionEnvironment(async () => {
     const { state, transaction } = makePromotionTransaction();
-    await transaction((tx) => mutateAgentInstructions(tx as never, {
-      kind: "publish",
-      revisionId: "shop-revision-2",
-      expectedRevisionEditVersion: 4,
-      expectedConfigurationPromptEditVersion: 5,
-      reason: "Promote reviewed category instructions",
-    }, "admin-1"));
+    await transaction((tx) =>
+      mutateAgentInstructions(
+        tx as never,
+        {
+          kind: "publish",
+          revisionId: "shop-revision-2",
+          expectedRevisionEditVersion: 4,
+          expectedConfigurationPromptEditVersion: 5,
+          reason: "Promote reviewed category instructions",
+        },
+        "admin-1",
+      ),
+    );
 
     assert.equal(state.revision.status, "PUBLISHED");
-    assert.equal(state.revision.contentHash, createHash("sha256").update(state.revision.promptText, "utf8").digest("hex"));
+    assert.equal(
+      state.revision.contentHash,
+      createHash("sha256")
+        .update(state.revision.promptText, "utf8")
+        .digest("hex"),
+    );
     assert.equal(state.configuration.activePromptRevisionId, "shop-revision-2");
     assert.equal(state.configuration.modelId, "model-1");
     assert.equal(state.profile.activeCategoryId, "category-home");
     assert.equal(state.profile.pendingCategoryId, null);
     assert.equal(state.profile.pendingPromptRevisionId, null);
     assert.equal(state.profile.pendingSelectionGeneration, 9);
-    assert.deepEqual(state.audits.map((event) => event.action), ["PUBLISH_AGENT_PROMPT_REVISION", "SET_AGENT_PROMPT"]);
-    assert.ok(state.audits.every((event) => typeof event.operationId === "string" && event.operationId.length > 0));
+    assert.deepEqual(
+      state.audits.map((event) => event.action),
+      ["PUBLISH_AGENT_PROMPT_REVISION", "SET_AGENT_PROMPT"],
+    );
+    assert.ok(
+      state.audits.every(
+        (event) =>
+          typeof event.operationId === "string" && event.operationId.length > 0,
+      ),
+    );
     assert.notEqual(state.audits[0]?.operationId, state.audits[1]?.operationId);
-    assert.deepEqual(state.audits[0]?.metadata, { changeKind: "PENDING_STORE_CATEGORY_PROMOTION" });
+    assert.deepEqual(state.audits[0]?.metadata, {
+      changeKind: "PENDING_STORE_CATEGORY_PROMOTION",
+    });
   });
 });
 
@@ -408,22 +642,42 @@ test("pending Shop read keeps the exact selection-time template snapshot after t
       pendingPromptRevisionId: revision.id,
       pendingSelectedAt: new Date("2026-09-30T12:00:00.000Z"),
       pendingSelectionGeneration: 9,
-      pendingCategory: { id: "category-home", displayName: "Home", defaultTemplateId: "template-b" },
+      pendingCategory: {
+        id: "category-home",
+        displayName: "Home",
+        defaultTemplateId: "template-b",
+      },
       pendingPromptRevision: {
         ...revision,
         prompt: { id: "shop-prompt", scope: "SHOP", shopId: "shop-1" },
-        sourceTemplate: { id: "template-a", key: "template-a", displayName: "Template A" },
+        sourceTemplate: {
+          id: "template-a",
+          key: "template-a",
+          displayName: "Template A",
+        },
       },
     };
     const tx = {
       commerceAgentPrompt: {
-        findMany: async () => [{ id: "shop-prompt", scope: "SHOP", shopId: "shop-1", revisions: [revision] }],
+        findMany: async () => [
+          {
+            id: "shop-prompt",
+            scope: "SHOP",
+            shopId: "shop-1",
+            revisions: [revision],
+          },
+        ],
       },
       commerceAgentConfiguration: { findMany: async () => [] },
       commerceShopProfile: { findUnique: async () => profile },
     };
 
-    const data = await getAgentInstructionsScopeData(tx as never, "PRODUCTION", "SHOP", "shop-1");
+    const data = await getAgentInstructionsScopeData(
+      tx as never,
+      "PRODUCTION",
+      "SHOP",
+      "shop-1",
+    );
 
     assert.equal(data.draft?.id, revision.id);
     assert.equal(data.draft?.promptText, "Pinned template-A text");
@@ -441,17 +695,28 @@ test("pending Shop publish promotes the exact template-A draft after the categor
     state.revision.sourceTemplateEditVersion = 7;
     state.revision.promptText = "Pinned template-A text  ";
 
-    await transaction((tx) => mutateAgentInstructions(tx as never, {
-      kind: "publish",
-      revisionId: "shop-revision-2",
-      expectedRevisionEditVersion: 4,
-      expectedConfigurationPromptEditVersion: 5,
-      reason: "Promote the pinned category draft",
-    }, "admin-1"));
+    await transaction((tx) =>
+      mutateAgentInstructions(
+        tx as never,
+        {
+          kind: "publish",
+          revisionId: "shop-revision-2",
+          expectedRevisionEditVersion: 4,
+          expectedConfigurationPromptEditVersion: 5,
+          reason: "Promote the pinned category draft",
+        },
+        "admin-1",
+      ),
+    );
 
     assert.equal(state.revision.status, "PUBLISHED");
     assert.equal(state.revision.promptText, "Pinned template-A text  ");
-    assert.equal(state.revision.contentHash, createHash("sha256").update("Pinned template-A text  ", "utf8").digest("hex"));
+    assert.equal(
+      state.revision.contentHash,
+      createHash("sha256")
+        .update("Pinned template-A text  ", "utf8")
+        .digest("hex"),
+    );
     assert.equal(state.revision.sourceTemplateId, "template-a");
     assert.equal(state.revision.sourceTemplateEditVersion, 7);
     assert.equal(state.configuration.activePromptRevisionId, "shop-revision-2");
@@ -463,14 +728,25 @@ test("pending Shop publish promotes the exact template-A draft after the categor
 
 test("pending category publish rolls back prompt, pointer, category, and audits on stale configuration CAS", async () => {
   await withProductionEnvironment(async () => {
-    const { state, transaction } = makePromotionTransaction({ configurationConflict: true });
-    await assert.rejects(transaction((tx) => mutateAgentInstructions(tx as never, {
-      kind: "publish",
-      revisionId: "shop-revision-2",
-      expectedRevisionEditVersion: 4,
-      expectedConfigurationPromptEditVersion: 5,
-      reason: "Promote reviewed category instructions",
-    }, "admin-1")), /Agent Instructions changed; reload and retry\./);
+    const { state, transaction } = makePromotionTransaction({
+      configurationConflict: true,
+    });
+    await assert.rejects(
+      transaction((tx) =>
+        mutateAgentInstructions(
+          tx as never,
+          {
+            kind: "publish",
+            revisionId: "shop-revision-2",
+            expectedRevisionEditVersion: 4,
+            expectedConfigurationPromptEditVersion: 5,
+            reason: "Promote reviewed category instructions",
+          },
+          "admin-1",
+        ),
+      ),
+      /Agent Instructions changed; reload and retry\./,
+    );
 
     assert.equal(state.revision.status, "DRAFT");
     assert.equal(state.configuration.activePromptRevisionId, "shop-revision-1");
@@ -483,14 +759,25 @@ test("pending category publish rolls back prompt, pointer, category, and audits 
 
 test("pending category publish rolls back every write when profile CAS loses the selection race", async () => {
   await withProductionEnvironment(async () => {
-    const { state, transaction } = makePromotionTransaction({ profileConflict: true });
-    await assert.rejects(transaction((tx) => mutateAgentInstructions(tx as never, {
-      kind: "publish",
-      revisionId: "shop-revision-2",
-      expectedRevisionEditVersion: 4,
-      expectedConfigurationPromptEditVersion: 5,
-      reason: "Promote reviewed category instructions",
-    }, "admin-1")), /Pending Store Category selection changed; reload and retry\./);
+    const { state, transaction } = makePromotionTransaction({
+      profileConflict: true,
+    });
+    await assert.rejects(
+      transaction((tx) =>
+        mutateAgentInstructions(
+          tx as never,
+          {
+            kind: "publish",
+            revisionId: "shop-revision-2",
+            expectedRevisionEditVersion: 4,
+            expectedConfigurationPromptEditVersion: 5,
+            reason: "Promote reviewed category instructions",
+          },
+          "admin-1",
+        ),
+      ),
+      /Pending Store Category selection changed; reload and retry\./,
+    );
 
     assert.equal(state.revision.status, "DRAFT");
     assert.equal(state.configuration.activePromptRevisionId, "shop-revision-1");
@@ -514,24 +801,37 @@ test("a second Platform publish rejects an already-published revision without mu
     const tx = {
       commerceAgentPromptRevision: {
         findUnique: async () => revision,
-        updateMany: async () => { writes++; return { count: 1 }; },
+        updateMany: async () => {
+          writes++;
+          return { count: 1 };
+        },
       },
       commerceAgentConfiguration: {
-        findMany: async () => { writes++; return []; },
+        findMany: async () => {
+          writes++;
+          return [];
+        },
       },
       commerceAuditEvent: {
-        create: async () => { writes++; },
+        create: async () => {
+          writes++;
+        },
       },
     };
     await assert.rejects(
-      mutateAgentInstructions(tx as never, {
-        kind: "publish",
-        revisionId: "platform-revision-1",
-        expectedRevisionEditVersion: 4,
-        expectedConfigurationPromptEditVersion: 1,
-        reason: "Attempt to publish twice",
-      }, "admin-1"),
-      (error: unknown) => error instanceof AgentInstructionsStaleMutationError &&
+      mutateAgentInstructions(
+        tx as never,
+        {
+          kind: "publish",
+          revisionId: "platform-revision-1",
+          expectedRevisionEditVersion: 4,
+          expectedConfigurationPromptEditVersion: 1,
+          reason: "Attempt to publish twice",
+        },
+        "admin-1",
+      ),
+      (error: unknown) =>
+        error instanceof AgentInstructionsStaleMutationError &&
         error.message === "Prompt revision is unavailable.",
     );
     assert.equal(writes, 0);

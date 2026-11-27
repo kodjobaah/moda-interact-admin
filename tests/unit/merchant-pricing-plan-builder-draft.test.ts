@@ -19,7 +19,9 @@ import {
   type MerchantPricingPlanDraft,
 } from "../../src/components/admin/merchant/merchant-pricing-plan-builder/merchant-pricing-plan-draft.ts";
 
-function draft(overrides: Partial<MerchantPricingPlanDraft> = {}): MerchantPricingPlanDraft {
+function draft(
+  overrides: Partial<MerchantPricingPlanDraft> = {},
+): MerchantPricingPlanDraft {
   return {
     isEditing: false,
     step: 0,
@@ -114,7 +116,10 @@ test("FREE payload clears the recovery handle and always includes Merchant Knowl
 
   assert.equal(payload.shopifyRecoveryUsageEventHandle, null);
   assert.equal(current.recoveryUsageEventHandle, "saved-meter");
-  assert.deepEqual(payload.supportedFeatureKeys, ["feature-a", "merchant_knowledge"]);
+  assert.deepEqual(payload.supportedFeatureKeys, [
+    "feature-a",
+    "merchant_knowledge",
+  ]);
   const disabledGenericFeature = merchantPricingPlanDraftReducer(current, {
     type: "set-supported-feature",
     key: "feature-a",
@@ -145,18 +150,84 @@ test("navigation gates only forward movement from the three guarded steps", () =
     economicsSatisfied: false,
   };
 
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 0, targetStep: 1, currentStepValid: false }), false);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 2, targetStep: 3, currentStepValid: false }), false);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 3, targetStep: 4 }), true);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 3, targetStep: 4, hasUnboundedZeroCostFixedEvent: true }), false);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 3, targetStep: 4, hasUnboundedZeroCostFixedEvent: false }), true);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 4, targetStep: 5 }), false);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 4, targetStep: 5, merchantContentValid: true }), true);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 5, targetStep: 6 }), false);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 5, targetStep: 6, economicsSatisfied: true }), true);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 5, targetStep: 4 }), true);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 5, targetStep: 0 }), true);
-  assert.equal(canNavigateTo({ ...navigation, currentStep: 2, targetStep: 4 }), false);
+  assert.equal(
+    canNavigateTo({
+      ...navigation,
+      currentStep: 0,
+      targetStep: 1,
+      currentStepValid: false,
+    }),
+    false,
+  );
+  assert.equal(
+    canNavigateTo({
+      ...navigation,
+      currentStep: 2,
+      targetStep: 3,
+      currentStepValid: false,
+    }),
+    false,
+  );
+  assert.equal(
+    canNavigateTo({ ...navigation, currentStep: 3, targetStep: 4 }),
+    true,
+  );
+  assert.equal(
+    canNavigateTo({
+      ...navigation,
+      currentStep: 3,
+      targetStep: 4,
+      hasUnboundedZeroCostFixedEvent: true,
+    }),
+    false,
+  );
+  assert.equal(
+    canNavigateTo({
+      ...navigation,
+      currentStep: 3,
+      targetStep: 4,
+      hasUnboundedZeroCostFixedEvent: false,
+    }),
+    true,
+  );
+  assert.equal(
+    canNavigateTo({ ...navigation, currentStep: 4, targetStep: 5 }),
+    false,
+  );
+  assert.equal(
+    canNavigateTo({
+      ...navigation,
+      currentStep: 4,
+      targetStep: 5,
+      merchantContentValid: true,
+    }),
+    true,
+  );
+  assert.equal(
+    canNavigateTo({ ...navigation, currentStep: 5, targetStep: 6 }),
+    false,
+  );
+  assert.equal(
+    canNavigateTo({
+      ...navigation,
+      currentStep: 5,
+      targetStep: 6,
+      economicsSatisfied: true,
+    }),
+    true,
+  );
+  assert.equal(
+    canNavigateTo({ ...navigation, currentStep: 5, targetStep: 4 }),
+    true,
+  );
+  assert.equal(
+    canNavigateTo({ ...navigation, currentStep: 5, targetStep: 0 }),
+    true,
+  );
+  assert.equal(
+    canNavigateTo({ ...navigation, currentStep: 2, targetStep: 4 }),
+    false,
+  );
 });
 
 test("save blockers explain the exact earlier fields that keep Save draft disabled", () => {
@@ -190,7 +261,8 @@ test("save blockers explain the exact earlier fields that keep Save draft disabl
     [
       {
         step: 2,
-        message: "Step 3 Shopify pricing: Recovery usage-event handle is required for a paid plan.",
+        message:
+          "Step 3 Shopify pricing: Recovery usage-event handle is required for a paid plan.",
       },
     ],
   );
@@ -219,11 +291,20 @@ test("submit selector requires each independent readiness condition", () => {
     "merchantKnowledgeConfigurationValid",
     "economicsSatisfied",
   ] as const) {
-    assert.equal(canSubmitMerchantPricingPlan({ ...ready, [key]: false }), false);
+    assert.equal(
+      canSubmitMerchantPricingPlan({ ...ready, [key]: false }),
+      false,
+    );
   }
   assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "  " }), false);
-  assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2000) }), true);
-  assert.equal(canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2001) }), false);
+  assert.equal(
+    canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2000) }),
+    true,
+  );
+  assert.equal(
+    canSubmitMerchantPricingPlan({ ...ready, reason: "x".repeat(2001) }),
+    false,
+  );
 });
 
 test("Merchant Knowledge configuration is retained only for one valid mapping with active source pairs", () => {
@@ -231,7 +312,9 @@ test("Merchant Knowledge configuration is retained only for one valid mapping wi
     schemaVersion: 1 as const,
     maxKnowledgeSources: 3,
     maxContentUnitsPerSource: 20,
-    allowedSourceTypes: [{ purposeKey: "FAQ" as const, dataFormatKey: "CSV" as const }],
+    allowedSourceTypes: [
+      { purposeKey: "FAQ" as const, dataFormatKey: "CSV" as const },
+    ],
   };
   const activePairs = new Set([sourceTypeKey("FAQ", "CSV")]);
 
@@ -239,9 +322,18 @@ test("Merchant Knowledge configuration is retained only for one valid mapping wi
     retainInitialMerchantKnowledgeConfiguration(1, configuration, activePairs),
     configuration,
   );
-  assert.equal(retainInitialMerchantKnowledgeConfiguration(0, configuration, activePairs), null);
-  assert.equal(retainInitialMerchantKnowledgeConfiguration(2, configuration, activePairs), null);
-  assert.equal(retainInitialMerchantKnowledgeConfiguration(1, null, activePairs), null);
+  assert.equal(
+    retainInitialMerchantKnowledgeConfiguration(0, configuration, activePairs),
+    null,
+  );
+  assert.equal(
+    retainInitialMerchantKnowledgeConfiguration(2, configuration, activePairs),
+    null,
+  );
+  assert.equal(
+    retainInitialMerchantKnowledgeConfiguration(1, null, activePairs),
+    null,
+  );
   assert.equal(
     retainInitialMerchantKnowledgeConfiguration(1, configuration, new Set()),
     null,
@@ -249,7 +341,10 @@ test("Merchant Knowledge configuration is retained only for one valid mapping wi
 });
 
 test("unavailable saved Commerce model remains selected for deliberate repair", () => {
-  assert.equal(selectUnavailableCommerceModelId("retired-model", []), "retired-model");
+  assert.equal(
+    selectUnavailableCommerceModelId("retired-model", []),
+    "retired-model",
+  );
   assert.equal(
     selectUnavailableCommerceModelId("active-model", [{ id: "active-model" }]),
     null,
@@ -270,12 +365,25 @@ test("usage-event identity allocation starts at zero and a full list consumes no
 });
 
 test("economics override readiness is bounded and requires an available enabled override", () => {
-  const available = { overrideAvailable: true, enabled: true, reason: " approved " };
+  const available = {
+    overrideAvailable: true,
+    enabled: true,
+    reason: " approved ",
+  };
   assert.equal(isEconomicsOverrideReady(available), true);
-  assert.equal(isEconomicsOverrideReady({ ...available, overrideAvailable: false }), false);
-  assert.equal(isEconomicsOverrideReady({ ...available, enabled: false }), false);
+  assert.equal(
+    isEconomicsOverrideReady({ ...available, overrideAvailable: false }),
+    false,
+  );
+  assert.equal(
+    isEconomicsOverrideReady({ ...available, enabled: false }),
+    false,
+  );
   assert.equal(isEconomicsOverrideReady({ ...available, reason: " " }), false);
-  assert.equal(isEconomicsOverrideReady({ ...available, reason: "x".repeat(2001) }), false);
+  assert.equal(
+    isEconomicsOverrideReady({ ...available, reason: "x".repeat(2001) }),
+    false,
+  );
 });
 
 test("economics invalidation key contains exactly the current configuration fields", () => {
@@ -307,23 +415,50 @@ test("economics invalidation key contains exactly the current configuration fiel
     buildEconomicsConfigurationKey({ ...baseline, currency: "USD" }),
     key,
   );
-  assert.notEqual(buildEconomicsConfigurationKey({ ...baseline, handle: "other" }), key);
-  assert.notEqual(buildEconomicsConfigurationKey({ ...baseline, credits: 6 }), key);
-  assert.notEqual(buildEconomicsConfigurationKey({ ...baseline, currency: "EUR" }), key);
-  assert.notEqual(buildEconomicsConfigurationKey({ ...baseline, recurring: "11.00" }), key);
-  assert.notEqual(buildEconomicsConfigurationKey({ ...baseline, effectivePlacement: "AFTER:p1" }), key);
-  assert.notEqual(buildEconomicsConfigurationKey({ ...baseline, minimumUpgradePremiumBps: 2100 }), key);
+  assert.notEqual(
+    buildEconomicsConfigurationKey({ ...baseline, handle: "other" }),
+    key,
+  );
+  assert.notEqual(
+    buildEconomicsConfigurationKey({ ...baseline, credits: 6 }),
+    key,
+  );
+  assert.notEqual(
+    buildEconomicsConfigurationKey({ ...baseline, currency: "EUR" }),
+    key,
+  );
+  assert.notEqual(
+    buildEconomicsConfigurationKey({ ...baseline, recurring: "11.00" }),
+    key,
+  );
   assert.notEqual(
     buildEconomicsConfigurationKey({
       ...baseline,
-      serializedUsageEvents: [...baseline.serializedUsageEvents, {
-        adminLabel: "Extra",
-        eventHandle: "extra",
-        creditsGrantedPerUnit: 1,
-        maximumUnitsPerBillingPeriod: 2,
-        pricingMode: "FIXED",
-        fixedUnitAmount: "2.00",
-      }],
+      effectivePlacement: "AFTER:p1",
+    }),
+    key,
+  );
+  assert.notEqual(
+    buildEconomicsConfigurationKey({
+      ...baseline,
+      minimumUpgradePremiumBps: 2100,
+    }),
+    key,
+  );
+  assert.notEqual(
+    buildEconomicsConfigurationKey({
+      ...baseline,
+      serializedUsageEvents: [
+        ...baseline.serializedUsageEvents,
+        {
+          adminLabel: "Extra",
+          eventHandle: "extra",
+          creditsGrantedPerUnit: 1,
+          maximumUnitsPerBillingPeriod: 2,
+          pricingMode: "FIXED",
+          fixedUnitAmount: "2.00",
+        },
+      ],
     }),
     key,
   );
@@ -340,7 +475,11 @@ test("economics invalidation key contains exactly the current configuration fiel
     { type: "set-supported-feature", key: "feature", selected: true },
     {
       type: "add-highlight",
-      highlight: { contentKey: "new-highlight", title: "New", description: "New" },
+      highlight: {
+        contentKey: "new-highlight",
+        title: "New",
+        description: "New",
+      },
     },
   ] as const;
   const updated = unrelatedUpdates.reduce(
@@ -380,7 +519,11 @@ test("reducer preserves event, tier, highlight, and externally generated identit
     pricingMode: "GRADUATED" as const,
     tiers: [{ upTo: null, amountPerUnit: "1", flatAmount: "0" }],
   };
-  const highlight = { contentKey: "uuid-from-ui", title: "Title", description: "Details" };
+  const highlight = {
+    contentKey: "uuid-from-ui",
+    title: "Title",
+    description: "Details",
+  };
   const initial = draft({ events: [event], highlights: [highlight] });
   const added = merchantPricingPlanDraftReducer(initial, {
     type: "add-tier",
@@ -426,7 +569,11 @@ test("reducer preserves event, tier, highlight, and externally generated identit
     }).events[1].clientKey,
     "new-usage-event-0",
   );
-  const secondEvent = { ...event, clientKey: "usage-2", eventHandle: "usage-2" };
+  const secondEvent = {
+    ...event,
+    clientKey: "usage-2",
+    eventHandle: "usage-2",
+  };
   const twoEvents = draft({ events: [event, secondEvent] });
   assert.deepEqual(
     merchantPricingPlanDraftReducer(twoEvents, {
@@ -451,10 +598,12 @@ test("reducer preserves event, tier, highlight, and externally generated identit
     }).events[1].adminLabel,
     "Updated",
   );
-  const fullDraft = draft({ events: Array.from({ length: 5 }, (_, index) => ({
-    ...event,
-    clientKey: `usage-${index}`,
-  })) });
+  const fullDraft = draft({
+    events: Array.from({ length: 5 }, (_, index) => ({
+      ...event,
+      clientKey: `usage-${index}`,
+    })),
+  });
   assert.equal(
     merchantPricingPlanDraftReducer(fullDraft, {
       type: "add-event",

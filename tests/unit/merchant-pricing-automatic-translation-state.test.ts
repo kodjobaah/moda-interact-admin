@@ -53,11 +53,17 @@ test("only complete READY_TO_APPLY work reports translation readiness", () => {
   };
   assert.equal(merchantPricingAutomaticTranslationReady(ready), true);
   assert.equal(
-    merchantPricingAutomaticTranslationReady({ ...ready, status: "PROCESSING" }),
+    merchantPricingAutomaticTranslationReady({
+      ...ready,
+      status: "PROCESSING",
+    }),
     false,
   );
   assert.equal(
-    merchantPricingAutomaticTranslationReady({ ...ready, completeLocaleCount: 19 }),
+    merchantPricingAutomaticTranslationReady({
+      ...ready,
+      completeLocaleCount: 19,
+    }),
     false,
   );
   assert.equal(
@@ -76,10 +82,27 @@ test("polling terminal states stop at ready, applied, failed, or stale", () => {
     failedItemCount: 0,
     failureCode: null,
   };
-  assert.equal(merchantPricingAutomaticTranslationTerminal({ ...base, status: "PENDING" }), false);
-  assert.equal(merchantPricingAutomaticTranslationTerminal({ ...base, status: "PROCESSING" }), false);
-  for (const status of ["READY_TO_APPLY", "APPLIED", "FAILED", "STALE"] as const) {
-    assert.equal(merchantPricingAutomaticTranslationTerminal({ ...base, status }), true);
+  assert.equal(
+    merchantPricingAutomaticTranslationTerminal({ ...base, status: "PENDING" }),
+    false,
+  );
+  assert.equal(
+    merchantPricingAutomaticTranslationTerminal({
+      ...base,
+      status: "PROCESSING",
+    }),
+    false,
+  );
+  for (const status of [
+    "READY_TO_APPLY",
+    "APPLIED",
+    "FAILED",
+    "STALE",
+  ] as const) {
+    assert.equal(
+      merchantPricingAutomaticTranslationTerminal({ ...base, status }),
+      true,
+    );
   }
 });
 
@@ -93,7 +116,12 @@ test("durable draft saving accepts active, ready-to-apply, and failed runs but n
     failedItemCount: 0,
     failureCode: null,
   };
-  for (const status of ["PENDING", "PROCESSING", "READY_TO_APPLY", "FAILED"] as const) {
+  for (const status of [
+    "PENDING",
+    "PROCESSING",
+    "READY_TO_APPLY",
+    "FAILED",
+  ] as const) {
     assert.equal(
       merchantPricingAutomaticTranslationCanPersistDraft({ ...base, status }),
       true,

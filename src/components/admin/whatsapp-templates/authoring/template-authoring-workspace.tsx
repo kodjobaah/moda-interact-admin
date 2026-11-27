@@ -3,80 +3,233 @@ import { CommonLayoutSelector } from "./common-layout-selector";
 import type { CommonLayoutChoice } from "@/lib/admin/whatsapp-templates/authoring/common-layout-reads";
 import { useState } from "react";
 import Link from "next/link";
-import type { MetaTemplateAst, TemplateDetail } from "@/lib/admin/whatsapp-templates/authoring/types";
+import type {
+  MetaTemplateAst,
+  TemplateDetail,
+} from "@/lib/admin/whatsapp-templates/authoring/types";
 import { TemplateFamilyPurposeSelector } from "./template-family-purpose-selector";
 import { TemplateContentEditor } from "./template-content-editor";
 import { TemplateReadOnlyPreview } from "./template-read-only-preview";
 import { TemplateSaveControls } from "./template-save-controls";
-import { TemplateEditorSteps, type TemplateEditorStep } from "./template-editor-steps";
+import {
+  TemplateEditorSteps,
+  type TemplateEditorStep,
+} from "./template-editor-steps";
 import { TemplateReviewSummary } from "./template-review-summary";
 import { useTemplateAuthoringDraft } from "./use-template-authoring-draft";
 import { useShopBrandMediaRole } from "../media/use-shop-brand-media-role";
 
 /** Layout only: all AST mutations, validation, preview and saving live in the controller or pure services. */
-export function TemplateAuthoringWorkspace({ cloneFrom, commonLayouts = [], initialScenario, initialFormat }: { cloneFrom?: TemplateDetail | null; commonLayouts?: CommonLayoutChoice[]; initialScenario?: MetaTemplateAst; initialFormat?: import("@/lib/admin/whatsapp-templates/recovery-defaults/contracts").RecoveryDefaultFormat }) {
-  const controller = useTemplateAuthoringDraft(cloneFrom, commonLayouts.find(layout => layout.active), initialScenario, initialFormat);
+export function TemplateAuthoringWorkspace({
+  cloneFrom,
+  commonLayouts = [],
+  initialScenario,
+  initialFormat,
+}: {
+  cloneFrom?: TemplateDetail | null;
+  commonLayouts?: CommonLayoutChoice[];
+  initialScenario?: MetaTemplateAst;
+  initialFormat?: import("@/lib/admin/whatsapp-templates/recovery-defaults/contracts").RecoveryDefaultFormat;
+}) {
+  const controller = useTemplateAuthoringDraft(
+    cloneFrom,
+    commonLayouts.find((layout) => layout.active),
+    initialScenario,
+    initialFormat,
+  );
   const media = useShopBrandMediaRole();
   const [step, setStep] = useState<TemplateEditorStep>("setup");
   const issues = controller.checked.ok ? [] : controller.checked.issues;
   const select = (next: TemplateEditorStep) => setStep(next);
-  return <div className="mx-auto max-w-7xl space-y-5" aria-label="Template authoring workspace">
-    <header className="space-y-2">
-      <Link href="/system-controls/whatsapp-templates" className="inline-flex text-sm text-blue-800 underline">← Back to catalogue</Link>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div><h2 className="text-xl font-bold text-slate-900">{cloneFrom ? "Clone as New" : "Create WhatsApp template"}</h2>
-          <p className="mt-1 text-sm text-slate-600">Create a new immutable English source in three steps.</p></div>
-        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">{controller.savedId ? "Saved" : "Unsaved draft"}</span>
+  return (
+    <div
+      className="mx-auto max-w-7xl space-y-5"
+      aria-label="Template authoring workspace"
+    >
+      <header className="space-y-2">
+        <Link
+          href="/system-controls/whatsapp-templates"
+          className="inline-flex text-sm text-blue-800 underline"
+        >
+          ← Back to catalogue
+        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">
+              {cloneFrom ? "Clone as New" : "Create WhatsApp template"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Create a new immutable English source in three steps.
+            </p>
+          </div>
+          <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
+            {controller.savedId ? "Saved" : "Unsaved draft"}
+          </span>
+        </div>
+      </header>
+      {cloneFrom?.kind === "META_RECOVERY" &&
+        commonLayouts.some((layout) => layout.active) && (
+          <p
+            role="status"
+            className="rounded border border-blue-200 bg-blue-50 p-3 text-sm"
+          >
+            The active common layout is preselected for this unsaved clone.
+            Review the full composition before saving; the original message body
+            and discount are retained.{" "}
+            {initialFormat === "TEXT"
+              ? "The IMAGE binding is removed from this unsaved TEXT clone."
+              : "Review the selected media settings."}
+          </p>
+        )}
+      {cloneFrom?.kind === "META_RECOVERY" &&
+        !commonLayouts.some((layout) => layout.active) && (
+          <p
+            role="status"
+            className="rounded border border-amber-300 bg-amber-50 p-3 text-sm"
+          >
+            No reviewed active common layout is available for automatic
+            selection. Review the saved layout choices before saving this clone.
+          </p>
+        )}
+      <CommonLayoutSelector
+        draft={controller.draft}
+        choices={commonLayouts}
+        onChange={controller.updateDraft}
+      />
+      <TemplateEditorSteps
+        value={step}
+        onChange={select}
+        issueCount={issues.length}
+      />
+      <div
+        id="whatsapp-panel-setup"
+        role="tabpanel"
+        aria-labelledby="whatsapp-tab-setup"
+        hidden={step !== "setup"}
+        className={
+          step === "setup"
+            ? "grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(270px,0.6fr)]"
+            : "hidden"
+        }
+      >
+        <TemplateFamilyPurposeSelector
+          draft={controller.draft}
+          onChange={controller.updateDraft}
+          onFamilyChange={controller.selectFamily}
+        />
+        <aside
+          className="rounded-xl border border-slate-200 bg-white p-5"
+          aria-label="Template setup summary"
+        >
+          <h3 className="font-semibold text-slate-900">About this template</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {controller.draft.family === "META_RECOVERY"
+              ? "An approved Meta recovery template can be used for a checkout recovery outreach, once separately submitted, approved and published."
+              : "An internal wrapper formats AI or human conversation replies. It does not create a Meta template."}
+          </p>
+          <p className="mt-4 text-xs text-slate-500">
+            Saved English definitions cannot be edited. Recovery templates
+            continue to translation review, Meta approval and publication.
+          </p>
+        </aside>
       </div>
-    </header>
-    {cloneFrom?.kind === "META_RECOVERY" && commonLayouts.some(layout => layout.active) &&
-      <p role="status" className="rounded border border-blue-200 bg-blue-50 p-3 text-sm">The active common layout is preselected for this unsaved clone. Review the full composition before saving; the original message body and discount are retained. {initialFormat === "TEXT" ? "The IMAGE binding is removed from this unsaved TEXT clone." : "Review the selected media settings."}</p>}
-    {cloneFrom?.kind === "META_RECOVERY" && !commonLayouts.some(layout => layout.active) &&
-      <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">No reviewed active common layout is available for automatic selection. Review the saved layout choices before saving this clone.</p>}
-    <CommonLayoutSelector draft={controller.draft} choices={commonLayouts} onChange={controller.updateDraft} />
-    <TemplateEditorSteps value={step} onChange={select} issueCount={issues.length} />
-    <div id="whatsapp-panel-setup" role="tabpanel" aria-labelledby="whatsapp-tab-setup" hidden={step !== "setup"}
-      className={step === "setup" ? "grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(270px,0.6fr)]" : "hidden"}>
-      <TemplateFamilyPurposeSelector draft={controller.draft} onChange={controller.updateDraft} onFamilyChange={controller.selectFamily} />
-      <aside className="rounded-xl border border-slate-200 bg-white p-5" aria-label="Template setup summary">
-        <h3 className="font-semibold text-slate-900">About this template</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-600">{controller.draft.family === "META_RECOVERY"
-          ? "An approved Meta recovery template can be used for a checkout recovery outreach, once separately submitted, approved and published."
-          : "An internal wrapper formats AI or human conversation replies. It does not create a Meta template."}</p>
-        <p className="mt-4 text-xs text-slate-500">Saved English definitions cannot be edited. Recovery templates continue to translation review, Meta approval and publication.</p>
-      </aside>
-    </div>
-    <div id="whatsapp-panel-compose" role="tabpanel" aria-labelledby="whatsapp-tab-compose" hidden={step !== "compose"}
-      className={step === "compose" ? "grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.82fr)]" : "hidden"}>
-      <TemplateContentEditor draft={controller.draft} onChange={controller.updateDraft} issues={issues} media={media} />
-      <div className="xl:sticky xl:top-0"><TemplateReadOnlyPreview preview={controller.preview} title="Live WhatsApp preview" draftInvalid={issues.length > 0}
-        verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
-          && controller.draft.shopBrandMediaRole !== "CHECKOUT_PRODUCT"
-          ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
-        mediaDomain={media.media?.label} /></div>
-    </div>
-    <div id="whatsapp-panel-review" role="tabpanel" aria-labelledby="whatsapp-tab-review" hidden={step !== "review"} className={step === "review" ? "space-y-5" : "hidden"}>
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-        <TemplateReviewSummary draft={controller.draft} issues={issues} onStep={select} />
-        <TemplateReadOnlyPreview preview={controller.preview} title="Final example preview" draftInvalid={issues.length > 0}
-          verifiedMedia={controller.draft.family === "META_RECOVERY" && controller.draft.shopBrandMediaRole
-            && controller.draft.shopBrandMediaRole !== "CHECKOUT_PRODUCT"
-            ? media.media?.roles[controller.draft.shopBrandMediaRole] : undefined}
-          mediaDomain={media.media?.label} />
+      <div
+        id="whatsapp-panel-compose"
+        role="tabpanel"
+        aria-labelledby="whatsapp-tab-compose"
+        hidden={step !== "compose"}
+        className={
+          step === "compose"
+            ? "grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.82fr)]"
+            : "hidden"
+        }
+      >
+        <TemplateContentEditor
+          draft={controller.draft}
+          onChange={controller.updateDraft}
+          issues={issues}
+          media={media}
+        />
+        <div className="xl:sticky xl:top-0">
+          <TemplateReadOnlyPreview
+            preview={controller.preview}
+            title="Live WhatsApp preview"
+            draftInvalid={issues.length > 0}
+            verifiedMedia={
+              controller.draft.family === "META_RECOVERY" &&
+              controller.draft.shopBrandMediaRole &&
+              controller.draft.shopBrandMediaRole !== "CHECKOUT_PRODUCT"
+                ? media.media?.roles[controller.draft.shopBrandMediaRole]
+                : undefined
+            }
+            mediaDomain={media.media?.label}
+          />
+        </div>
       </div>
-      <TemplateSaveControls issues={issues} saving={controller.saving} savedId={controller.savedId}
-        error={controller.error} cloneFromId={cloneFrom?.id} showIssues={false} onSave={controller.submit} startTranslations={controller.draft.family === "META_RECOVERY"} />
-    </div>
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-      <p className="text-xs text-slate-500">Your changes are preserved between tabs. Leaving this page discards an unsaved draft.</p>
-      <div className="flex gap-2">
-        {step !== "setup" && <button type="button" onClick={() => select(step === "review" ? "compose" : "setup")}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Back</button>}
-        {step !== "review" && <button type="button" onClick={() => select(step === "setup" ? "compose" : "review")}
-          className="rounded-lg bg-blue-800 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900">
-          Next: {step === "setup" ? "Compose" : "Review & Save"}
-        </button>}
+      <div
+        id="whatsapp-panel-review"
+        role="tabpanel"
+        aria-labelledby="whatsapp-tab-review"
+        hidden={step !== "review"}
+        className={step === "review" ? "space-y-5" : "hidden"}
+      >
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+          <TemplateReviewSummary
+            draft={controller.draft}
+            issues={issues}
+            onStep={select}
+          />
+          <TemplateReadOnlyPreview
+            preview={controller.preview}
+            title="Final example preview"
+            draftInvalid={issues.length > 0}
+            verifiedMedia={
+              controller.draft.family === "META_RECOVERY" &&
+              controller.draft.shopBrandMediaRole &&
+              controller.draft.shopBrandMediaRole !== "CHECKOUT_PRODUCT"
+                ? media.media?.roles[controller.draft.shopBrandMediaRole]
+                : undefined
+            }
+            mediaDomain={media.media?.label}
+          />
+        </div>
+        <TemplateSaveControls
+          issues={issues}
+          saving={controller.saving}
+          savedId={controller.savedId}
+          error={controller.error}
+          cloneFromId={cloneFrom?.id}
+          showIssues={false}
+          onSave={controller.submit}
+          startTranslations={controller.draft.family === "META_RECOVERY"}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+        <p className="text-xs text-slate-500">
+          Your changes are preserved between tabs. Leaving this page discards an
+          unsaved draft.
+        </p>
+        <div className="flex gap-2">
+          {step !== "setup" && (
+            <button
+              type="button"
+              onClick={() => select(step === "review" ? "compose" : "setup")}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              Back
+            </button>
+          )}
+          {step !== "review" && (
+            <button
+              type="button"
+              onClick={() => select(step === "setup" ? "compose" : "review")}
+              className="rounded-lg bg-blue-800 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900"
+            >
+              Next: {step === "setup" ? "Compose" : "Review & Save"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
-  </div>;
+  );
 }

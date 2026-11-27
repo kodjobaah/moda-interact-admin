@@ -18,7 +18,10 @@ const policyAction = readFileSync(
   "utf8",
 );
 const controlsPage = readFileSync(
-  resolve(root, "src/app/(protected)/system-controls/background-runtime/page.tsx"),
+  resolve(
+    root,
+    "src/app/(protected)/system-controls/background-runtime/page.tsx",
+  ),
   "utf8",
 );
 const billingPage = readFileSync(

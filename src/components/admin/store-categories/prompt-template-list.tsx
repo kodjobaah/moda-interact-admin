@@ -15,7 +15,9 @@ export function PromptTemplateList({
       <div className="flex items-center justify-between gap-2 px-1 pb-3">
         <div>
           <h4 className="text-sm font-semibold text-gray-900">Templates</h4>
-          <p className="mt-1 text-xs text-gray-500">{category.templates.length} configured</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {category.templates.length} configured
+          </p>
         </div>
         <Link
           href={`/system-controls/store-categories?category=${encodeURIComponent(category.id)}&tab=templates&template=new`}

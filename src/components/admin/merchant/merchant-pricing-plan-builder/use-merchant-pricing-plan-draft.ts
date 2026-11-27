@@ -310,7 +310,8 @@ export function useMerchantPricingPlanDraft({
 
   function setStep(next: number | ((current: number) => number)) {
     const target = typeof next === "function" ? next(draft.step) : next;
-    if ((plan && target === 6) || canNavigateTo(target)) dispatch({ type: "set-step", step: target });
+    if ((plan && target === 6) || canNavigateTo(target))
+      dispatch({ type: "set-step", step: target });
   }
 
   const actions = {
@@ -370,8 +371,7 @@ export function useMerchantPricingPlanDraft({
       index: number,
       update: Partial<Omit<BuilderEvent, "clientKey">>,
     ) => dispatch({ type: "update-event", index, update }),
-    addTier: (eventIndex: number) =>
-      dispatch({ type: "add-tier", eventIndex }),
+    addTier: (eventIndex: number) => dispatch({ type: "add-tier", eventIndex }),
     removeTier: (eventIndex: number, tierIndex: number) =>
       dispatch({ type: "remove-tier", eventIndex, tierIndex }),
     updateTier: (
@@ -394,7 +394,9 @@ export function useMerchantPricingPlanDraft({
       dispatch({ type: "move-highlight", index, direction }),
     updateHighlight: (
       index: number,
-      update: Partial<Omit<MerchantPricingPlanDraft["highlights"][number], "contentKey">>,
+      update: Partial<
+        Omit<MerchantPricingPlanDraft["highlights"][number], "contentKey">
+      >,
     ) => dispatch({ type: "update-highlight", index, update }),
     retryAutomaticTranslation: automaticTranslation.retry,
     setSupportedFeatureKeys: (keys: string[]) =>

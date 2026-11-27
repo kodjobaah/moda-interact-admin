@@ -14,7 +14,14 @@ export function assignmentAuditOperationId(
   languageTag: string,
 ): string {
   const digest = createHash("sha256")
-    .update(JSON.stringify(["arch047-template-assignment-v1", publicationOperationId, shopId, languageTag]))
+    .update(
+      JSON.stringify([
+        "arch047-template-assignment-v1",
+        publicationOperationId,
+        shopId,
+        languageTag,
+      ]),
+    )
     .digest("hex");
   return `arch047-assignment-${digest}`;
 }

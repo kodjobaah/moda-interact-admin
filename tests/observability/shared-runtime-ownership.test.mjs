@@ -10,14 +10,14 @@
 // - The admin repository creates no Moda-owned spans/metrics and the preload
 //   performs no local OpenTelemetry rewriting or span patching.
 
-import { strict as assert } from 'node:assert';
-import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import { strict as assert } from "node:assert";
+import { execFileSync } from "node:child_process";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
 
-const adminRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const adminRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const COMPETING_RUNTIME_PATTERNS = [
   /NodeSDK/,
@@ -87,10 +87,10 @@ function runPreload(extraEnv) {
   `;
   const stdout = execFileSync(
     process.execPath,
-    ['--input-type=module', '--eval', script],
+    ["--input-type=module", "--eval", script],
     {
       cwd: adminRoot,
-      encoding: 'utf8',
+      encoding: "utf8",
       env: cleanEnv(extraEnv),
     },
   );
@@ -110,42 +110,42 @@ function collectSourceFiles(dir, files = []) {
   return files;
 }
 
-test('preload initializes the canonical admin service identity', () => {
+test("preload initializes the canonical admin service identity", () => {
   const runtime = runPreload({
-    DEPLOYMENT_ENVIRONMENT_NAME: 'test',
-    OTEL_SDK_DISABLED: 'true',
+    DEPLOYMENT_ENVIRONMENT_NAME: "test",
+    OTEL_SDK_DISABLED: "true",
   });
   assert.equal(runtime.enabled, false);
-  assert.equal(runtime.serviceName, 'moda-interact-admin');
-  assert.equal(runtime.environment, 'test');
+  assert.equal(runtime.serviceName, "moda-interact-admin");
+  assert.equal(runtime.environment, "test");
 });
 
-test('hosted export stays disableable without an OTLP endpoint', () => {
+test("hosted export stays disableable without an OTLP endpoint", () => {
   const runtime = runPreload({
-    DEPLOYMENT_ENVIRONMENT_NAME: 'test',
+    DEPLOYMENT_ENVIRONMENT_NAME: "test",
   });
   assert.equal(runtime.enabled, false);
-  assert.equal(runtime.serviceName, 'moda-interact-admin');
-  assert.equal(runtime.environment, 'test');
+  assert.equal(runtime.serviceName, "moda-interact-admin");
+  assert.equal(runtime.environment, "test");
 });
 
-test('runtime enables when an OTLP endpoint is configured', () => {
+test("runtime enables when an OTLP endpoint is configured", () => {
   const runtime = runPreload({
-    DEPLOYMENT_ENVIRONMENT_NAME: 'test',
-    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://127.0.0.1:1/v1/traces',
+    DEPLOYMENT_ENVIRONMENT_NAME: "test",
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://127.0.0.1:1/v1/traces",
   });
   assert.equal(runtime.enabled, true);
-  assert.equal(runtime.serviceName, 'moda-interact-admin');
+  assert.equal(runtime.serviceName, "moda-interact-admin");
 });
 
-test('no competing generic provider/exporter/sampler stack exists in app code', () => {
-  const srcDir = join(adminRoot, 'src');
+test("no competing generic provider/exporter/sampler stack exists in app code", () => {
+  const srcDir = join(adminRoot, "src");
   const files = collectSourceFiles(srcDir);
-  assert.ok(files.length > 0, 'expected application source files to exist');
+  assert.ok(files.length > 0, "expected application source files to exist");
 
   const offenders = [];
   for (const file of files) {
-    const contents = readFileSync(file, 'utf8');
+    const contents = readFileSync(file, "utf8");
     for (const pattern of COMPETING_RUNTIME_PATTERNS) {
       if (pattern.test(contents)) {
         offenders.push(`${relative(adminRoot, file)} matched ${pattern}`);
@@ -155,18 +155,18 @@ test('no competing generic provider/exporter/sampler stack exists in app code', 
   assert.deepEqual(
     offenders,
     [],
-    `application code must not implement a competing runtime: ${offenders.join('; ')}`,
+    `application code must not implement a competing runtime: ${offenders.join("; ")}`,
   );
 });
 
-test('no Moda-owned span/metric creation exists in application code', () => {
-  const srcDir = join(adminRoot, 'src');
+test("no Moda-owned span/metric creation exists in application code", () => {
+  const srcDir = join(adminRoot, "src");
   const files = collectSourceFiles(srcDir);
-  assert.ok(files.length > 0, 'expected application source files to exist');
+  assert.ok(files.length > 0, "expected application source files to exist");
 
   const offenders = [];
   for (const file of files) {
-    const contents = readFileSync(file, 'utf8');
+    const contents = readFileSync(file, "utf8");
     for (const pattern of MODA_OWNED_TELEMETRY_PATTERNS) {
       if (pattern.test(contents)) {
         offenders.push(`${relative(adminRoot, file)} matched ${pattern}`);
@@ -176,31 +176,31 @@ test('no Moda-owned span/metric creation exists in application code', () => {
   assert.deepEqual(
     offenders,
     [],
-    `application code must not create Moda-owned telemetry: ${offenders.join('; ')}`,
+    `application code must not create Moda-owned telemetry: ${offenders.join("; ")}`,
   );
 });
 
-test('preload performs no local telemetry rewriting or span patching', () => {
-  const preload = readFileSync(join(adminRoot, 'observability.mjs'), 'utf8');
+test("preload performs no local telemetry rewriting or span patching", () => {
+  const preload = readFileSync(join(adminRoot, "observability.mjs"), "utf8");
   const offenders = PRELOAD_REWRITING_PATTERNS.filter((pattern) =>
     pattern.test(preload),
   );
   assert.deepEqual(
     offenders,
     [],
-    'preload must only call initNodeObservability (no local sanitizer/span patch)',
+    "preload must only call initNodeObservability (no local sanitizer/span patch)",
   );
 });
 
-test('environment identity distinguishes test and production', () => {
+test("environment identity distinguishes test and production", () => {
   const testRuntime = runPreload({
-    DEPLOYMENT_ENVIRONMENT_NAME: 'test',
-    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://127.0.0.1:1/v1/traces',
+    DEPLOYMENT_ENVIRONMENT_NAME: "test",
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://127.0.0.1:1/v1/traces",
   });
   const productionRuntime = runPreload({
-    DEPLOYMENT_ENVIRONMENT_NAME: 'production',
-    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://127.0.0.1:1/v1/traces',
+    DEPLOYMENT_ENVIRONMENT_NAME: "production",
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://127.0.0.1:1/v1/traces",
   });
-  assert.equal(testRuntime.environment, 'test');
-  assert.equal(productionRuntime.environment, 'production');
+  assert.equal(testRuntime.environment, "test");
+  assert.equal(productionRuntime.environment, "production");
 });

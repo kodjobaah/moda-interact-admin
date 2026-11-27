@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  assessMerchantPricingEconomicsOverride,
-} from "../../src/lib/admin/merchant/pricing-economics-override.ts";
+import { assessMerchantPricingEconomicsOverride } from "../../src/lib/admin/merchant/pricing-economics-override.ts";
 import { createMerchantPricingEconomicsOverrideFingerprint } from "../../src/lib/admin/merchant/pricing-economics-override.server.ts";
 import type {
   MerchantPricingEconomicsPlan,
@@ -60,10 +58,10 @@ function plan(
 }
 
 test("economics override policy allows only the two commercial policy failures", () => {
-  assert.deepEqual(
-    assessMerchantPricingEconomicsOverride([], false),
-    { kind: "PASS", failureCodes: [] },
-  );
+  assert.deepEqual(assessMerchantPricingEconomicsOverride([], false), {
+    kind: "PASS",
+    failureCodes: [],
+  });
 
   assert.deepEqual(
     assessMerchantPricingEconomicsOverride(
@@ -143,13 +141,15 @@ test("override fingerprint changes when economics-relevant portfolio state chang
   const free = plan("free-id", "free", 0, 0, 1500);
   const growth = plan("growth-id", "growth", 50, 5000, 1000);
 
-  const fingerprint = (input: {
-    free?: MerchantPricingEconomicsPlan;
-    growth?: MerchantPricingEconomicsPlan;
-    minimumUpgradePremiumBps?: number;
-    failureCodes?: string[];
-    reversed?: boolean;
-  } = {}) => {
+  const fingerprint = (
+    input: {
+      free?: MerchantPricingEconomicsPlan;
+      growth?: MerchantPricingEconomicsPlan;
+      minimumUpgradePremiumBps?: number;
+      failureCodes?: string[];
+      reversed?: boolean;
+    } = {},
+  ) => {
     const effectiveFree = input.free ?? free;
     const effectiveGrowth = input.growth ?? growth;
     const orderedPlanIds = input.reversed
@@ -163,8 +163,7 @@ test("override fingerprint changes when economics-relevant portfolio state chang
         [effectiveGrowth.id]: effectiveGrowth,
       },
       minimumUpgradePremiumBps: input.minimumUpgradePremiumBps ?? 2000,
-      failureCodes:
-        input.failureCodes ?? ["TOPUPS_CHEAPER_THAN_UPGRADE"],
+      failureCodes: input.failureCodes ?? ["TOPUPS_CHEAPER_THAN_UPGRADE"],
     });
   };
 

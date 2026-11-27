@@ -54,11 +54,11 @@ export function BillingSyncErrors({
           Subscription sync errors
         </h2>
         <p className="mt-1 max-w-4xl text-sm text-gray-500">
-          A sync error is not cleared manually. Correct the underlying billing or
-          Shopify state when required, then request reconciliation. The billing
-          worker will reconstruct the scheduled subscription reconciliation on its
-          next billing cycle and only clear the error after a successful provider
-          projection.
+          A sync error is not cleared manually. Correct the underlying billing
+          or Shopify state when required, then request reconciliation. The
+          billing worker will reconstruct the scheduled subscription
+          reconciliation on its next billing cycle and only clear the error
+          after a successful provider projection.
         </p>
       </div>
 
@@ -106,7 +106,9 @@ export function BillingSyncErrors({
                       <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                         Pending plan
                       </dt>
-                      <dd className="mt-1 text-gray-900">{item.pendingPlan.name}</dd>
+                      <dd className="mt-1 text-gray-900">
+                        {item.pendingPlan.name}
+                      </dd>
                     </div>
                   ) : null}
                 </dl>
@@ -124,13 +126,17 @@ export function BillingSyncErrors({
                     <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Last error
                     </dt>
-                    <dd className="mt-1 text-gray-900">{date(item.lastSyncErrorAt)}</dd>
+                    <dd className="mt-1 text-gray-900">
+                      {date(item.lastSyncErrorAt)}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Next reconciliation
                     </dt>
-                    <dd className="mt-1 text-gray-900">{date(item.nextReconcileAt)}</dd>
+                    <dd className="mt-1 text-gray-900">
+                      {date(item.nextReconcileAt)}
+                    </dd>
                   </div>
                 </dl>
               </div>
@@ -170,7 +176,10 @@ export function BillingSyncErrors({
                 </form>
               ) : (
                 <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-                  Automatic subscription retry is not safe for this state. Use the tenant billing link above to inspect and correct the underlying billing state; the error remains visible until a successful provider projection clears it.
+                  Automatic subscription retry is not safe for this state. Use
+                  the tenant billing link above to inspect and correct the
+                  underlying billing state; the error remains visible until a
+                  successful provider projection clears it.
                 </div>
               )}
             </article>

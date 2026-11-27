@@ -1,8 +1,21 @@
-import type { ImmutableAuthoringRecord, PreparedTemplate, TemplateAst, TemplatePreviewDTO, SemanticVariable } from "../authoring/types";
+import type {
+  ImmutableAuthoringRecord,
+  PreparedTemplate,
+  TemplateAst,
+  TemplatePreviewDTO,
+  SemanticVariable,
+} from "../authoring/types";
 
 /** ADMIN-004 -> Background -> ADMIN-005 persisted JSONB handoff (not a new Shared contract). */
-export type ProtectedOccurrence = { marker: string; variable: SemanticVariable };
-export type SourceSegment = { key: string; text: string; protectedTokens: ProtectedOccurrence[] };
+export type ProtectedOccurrence = {
+  marker: string;
+  variable: SemanticVariable;
+};
+export type SourceSegment = {
+  key: string;
+  text: string;
+  protectedTokens: ProtectedOccurrence[];
+};
 export type TranslationSourceSnapshot = {
   schemaVersion: 1;
   definitionId: string;
@@ -10,7 +23,10 @@ export type TranslationSourceSnapshot = {
   sourceLanguageTag: "en";
   segments: SourceSegment[];
 };
-export type TranslationSegmentResult = { schemaVersion: 1; segments: Array<{ key: string; text: string }> };
+export type TranslationSegmentResult = {
+  schemaVersion: 1;
+  segments: Array<{ key: string; text: string }>;
+};
 export type CompilationCandidate = {
   record: ImmutableAuthoringRecord;
   contentHash: string;
@@ -18,7 +34,8 @@ export type CompilationCandidate = {
 };
 export type CompiledBindings = PreparedTemplate;
 
-export type ReviewLocaleStatus = "SOURCE" | "APPROVED" | "REJECTED" | "READY" | "WAITING" | "INVALID";
+export type ReviewLocaleStatus =
+  "SOURCE" | "APPROVED" | "REJECTED" | "READY" | "WAITING" | "INVALID";
 export type ReviewLocaleDTO = {
   languageTag: string;
   providerLanguageCode: string | null;
@@ -43,9 +60,18 @@ export type ReviewWorkspaceDTO = {
   canSynchroniseLifecycle?: boolean;
 };
 export type ReviewDecision = "APPROVE" | "REJECT";
-export type ReviewedTranslationBatch = { definitionId: string; runId: string; acknowledged: true;
-  locales: Array<{ languageTag: string; contentHash: string }> };
-export type ReviewInput = { definitionId: string; languageTag: string; runId: string; decision: ReviewDecision };
+export type ReviewedTranslationBatch = {
+  definitionId: string;
+  runId: string;
+  acknowledged: true;
+  locales: Array<{ languageTag: string; contentHash: string }>;
+};
+export type ReviewInput = {
+  definitionId: string;
+  languageTag: string;
+  runId: string;
+  decision: ReviewDecision;
+};
 
 export type SegmentLocation = {
   key: string;

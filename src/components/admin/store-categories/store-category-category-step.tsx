@@ -46,8 +46,7 @@ export function StoreCategoryCategoryStep({
     session.dirty.defaultTemplate || session.shopifyMappings.length > 0;
 
   function changeReferenceTaxonomy(
-    referenceTaxonomy:
-      StoreCategoryAuthoringSession["category"]["referenceTaxonomy"],
+    referenceTaxonomy: StoreCategoryAuthoringSession["category"]["referenceTaxonomy"],
   ) {
     const currentCategoryId =
       session.category.referenceTaxonomy?.categoryId ?? null;
@@ -88,7 +87,8 @@ export function StoreCategoryCategoryStep({
             Category identity
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Select the top-level reference taxonomy category, then define Moda&apos;s stable category identity and merchant-facing metadata.
+            Select the top-level reference taxonomy category, then define
+            Moda&apos;s stable category identity and merchant-facing metadata.
           </p>
         </div>
         <StoreCategoryAuthoringSectionStatus
@@ -110,9 +110,9 @@ export function StoreCategoryCategoryStep({
             className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800"
             role="status"
           >
-            This reference category is already assigned to Store Category
-            “{selectedReferenceAssignment.storeCategoryDisplayName}”. Choose another
-            reference category before continuing.
+            This reference category is already assigned to Store Category “
+            {selectedReferenceAssignment.storeCategoryDisplayName}”. Choose
+            another reference category before continuing.
           </p>
         ) : null}
       </div>
@@ -189,7 +189,8 @@ export function StoreCategoryCategoryStep({
       </div>
 
       <p className="mt-4 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
-        New categories are created disabled. Review the default template and mappings, then enable the category when it is ready for merchants.
+        New categories are created disabled. Review the default template and
+        mappings, then enable the category when it is ready for merchants.
       </p>
       <StoreCategoryAuthoringErrorList issues={validation.issues} />
     </section>

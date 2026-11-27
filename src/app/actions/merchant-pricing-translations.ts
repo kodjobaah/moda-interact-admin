@@ -38,7 +38,10 @@ function requestClientMessage(error: unknown) {
     MERCHANT_PRICING_TRANSLATION_ERRORS.requestTimedOut,
     "Merchant Pricing translation state changed; retry the request.",
   ]);
-  if (allowed.has(message) || message.startsWith("Merchant Pricing highlight ")) {
+  if (
+    allowed.has(message) ||
+    message.startsWith("Merchant Pricing highlight ")
+  ) {
     return {
       message,
       configurationRequired:

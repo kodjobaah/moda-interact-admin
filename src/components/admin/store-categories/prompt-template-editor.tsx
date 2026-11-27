@@ -39,7 +39,8 @@ export function PromptTemplateEditor({
       <section>
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h4 className="text-sm font-semibold text-gray-900">
-            {heading ?? (creating ? "Create prompt template" : template.displayName)}
+            {heading ??
+              (creating ? "Create prompt template" : template.displayName)}
           </h4>
           {!creating ? (
             <span className="font-mono text-xs text-gray-500">
@@ -49,9 +50,9 @@ export function PromptTemplateEditor({
           ) : null}
         </div>
         <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
-          This Store Category is enabled. Disable it before creating or changing prompt
-          templates because those changes invalidate the reviewed translation/enablement
-          configuration.
+          This Store Category is enabled. Disable it before creating or changing
+          prompt templates because those changes invalidate the reviewed
+          translation/enablement configuration.
         </p>
         {template ? (
           <pre className="mt-4 max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-800">
@@ -66,7 +67,8 @@ export function PromptTemplateEditor({
     <section>
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="text-sm font-semibold text-gray-900">
-          {heading ?? (creating ? "Create prompt template" : template.displayName)}
+          {heading ??
+            (creating ? "Create prompt template" : template.displayName)}
         </h4>
         {!creating ? (
           <span className="font-mono text-xs text-gray-500">
@@ -75,7 +77,10 @@ export function PromptTemplateEditor({
           </span>
         ) : null}
       </div>
-      <form action={mutateStoreCategoryCatalogueAction} className="grid gap-4 sm:grid-cols-2">
+      <form
+        action={mutateStoreCategoryCatalogueAction}
+        className="grid gap-4 sm:grid-cols-2"
+      >
         <input
           type="hidden"
           name="intent"
@@ -154,7 +159,12 @@ export function PromptTemplateEditor({
         </div>
         <label className="text-sm font-medium text-gray-700">
           Audit reason
-          <input className={inputClass} name="reason" maxLength={1000} required />
+          <input
+            className={inputClass}
+            name="reason"
+            maxLength={1000}
+            required
+          />
         </label>
         <div className="flex items-end">
           <button

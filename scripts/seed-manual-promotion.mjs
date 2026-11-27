@@ -57,17 +57,21 @@ const TITLE_TEMPLATES = {
   da: (quantity) => `Testkampagne — ${quantity} recovery-kreditter`,
   de: (quantity) => `Testaktion — ${quantity} Recovery-Credits`,
   en: (quantity) => `Test promotion — ${quantity} recovery credits`,
-  es: (quantity) => `Promoción de prueba — ${quantity} créditos de recuperación`,
+  es: (quantity) =>
+    `Promoción de prueba — ${quantity} créditos de recuperación`,
   fi: (quantity) => `Testikampanja — ${quantity} palautuskrediittiä`,
   fr: (quantity) => `Promotion test — ${quantity} crédits de récupération`,
   it: (quantity) => `Promozione di prova — ${quantity} crediti di recupero`,
-  ja: (quantity) => `テストプロモーション — リカバリークレジット ${quantity} 件`,
+  ja: (quantity) =>
+    `テストプロモーション — リカバリークレジット ${quantity} 件`,
   ko: (quantity) => `테스트 프로모션 — 복구 크레딧 ${quantity}개`,
   nb: (quantity) => `Testkampanje — ${quantity} gjenopprettingskreditter`,
   nl: (quantity) => `Testpromotie — ${quantity} herstelcredits`,
   pl: (quantity) => `Promocja testowa — ${quantity} kredytów odzyskiwania`,
-  "pt-BR": (quantity) => `Promoção de teste — ${quantity} créditos de recuperação`,
-  "pt-PT": (quantity) => `Promoção de teste — ${quantity} créditos de recuperação`,
+  "pt-BR": (quantity) =>
+    `Promoção de teste — ${quantity} créditos de recuperação`,
+  "pt-PT": (quantity) =>
+    `Promoção de teste — ${quantity} créditos de recuperação`,
   sv: (quantity) => `Testkampanj — ${quantity} återställningskrediter`,
   th: (quantity) => `โปรโมชันทดสอบ — เครดิตการกู้คืน ${quantity} เครดิต`,
   tr: (quantity) => `Test promosyonu — ${quantity} kurtarma kredisi`,
@@ -76,26 +80,46 @@ const TITLE_TEMPLATES = {
 };
 
 const DESCRIPTION_TEMPLATES = {
-  cs: (quantity, target) => `Ruční testovací akce pro ${target}. Po výběru přidá ${quantity} propagačních kreditů pro obnovu.`,
-  da: (quantity, target) => `Manuel testkampagne for ${target}. Ved valg tilføjes ${quantity} salgsfremmende recovery-kreditter.`,
-  de: (quantity, target) => `Manuelle Testaktion für ${target}. Bei Auswahl werden ${quantity} zusätzliche Recovery-Credits gutgeschrieben.`,
-  en: (quantity, target) => `Manual test promotion for ${target}. Selecting it adds ${quantity} promotional recovery credits.`,
-  es: (quantity, target) => `Promoción de prueba manual para ${target}. Al seleccionarla se añaden ${quantity} créditos de recuperación promocionales.`,
-  fi: (quantity, target) => `Manuaalinen testikampanja kohteelle ${target}. Valinta lisää ${quantity} kampanjapalautuskrediittiä.`,
-  fr: (quantity, target) => `Promotion de test manuelle pour ${target}. Sa sélection ajoute ${quantity} crédits de récupération promotionnels.`,
-  it: (quantity, target) => `Promozione di prova manuale per ${target}. Se selezionata aggiunge ${quantity} crediti di recupero promozionali.`,
-  ja: (quantity, target) => `${target} 向けの手動テストプロモーションです。選択するとプロモーション用リカバリークレジットが ${quantity} 件追加されます。`,
-  ko: (quantity, target) => `${target}용 수동 테스트 프로모션입니다. 선택하면 프로모션 복구 크레딧 ${quantity}개가 추가됩니다.`,
-  nb: (quantity, target) => `Manuell testkampanje for ${target}. Ved valg legges ${quantity} kampanjekreditter til.`,
-  nl: (quantity, target) => `Handmatige testpromotie voor ${target}. Selecteren voegt ${quantity} promotionele herstelcredits toe.`,
-  pl: (quantity, target) => `Ręczna promocja testowa dla ${target}. Wybranie jej dodaje ${quantity} promocyjnych kredytów odzyskiwania.`,
-  "pt-BR": (quantity, target) => `Promoção de teste manual para ${target}. Ao selecionar, são adicionados ${quantity} créditos promocionais de recuperação.`,
-  "pt-PT": (quantity, target) => `Promoção de teste manual para ${target}. Ao selecionar, são adicionados ${quantity} créditos promocionais de recuperação.`,
-  sv: (quantity, target) => `Manuell testkampanj för ${target}. När den väljs läggs ${quantity} kampanjkrediter för återställning till.`,
-  th: (quantity, target) => `โปรโมชันทดสอบแบบกำหนดเองสำหรับ ${target} เมื่อเลือกจะเพิ่มเครดิตการกู้คืนจากโปรโมชัน ${quantity} เครดิต`,
-  tr: (quantity, target) => `${target} için manuel test promosyonu. Seçildiğinde ${quantity} promosyon kurtarma kredisi ekler.`,
-  "zh-Hans": (quantity, target) => `${target} 的手动测试促销。选择后会增加 ${quantity} 个促销恢复积分。`,
-  "zh-Hant": (quantity, target) => `${target} 的手動測試促銷。選取後會增加 ${quantity} 個促銷恢復點數。`,
+  cs: (quantity, target) =>
+    `Ruční testovací akce pro ${target}. Po výběru přidá ${quantity} propagačních kreditů pro obnovu.`,
+  da: (quantity, target) =>
+    `Manuel testkampagne for ${target}. Ved valg tilføjes ${quantity} salgsfremmende recovery-kreditter.`,
+  de: (quantity, target) =>
+    `Manuelle Testaktion für ${target}. Bei Auswahl werden ${quantity} zusätzliche Recovery-Credits gutgeschrieben.`,
+  en: (quantity, target) =>
+    `Manual test promotion for ${target}. Selecting it adds ${quantity} promotional recovery credits.`,
+  es: (quantity, target) =>
+    `Promoción de prueba manual para ${target}. Al seleccionarla se añaden ${quantity} créditos de recuperación promocionales.`,
+  fi: (quantity, target) =>
+    `Manuaalinen testikampanja kohteelle ${target}. Valinta lisää ${quantity} kampanjapalautuskrediittiä.`,
+  fr: (quantity, target) =>
+    `Promotion de test manuelle pour ${target}. Sa sélection ajoute ${quantity} crédits de récupération promotionnels.`,
+  it: (quantity, target) =>
+    `Promozione di prova manuale per ${target}. Se selezionata aggiunge ${quantity} crediti di recupero promozionali.`,
+  ja: (quantity, target) =>
+    `${target} 向けの手動テストプロモーションです。選択するとプロモーション用リカバリークレジットが ${quantity} 件追加されます。`,
+  ko: (quantity, target) =>
+    `${target}용 수동 테스트 프로모션입니다. 선택하면 프로모션 복구 크레딧 ${quantity}개가 추가됩니다.`,
+  nb: (quantity, target) =>
+    `Manuell testkampanje for ${target}. Ved valg legges ${quantity} kampanjekreditter til.`,
+  nl: (quantity, target) =>
+    `Handmatige testpromotie voor ${target}. Selecteren voegt ${quantity} promotionele herstelcredits toe.`,
+  pl: (quantity, target) =>
+    `Ręczna promocja testowa dla ${target}. Wybranie jej dodaje ${quantity} promocyjnych kredytów odzyskiwania.`,
+  "pt-BR": (quantity, target) =>
+    `Promoção de teste manual para ${target}. Ao selecionar, são adicionados ${quantity} créditos promocionais de recuperação.`,
+  "pt-PT": (quantity, target) =>
+    `Promoção de teste manual para ${target}. Ao selecionar, são adicionados ${quantity} créditos promocionais de recuperação.`,
+  sv: (quantity, target) =>
+    `Manuell testkampanj för ${target}. När den väljs läggs ${quantity} kampanjkrediter för återställning till.`,
+  th: (quantity, target) =>
+    `โปรโมชันทดสอบแบบกำหนดเองสำหรับ ${target} เมื่อเลือกจะเพิ่มเครดิตการกู้คืนจากโปรโมชัน ${quantity} เครดิต`,
+  tr: (quantity, target) =>
+    `${target} için manuel test promosyonu. Seçildiğinde ${quantity} promosyon kurtarma kredisi ekler.`,
+  "zh-Hans": (quantity, target) =>
+    `${target} 的手动测试促销。选择后会增加 ${quantity} 个促销恢复积分。`,
+  "zh-Hant": (quantity, target) =>
+    `${target} 的手動測試促銷。選取後會增加 ${quantity} 個促銷恢復點數。`,
 };
 
 function hasFlag(name) {
@@ -138,7 +162,9 @@ function slug(value) {
 }
 
 function normalizeScope(raw) {
-  const value = String(raw ?? "").trim().toLowerCase();
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
   if (value === "global") return PromotionTargetScope.GLOBAL;
   if (value === "plan" || value === "tiered" || value === "tier") {
     return PromotionTargetScope.PLAN;
@@ -148,7 +174,9 @@ function normalizeScope(raw) {
 }
 
 function lifecycleForState(rawState, now, durationDays) {
-  const state = String(rawState ?? "running").trim().toLowerCase();
+  const state = String(rawState ?? "running")
+    .trim()
+    .toLowerCase();
   const dayMs = 24 * 60 * 60 * 1000;
 
   if (state === "draft") {
@@ -422,7 +450,9 @@ async function deleteCampaignIds(ids, { forceUsed }) {
   if (!ids.length) return 0;
 
   const campaigns = await prisma.promotionCampaign.findMany({
-    where: { AND: [{ id: { in: ids } }, { id: { startsWith: FIXTURE_PREFIX } }] },
+    where: {
+      AND: [{ id: { in: ids } }, { id: { startsWith: FIXTURE_PREFIX } }],
+    },
     select: {
       id: true,
       name: true,
@@ -462,36 +492,33 @@ async function deleteCampaignIds(ids, { forceUsed }) {
     campaign.promotionalCreditGrants.map((grant) => grant.id),
   );
 
-  await prisma.$transaction(
-    async (transaction) => {
-      if (grantIds.length) {
-        await transaction.merchantPromotionSelection.deleteMany({
+  await prisma.$transaction(async (transaction) => {
+    if (grantIds.length) {
+      await transaction.merchantPromotionSelection.deleteMany({
+        where: { promotionalCreditGrantId: { in: grantIds } },
+      });
+
+      if (forceUsed) {
+        await transaction.usageReservation.deleteMany({
           where: { promotionalCreditGrantId: { in: grantIds } },
-        });
-
-        if (forceUsed) {
-          await transaction.usageReservation.deleteMany({
-            where: { promotionalCreditGrantId: { in: grantIds } },
-          });
-        }
-
-        await transaction.promotionalCreditGrant.deleteMany({
-          where: { id: { in: grantIds } },
         });
       }
 
-      await transaction.promotionCampaignEvent.deleteMany({
-        where: { campaignId: { in: campaignIds } },
+      await transaction.promotionalCreditGrant.deleteMany({
+        where: { id: { in: grantIds } },
       });
-      await transaction.promotionCampaignTranslation.deleteMany({
-        where: { promotionCampaignId: { in: campaignIds } },
-      });
-      await transaction.promotionCampaign.deleteMany({
-        where: { id: { in: campaignIds } },
-      });
-    },
-    TRANSACTION_OPTIONS,
-  );
+    }
+
+    await transaction.promotionCampaignEvent.deleteMany({
+      where: { campaignId: { in: campaignIds } },
+    });
+    await transaction.promotionCampaignTranslation.deleteMany({
+      where: { promotionCampaignId: { in: campaignIds } },
+    });
+    await transaction.promotionCampaign.deleteMany({
+      where: { id: { in: campaignIds } },
+    });
+  }, TRANSACTION_OPTIONS);
 
   return campaignIds.length;
 }
@@ -521,11 +548,7 @@ async function seed(scope) {
     defaultQuantity(scope),
     "--quantity",
   );
-  const durationDays = parsePositiveInteger(
-    argument("--days"),
-    30,
-    "--days",
-  );
+  const durationDays = parsePositiveInteger(argument("--days"), 30, "--days");
   const now = new Date();
   const lifecycle = lifecycleForState(argument("--state"), now, durationDays);
   const requestedName = argument("--name")?.trim();
@@ -534,47 +557,44 @@ async function seed(scope) {
     `Manual ${scope} promotion · ${target.targetLabel} · ${lifecycle.label}`;
   const translations = buildTranslations(id, quantity, target.targetLabel, now);
 
-  await prisma.$transaction(
-    async (transaction) => {
-      const admin = await ensureDevelopmentAdmin(transaction);
+  await prisma.$transaction(async (transaction) => {
+    const admin = await ensureDevelopmentAdmin(transaction);
 
-      await transaction.promotionCampaign.create({
+    await transaction.promotionCampaign.create({
+      data: {
+        id,
+        name,
+        merchantDescription: null,
+        scope,
+        quantity,
+        targetPlanId: target.targetPlanId,
+        targetShopId: target.targetShopId,
+        startsAt: lifecycle.startsAt,
+        expiresAt: lifecycle.expiresAt,
+        status: lifecycle.status,
+        createdByPlatformAdminId: admin.id,
+        createdAt: now,
+        updatedAt: now,
+        version: lifecycle.version,
+      },
+    });
+
+    await transaction.promotionCampaignTranslation.createMany({
+      data: translations,
+    });
+
+    for (let index = 0; index < lifecycle.eventKinds.length; index += 1) {
+      await transaction.promotionCampaignEvent.create({
         data: {
-          id,
-          name,
-          merchantDescription: null,
-          scope,
-          quantity,
-          targetPlanId: target.targetPlanId,
-          targetShopId: target.targetShopId,
-          startsAt: lifecycle.startsAt,
-          expiresAt: lifecycle.expiresAt,
-          status: lifecycle.status,
-          createdByPlatformAdminId: admin.id,
-          createdAt: now,
-          updatedAt: now,
-          version: lifecycle.version,
+          id: `${id}-event-${index + 1}`,
+          campaignId: id,
+          kind: lifecycle.eventKinds[index],
+          platformAdminId: admin.id,
+          createdAt: new Date(now.getTime() + index * 1000),
         },
       });
-
-      await transaction.promotionCampaignTranslation.createMany({
-        data: translations,
-      });
-
-      for (let index = 0; index < lifecycle.eventKinds.length; index += 1) {
-        await transaction.promotionCampaignEvent.create({
-          data: {
-            id: `${id}-event-${index + 1}`,
-            campaignId: id,
-            kind: lifecycle.eventKinds[index],
-            platformAdminId: admin.id,
-            createdAt: new Date(now.getTime() + index * 1000),
-          },
-        });
-      }
-    },
-    TRANSACTION_OPTIONS,
-  );
+    }
+  }, TRANSACTION_OPTIONS);
 
   console.log("Seeded manual promotion fixture.");
   console.log(`  id:       ${id}`);
@@ -587,7 +607,9 @@ async function seed(scope) {
   console.log(`  locales:  ${LOCALES.length}/${LOCALES.length}`);
   if (target.shop) console.log(`  shop:     ${target.shop.domain}`);
   if (target.plan) {
-    console.log(`  plan:     ${target.plan.name} (${target.plan.shopifyPlanHandle})`);
+    console.log(
+      `  plan:     ${target.plan.name} (${target.plan.shopifyPlanHandle})`,
+    );
   }
   console.log("");
   console.log(
@@ -667,7 +689,7 @@ async function status() {
           ? "all merchants"
           : campaign.scope === PromotionTargetScope.PLAN
             ? `${campaign.targetPlan?.name ?? "?"} (${campaign.targetPlan?.shopifyPlanHandle ?? "?"})`
-            : campaign.targetShop?.domain ?? "?",
+            : (campaign.targetShop?.domain ?? "?"),
       state: derivedState(campaign),
       quantity: campaign.quantity,
       translations: campaign._count.translations,
@@ -678,7 +700,8 @@ async function status() {
 }
 
 function printUsage() {
-  console.log(`
+  console.log(
+    `
 Manual promotion fixture seeder
 
 Usage:
@@ -726,13 +749,14 @@ Deletion safety:
   ${FORCE_USED_FLAG} also removes that disposable test reservation history.
 
 All mutations require ${CONFIRM_FLAG}.
-`.trim());
+`.trim(),
+  );
 }
 
 async function main() {
-  const [command, rawScope] = process.argv.slice(2).filter(
-    (value) => !value.startsWith("--"),
-  );
+  const [command, rawScope] = process.argv
+    .slice(2)
+    .filter((value) => !value.startsWith("--"));
 
   if (!command || command === "help") {
     printUsage();

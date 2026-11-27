@@ -6,17 +6,40 @@ import { test } from "node:test";
 import { loadPolicyModule } from "../unit/helpers/commerce-model-policy-module-harness.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const action = readFileSync(resolve(root, "src/app/actions/background-runtime-controls.ts"), "utf8");
-const component = readFileSync(resolve(root, "src/components/admin/background-runtime-controls.tsx"), "utf8");
-const validation = readFileSync(resolve(root, "src/lib/admin/background-runtime-control-validation.ts"), "utf8");
-const page = readFileSync(resolve(root, "src/app/(protected)/system-controls/background-runtime/page.tsx"), "utf8");
-const runtimeValidation = loadPolicyModule("src/lib/admin/background-runtime-control-validation.ts", {});
+const action = readFileSync(
+  resolve(root, "src/app/actions/background-runtime-controls.ts"),
+  "utf8",
+);
+const component = readFileSync(
+  resolve(root, "src/components/admin/background-runtime-controls.tsx"),
+  "utf8",
+);
+const validation = readFileSync(
+  resolve(root, "src/lib/admin/background-runtime-control-validation.ts"),
+  "utf8",
+);
+const page = readFileSync(
+  resolve(
+    root,
+    "src/app/(protected)/system-controls/background-runtime/page.tsx",
+  ),
+  "utf8",
+);
+const runtimeValidation = loadPolicyModule(
+  "src/lib/admin/background-runtime-control-validation.ts",
+  {},
+);
 
 function actionFixture({ role = "SUPER_ADMIN", version = 7 } = {}) {
   const stored = {
     id: "default",
     version,
-    ...Object.fromEntries(runtimeValidation.ALL_RUNTIME_FIELDS.map((field) => [field.key, field.defaultValue])),
+    ...Object.fromEntries(
+      runtimeValidation.ALL_RUNTIME_FIELDS.map((field) => [
+        field.key,
+        field.defaultValue,
+      ]),
+    ),
   };
   const updates = [];
   const audits = [];
@@ -34,7 +57,8 @@ function actionFixture({ role = "SUPER_ADMIN", version = 7 } = {}) {
           },
           async updateMany({ where, data }) {
             updates.push({ where, data });
-            if (where.id !== staged.id || where.version !== staged.version) return { count: 0 };
+            if (where.id !== staged.id || where.version !== staged.version)
+              return { count: 0 };
             for (const [key, value] of Object.entries(data)) {
               if (key === "version") staged.version += value.increment;
               else staged[key] = value;
@@ -54,36 +78,64 @@ function actionFixture({ role = "SUPER_ADMIN", version = 7 } = {}) {
       return result;
     },
   };
-  const module = loadPolicyModule("src/app/actions/background-runtime-controls.ts", {
-    "@prisma/client": { BackgroundRuntimeConfigSection: { OPERATIONAL: "OPERATIONAL" } },
-    "next/cache": { revalidatePath: (path) => {
-      assert.equal(path, "/system-controls/background-runtime");
-      state.revalidated++;
-    } },
-    "@/lib/auth/platform-admin": {
-      requirePlatformAdminMutation: async () => ({ id: "platform-admin-1", role, developmentBypass: false }),
-      requirePlatformAdminRead: async () => ({ id: "platform-admin-1", role }),
+  const module = loadPolicyModule(
+    "src/app/actions/background-runtime-controls.ts",
+    {
+      "@prisma/client": {
+        BackgroundRuntimeConfigSection: { OPERATIONAL: "OPERATIONAL" },
+      },
+      "next/cache": {
+        revalidatePath: (path) => {
+          assert.equal(path, "/system-controls/background-runtime");
+          state.revalidated++;
+        },
+      },
+      "@/lib/auth/platform-admin": {
+        requirePlatformAdminMutation: async () => ({
+          id: "platform-admin-1",
+          role,
+          developmentBypass: false,
+        }),
+        requirePlatformAdminRead: async () => ({
+          id: "platform-admin-1",
+          role,
+        }),
+      },
+      "@/lib/prisma": { prisma },
+      "@/lib/admin/background-runtime-control-validation": runtimeValidation,
     },
-    "@/lib/prisma": { prisma },
-    "@/lib/admin/background-runtime-control-validation": runtimeValidation,
-  });
+  );
   const form = (overrides = {}) => {
     const data = new FormData();
     data.set("section", "OPERATIONAL");
     data.set("expectedVersion", String(version));
     data.set("reason", "Support requested a longer recovery window");
     for (const field of runtimeValidation.fieldsForSection("OPERATIONAL")) {
-      const value = field.displayMultiplier ? stored[field.key] / field.displayMultiplier : stored[field.key];
+      const value = field.displayMultiplier
+        ? stored[field.key] / field.displayMultiplier
+        : stored[field.key];
       data.set(field.key, String(value));
     }
     for (const [key, value] of Object.entries(overrides)) data.set(key, value);
     return data;
   };
-  const snapshot = (config) => Object.fromEntries([
-    ["version", config.version],
-    ...runtimeValidation.ALL_RUNTIME_FIELDS.map(({ key }) => [key, config[key]]),
-  ]);
-  return { action: module.mutateBackgroundRuntimeControlsAction, form, stored, updates, audits, state, snapshot };
+  const snapshot = (config) =>
+    Object.fromEntries([
+      ["version", config.version],
+      ...runtimeValidation.ALL_RUNTIME_FIELDS.map(({ key }) => [
+        key,
+        config[key],
+      ]),
+    ]);
+  return {
+    action: module.mutateBackgroundRuntimeControlsAction,
+    form,
+    stored,
+    updates,
+    audits,
+    state,
+    snapshot,
+  };
 }
 
 test("runtime mutations are SUPER_ADMIN-only and version fenced", () => {
@@ -110,13 +162,18 @@ test("background runtime controls remain readable for non-super admins and expos
 });
 
 test("scopes fleet-wide copy to Worker throughput and queue saves", () => {
-  const queueIntro = "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap.";
-  const convergence = "Fleet-wide queue limits converge without redeploying workers.";
+  const queueIntro =
+    "These values are fleet-wide queue limits across all worker replicas. Adding replicas does not multiply the configured cap.";
+  const convergence =
+    "Fleet-wide queue limits converge without redeploying workers.";
   assert.match(component, /title === "Worker throughput"/);
   assert.equal(component.includes(queueIntro), true);
   assert.equal(validation.includes(convergence), true);
   assert.match(component, /changedQueueConcurrency/);
-  assert.equal(component.includes('section === "ADVANCED" ? (\n        <p'), false);
+  assert.equal(
+    component.includes('section === "ADVANCED" ? (\n        <p'),
+    false,
+  );
 });
 
 test("abuse windows are copy, not editable fields", () => {
@@ -130,12 +187,24 @@ test("checkout recovery lifetime is an audited operational control", () => {
   assert.match(validation, /checkoutRecoveryLifetimeDays/);
   assert.match(validation, /Checkout recovery lifetime/);
   assert.match(validation, /"days", 0, null, 21/);
-  assert.match(validation, /Zero expires eligible recoveries immediately; expired history remains\. Choose a non-negative whole number of days\./);
+  assert.match(
+    validation,
+    /Zero expires eligible recoveries immediately; expired history remains\. Choose a non-negative whole number of days\./,
+  );
   assert.match(component, /defaults to 21 days/);
-  assert.match(component, /max=\{field\.max === null \? undefined : field\.max/);
-  assert.match(component, /Zero expires eligible recoveries immediately and may prevent recovery outreach\./);
+  assert.match(
+    component,
+    /max=\{field\.max === null \? undefined : field\.max/,
+  );
+  assert.match(
+    component,
+    /Zero expires eligible recoveries immediately and may prevent recovery outreach\./,
+  );
   assert.match(component, /platform-wide control/);
-  assert.match(component, /retains recovery, conversation, and message history/);
+  assert.match(
+    component,
+    /retains recovery, conversation, and message history/,
+  );
 });
 
 test("SUPER_ADMIN action persists the recovery lifetime and audits exact snapshots and reason", async () => {
@@ -166,17 +235,28 @@ test("SUPER_ADMIN action persists the recovery lifetime and audits exact snapsho
 
 test("action rejects non-admins, stale versions, and invalid lifetimes without mutation or audit", async () => {
   const unauthorized = actionFixture({ role: "ADMIN" });
-  await assert.rejects(unauthorized.action(unauthorized.form({ checkoutRecoveryLifetimeDays: "180" })), /SUPER_ADMIN/);
+  await assert.rejects(
+    unauthorized.action(
+      unauthorized.form({ checkoutRecoveryLifetimeDays: "180" }),
+    ),
+    /SUPER_ADMIN/,
+  );
   assert.equal(unauthorized.state.transactions, 0);
 
   const stale = actionFixture();
-  await assert.rejects(stale.action(stale.form({ expectedVersion: "6" })), /changed since this page was loaded/);
+  await assert.rejects(
+    stale.action(stale.form({ expectedVersion: "6" })),
+    /changed since this page was loaded/,
+  );
   assert.equal(stale.updates.length, 0);
   assert.equal(stale.audits.length, 0);
   assert.equal(stale.stored.checkoutRecoveryLifetimeDays, 21);
 
   const invalid = actionFixture();
-  await assert.rejects(invalid.action(invalid.form({ checkoutRecoveryLifetimeDays: "-1" })), /whole number|at least 0/);
+  await assert.rejects(
+    invalid.action(invalid.form({ checkoutRecoveryLifetimeDays: "-1" })),
+    /whole number|at least 0/,
+  );
   assert.equal(invalid.updates.length, 0);
   assert.equal(invalid.audits.length, 0);
   assert.equal(invalid.stored.checkoutRecoveryLifetimeDays, 21);
@@ -187,17 +267,29 @@ test("action rejects non-admins, stale versions, and invalid lifetimes without m
 test("documents expired promotion cleanup on the existing reconciliation controls", () => {
   assert.match(validation, /Reconciliation interval/);
   assert.match(validation, /expired promotion cleanup/);
-  assert.doesNotMatch(action, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
-  assert.doesNotMatch(validation, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
-  assert.doesNotMatch(component, /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/);
+  assert.doesNotMatch(
+    action,
+    /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/,
+  );
+  assert.doesNotMatch(
+    validation,
+    /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/,
+  );
+  assert.doesNotMatch(
+    component,
+    /promotionReconciliationIntervalSeconds|promotionReconciliationBatchSize/,
+  );
 });
-
 
 test("SUPER_ADMIN saves and audits all delivery retry controls through the operational section", async () => {
   const fixture = actionFixture();
   const before = fixture.snapshot(fixture.stored);
-  const overrides = { recoveryDeliveryTemporaryRetryDelayMinutes: "7", recoveryDeliveryRateLimitRetryDelayMinutes: "29",
-    recoveryDeliveryMarketingRetryDelayMinutes: "2880", recoveryDeliveryMaxRetries: "0" };
+  const overrides = {
+    recoveryDeliveryTemporaryRetryDelayMinutes: "7",
+    recoveryDeliveryRateLimitRetryDelayMinutes: "29",
+    recoveryDeliveryMarketingRetryDelayMinutes: "2880",
+    recoveryDeliveryMaxRetries: "0",
+  };
   await fixture.action(fixture.form(overrides));
   for (const [key, value] of Object.entries(overrides)) {
     assert.equal(fixture.stored[key], Number(value));
@@ -207,7 +299,12 @@ test("SUPER_ADMIN saves and audits all delivery retry controls through the opera
   assert.deepEqual(fixture.audits[0].beforeValue, before);
   assert.equal(fixture.stored.version, 8);
   const invalid = actionFixture();
-  await assert.rejects(invalid.action(invalid.form({ recoveryDeliveryMarketingRetryDelayMinutes: "1439" })), /Marketing restriction retry delay/);
+  await assert.rejects(
+    invalid.action(
+      invalid.form({ recoveryDeliveryMarketingRetryDelayMinutes: "1439" }),
+    ),
+    /Marketing restriction retry delay/,
+  );
   assert.equal(invalid.updates.length, 0);
   assert.equal(invalid.audits.length, 0);
 });

@@ -1,11 +1,17 @@
 import type { Prisma, CommerceEnvironment } from "@prisma/client";
 import { resolveAdminCommerceEnvironment } from "./commerce-environment.ts";
-import { canEditLiveCommerceBudget, readCommerceModelBudget, type CommerceModelBudget } from "./commerce-model-policy-fields.ts";
+import {
+  canEditLiveCommerceBudget,
+  readCommerceModelBudget,
+  type CommerceModelBudget,
+} from "./commerce-model-policy-fields.ts";
 
 type Tx = Prisma.TransactionClient;
 
 export class CommerceModelPolicyConflict extends Error {
-  constructor(message = "CommerceAgent execution policy changed. Reload the page and retry.") {
+  constructor(
+    message = "CommerceAgent execution policy changed. Reload the page and retry.",
+  ) {
     super(message);
     this.name = "CommerceModelPolicyConflict";
   }
@@ -45,7 +51,11 @@ export function projectLivePlatformPolicy(row: {
 
 export async function updateLivePlatformPolicy(
   transaction: Tx,
-  input: { budget: CommerceModelBudget; expectedEditVersion: number; reason: string },
+  input: {
+    budget: CommerceModelBudget;
+    expectedEditVersion: number;
+    reason: string;
+  },
   environment: CommerceEnvironment,
   actorAdminId: string,
 ): Promise<void> {
@@ -54,12 +64,19 @@ export async function updateLivePlatformPolicy(
     take: 2,
   });
   if (rows.length !== 1) {
-    throw new Error("Required LIVE Platform policy is unavailable. Verify the ARCH-038 migration.");
+    throw new Error(
+      "Required LIVE Platform policy is unavailable. Verify the ARCH-038 migration.",
+    );
   }
   const previous = projectLivePlatformPolicy(rows[0]!);
-  if (previous.editVersion !== input.expectedEditVersion) throw new CommerceModelPolicyConflict();
-  if (previous.budget.deadlineMs === input.budget.deadlineMs && previous.budget.outputTokens === input.budget.outputTokens &&
-      previous.budget.initialOutreachToolCalls === input.budget.initialOutreachToolCalls) {
+  if (previous.editVersion !== input.expectedEditVersion)
+    throw new CommerceModelPolicyConflict();
+  if (
+    previous.budget.deadlineMs === input.budget.deadlineMs &&
+    previous.budget.outputTokens === input.budget.outputTokens &&
+    previous.budget.initialOutreachToolCalls ===
+      input.budget.initialOutreachToolCalls
+  ) {
     throw new Error("No CommerceAgent policy values have changed.");
   }
   const updated = await transaction.commerceModelPolicy.updateMany({
@@ -111,7 +128,11 @@ export type LivePlatformPolicyHistoryEntry = {
 };
 
 function auditBudget(value: unknown): CommerceModelBudget | null {
-  try { return readCommerceModelBudget(value, 1); } catch { return null; }
+  try {
+    return readCommerceModelBudget(value, 1);
+  } catch {
+    return null;
+  }
 }
 
 export async function loadLivePlatformPolicyDashboard(
@@ -149,17 +170,31 @@ export async function loadLivePlatformPolicyDashboard(
     take: 11,
   });
   const history = records.slice(0, 10).map((record) => {
-    const metadata = (record.metadata && typeof record.metadata === "object" && !Array.isArray(record.metadata))
-      ? (record.metadata as Record<string, unknown>) : {};
+    const metadata =
+      record.metadata &&
+      typeof record.metadata === "object" &&
+      !Array.isArray(record.metadata)
+        ? (record.metadata as Record<string, unknown>)
+        : {};
     return {
       id: record.id,
       createdAt: record.createdAt.toISOString(),
-      actor: record.actor?.displayName || record.actor?.email || record.actorAdminId || "Unknown administrator",
+      actor:
+        record.actor?.displayName ||
+        record.actor?.email ||
+        record.actorAdminId ||
+        "Unknown administrator",
       reason: record.reason,
       previousBudget: auditBudget(metadata.previousBudget),
       nextBudget: auditBudget(metadata.nextBudget),
-      previousEditVersion: typeof metadata.previousEditVersion === "number" ? metadata.previousEditVersion : null,
-      nextEditVersion: typeof metadata.nextEditVersion === "number" ? metadata.nextEditVersion : null,
+      previousEditVersion:
+        typeof metadata.previousEditVersion === "number"
+          ? metadata.previousEditVersion
+          : null,
+      nextEditVersion:
+        typeof metadata.nextEditVersion === "number"
+          ? metadata.nextEditVersion
+          : null,
     };
   });
   return { policy, history, hasMore: records.length > 10 };
@@ -167,11 +202,19 @@ export async function loadLivePlatformPolicyDashboard(
 
 /** Environment is always determined from the trusted server deployment. */
 export async function getLivePlatformPolicyDashboard(page: number) {
-  const [{ requirePlatformAdminRead, PlatformAdminUnauthorizedError }, { prisma }] = await Promise.all([
+  const [
+    { requirePlatformAdminRead, PlatformAdminUnauthorizedError },
+    { prisma },
+  ] = await Promise.all([
     import("@/lib/auth/platform-admin"),
     import("@/lib/prisma"),
   ]);
   const principal = await requirePlatformAdminRead();
-  if (!canEditLiveCommerceBudget(principal.role)) throw new PlatformAdminUnauthorizedError();
-  return loadLivePlatformPolicyDashboard(prisma, resolveAdminCommerceEnvironment(), page);
+  if (!canEditLiveCommerceBudget(principal.role))
+    throw new PlatformAdminUnauthorizedError();
+  return loadLivePlatformPolicyDashboard(
+    prisma,
+    resolveAdminCommerceEnvironment(),
+    page,
+  );
 }

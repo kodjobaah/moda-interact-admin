@@ -22,24 +22,38 @@ const suites = {
     "tests/unit/arch047-template-publication-pure.test.ts",
     "tests/unit/arch047-template-publication-components.test.tsx",
   ],
-  "authoring-postgres": ["tests/integration/arch047-template-authoring.postgres.test.ts"],
-  "compilation-postgres": ["tests/integration/arch047-template-compilation.postgres.test.ts"],
+  "authoring-postgres": [
+    "tests/integration/arch047-template-authoring.postgres.test.ts",
+  ],
+  "compilation-postgres": [
+    "tests/integration/arch047-template-compilation.postgres.test.ts",
+  ],
   "meta-postgres": ["tests/integration/arch047-template-meta.postgres.test.ts"],
   postgres: ["tests/integration/arch047-template-publication.postgres.test.ts"],
-  "recovery-defaults-postgres": ["tests/integration/whatsapp-recovery-defaults.postgres.test.ts"],
-  "common-activation-postgres": ["tests/integration/arch075-common-activation.postgres.test.ts"],
-  "common-layout-postgres": ["tests/integration/arch075-common-layout.postgres.test.ts"],
+  "recovery-defaults-postgres": [
+    "tests/integration/whatsapp-recovery-defaults.postgres.test.ts",
+  ],
+  "common-activation-postgres": [
+    "tests/integration/arch075-common-activation.postgres.test.ts",
+  ],
+  "common-layout-postgres": [
+    "tests/integration/arch075-common-layout.postgres.test.ts",
+  ],
 };
 const selected = suites[process.argv[2]];
 if (!selected || process.argv.length !== 3) {
-  throw new Error(`Usage: node scripts/run-arch047-admin-publication-tests.mjs ${Object.keys(suites).join("|")}`);
+  throw new Error(
+    `Usage: node scripts/run-arch047-admin-publication-tests.mjs ${Object.keys(suites).join("|")}`,
+  );
 }
 
 // Keep bundles inside the Admin repository so normal package resolution finds
 // its pinned dependencies. The generated directory is ignored by Git.
 const generatedRoot = resolve(root, ".generated");
 await mkdir(generatedRoot, { recursive: true });
-const outputDir = await mkdtemp(join(generatedRoot, "arch047-publication-test-"));
+const outputDir = await mkdtemp(
+  join(generatedRoot, "arch047-publication-test-"),
+);
 try {
   await build({
     entryPoints: selected.map((path) => resolve(root, path)),
@@ -56,14 +70,27 @@ try {
     sourcemap: "inline",
     logLevel: "warning",
   });
-  const compiled = selected.map((path) => join(outputDir, path.split("/").at(-1).replace(/\.tsx?$/, ".mjs")));
-  const result = spawnSync(process.execPath, ["--enable-source-maps", "--test", ...compiled], {
-    cwd: root,
-    env: process.env,
-    stdio: "inherit",
-  });
+  const compiled = selected.map((path) =>
+    join(
+      outputDir,
+      path
+        .split("/")
+        .at(-1)
+        .replace(/\.tsx?$/, ".mjs"),
+    ),
+  );
+  const result = spawnSync(
+    process.execPath,
+    ["--enable-source-maps", "--test", ...compiled],
+    {
+      cwd: root,
+      env: process.env,
+      stdio: "inherit",
+    },
+  );
   if (result.error) throw result.error;
-  if (result.signal) throw new Error(`ARCH-047 test process terminated: ${result.signal}`);
+  if (result.signal)
+    throw new Error(`ARCH-047 test process terminated: ${result.signal}`);
   process.exitCode = result.status ?? 1;
 } finally {
   await rm(outputDir, { recursive: true, force: true });

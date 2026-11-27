@@ -1,6 +1,4 @@
-import {
-  CommerceProviderModelIdSchema,
-} from "@modainteract/moda-interact-shared/commerce/model";
+import { CommerceProviderModelIdSchema } from "@modainteract/moda-interact-shared/commerce/model";
 
 export const TRANSLATION_PROVIDER = "openai" as const;
 
@@ -43,7 +41,9 @@ function boundedTrimmed(
 ): string {
   if (typeof value !== "string") throw new Error(`${name} is invalid.`);
   const trimmed = value.trim();
-  const invalidControl = allowNewlines ? /\0/.test(trimmed) : /[\r\n\0]/.test(trimmed);
+  const invalidControl = allowNewlines
+    ? /\0/.test(trimmed)
+    : /[\r\n\0]/.test(trimmed);
   if (!trimmed || trimmed.length > maximum || invalidControl) {
     throw new Error(`${name} is invalid.`);
   }
@@ -99,9 +99,8 @@ export function validateTranslationModelConfigurationMutation(input: {
     "providerModelId",
     255,
   );
-  const providerModelId = CommerceProviderModelIdSchema.safeParse(
-    providerModelIdRaw,
-  );
+  const providerModelId =
+    CommerceProviderModelIdSchema.safeParse(providerModelIdRaw);
   if (!providerModelId.success) {
     throw new Error("providerModelId is invalid.");
   }

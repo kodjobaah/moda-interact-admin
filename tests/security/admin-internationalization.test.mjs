@@ -32,7 +32,9 @@ async function readQueueMonitorSources() {
   const moduleUrls = entries
     .filter((entry) => entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name))
     .map((entry) => new URL(entry.name, moduleDirectory))
-    .sort((left, right) => (left.href < right.href ? -1 : left.href > right.href ? 1 : 0));
+    .sort((left, right) =>
+      left.href < right.href ? -1 : left.href > right.href ? 1 : 0,
+    );
   const sources = await Promise.all(
     [
       new URL("../../src/components/admin/queue-monitor.tsx", import.meta.url),
@@ -73,7 +75,10 @@ test("Admin validates and consumes the published Shared ICU runtime", () => {
   );
   assert.doesNotMatch(adapterSource, /new Intl\.(NumberFormat|DateTimeFormat)/);
   assert.doesNotMatch(adapterSource, /IntlMessageFormat/);
-  assert.match(packageJson.dependencies["@modainteract/moda-interact-shared"], /^\d+\.\d+\.\d+$/);
+  assert.match(
+    packageJson.dependencies["@modainteract/moda-interact-shared"],
+    /^\d+\.\d+\.\d+$/,
+  );
 });
 
 test("Admin canonical catalogue keys are independent and intentionally aligned", () => {
@@ -82,7 +87,8 @@ test("Admin canonical catalogue keys are independent and intentionally aligned",
   const missingKeyCatalogue = { ...catalogue };
   delete missingKeyCatalogue[requiredKeys[0]];
   assert.throws(
-    () => validateIcuCatalogue(missingKeyCatalogue, requiredKeys, { locale: "en" }),
+    () =>
+      validateIcuCatalogue(missingKeyCatalogue, requiredKeys, { locale: "en" }),
     /missing required keys/i,
   );
 });
@@ -101,10 +107,7 @@ test("known WhatsApp sender types use bounded catalogue labels with raw fallback
   ]) {
     assert.equal(runtime.t(key), expected);
   }
-  assert.match(
-    adapterSource,
-    /adminSenderLabel/,
-  );
+  assert.match(adapterSource, /adminSenderLabel/);
   assert.match(
     adapterSource,
     /export function adminSenderLabel\(value: string \| null \| undefined\): string \{\s+if \(!value\) return "—";\s+return Object\.hasOwn\(catalogue, `sender\.\$\{value\}`\)\s+\? adminI18n\.t\(`sender\.\$\{value\}`\)\s+: value;\s+\}/,
@@ -112,7 +115,10 @@ test("known WhatsApp sender types use bounded catalogue labels with raw fallback
 });
 
 test("current Admin surfaces do not bypass the shared locale and currency boundary", () => {
-  assert.doesNotMatch(adminSource, /en-GB|GBP|toLocaleString|toLocaleTimeString/);
+  assert.doesNotMatch(
+    adminSource,
+    /en-GB|GBP|toLocaleString|toLocaleTimeString/,
+  );
   for (const key of [
     "tenant.platformSummary",
     "search.customerPlaceholder",
@@ -149,7 +155,10 @@ test("Admin locale input is independent of currency and merchant content", () =>
   assert.equal(runtime.locale, "fr-CA");
   assert.match(runtime.formatMoney(12.5, "EUR"), /12/);
   assert.doesNotMatch(
-    adapterSource.slice(adapterSource.indexOf("export function getAdminI18n"), adapterSource.indexOf("export const adminI18n")),
+    adapterSource.slice(
+      adapterSource.indexOf("export function getAdminI18n"),
+      adapterSource.indexOf("export const adminI18n"),
+    ),
     /\bmerchant\b(?!-communications)|\bcustomer\b|currency.*locale|country.*locale/i,
   );
 });

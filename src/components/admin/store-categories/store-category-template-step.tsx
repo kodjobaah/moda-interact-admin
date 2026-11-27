@@ -24,7 +24,9 @@ export function StoreCategoryTemplateStep({
   const validation =
     validateStoreCategoryAuthoringSession(session).defaultTemplate;
   const conditions = session.shopifyMappings
-    .filter((mapping) => mapping.conditionKey.trim() && mapping.displayName.trim())
+    .filter(
+      (mapping) => mapping.conditionKey.trim() && mapping.displayName.trim(),
+    )
     .map((mapping) => ({
       id: mapping.clientId,
       conditionKey: mapping.conditionKey.trim(),
@@ -42,9 +44,9 @@ export function StoreCategoryTemplateStep({
             Conditional prompt template
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Author the canonical-English prompt after the mappings are known. Mapping
-            conditions decide which specialized instructions are included when a merchant
-            later selects this Store Category.
+            Author the canonical-English prompt after the mappings are known.
+            Mapping conditions decide which specialized instructions are
+            included when a merchant later selects this Store Category.
           </p>
         </div>
         <StoreCategoryAuthoringSectionStatus valid={validation.valid} />

@@ -45,11 +45,16 @@ test("embedding configuration normalizes provider and bounds dimensions", () => 
 });
 
 test("embedding credential validation rejects line breaks and empty input", () => {
-  assert.equal(validateEmbeddingCredentialSecret("secret-value"), "secret-value");
+  assert.equal(
+    validateEmbeddingCredentialSecret("secret-value"),
+    "secret-value",
+  );
   assert.throws(() => validateEmbeddingCredentialSecret(""), /invalid/);
-  assert.throws(() => validateEmbeddingCredentialSecret("bad\nsecret"), /invalid/);
+  assert.throws(
+    () => validateEmbeddingCredentialSecret("bad\nsecret"),
+    /invalid/,
+  );
 });
-
 
 test("embedding removal requires a positive CAS edit version", () => {
   assert.deepEqual(

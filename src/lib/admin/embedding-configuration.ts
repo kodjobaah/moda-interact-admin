@@ -40,7 +40,6 @@ export type EmbeddingConfigurationStatus = {
   updatedByAdminId: string | null;
 };
 
-
 export type EmbeddingRuntimeConfiguration = {
   environment: CommerceEnvironment;
   purpose: CommerceEmbeddingPurpose;
@@ -56,7 +55,8 @@ export const EMBEDDING_CONFIGURATION_ERRORS = {
   changed: "Embedding configuration changed. Refresh and try again.",
   alreadyConfigured: "Embedding configuration is already configured.",
   notConfigured: "Embedding configuration is not configured.",
-  credentialRequired: "An embedding credential is required for a new configuration.",
+  credentialRequired:
+    "An embedding credential is required for a new configuration.",
   providerCredentialRequired:
     "A new embedding credential is required when the provider changes.",
   superAdminRequired: "SUPER_ADMIN access is required.",
@@ -157,23 +157,27 @@ export async function getEmbeddingRuntimeConfiguration(
   // Do not require an active writer key when recovering an existing credential.
   let apiKey: string;
   try {
-    const keyring = parseCredentialKeyring(process.env.MODA_ENCRYPTION_KEYS_JSON);
+    const keyring = parseCredentialKeyring(
+      process.env.MODA_ENCRYPTION_KEYS_JSON,
+    );
     const aad = createCommerceEmbeddingCredentialAad({
       environment,
       purpose,
       provider: row.embeddingProvider,
       keyId: row.keyId,
     });
-    apiKey = validateEmbeddingCredentialSecret(decryptCredential({
-      keyring,
-      envelope: {
-        ciphertext: new Uint8Array(row.ciphertext),
-        nonce: new Uint8Array(row.nonce),
-        authTag: new Uint8Array(row.authTag),
-        keyId: row.keyId,
-      },
-      aad,
-    }));
+    apiKey = validateEmbeddingCredentialSecret(
+      decryptCredential({
+        keyring,
+        envelope: {
+          ciphertext: new Uint8Array(row.ciphertext),
+          nonce: new Uint8Array(row.nonce),
+          authTag: new Uint8Array(row.authTag),
+          keyId: row.keyId,
+        },
+        aad,
+      }),
+    );
   } catch {
     throw new Error(EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE);
   }
@@ -242,21 +246,22 @@ export async function saveEmbeddingConfiguration(
     return await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const existing = await transaction.commerceEmbeddingConfiguration.findUnique({
-          where: {
-            environment_purpose: {
-              environment,
-              purpose: validated.purpose,
+        const existing =
+          await transaction.commerceEmbeddingConfiguration.findUnique({
+            where: {
+              environment_purpose: {
+                environment,
+                purpose: validated.purpose,
+              },
             },
-          },
-          select: {
-            ...statusSelect,
-            ciphertext: true,
-            nonce: true,
-            authTag: true,
-            keyId: true,
-          },
-        });
+            select: {
+              ...statusSelect,
+              ciphertext: true,
+              nonce: true,
+              authTag: true,
+              keyId: true,
+            },
+          });
 
         if (!existing) {
           if (validated.expectedEditVersion !== undefined) {
@@ -328,29 +333,30 @@ export async function saveEmbeddingConfiguration(
                 secret: validated.secret,
               })
             : null;
-          const updated = await transaction.commerceEmbeddingConfiguration.updateMany({
-            where: {
-              environment,
-              purpose: validated.purpose,
-              editVersion: validated.expectedEditVersion,
-            },
-            data: {
-              embeddingProvider: validated.embeddingProvider,
-              embeddingModel: validated.embeddingModel,
-              embeddingDimensions: validated.embeddingDimensions,
-              embeddingIndexVersion: validated.embeddingIndexVersion,
-              ...(sealed
-                ? {
-                    ciphertext: Buffer.from(sealed.ciphertext),
-                    nonce: Buffer.from(sealed.nonce),
-                    authTag: Buffer.from(sealed.authTag),
-                    keyId: sealed.keyId,
-                  }
-                : {}),
-              updatedByAdminId: principal.id,
-              editVersion: { increment: 1 },
-            },
-          });
+          const updated =
+            await transaction.commerceEmbeddingConfiguration.updateMany({
+              where: {
+                environment,
+                purpose: validated.purpose,
+                editVersion: validated.expectedEditVersion,
+              },
+              data: {
+                embeddingProvider: validated.embeddingProvider,
+                embeddingModel: validated.embeddingModel,
+                embeddingDimensions: validated.embeddingDimensions,
+                embeddingIndexVersion: validated.embeddingIndexVersion,
+                ...(sealed
+                  ? {
+                      ciphertext: Buffer.from(sealed.ciphertext),
+                      nonce: Buffer.from(sealed.nonce),
+                      authTag: Buffer.from(sealed.authTag),
+                      keyId: sealed.keyId,
+                    }
+                  : {}),
+                updatedByAdminId: principal.id,
+                editVersion: { increment: 1 },
+              },
+            });
           if (updated.count !== 1) {
             throw new Error(EMBEDDING_CONFIGURATION_ERRORS.changed);
           }
@@ -376,15 +382,17 @@ export async function saveEmbeddingConfiguration(
           });
         }
 
-        const row = await transaction.commerceEmbeddingConfiguration.findUnique({
-          where: {
-            environment_purpose: {
-              environment,
-              purpose: validated.purpose,
+        const row = await transaction.commerceEmbeddingConfiguration.findUnique(
+          {
+            where: {
+              environment_purpose: {
+                environment,
+                purpose: validated.purpose,
+              },
             },
+            select: statusSelect,
           },
-          select: statusSelect,
-        });
+        );
         return statusFromRecord(environment, validated.purpose, row);
       },
       { isolationLevel: "Serializable" },
@@ -419,18 +427,20 @@ export async function removeEmbeddingConfiguration(
     return await prisma.$transaction(
       async (transaction: ConfigurationTransaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const deleted = await transaction.commerceEmbeddingConfiguration.deleteMany({
-          where: {
-            environment,
-            purpose,
-            editVersion: validated.expectedEditVersion!,
-          },
-        });
-        if (deleted.count !== 1) {
-          const exists = await transaction.commerceEmbeddingConfiguration.findUnique({
-            where: { environment_purpose: { environment, purpose } },
-            select: { editVersion: true },
+        const deleted =
+          await transaction.commerceEmbeddingConfiguration.deleteMany({
+            where: {
+              environment,
+              purpose,
+              editVersion: validated.expectedEditVersion!,
+            },
           });
+        if (deleted.count !== 1) {
+          const exists =
+            await transaction.commerceEmbeddingConfiguration.findUnique({
+              where: { environment_purpose: { environment, purpose } },
+              select: { editVersion: true },
+            });
           throw new Error(
             exists
               ? EMBEDDING_CONFIGURATION_ERRORS.changed

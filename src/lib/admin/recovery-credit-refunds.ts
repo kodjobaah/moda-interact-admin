@@ -63,13 +63,17 @@ const refundSelect = {
   },
 } satisfies Prisma.RecoveryCreditRefundSelect;
 
-type RefundRow = Prisma.RecoveryCreditRefundGetPayload<{ select: typeof refundSelect }>;
+type RefundRow = Prisma.RecoveryCreditRefundGetPayload<{
+  select: typeof refundSelect;
+}>;
 
 function decimalValue(value: Prisma.Decimal | null | undefined): string | null {
   return value?.toString() ?? null;
 }
 
-function queueStatus(row: Pick<RefundRow, "status" | "purchase">): RecoveryCreditRefundQueueStatus {
+function queueStatus(
+  row: Pick<RefundRow, "status" | "purchase">,
+): RecoveryCreditRefundQueueStatus {
   if (row.status !== RecoveryCreditRefundStatus.REQUESTED) {
     return row.status as RecoveryCreditRefundQueueStatus;
   }
@@ -93,7 +97,10 @@ function baseProjection(row: RefundRow): RecoveryCreditRefundItem {
   return {
     id: row.id,
     shopId: row.shopId,
-    shop: { domain: row.shop.domain, brandName: row.shop.brand?.brandName ?? null },
+    shop: {
+      domain: row.shop.domain,
+      brandName: row.shop.brand?.brandName ?? null,
+    },
     source: row.source,
     requestedByShopifyUserId: row.requestedByShopifyUserId,
     status: row.status,
@@ -110,16 +117,25 @@ function baseProjection(row: RefundRow): RecoveryCreditRefundItem {
     providerSubscriptionIdSnapshot: row.providerSubscriptionIdSnapshot,
     planHandleSnapshot: row.planHandleSnapshot,
     eventHandleSnapshot: row.eventHandleSnapshot,
-    purchaseProviderAmountSnapshot: row.purchaseProviderAmountSnapshot.toString(),
+    purchaseProviderAmountSnapshot:
+      row.purchaseProviderAmountSnapshot.toString(),
     purchaseProviderCurrencySnapshot: row.purchaseProviderCurrencySnapshot,
     finalCreditQuantity: row.finalCreditQuantity,
     expectedProviderAmount: decimalValue(row.expectedProviderAmount),
     expectedProviderCurrency: row.expectedProviderCurrency,
     automaticCorrectionUsageEventId: row.automaticCorrectionUsageEventId,
-    providerUsageQuantityBeforeCorrection: decimalValue(row.providerUsageQuantityBeforeCorrection),
-    providerUsageCostBeforeCorrection: decimalValue(row.providerUsageCostBeforeCorrection),
-    expectedProviderUsageQuantityAfterCorrection: decimalValue(row.expectedProviderUsageQuantityAfterCorrection),
-    expectedProviderUsageCostAfterCorrection: decimalValue(row.expectedProviderUsageCostAfterCorrection),
+    providerUsageQuantityBeforeCorrection: decimalValue(
+      row.providerUsageQuantityBeforeCorrection,
+    ),
+    providerUsageCostBeforeCorrection: decimalValue(
+      row.providerUsageCostBeforeCorrection,
+    ),
+    expectedProviderUsageQuantityAfterCorrection: decimalValue(
+      row.expectedProviderUsageQuantityAfterCorrection,
+    ),
+    expectedProviderUsageCostAfterCorrection: decimalValue(
+      row.expectedProviderUsageCostAfterCorrection,
+    ),
     automaticCorrection: null,
     providerReference: row.providerReference,
     providerActionKind: row.providerActionKind,
@@ -139,18 +155,27 @@ function boundedPage(page: number, pageSize: number) {
   };
 }
 
-function statusWhere(status: RecoveryCreditRefundQueueStatus): Prisma.RecoveryCreditRefundWhereInput {
+function statusWhere(
+  status: RecoveryCreditRefundQueueStatus,
+): Prisma.RecoveryCreditRefundWhereInput {
   if (status === "ALL") return {};
   if (status === "READY_FOR_REFUND_PROCESSING") {
     return {
       status: RecoveryCreditRefundStatus.REQUESTED,
-      purchase: { status: RecoveryCreditPurchaseStatus.WITHDRAWN, reservedAmount: 0, currentAmount: { gt: 0 } },
+      purchase: {
+        status: RecoveryCreditPurchaseStatus.WITHDRAWN,
+        reservedAmount: 0,
+        currentAmount: { gt: 0 },
+      },
     };
   }
   if (status === "WAITING_FOR_RESERVATIONS") {
     return {
       status: RecoveryCreditRefundStatus.REQUESTED,
-      purchase: { status: RecoveryCreditPurchaseStatus.WITHDRAWN, reservedAmount: { gt: 0 } },
+      purchase: {
+        status: RecoveryCreditPurchaseStatus.WITHDRAWN,
+        reservedAmount: { gt: 0 },
+      },
     };
   }
   if (status === "NEEDS_ATTENTION") {
@@ -181,12 +206,24 @@ function statusWhere(status: RecoveryCreditRefundQueueStatus): Prisma.RecoveryCr
       ],
     };
   }
-  if (status === "REQUESTED") return { status: RecoveryCreditRefundStatus.REQUESTED };
+  if (status === "REQUESTED")
+    return { status: RecoveryCreditRefundStatus.REQUESTED };
   return { status: status as RecoveryCreditRefundStatus };
 }
 
-function pageResult<T>(items: T[], page: number, pageSize: number, totalItems: number): PageResult<T> {
-  return { items, page, pageSize, totalItems, totalPages: Math.max(1, Math.ceil(totalItems / pageSize)) };
+function pageResult<T>(
+  items: T[],
+  page: number,
+  pageSize: number,
+  totalItems: number,
+): PageResult<T> {
+  return {
+    items,
+    page,
+    pageSize,
+    totalItems,
+    totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
+  };
 }
 
 export async function getRecoveryCreditRefunds(input: {
@@ -197,11 +234,22 @@ export async function getRecoveryCreditRefunds(input: {
   await requirePlatformAdminRead();
   const status = input.status ?? "ALL";
   const allowed: RecoveryCreditRefundQueueStatus[] = [
-    "ALL", "REQUESTED", "READY_FOR_REFUND_PROCESSING", "WAITING_FOR_RESERVATIONS",
-    "PROVIDER_ACTION_REQUIRED", "NEEDS_ATTENTION", "COMPLETED", "REJECTED", "CANCELLED",
+    "ALL",
+    "REQUESTED",
+    "READY_FOR_REFUND_PROCESSING",
+    "WAITING_FOR_RESERVATIONS",
+    "PROVIDER_ACTION_REQUIRED",
+    "NEEDS_ATTENTION",
+    "COMPLETED",
+    "REJECTED",
+    "CANCELLED",
   ];
-  if (!allowed.includes(status)) throw new Error("Unsupported recovery-credit refund status");
-  const { page: requestedPage, pageSize } = boundedPage(input.page, input.pageSize ?? RECOVERY_CREDIT_REFUND_PAGE_SIZE);
+  if (!allowed.includes(status))
+    throw new Error("Unsupported recovery-credit refund status");
+  const { page: requestedPage, pageSize } = boundedPage(
+    input.page,
+    input.pageSize ?? RECOVERY_CREDIT_REFUND_PAGE_SIZE,
+  );
   const where = statusWhere(status);
   const totalItems = await prisma.recoveryCreditRefund.count({ where });
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -216,7 +264,9 @@ export async function getRecoveryCreditRefunds(input: {
   return pageResult(rows.map(baseProjection), page, pageSize, totalItems);
 }
 
-export async function getRecoveryCreditRefundDetail(id: string): Promise<RecoveryCreditRefundDetail | null> {
+export async function getRecoveryCreditRefundDetail(
+  id: string,
+): Promise<RecoveryCreditRefundDetail | null> {
   await requirePlatformAdminRead();
   const row = await prisma.recoveryCreditRefund.findUnique({
     where: { id },
@@ -238,7 +288,14 @@ export async function getRecoveryCreditRefundDetail(id: string): Promise<Recover
       holdAppliedAt: true,
       providerConfirmedAt: true,
       completedAt: true,
-      sourceMessage: { select: { id: true, createdAt: true, shopifyUserId: true, systemCode: true } },
+      sourceMessage: {
+        select: {
+          id: true,
+          createdAt: true,
+          shopifyUserId: true,
+          systemCode: true,
+        },
+      },
       purchase: {
         select: {
           ...refundSelect.purchase.select,
@@ -254,16 +311,40 @@ export async function getRecoveryCreditRefundDetail(id: string): Promise<Recover
           providerUsageCostCurrencyAfterSnapshot: true,
           providerValuationConfirmedAt: true,
           providerPriceSnapshot: true,
-          billingPeriod: { select: { id: true, periodStart: true, periodEnd: true, planNameSnapshot: true, planKindSnapshot: true } },
+          billingPeriod: {
+            select: {
+              id: true,
+              periodStart: true,
+              periodEnd: true,
+              planNameSnapshot: true,
+              planKindSnapshot: true,
+            },
+          },
           purchasedReservations: {
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 20,
-            select: { id: true, quantity: true, status: true, createdAt: true, updatedAt: true },
+            select: {
+              id: true,
+              quantity: true,
+              status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
           },
           refunds: {
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 20,
-            select: { id: true, status: true, source: true, reason: true, finalCreditQuantity: true, providerAmount: true, providerCurrency: true, createdAt: true, completedAt: true },
+            select: {
+              id: true,
+              status: true,
+              source: true,
+              reason: true,
+              finalCreditQuantity: true,
+              providerAmount: true,
+              providerCurrency: true,
+              createdAt: true,
+              completedAt: true,
+            },
           },
         },
       },
@@ -283,17 +364,24 @@ export async function getRecoveryCreditRefundDetail(id: string): Promise<Recover
       planName: row.purchase.plan?.name ?? null,
       shopifyPlanHandleSnapshot: row.purchase.shopifyPlanHandleSnapshot,
       shopifyEventHandleSnapshot: row.purchase.shopifyEventHandleSnapshot,
-      providerSubscriptionIdSnapshot: row.purchase.providerSubscriptionIdSnapshot,
+      providerSubscriptionIdSnapshot:
+        row.purchase.providerSubscriptionIdSnapshot,
       providerUsageQuantityBeforeSnapshot: decimalValue(
         row.purchase.providerUsageQuantityBeforeSnapshot,
       ),
       providerUsageCostBeforeSnapshot: decimalValue(
         row.purchase.providerUsageCostBeforeSnapshot,
       ),
-      providerUsageCostCurrencyBeforeSnapshot: row.purchase.providerUsageCostCurrencyBeforeSnapshot,
-      providerUsageQuantityAfterSnapshot: decimalValue(row.purchase.providerUsageQuantityAfterSnapshot),
-      providerUsageCostAfterSnapshot: decimalValue(row.purchase.providerUsageCostAfterSnapshot),
-      providerUsageCostCurrencyAfterSnapshot: row.purchase.providerUsageCostCurrencyAfterSnapshot,
+      providerUsageCostCurrencyBeforeSnapshot:
+        row.purchase.providerUsageCostCurrencyBeforeSnapshot,
+      providerUsageQuantityAfterSnapshot: decimalValue(
+        row.purchase.providerUsageQuantityAfterSnapshot,
+      ),
+      providerUsageCostAfterSnapshot: decimalValue(
+        row.purchase.providerUsageCostAfterSnapshot,
+      ),
+      providerUsageCostCurrencyAfterSnapshot:
+        row.purchase.providerUsageCostCurrencyAfterSnapshot,
       providerValuationConfirmedAt: row.purchase.providerValuationConfirmedAt,
       providerPriceSnapshot: row.purchase.providerPriceSnapshot,
       billingPeriod: row.purchase.billingPeriod,

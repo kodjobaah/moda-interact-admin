@@ -1,10 +1,6 @@
 import { createHash } from "node:crypto";
-import {
-  validateStoreCategoryPromptTemplate,
-} from "@modainteract/moda-interact-shared/commerce";
-import {
-  MODA_SUPPORTED_LANGUAGE_TAGS,
-} from "@modainteract/moda-interact-shared/internationalization";
+import { validateStoreCategoryPromptTemplate } from "@modainteract/moda-interact-shared/commerce";
+import { MODA_SUPPORTED_LANGUAGE_TAGS } from "@modainteract/moda-interact-shared/internationalization";
 import { createLogger } from "@modainteract/moda-interact-shared/logging";
 import {
   CommerceAuditAction,
@@ -21,9 +17,7 @@ import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-
 import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
 import { resolveCommerceEnvironment } from "./openrouter-credential-environment.ts";
 import { TRANSLATION_PROVIDER } from "./translation-configuration-validation.ts";
-import {
-  validateRequestStoreCategoryTranslationInput,
-} from "./store-category-translation-enablement-validation.ts";
+import { validateRequestStoreCategoryTranslationInput } from "./store-category-translation-enablement-validation.ts";
 
 const logger = createLogger({
   serviceNamespace: "moda-interact",
@@ -131,7 +125,8 @@ function createTranslationItems(input: {
   return MODA_SUPPORTED_LANGUAGE_TAGS.flatMap((targetLanguageTag) =>
     sources.map((source) => {
       const immediatelyAvailable =
-        targetLanguageTag === SOURCE_LANGUAGE_TAG || source.sourceText.length === 0;
+        targetLanguageTag === SOURCE_LANGUAGE_TAG ||
+        source.sourceText.length === 0;
       return {
         runId: input.runId,
         sourceEntityKind: source.entityKind,
@@ -176,58 +171,63 @@ export async function requestStoreCategoryTranslation(
 
     const result = await prisma.$transaction(
       async (transaction: TranslationTransaction) => {
-        const category = await transaction.commercePromptTemplateCategory.findUnique({
-          where: { id: input.categoryId },
-          select: {
-            id: true,
-            slug: true,
-            displayName: true,
-            description: true,
-            displayOrder: true,
-            referenceTaxonomySource: true,
-            referenceTaxonomyVersion: true,
-            referenceTaxonomyCategoryId: true,
-            enabled: true,
-            editVersion: true,
-            defaultTemplate: {
-              select: {
-                id: true,
-                key: true,
-                displayName: true,
-                description: true,
-                promptText: true,
-                enabled: true,
-                editVersion: true,
-                categoryId: true,
+        const category =
+          await transaction.commercePromptTemplateCategory.findUnique({
+            where: { id: input.categoryId },
+            select: {
+              id: true,
+              slug: true,
+              displayName: true,
+              description: true,
+              displayOrder: true,
+              referenceTaxonomySource: true,
+              referenceTaxonomyVersion: true,
+              referenceTaxonomyCategoryId: true,
+              enabled: true,
+              editVersion: true,
+              defaultTemplate: {
+                select: {
+                  id: true,
+                  key: true,
+                  displayName: true,
+                  description: true,
+                  promptText: true,
+                  enabled: true,
+                  editVersion: true,
+                  categoryId: true,
+                },
+              },
+              taxonomyMappings: {
+                orderBy: [{ id: "asc" }],
+                select: {
+                  id: true,
+                  conditionKey: true,
+                  displayName: true,
+                  shopifyTaxonomyCategoryId: true,
+                  weight: true,
+                  editVersion: true,
+                },
+              },
+              translationRuns: {
+                where: { status: { in: [...ACTIVE_RUN_STATUSES] } },
+                take: 1,
+                select: { id: true, status: true },
               },
             },
-            taxonomyMappings: {
-              orderBy: [{ id: "asc" }],
-              select: {
-                id: true,
-                conditionKey: true,
-                displayName: true,
-                shopifyTaxonomyCategoryId: true,
-                weight: true,
-                editVersion: true,
-              },
-            },
-            translationRuns: {
-              where: { status: { in: [...ACTIVE_RUN_STATUSES] } },
-              take: 1,
-              select: { id: true, status: true },
-            },
-          },
-        });
+          });
         if (!category) throw new Error("Store Category was not found.");
         if (category.editVersion !== input.expectedCategoryEditVersion) {
           throw new Error("Store Category changed; refresh and try again.");
         }
         if (category.enabled) {
-          throw new Error("Disable this Store Category before requesting translation.");
+          throw new Error(
+            "Disable this Store Category before requesting translation.",
+          );
         }
         if (category.translationRuns.length > 0) {
-          throw new Error("A translation/enablement run is already active for this Store Category.");
+          throw new Error(
+            "A translation/enablement run is already active for this Store Category.",
+          );
         }
         const template = category.defaultTemplate;
         if (
@@ -236,7 +236,9 @@ export async function requestStoreCategoryTranslation(
           !template.enabled ||
           !template.promptText.trim()
         ) {
-          throw new Error("Choose a valid enabled default prompt template before translation.");
+          throw new Error(
+            "Choose a valid enabled default prompt template before translation.",
+          );
         }
 
         const mappings = category.taxonomyMappings.map((mapping) => {
@@ -256,7 +258,9 @@ export async function requestStoreCategoryTranslation(
         });
         const promptValidation = validateStoreCategoryPromptTemplate({
           source: template.promptText,
-          availableConditionKeys: mappings.map((mapping) => mapping.conditionKey),
+          availableConditionKeys: mappings.map(
+            (mapping) => mapping.conditionKey,
+          ),
         });
         if (!promptValidation.valid) {
           throw new Error(
@@ -265,21 +269,22 @@ export async function requestStoreCategoryTranslation(
           );
         }
 
-        const model = await transaction.commerceTranslationModelConfiguration.findFirst({
-          where: {
-            id: input.translationModelConfigurationId,
-            environment,
-            provider: TRANSLATION_PROVIDER,
-            enabled: true,
-          },
-          select: {
-            id: true,
-            provider: true,
-            providerModelId: true,
-            editVersion: true,
-            credential: { select: { id: true } },
-          },
-        });
+        const model =
+          await transaction.commerceTranslationModelConfiguration.findFirst({
+            where: {
+              id: input.translationModelConfigurationId,
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              enabled: true,
+            },
+            select: {
+              id: true,
+              provider: true,
+              providerModelId: true,
+              editVersion: true,
+              credential: { select: { id: true } },
+            },
+          });
         if (!model || !model.credential) {
           throw new Error(
             "The selected translation model is unavailable or its provider credential is not configured.",
@@ -309,22 +314,23 @@ export async function requestStoreCategoryTranslation(
           mappings,
         });
         const hash = sourceHash(snapshot);
-        const run = await transaction.commerceStoreCategoryTranslationRun.create({
-          data: {
-            categoryId: category.id,
-            environment,
-            translationModelConfigurationId: model.id,
-            provider: model.provider,
-            providerModelId: model.providerModelId,
-            modelConfigurationVersion: model.editVersion,
-            sourceSchemaVersion: SOURCE_SCHEMA_VERSION,
-            sourceHash: hash,
-            sourceSnapshot: snapshot as Prisma.InputJsonObject,
-            status: CommerceStoreCategoryTranslationRunStatus.PENDING,
-            requestedByAdminId: principal.id,
-          },
-          select: { id: true },
-        });
+        const run =
+          await transaction.commerceStoreCategoryTranslationRun.create({
+            data: {
+              categoryId: category.id,
+              environment,
+              translationModelConfigurationId: model.id,
+              provider: model.provider,
+              providerModelId: model.providerModelId,
+              modelConfigurationVersion: model.editVersion,
+              sourceSchemaVersion: SOURCE_SCHEMA_VERSION,
+              sourceHash: hash,
+              sourceSnapshot: snapshot as Prisma.InputJsonObject,
+              status: CommerceStoreCategoryTranslationRunStatus.PENDING,
+              requestedByAdminId: principal.id,
+            },
+            select: { id: true },
+          });
         const now = new Date();
         const items = createTranslationItems({
           runId: run.id,
@@ -344,7 +350,8 @@ export async function requestStoreCategoryTranslation(
             actorType: CommerceAuditActorType.PLATFORM_ADMIN,
             actorAdminId: principal.id,
             operationId: input.operationId,
-            action: CommerceAuditAction.REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION,
+            action:
+              CommerceAuditAction.REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION,
             environment,
             promptTemplateCategoryId: category.id,
             promptTemplateId: template.id,

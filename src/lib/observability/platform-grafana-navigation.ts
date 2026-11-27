@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { PLATFORM_POLICY_REGISTRY, validateConfiguration } from "@/lib/admin/platform-configuration/contracts";
+import {
+  PLATFORM_POLICY_REGISTRY,
+  validateConfiguration,
+} from "@/lib/admin/platform-configuration/contracts";
 import { getConfigurationEnvironment } from "@/lib/admin/platform-configuration/service";
 import { getGrafanaNavigation, type GrafanaNavigation } from "./grafana";
 

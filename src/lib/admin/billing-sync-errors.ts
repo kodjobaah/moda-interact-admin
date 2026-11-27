@@ -25,21 +25,26 @@ export function canRequestBillingSyncReconciliation(input: {
 }): boolean {
   if (!input.errorCode || !input.planId) return false;
   const hasCompletePendingPlan = Boolean(
-    input.pendingPlanId
-      && input.pendingShopifyPlanHandle
-      && input.pendingEffectiveAt,
+    input.pendingPlanId &&
+    input.pendingShopifyPlanHandle &&
+    input.pendingEffectiveAt,
   );
-  const hasNoPendingPlan = !input.pendingPlanId
-    && !input.pendingShopifyPlanHandle
-    && !input.pendingEffectiveAt;
-  if (RETRYABLE_PLAN_CHANGE_SYNC_ERROR_CODES.includes(
-    input.errorCode as (typeof RETRYABLE_PLAN_CHANGE_SYNC_ERROR_CODES)[number],
-  )) {
+  const hasNoPendingPlan =
+    !input.pendingPlanId &&
+    !input.pendingShopifyPlanHandle &&
+    !input.pendingEffectiveAt;
+  if (
+    RETRYABLE_PLAN_CHANGE_SYNC_ERROR_CODES.includes(
+      input.errorCode as (typeof RETRYABLE_PLAN_CHANGE_SYNC_ERROR_CODES)[number],
+    )
+  ) {
     return hasCompletePendingPlan;
   }
-  if (RETRYABLE_PROVIDER_SYNC_ERROR_CODES.includes(
-    input.errorCode as (typeof RETRYABLE_PROVIDER_SYNC_ERROR_CODES)[number],
-  )) {
+  if (
+    RETRYABLE_PROVIDER_SYNC_ERROR_CODES.includes(
+      input.errorCode as (typeof RETRYABLE_PROVIDER_SYNC_ERROR_CODES)[number],
+    )
+  ) {
     return hasCompletePendingPlan || hasNoPendingPlan;
   }
   return false;

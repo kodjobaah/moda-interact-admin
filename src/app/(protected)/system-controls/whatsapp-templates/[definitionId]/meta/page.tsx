@@ -12,7 +12,11 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function MetaTemplatePage({ params }: { params: Promise<{ definitionId: string }> }) {
+export default async function MetaTemplatePage({
+  params,
+}: {
+  params: Promise<{ definitionId: string }>;
+}) {
   const principal = await requirePlatformAdminPage();
   if (principal.role !== "SUPER_ADMIN") notFound();
   requireTemplateSuperAdmin(principal);
@@ -20,29 +24,71 @@ export default async function MetaTemplatePage({ params }: { params: Promise<{ d
   let dashboard;
   try {
     const trustedWabaId = await resolveTrustedMetaWaba(prisma);
-    dashboard = await readMetaDashboard(definitionId, { db: prisma, principal, trustedWabaId });
+    dashboard = await readMetaDashboard(definitionId, {
+      db: prisma,
+      principal,
+      trustedWabaId,
+    });
   } catch (cause) {
-    if (!(cause instanceof MetaSubmissionError) || cause.reasonCode !== "SENDER_UNAVAILABLE") {
-      if (cause instanceof MetaSubmissionError && ["NOT_FOUND", "INVALID_INPUT"].includes(cause.reasonCode)) notFound();
+    if (
+      !(cause instanceof MetaSubmissionError) ||
+      cause.reasonCode !== "SENDER_UNAVAILABLE"
+    ) {
+      if (
+        cause instanceof MetaSubmissionError &&
+        ["NOT_FOUND", "INVALID_INPUT"].includes(cause.reasonCode)
+      )
+        notFound();
       throw cause;
     }
     // Configuration failure blocks confirmation, but existing approval evidence
     // must remain inspectable to a privileged operator.
-    const status = await readMetaStatus(definitionId, { db: prisma, principal });
-    dashboard = { definitionId, status, plan: null, previewIssue: cause.message };
+    const status = await readMetaStatus(definitionId, {
+      db: prisma,
+      principal,
+    });
+    dashboard = {
+      definitionId,
+      status,
+      plan: null,
+      previewIssue: cause.message,
+    };
   }
-  return <AdminShell active="whatsapp-templates">
-    <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
-      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap gap-2 text-sm">
-        <Link href="/system-controls" className="text-blue-800 underline">System Controls</Link><span>/</span>
-        <Link href={`/system-controls/whatsapp-templates?definition=${encodeURIComponent(definitionId)}`} className="text-blue-800 underline">WhatsApp template</Link><span>/</span>
-        <span>Meta submission and approvals</span>
-      </nav>
-      <h1 className="mb-2 text-2xl font-bold">Meta submission and language approvals</h1>
-      <p className="mb-6 text-sm text-slate-600">Operator-confirmed, Moda-authored and immutable. Provider decisions do not publish templates to merchants.</p>
-      <Link className="mb-5 inline-block rounded border border-blue-800 px-3 py-2 text-sm font-semibold text-blue-800"
-        href={`/system-controls/whatsapp-templates/${encodeURIComponent(definitionId)}/publish`}>Publish template</Link>
-      <MetaTemplateDashboard initial={dashboard} />
-    </main>
-  </AdminShell>;
+  return (
+    <AdminShell active="whatsapp-templates">
+      <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 flex flex-wrap gap-2 text-sm"
+        >
+          <Link href="/system-controls" className="text-blue-800 underline">
+            System Controls
+          </Link>
+          <span>/</span>
+          <Link
+            href={`/system-controls/whatsapp-templates?definition=${encodeURIComponent(definitionId)}`}
+            className="text-blue-800 underline"
+          >
+            WhatsApp template
+          </Link>
+          <span>/</span>
+          <span>Meta submission and approvals</span>
+        </nav>
+        <h1 className="mb-2 text-2xl font-bold">
+          Meta submission and language approvals
+        </h1>
+        <p className="mb-6 text-sm text-slate-600">
+          Operator-confirmed, Moda-authored and immutable. Provider decisions do
+          not publish templates to merchants.
+        </p>
+        <Link
+          className="mb-5 inline-block rounded border border-blue-800 px-3 py-2 text-sm font-semibold text-blue-800"
+          href={`/system-controls/whatsapp-templates/${encodeURIComponent(definitionId)}/publish`}
+        >
+          Publish template
+        </Link>
+        <MetaTemplateDashboard initial={dashboard} />
+      </main>
+    </AdminShell>
+  );
 }

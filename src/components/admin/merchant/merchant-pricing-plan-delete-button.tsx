@@ -45,8 +45,8 @@ export function MerchantPricingPlanDeleteButton({
         durable
           ? "This pricing plan is durable and cannot be deleted. Deactivate it instead."
           : disabled
-          ? "Deactivate this paid plan before deleting it."
-          : `Delete ${displayName}`
+            ? "Deactivate this paid plan before deleting it."
+            : `Delete ${displayName}`
       }
       className="rounded-md border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
     >

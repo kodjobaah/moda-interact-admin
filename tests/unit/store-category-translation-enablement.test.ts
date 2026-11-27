@@ -38,7 +38,8 @@ test("translation enablement request validation rejects malformed versions and e
     /expectedCategoryEditVersion/,
   );
   assert.throws(
-    () => validateRequestStoreCategoryTranslationInput({ ...base, reason: " " }),
+    () =>
+      validateRequestStoreCategoryTranslationInput({ ...base, reason: " " }),
     /reason/,
   );
 });

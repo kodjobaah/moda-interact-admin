@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CredentialSecurityError } from "@modainteract/moda-interact-shared/security/credentials/node";
-import {
-  loadActiveSharedCredentialKeyring,
-} from "../../src/lib/admin/shared-credential-keyring.ts";
+import { loadActiveSharedCredentialKeyring } from "../../src/lib/admin/shared-credential-keyring.ts";
 import { CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "../../src/lib/admin/shared-credential-keyring.ts";
 
 const keysBefore = process.env.MODA_ENCRYPTION_KEYS_JSON;
@@ -18,7 +16,13 @@ function setKeyring(raw: string | undefined, active: string | undefined): void {
 }
 
 test("writer uses canonical Shared keyring and active ID without exposing bytes", () => {
-  setKeyring(JSON.stringify({ active: key, old: Buffer.alloc(32, 9).toString("base64") }), "active");
+  setKeyring(
+    JSON.stringify({
+      active: key,
+      old: Buffer.alloc(32, 9).toString("base64"),
+    }),
+    "active",
+  );
   const result = loadActiveSharedCredentialKeyring();
   assert.equal(result.activeKeyId, "active");
   assert.deepEqual(result.keyring.keyIds, ["active", "old"]);
@@ -48,12 +52,15 @@ test("invalid configuration, duplicate IDs, noncanonical Base64 and implicit ID 
 
 test("keyring does not reveal underlying Shared error codes", () => {
   setKeyring("bad-json", "active");
-  assert.throws(() => loadActiveSharedCredentialKeyring(), (error: unknown) => {
-    assert.ok(error instanceof Error);
-    assert.equal(error.message, CREDENTIAL_ENCRYPTION_UNAVAILABLE);
-    assert.equal(error instanceof CredentialSecurityError, false);
-    return true;
-  });
+  assert.throws(
+    () => loadActiveSharedCredentialKeyring(),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.message, CREDENTIAL_ENCRYPTION_UNAVAILABLE);
+      assert.equal(error instanceof CredentialSecurityError, false);
+      return true;
+    },
+  );
 });
 
 test.after(() => setKeyring(keysBefore, activeBefore));

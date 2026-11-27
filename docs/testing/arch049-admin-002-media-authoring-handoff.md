@@ -21,7 +21,7 @@ READY record, the immutable object key is exactly the shop/role/digest key under
 `shop-brands/`, the derivative is JPEG/PNG with validated dimensions and size below
 5 MiB, and the origin is a configured, well-formed HTTPS **origin**. The selected
 role is a semantic binding; the particular preview shop and URL are not persisted
-in the template. ARCH-049-BACKGROUND-004 must independently verify the *destination*
+in the template. ARCH-049-BACKGROUND-004 must independently verify the _destination_
 shop's READY derivative again at send time and must never fall back to an original
 merchant URL when it is missing or stale.
 
@@ -33,7 +33,16 @@ component with `format: "IMAGE"`; the stored immutable registration binding
 contains exactly:
 
 ```json
-{"schemaVersion":1,"headerMediaRole":"LOGO","header":[],"body":[{"position":1,"variable":"customer.firstName"},{"position":2,"variable":"shop.name"}],"buttons":[]}
+{
+  "schemaVersion": 1,
+  "headerMediaRole": "LOGO",
+  "header": [],
+  "body": [
+    { "position": 1, "variable": "customer.firstName" },
+    { "position": 2, "variable": "shop.name" }
+  ],
+  "buttons": []
+}
 ```
 
 `headerMediaRole` is one of `LOGO`, `SQUARE_LOGO`, `COVER_IMAGE`. TEXT headers do not
@@ -79,7 +88,7 @@ reproduce real user interaction or layout.
 
 ## Review notes
 
-- Source of truth for ARCH-049 task status is the *parent* task-file YAML; the
+- Source of truth for ARCH-049 task status is the _parent_ task-file YAML; the
   implementation patch does not mark its own task Complete.
 - Do not implement Meta media-upload mechanics or Background send-time verification
   in this Admin task. Those require their own owning boundaries and validation.

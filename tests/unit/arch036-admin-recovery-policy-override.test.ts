@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PrismaClient } from "@prisma/client";
-import {
-  saveTenantRecoveryPolicyOverride,
-} from "../../src/lib/admin/recovery-policy-override";
+import { saveTenantRecoveryPolicyOverride } from "../../src/lib/admin/recovery-policy-override";
 import type { RecoveryPolicySnapshot } from "../../src/lib/admin/recovery-policy";
 
 const now = new Date("2026-11-02T12:00:00.000Z");
@@ -16,17 +14,19 @@ const policy: RecoveryPolicySnapshot = {
   followUpDelayMinutes: null,
 };
 
-function makeFixture(options: {
-  platform?: "SHOPIFY" | "WOOCOMMERCE";
-  catalogueStatus?: string;
-  catalogueGeneration?: number;
-  discountShopId?: string;
-  discountPlatform?: "SHOPIFY" | "WOOCOMMERCE";
-  discountSelected?: boolean;
-  lastSeenSyncGeneration?: number;
-  failAudit?: boolean;
-  failOverrideWrite?: boolean;
-} = {}) {
+function makeFixture(
+  options: {
+    platform?: "SHOPIFY" | "WOOCOMMERCE";
+    catalogueStatus?: string;
+    catalogueGeneration?: number;
+    discountShopId?: string;
+    discountPlatform?: "SHOPIFY" | "WOOCOMMERCE";
+    discountSelected?: boolean;
+    lastSeenSyncGeneration?: number;
+    failAudit?: boolean;
+    failOverrideWrite?: boolean;
+  } = {},
+) {
   const committed = {
     override: {
       shopId: "shop-1",
@@ -44,7 +44,8 @@ function makeFixture(options: {
   let isolationLevel: string | undefined;
 
   const shop = { id: "shop-1", platform: options.platform ?? "WOOCOMMERCE" };
-  const isWooDiscount = (options.discountPlatform ?? "WOOCOMMERCE") === "WOOCOMMERCE";
+  const isWooDiscount =
+    (options.discountPlatform ?? "WOOCOMMERCE") === "WOOCOMMERCE";
   const discount = {
     id: "discount-1",
     shopId: options.discountShopId ?? "shop-1",
@@ -88,7 +89,8 @@ function makeFixture(options: {
         shopifyDiscount: {
           findFirst: async (query: unknown) => {
             queries.push({ kind: "discount", query });
-            const where = (query as { where: { id: string; shopId: string } }).where;
+            const where = (query as { where: { id: string; shopId: string } })
+              .where;
             return where.id === discount.id && where.shopId === discount.shopId
               ? discount
               : null;
@@ -101,7 +103,8 @@ function makeFixture(options: {
           },
           upsert: async (query: unknown) => {
             queries.push({ kind: "override-write", query });
-            if (options.failOverrideWrite) throw new Error("override write failed");
+            if (options.failOverrideWrite)
+              throw new Error("override write failed");
             const values = query as { create: Record<string, unknown> };
             working.override = values.create;
           },
@@ -110,7 +113,9 @@ function makeFixture(options: {
           create: async (query: unknown) => {
             queries.push({ kind: "audit-write", query });
             if (options.failAudit) throw new Error("audit write failed");
-            working.audits.push((query as { data: Record<string, unknown> }).data);
+            working.audits.push(
+              (query as { data: Record<string, unknown> }).data,
+            );
           },
         },
       };
@@ -131,7 +136,11 @@ function makeFixture(options: {
   };
 }
 
-function input(overrides: Partial<Parameters<typeof saveTenantRecoveryPolicyOverride>[1]> = {}) {
+function input(
+  overrides: Partial<
+    Parameters<typeof saveTenantRecoveryPolicyOverride>[1]
+  > = {},
+) {
   return {
     shopId: "shop-1",
     policy,
@@ -146,14 +155,24 @@ test("FIXED override accepts an unchecked valid Woo coupon and writes an audited
   const fixture = makeFixture();
   await saveTenantRecoveryPolicyOverride(fixture.database, input());
 
-  assert.equal(fixture.committed.override?.fixedShopifyDiscountId, "discount-1");
+  assert.equal(
+    fixture.committed.override?.fixedShopifyDiscountId,
+    "discount-1",
+  );
   assert.equal(fixture.committed.override?.updatedByPlatformAdminId, "admin-1");
   assert.equal(fixture.committed.audits.length, 1);
   assert.equal(fixture.committed.audits[0]?.platformAdminId, "admin-1");
-  assert.equal(fixture.committed.audits[0]?.reason, "approved recovery override");
+  assert.equal(
+    fixture.committed.audits[0]?.reason,
+    "approved recovery override",
+  );
   assert.equal(fixture.isolationLevel, "Serializable");
   assert.deepEqual(
-    (fixture.queries.find((entry) => entry.kind === "discount")?.query as { where: unknown }).where,
+    (
+      fixture.queries.find((entry) => entry.kind === "discount")?.query as {
+        where: unknown;
+      }
+    ).where,
     { id: "discount-1", shopId: "shop-1" },
   );
 });
@@ -171,7 +190,10 @@ test("stale or foreign-Shop choices are rejected before audit or override writes
       /discount catalogue must be current|current\/selectable/,
     );
     assert.equal(fixture.committed.audits.length, 0);
-    assert.equal(fixture.queries.some((entry) => entry.kind === "override-write"), false);
+    assert.equal(
+      fixture.queries.some((entry) => entry.kind === "override-write"),
+      false,
+    );
   }
 });
 
@@ -186,7 +208,10 @@ test("Shopify override rejects a Woo provider row even when it is marked availab
     /current\/selectable/,
   );
   assert.equal(fixture.committed.audits.length, 0);
-  assert.equal(fixture.queries.some((entry) => entry.kind === "override-write"), false);
+  assert.equal(
+    fixture.queries.some((entry) => entry.kind === "override-write"),
+    false,
+  );
 });
 
 test("audit and override writes roll back together when the override write fails", async () => {
@@ -200,7 +225,10 @@ test("audit and override writes roll back together when the override write fails
 
   assert.deepEqual(fixture.committed.override, originalOverride);
   assert.deepEqual(fixture.committed.audits, []);
-  assert.equal(fixture.queries.some((entry) => entry.kind === "audit-write"), true);
+  assert.equal(
+    fixture.queries.some((entry) => entry.kind === "audit-write"),
+    true,
+  );
 });
 
 test("audit failure propagates without changing the existing override", async () => {
@@ -214,5 +242,8 @@ test("audit failure propagates without changing the existing override", async ()
 
   assert.deepEqual(fixture.committed.override, originalOverride);
   assert.deepEqual(fixture.committed.audits, []);
-  assert.equal(fixture.queries.some((entry) => entry.kind === "override-write"), false);
+  assert.equal(
+    fixture.queries.some((entry) => entry.kind === "override-write"),
+    false,
+  );
 });

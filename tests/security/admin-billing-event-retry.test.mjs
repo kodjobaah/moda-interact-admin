@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { test } from "node:test";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 
 async function source(relative) {
   return readFile(path.join(root, relative), "utf8");
@@ -22,8 +25,14 @@ test("App Event retry is SUPER_ADMIN-only, worker-owned, audited and identity pr
   assert.match(action, /shopifyReportState: ShopifyReportState\.RETRYABLE/);
   assert.match(action, /nextReportAt: now/);
 
-  const mutation = action.slice(action.indexOf("transaction.usageEvent.updateMany"), action.indexOf("transaction.billingAuditEvent.create"));
-  assert.doesNotMatch(mutation, /quantity:\s*|occurredAt:\s*|shopifyEventHandle:\s*|shopifyIdempotencyKey:\s*|idempotencyKey:\s*/);
+  const mutation = action.slice(
+    action.indexOf("transaction.usageEvent.updateMany"),
+    action.indexOf("transaction.billingAuditEvent.create"),
+  );
+  assert.doesNotMatch(
+    mutation,
+    /quantity:\s*|occurredAt:\s*|shopifyEventHandle:\s*|shopifyIdempotencyKey:\s*|idempotencyKey:\s*/,
+  );
   assert.doesNotMatch(action, /fetch\(|axios|api\.shopify\.com/);
 });
 
@@ -31,7 +40,10 @@ test("App Event retry uses compare-and-set state so repeated submits do not queu
   const action = await source("src/app/actions/billing-events.ts");
   assert.match(action, /event\.shopifyReportState !== expectedState/);
   assert.match(action, /event\.reportAttemptCount !== expectedAttemptCount/);
-  assert.match(action, /!sameDate\(event\.nextReportAt, expectedNextReportAt\)/);
+  assert.match(
+    action,
+    /!sameDate\(event\.nextReportAt, expectedNextReportAt\)/,
+  );
   assert.match(action, /reportAttemptCount: event\.reportAttemptCount/);
   assert.match(action, /nextReportAt: event\.nextReportAt/);
   assert.match(action, /if \(updated\.count !== 1\) return "stale"/);
@@ -52,7 +64,10 @@ test("App Event retry UI prevents double clicks and is shown only for retryable 
   assert.match(drawer, /event\.shopifyReportState === "NEEDS_ATTENTION"/);
   assert.match(drawer, /retryAlreadyDue/);
   assert.match(drawer, /billing\.retryEventQueuedHelp/);
-  assert.doesNotMatch(drawer, /event\.shopifyReportState === "REPORTED"[^?]*BillingEventRetryControl/s);
+  assert.doesNotMatch(
+    drawer,
+    /event\.shopifyReportState === "REPORTED"[^?]*BillingEventRetryControl/s,
+  );
   assert.match(page, /canRetry=\{principal\.role === "SUPER_ADMIN"\}/);
 });
 

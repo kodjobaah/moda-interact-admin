@@ -45,11 +45,8 @@ const ACTIVE_RUN_STATUSES = [
   MerchantPricingTranslationRunStatus.READY_TO_APPLY,
 ] as const;
 
-const DRAFT_PERSISTABLE_RUN_STATUSES:
-  readonly MerchantPricingTranslationRunStatus[] = [
-    ...ACTIVE_RUN_STATUSES,
-    MerchantPricingTranslationRunStatus.FAILED,
-  ];
+const DRAFT_PERSISTABLE_RUN_STATUSES: readonly MerchantPricingTranslationRunStatus[] =
+  [...ACTIVE_RUN_STATUSES, MerchantPricingTranslationRunStatus.FAILED];
 
 const TRANSACTION_OPTIONS = {
   isolationLevel: "Serializable" as const,
@@ -62,7 +59,8 @@ export const MERCHANT_PRICING_TRANSLATION_ERRORS = {
   automaticNotConfigured:
     "Automatic translation is not configured. Choose an automatic-default translation model in System Controls / Translations.",
   planNotFound: "MerchantPricing plan was not found.",
-  planHandleMismatch: "MerchantPricing plan handle does not match the current draft.",
+  planHandleMismatch:
+    "MerchantPricing plan handle does not match the current draft.",
   existingPlanIdRequired:
     "An existing MerchantPricing plan must be edited using its plan id.",
   runNotFound: "Merchant Pricing translation run was not found.",
@@ -126,22 +124,23 @@ async function resolveAutomaticModel(
   transaction: TranslationDb,
   environment: CommerceEnvironment,
 ) {
-  const model = await transaction.commerceTranslationModelConfiguration.findFirst({
-    where: {
-      environment,
-      provider: TRANSLATION_PROVIDER,
-      enabled: true,
-      automaticDefault: true,
-    },
-    select: {
-      id: true,
-      provider: true,
-      providerModelId: true,
-      displayName: true,
-      editVersion: true,
-      credential: { select: { id: true } },
-    },
-  });
+  const model =
+    await transaction.commerceTranslationModelConfiguration.findFirst({
+      where: {
+        environment,
+        provider: TRANSLATION_PROVIDER,
+        enabled: true,
+        automaticDefault: true,
+      },
+      select: {
+        id: true,
+        provider: true,
+        providerModelId: true,
+        displayName: true,
+        editVersion: true,
+        credential: { select: { id: true } },
+      },
+    });
   if (!model?.credential) {
     throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.automaticNotConfigured);
   }
@@ -154,7 +153,9 @@ function exactEnglish<T extends { locale: string }>(
 ): T {
   const row = rows.find((candidate) => candidate.locale === "en");
   if (!row) {
-    throw new Error(`${label} does not contain the required English translation.`);
+    throw new Error(
+      `${label} does not contain the required English translation.`,
+    );
   }
   return row;
 }
@@ -170,7 +171,9 @@ async function existingTranslationState(
       select: { id: true },
     });
     if (existing) {
-      throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.existingPlanIdRequired);
+      throw new Error(
+        MERCHANT_PRICING_TRANSLATION_ERRORS.existingPlanIdRequired,
+      );
     }
     return undefined;
   }
@@ -197,7 +200,8 @@ async function existingTranslationState(
       },
     },
   });
-  if (!existing) throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.planNotFound);
+  if (!existing)
+    throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.planNotFound);
   if (existing.shopifyPlanHandle !== shopifyPlanHandle) {
     throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.planHandleMismatch);
   }
@@ -318,7 +322,8 @@ function countsForItems(
     status: MerchantPricingTranslationItemStatus;
   }>,
 ) {
-  const expectedPerLocale = merchantPricingTranslationExpectedItemsPerLocale(source);
+  const expectedPerLocale =
+    merchantPricingTranslationExpectedItemsPerLocale(source);
   const byLocale = new Map<string, { total: number; available: number }>();
   let pendingItemCount = 0;
   let failedItemCount = 0;
@@ -340,26 +345,27 @@ function countsForItems(
   const completeLocaleCount = MERCHANT_PRICING_LOCALES.filter((locale) => {
     const value = byLocale.get(locale);
     return (
-      value?.total === expectedPerLocale && value.available === expectedPerLocale
+      value?.total === expectedPerLocale &&
+      value.available === expectedPerLocale
     );
   }).length;
   return { completeLocaleCount, pendingItemCount, failedItemCount };
 }
 
-async function statusViewFromRun(
-  run: {
-    id: string;
-    status: MerchantPricingTranslationRunStatus;
-    failureCode: string | null;
-    sourceSnapshot: Prisma.JsonValue;
-    translationModel: { displayName: string };
-    items: Array<{
-      targetLanguageTag: string;
-      status: MerchantPricingTranslationItemStatus;
-    }>;
-  },
-): Promise<MerchantPricingTranslationRunStatusView> {
-  const source = parseMerchantPricingTranslationSourceSnapshot(run.sourceSnapshot);
+async function statusViewFromRun(run: {
+  id: string;
+  status: MerchantPricingTranslationRunStatus;
+  failureCode: string | null;
+  sourceSnapshot: Prisma.JsonValue;
+  translationModel: { displayName: string };
+  items: Array<{
+    targetLanguageTag: string;
+    status: MerchantPricingTranslationItemStatus;
+  }>;
+}): Promise<MerchantPricingTranslationRunStatusView> {
+  const source = parseMerchantPricingTranslationSourceSnapshot(
+    run.sourceSnapshot,
+  );
   const counts = countsForItems(source, run.items);
   return {
     runId: run.id,
@@ -513,7 +519,9 @@ export async function requestMerchantPricingTranslation(
   if (principal.role !== "SUPER_ADMIN") {
     throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.superAdminRequired);
   }
-  const merchantPricingPlanId = parseOptionalPlanId(rawInput.merchantPricingPlanId);
+  const merchantPricingPlanId = parseOptionalPlanId(
+    rawInput.merchantPricingPlanId,
+  );
   const source = canonicalMerchantPricingTranslationSource(rawInput);
   const sourceHash = merchantPricingTranslationSourceHash(source);
   const environment = resolveCommerceEnvironment() as CommerceEnvironment;
@@ -590,7 +598,9 @@ export async function requestMerchantPricingTranslation(
       durationMs: Date.now() - startedAt,
     });
     if (databaseCode(cause) === "P2034") {
-      throw new Error("Merchant Pricing translation state changed; retry the request.");
+      throw new Error(
+        "Merchant Pricing translation state changed; retry the request.",
+      );
     }
     if (databaseCode(cause) === "P2028") {
       throw new Error(MERCHANT_PRICING_TRANSLATION_ERRORS.requestTimedOut);
@@ -719,7 +729,10 @@ export async function ensureMerchantPricingTranslationRunForDraftSave(
   };
 }
 
-type ReadyPackageDb = Pick<Prisma.TransactionClient, "merchantPricingTranslationRun">;
+type ReadyPackageDb = Pick<
+  Prisma.TransactionClient,
+  "merchantPricingTranslationRun"
+>;
 
 function itemIdentity(item: {
   sourceEntityKind: MerchantPricingTranslationEntityKind;

@@ -35,8 +35,8 @@ export function validateMerchantKnowledgeConfiguration(
   }
 
   const activePairKeys = new Set(
-    activePairs.map(({ purposeKey, dataFormatKey }) =>
-      `${purposeKey}\u001f${dataFormatKey}`,
+    activePairs.map(
+      ({ purposeKey, dataFormatKey }) => `${purposeKey}\u001f${dataFormatKey}`,
     ),
   );
   if (
@@ -115,11 +115,11 @@ export function buildDesiredPlanFeatures({
     if (featureId === merchantKnowledgeFeatureId) {
       return {
         featureId,
-        configuration:
-          merchantKnowledgeConfiguration as Prisma.InputJsonValue,
+        configuration: merchantKnowledgeConfiguration as Prisma.InputJsonValue,
       };
     }
-    const existingConfiguration = existingByFeatureId.get(featureId)?.configuration;
+    const existingConfiguration =
+      existingByFeatureId.get(featureId)?.configuration;
     return {
       featureId,
       configuration:

@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { test } from "node:test";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const read = (file) => readFile(path.join(root, file), "utf8");
 
 test("tenant details separate overview, recovery settings, logs, and billing", async () => {
@@ -32,7 +35,9 @@ test("overview keeps mutations behind progressive disclosure", async () => {
 });
 
 test("recovery settings present effective state before the override editor", async () => {
-  const recovery = await read("src/components/admin/tenant-recovery-settings.tsx");
+  const recovery = await read(
+    "src/components/admin/tenant-recovery-settings.tsx",
+  );
 
   assert.match(recovery, /tenant\.effectiveRecoveryPolicy/);
   assert.match(recovery, /policy\.effective\.source/);

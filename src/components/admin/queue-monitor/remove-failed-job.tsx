@@ -33,8 +33,13 @@ export function RemoveFailedJob({ job, onRemoved }: Props) {
         }),
       });
       if (!response.ok) {
-        setError(adminI18n.t(response.status === 409 || response.status === 404
-          ? "queue.removeFailedJobConflict" : "queue.removeFailedJobError"));
+        setError(
+          adminI18n.t(
+            response.status === 409 || response.status === 404
+              ? "queue.removeFailedJobConflict"
+              : "queue.removeFailedJobError",
+          ),
+        );
         return;
       }
       onRemoved();
@@ -46,10 +51,20 @@ export function RemoveFailedJob({ job, onRemoved }: Props) {
   }
 
   return (
-    <section className="mt-5 border-t border-gray-200 pt-5" aria-label={adminI18n.t("queue.removeFailedJob")}>
-      <h5 className="text-sm font-semibold text-red-800">{adminI18n.t("queue.removeFailedJob")}</h5>
-      <p className="mt-1 text-xs text-gray-600">{adminI18n.t("queue.removeFailedJobHint")}</p>
-      <label className="mt-3 block text-xs font-medium text-gray-700" htmlFor="queue-remove-confirm-job-id">
+    <section
+      className="mt-5 border-t border-gray-200 pt-5"
+      aria-label={adminI18n.t("queue.removeFailedJob")}
+    >
+      <h5 className="text-sm font-semibold text-red-800">
+        {adminI18n.t("queue.removeFailedJob")}
+      </h5>
+      <p className="mt-1 text-xs text-gray-600">
+        {adminI18n.t("queue.removeFailedJobHint")}
+      </p>
+      <label
+        className="mt-3 block text-xs font-medium text-gray-700"
+        htmlFor="queue-remove-confirm-job-id"
+      >
         {adminI18n.t("queue.confirmJobId")}
       </label>
       <input
@@ -66,9 +81,15 @@ export function RemoveFailedJob({ job, onRemoved }: Props) {
         disabled={job.status !== "failed" || pending || confirmation !== job.id}
         onClick={() => void submit()}
       >
-        {pending ? adminI18n.t("queue.removingJob") : adminI18n.t("queue.removeFailedJob")}
+        {pending
+          ? adminI18n.t("queue.removingJob")
+          : adminI18n.t("queue.removeFailedJob")}
       </button>
-      {error ? <p role="alert" className="mt-2 text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

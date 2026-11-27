@@ -74,10 +74,7 @@ test("taxonomy sync streams bounded child progress through the shared logger", a
     source("scripts/sync-shopify-taxonomy.mjs"),
   ]);
 
-  assert.match(
-    management,
-    /@modainteract\/moda-interact-shared\/logging/,
-  );
+  assert.match(management, /@modainteract\/moda-interact-shared\/logging/);
   assert.match(management, /admin\.reference_taxonomy\.sync\.progress/);
   assert.match(management, /stdoutRelay\.write\(chunk\)/);
   assert.match(management, /stderrRelay\.write\(chunk\)/);

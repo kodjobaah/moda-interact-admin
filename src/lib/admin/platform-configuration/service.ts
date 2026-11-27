@@ -1,9 +1,20 @@
 import { requireConfigurationSuperAdmin } from "./configuration-authorization";
-import { readRoutingPromptOptions, publishRoutingPromptWithDependencies } from "./routing-agent-prompts";
+import {
+  readRoutingPromptOptions,
+  publishRoutingPromptWithDependencies,
+} from "./routing-agent-prompts";
 import { prisma } from "@/lib/prisma";
-import { requirePlatformAdminMutation, requirePlatformAdminRead, type PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
+import {
+  requirePlatformAdminMutation,
+  requirePlatformAdminRead,
+  type PlatformAdminPrincipal,
+} from "@/lib/auth/platform-admin";
 import { getConfigurationEnvironment } from "./environment";
-import { PLATFORM_POLICY_REGISTRY, publicContracts, type Registry } from "./contracts";
+import {
+  PLATFORM_POLICY_REGISTRY,
+  publicContracts,
+  type Registry,
+} from "./contracts";
 import { ConfigurationError } from "./errors";
 import { readConfiguration, readConfigurationHistory } from "./repository";
 import { mutateConfigurationWithDependencies } from "./mutate";
@@ -13,9 +24,14 @@ export { getConfigurationEnvironment };
 export { requireConfigurationSuperAdmin } from "./configuration-authorization";
 
 function policy(key: unknown, registry: Registry) {
-  if (typeof key !== "string") throw new ConfigurationError("INVALID_INPUT", "Unsupported policy key.");
+  if (typeof key !== "string")
+    throw new ConfigurationError("INVALID_INPUT", "Unsupported policy key.");
   const contract = registry.get(key);
-  if (!contract || contract.kind !== "policy" || contract.requiredRole !== "SUPER_ADMIN") {
+  if (
+    !contract ||
+    contract.kind !== "policy" ||
+    contract.requiredRole !== "SUPER_ADMIN"
+  ) {
     throw new ConfigurationError("INVALID_INPUT", "Unsupported policy key.");
   }
   return contract;
@@ -23,8 +39,15 @@ function policy(key: unknown, registry: Registry) {
 /** Only a real persisted active SUPER_ADMIN may be recorded in the audit. */
 async function authorId(principal: PlatformAdminPrincipal): Promise<string> {
   if (!principal.developmentBypass) return principal.id;
-  const admin = await prisma.platformAdmin.findFirst({ where: { role: "SUPER_ADMIN", active: true }, select: { id: true } });
-  if (!admin) throw new ConfigurationError("FORBIDDEN", "Provision an active SUPER_ADMIN account before editing policies.");
+  const admin = await prisma.platformAdmin.findFirst({
+    where: { role: "SUPER_ADMIN", active: true },
+    select: { id: true },
+  });
+  if (!admin)
+    throw new ConfigurationError(
+      "FORBIDDEN",
+      "Provision an active SUPER_ADMIN account before editing policies.",
+    );
   return admin.id;
 }
 
@@ -33,23 +56,52 @@ export async function configurationPageData(key: unknown, cursor?: string) {
   requireConfigurationSuperAdmin(principal);
   const env = getConfigurationEnvironment();
   const selected = policy(key, PLATFORM_POLICY_REGISTRY);
-  const snapshot = await readConfiguration(prisma, env, selected.key, PLATFORM_POLICY_REGISTRY);
-  const history = await readConfigurationHistory(prisma, env, selected.key, cursor);
-  return { contracts: publicContracts(), snapshot, history, environment: env,
-    ...(selected.key === "recovery.routingAgent" ? { routingPrompts: await readRoutingPromptOptions(prisma) } : {}),
+  const snapshot = await readConfiguration(
+    prisma,
+    env,
+    selected.key,
+    PLATFORM_POLICY_REGISTRY,
+  );
+  const history = await readConfigurationHistory(
+    prisma,
+    env,
+    selected.key,
+    cursor,
+  );
+  return {
+    contracts: publicContracts(),
+    snapshot,
+    history,
+    environment: env,
+    ...(selected.key === "recovery.routingAgent"
+      ? { routingPrompts: await readRoutingPromptOptions(prisma) }
+      : {}),
   };
 }
 export async function readPlatformConfiguration(key: unknown) {
   const principal = await requirePlatformAdminRead();
   requireConfigurationSuperAdmin(principal);
   const env = getConfigurationEnvironment();
-  return readConfiguration(prisma, env, policy(key, PLATFORM_POLICY_REGISTRY).key, PLATFORM_POLICY_REGISTRY);
+  return readConfiguration(
+    prisma,
+    env,
+    policy(key, PLATFORM_POLICY_REGISTRY).key,
+    PLATFORM_POLICY_REGISTRY,
+  );
 }
-export async function listPlatformConfigurationAudit(key: unknown, cursor?: string) {
+export async function listPlatformConfigurationAudit(
+  key: unknown,
+  cursor?: string,
+) {
   const principal = await requirePlatformAdminRead();
   requireConfigurationSuperAdmin(principal);
   const env = getConfigurationEnvironment();
-  return readConfigurationHistory(prisma, env, policy(key, PLATFORM_POLICY_REGISTRY).key, cursor);
+  return readConfigurationHistory(
+    prisma,
+    env,
+    policy(key, PLATFORM_POLICY_REGISTRY).key,
+    cursor,
+  );
 }
 
 export async function updatePlatformConfiguration(input: unknown) {
@@ -64,12 +116,21 @@ async function authorizedMutation(input: unknown, operation: "save" | "reset") {
   const environment = getConfigurationEnvironment();
   const actorId = await authorId(principal);
   return mutateConfigurationWithDependencies(input, operation, {
-    principal, environment, actorId, db: prisma, registry: PLATFORM_POLICY_REGISTRY,
+    principal,
+    environment,
+    actorId,
+    db: prisma,
+    registry: PLATFORM_POLICY_REGISTRY,
   });
 }
 
 export async function publishRoutingPrompt(input: unknown) {
   const principal = await requirePlatformAdminMutation();
   requireConfigurationSuperAdmin(principal);
-  return publishRoutingPromptWithDependencies(input, { principal, actorId: await authorId(principal), environment: getConfigurationEnvironment(), db: prisma });
+  return publishRoutingPromptWithDependencies(input, {
+    principal,
+    actorId: await authorId(principal),
+    environment: getConfigurationEnvironment(),
+    db: prisma,
+  });
 }

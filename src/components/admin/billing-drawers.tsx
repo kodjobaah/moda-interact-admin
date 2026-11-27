@@ -3,7 +3,11 @@ import type {
   RecoveryCreditPurchaseItem,
 } from "@/lib/admin/types";
 import type { Feature } from "@prisma/client";
-import { adminBillingPackStatusLabel, adminBillingReportStateLabel, adminI18n } from "@/i18n";
+import {
+  adminBillingPackStatusLabel,
+  adminBillingReportStateLabel,
+  adminI18n,
+} from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { AdminDetailDrawer } from "./admin-detail-drawer";
 import { BillingEventRetryControl } from "./billing-event-retry-control";
@@ -13,7 +17,10 @@ import type { MerchantKnowledgeSourceTypeOption } from "@/lib/admin/merchant/pri
 import type { MerchantPricingPlanModelOption } from "@/lib/admin/merchant/pricing-plan-model";
 import { LivePlanPolicyControls } from "./commerce-model-policy/live-plan-policy";
 import type { CommerceModelBudget } from "@/lib/admin/commerce-model-policy-fields";
-import type { LivePlanPolicyHistoryEntry, LivePlanPolicyView } from "@/lib/admin/commerce-model-plan-policy";
+import type {
+  LivePlanPolicyHistoryEntry,
+  LivePlanPolicyView,
+} from "@/lib/admin/commerce-model-plan-policy";
 
 function DetailList({
   items,
@@ -43,7 +50,11 @@ export function MerchantPricingPlanDrawer({
   merchantKnowledgeSourceTypes = [],
   commerceModelOptions = [],
   minimumUpgradePremiumBps = 2000,
-  planPolicy, createPlanPlatformPolicy = null, planPolicyHistory = [], planPolicyHistoryPage = 0, planPolicyHasMore = false,
+  planPolicy,
+  createPlanPlatformPolicy = null,
+  planPolicyHistory = [],
+  planPolicyHistoryPage = 0,
+  planPolicyHasMore = false,
   canEditPlanPolicy = false,
   params,
   register = false,
@@ -75,18 +86,27 @@ export function MerchantPricingPlanDrawer({
       closeHref={closeHref}
       size="wide"
     >
-      {plan && planPolicy ? <LivePlanPolicyControls
-        key={`${plan.id}:${planPolicy.editVersion}`}
-        policy={planPolicy}
-        history={planPolicyHistory}
-        page={planPolicyHistoryPage}
-        hasMore={planPolicyHasMore}
-        canEdit={canEditPlanPolicy}
-        historyBaseHref={withParamUpdates("/billing", params, {
-          view: "plans", section: "pricing", planId: plan.id, commercePlanHistoryPage: null,
-        })}
-      /> : null}
-      {!plan ? <p className="mb-4 rounded-md bg-gray-50 p-3 text-sm text-gray-600">Save the new Price Plan before setting optional CommerceAgent budgets.</p> : null}
+      {plan && planPolicy ? (
+        <LivePlanPolicyControls
+          key={`${plan.id}:${planPolicy.editVersion}`}
+          policy={planPolicy}
+          history={planPolicyHistory}
+          page={planPolicyHistoryPage}
+          hasMore={planPolicyHasMore}
+          canEdit={canEditPlanPolicy}
+          historyBaseHref={withParamUpdates("/billing", params, {
+            view: "plans",
+            section: "pricing",
+            planId: plan.id,
+            commercePlanHistoryPage: null,
+          })}
+        />
+      ) : null}
+      {!plan ? (
+        <p className="mb-4 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
+          Save the new Price Plan before setting optional CommerceAgent budgets.
+        </p>
+      ) : null}
       <MerchantPricingPlanBuilder
         plan={plan}
         planPolicy={planPolicy}
@@ -95,9 +115,15 @@ export function MerchantPricingPlanDrawer({
         planPolicyHistoryPage={planPolicyHistoryPage}
         planPolicyHasMore={planPolicyHasMore}
         canEditPlanPolicy={canEditPlanPolicy}
-        initialPolicyStep={Boolean(params.commercePlanPolicyTab) && Boolean(plan)}
+        initialPolicyStep={
+          Boolean(params.commercePlanPolicyTab) && Boolean(plan)
+        }
         policyHistoryBaseHref={withParamUpdates("/billing", params, {
-          view: "plans", section: "pricing", planId: plan?.id ?? null, commercePlanHistoryPage: null, commercePlanPolicyTab: "1",
+          view: "plans",
+          section: "pricing",
+          planId: plan?.id ?? null,
+          commercePlanHistoryPage: null,
+          commercePlanPolicyTab: "1",
         })}
         cataloguePlans={cataloguePlans}
         featureCatalogue={featureCatalogue}
@@ -160,7 +186,9 @@ export function RecoveryCreditPurchaseDrawer({
           [adminI18n.t("billing.quantity"), event?.quantity ?? null],
           [
             adminI18n.t("billing.reportStateLabel"),
-            event ? adminBillingReportStateLabel(event.shopifyReportState) : null,
+            event
+              ? adminBillingReportStateLabel(event.shopifyReportState)
+              : null,
           ],
           [
             adminI18n.t("billing.submittedAt"),
@@ -168,14 +196,20 @@ export function RecoveryCreditPurchaseDrawer({
               ? adminI18n.formatDateTime(event.reportedAt)
               : null,
           ],
-          [adminI18n.t("billing.reportAttempts"), event?.reportAttemptCount ?? null],
+          [
+            adminI18n.t("billing.reportAttempts"),
+            event?.reportAttemptCount ?? null,
+          ],
           [
             adminI18n.t("billing.lastReportAttemptAt"),
             event?.lastReportAttemptAt
               ? adminI18n.formatDateTime(event.lastReportAttemptAt)
               : null,
           ],
-          [adminI18n.t("billing.providerErrorCode"), event?.providerErrorCode ?? null],
+          [
+            adminI18n.t("billing.providerErrorCode"),
+            event?.providerErrorCode ?? null,
+          ],
           [
             adminI18n.t("billing.providerResponse"),
             event?.providerResponseSummary ?? null,

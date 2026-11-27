@@ -74,13 +74,19 @@ function requiredString(
   return result;
 }
 
-function parseHighlights(value: unknown): MerchantPricingTranslationHighlightSource[] {
+function parseHighlights(
+  value: unknown,
+): MerchantPricingTranslationHighlightSource[] {
   if (!Array.isArray(value)) {
     throw new Error("Merchant Pricing highlights are invalid.");
   }
   const seen = new Set<string>();
   return value.map((candidate, index) => {
-    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) {
+    if (
+      typeof candidate !== "object" ||
+      candidate === null ||
+      Array.isArray(candidate)
+    ) {
       throw new Error(`Merchant Pricing highlight ${index + 1} is invalid.`);
     }
     const row = candidate as Record<string, unknown>;
@@ -89,8 +95,13 @@ function parseHighlights(value: unknown): MerchantPricingTranslationHighlightSou
       `Merchant Pricing highlight ${index + 1} content key`,
       64,
     );
-    if (!CANONICAL_UUID.test(contentKey) || seen.has(contentKey.toLowerCase())) {
-      throw new Error(`Merchant Pricing highlight ${index + 1} content key is invalid.`);
+    if (
+      !CANONICAL_UUID.test(contentKey) ||
+      seen.has(contentKey.toLowerCase())
+    ) {
+      throw new Error(
+        `Merchant Pricing highlight ${index + 1} content key is invalid.`,
+      );
     }
     seen.add(contentKey.toLowerCase());
     return {
@@ -138,8 +149,12 @@ export function parseMerchantPricingTranslationSourceSnapshot(
     throw new Error("Merchant Pricing translation source snapshot is invalid.");
   }
   const row = value as Record<string, unknown>;
-  if (row.schemaVersion !== MERCHANT_PRICING_TRANSLATION_SOURCE_SCHEMA_VERSION) {
-    throw new Error("Merchant Pricing translation source snapshot version is invalid.");
+  if (
+    row.schemaVersion !== MERCHANT_PRICING_TRANSLATION_SOURCE_SCHEMA_VERSION
+  ) {
+    throw new Error(
+      "Merchant Pricing translation source snapshot version is invalid.",
+    );
   }
   return canonicalMerchantPricingTranslationSource({
     shopifyPlanHandle: row.shopifyPlanHandle,
@@ -173,7 +188,9 @@ function exactLocaleMap<T extends { locale: string }>(
 ): Map<MerchantPricingLocale, T> {
   const result = new Map<MerchantPricingLocale, T>();
   for (const row of rows) {
-    if (!MERCHANT_PRICING_LOCALES.includes(row.locale as MerchantPricingLocale)) {
+    if (
+      !MERCHANT_PRICING_LOCALES.includes(row.locale as MerchantPricingLocale)
+    ) {
       throw new Error(`${label} contains an unsupported locale.`);
     }
     const locale = row.locale as MerchantPricingLocale;
@@ -186,7 +203,9 @@ function exactLocaleMap<T extends { locale: string }>(
     result.size !== MERCHANT_PRICING_LOCALES.length ||
     MERCHANT_PRICING_LOCALES.some((locale) => !result.has(locale))
   ) {
-    throw new Error(`${label} does not contain the exact supported locale set.`);
+    throw new Error(
+      `${label} does not contain the exact supported locale set.`,
+    );
   }
   return result;
 }
@@ -211,7 +230,8 @@ function seed(
 ): MerchantPricingTranslationItemSeed {
   const retained = input.retainedByLocale?.get(locale);
   const immediatelyAvailable = locale === "en" || retained !== undefined;
-  const translatedText = retained ?? (locale === "en" ? input.sourceText : null);
+  const translatedText =
+    retained ?? (locale === "en" ? input.sourceText : null);
   return {
     sourceEntityKind: input.entityKind,
     sourceContentKey: input.contentKey,
@@ -233,7 +253,10 @@ export function buildMerchantPricingTranslationItemSeeds(input: {
   assertMerchantPricingLocaleRegistryMatchesShared();
   const previous = input.previous;
   const previousDescriptions = previous
-    ? exactLocaleMap(previous.translations, "Existing Merchant Pricing plan translations")
+    ? exactLocaleMap(
+        previous.translations,
+        "Existing Merchant Pricing plan translations",
+      )
     : null;
   const previousHighlights = new Map(
     (previous?.highlights ?? []).map((highlight) => [

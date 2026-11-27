@@ -14,10 +14,10 @@ export function isStoreCategoryTaxonomyReference(
 ): value is StoreCategoryTaxonomyReference {
   return Boolean(
     value &&
-      value.source === STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE &&
-      value.version.trim() &&
-      value.categoryId.trim() &&
-      value.name.trim() &&
-      value.fullName.trim(),
+    value.source === STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE &&
+    value.version.trim() &&
+    value.categoryId.trim() &&
+    value.name.trim() &&
+    value.fullName.trim(),
   );
 }

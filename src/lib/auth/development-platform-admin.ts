@@ -1,14 +1,14 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 
-import type { PlatformAdminPrincipal } from './platform-admin.ts';
+import type { PlatformAdminPrincipal } from "./platform-admin.ts";
 
 export const DEVELOPMENT_PLATFORM_ADMIN = {
-  id: 'development-platform-admin',
-  provider: 'development',
-  providerSubject: 'development-platform-admin',
-  email: 'development-platform-admin@local.invalid',
-  displayName: 'Development Platform Admin',
-  role: 'SUPER_ADMIN',
+  id: "development-platform-admin",
+  provider: "development",
+  providerSubject: "development-platform-admin",
+  email: "development-platform-admin@local.invalid",
+  displayName: "Development Platform Admin",
+  role: "SUPER_ADMIN",
   active: true,
 } as const;
 
@@ -63,7 +63,7 @@ export async function ensureDevelopmentPlatformAdmin(
     backing.active !== DEVELOPMENT_PLATFORM_ADMIN.active
   ) {
     throw new Error(
-      'The reserved development platform administrator identity conflicts with the database.',
+      "The reserved development platform administrator identity conflicts with the database.",
     );
   }
 }

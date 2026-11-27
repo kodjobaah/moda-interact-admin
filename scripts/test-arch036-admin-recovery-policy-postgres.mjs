@@ -117,12 +117,12 @@ try {
         `Kept disposable PostgreSQL container ${container} on 127.0.0.1:${mappedPort}`,
       );
     } else {
-    try {
-      docker(["rm", "--force", container]);
-    } catch (error) {
-      console.error("Disposable PostgreSQL cleanup failed", container, error);
-      process.exitCode = 1;
-    }
+      try {
+        docker(["rm", "--force", container]);
+      } catch (error) {
+        console.error("Disposable PostgreSQL cleanup failed", container, error);
+        process.exitCode = 1;
+      }
     }
   }
 }

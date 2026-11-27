@@ -7,7 +7,9 @@ const inputClass =
 type Controller = MerchantPricingPlanDraftController;
 
 type CataloguePlacementStepProps = {
-  cataloguePlans: Array<Pick<MerchantPricingPlanWithChildren, "id" | "displayName">>;
+  cataloguePlans: Array<
+    Pick<MerchantPricingPlanWithChildren, "id" | "displayName">
+  >;
   isEditing: boolean;
   cataloguePosition: number | null;
   planKind: Controller["draft"]["planKind"];
@@ -49,10 +51,7 @@ export function CataloguePlacementStep({
           </option>
         ) : (
           cataloguePlans.map((cataloguePlan) => (
-            <option
-              key={cataloguePlan.id}
-              value={`AFTER:${cataloguePlan.id}`}
-            >
+            <option key={cataloguePlan.id} value={`AFTER:${cataloguePlan.id}`}>
               After {cataloguePlan.displayName}
             </option>
           ))
@@ -60,8 +59,8 @@ export function CataloguePlacementStep({
       </select>
       {!isEditing && planKind === "FREE" && cataloguePlans.length ? (
         <p className="text-sm text-gray-600">
-          The FREE plan must be the first plan in the catalogue, so it will
-          be inserted before {cataloguePlans[0].displayName}.
+          The FREE plan must be the first plan in the catalogue, so it will be
+          inserted before {cataloguePlans[0].displayName}.
         </p>
       ) : null}
       {isEditing ? (

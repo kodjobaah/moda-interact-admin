@@ -73,7 +73,8 @@ function assertConditionalPrompt(
   });
   if (!validation.valid) {
     throw new Error(
-      validation.issues[0]?.message ?? "Conditional Store Category prompt is invalid.",
+      validation.issues[0]?.message ??
+        "Conditional Store Category prompt is invalid.",
     );
   }
 }
@@ -85,11 +86,7 @@ export async function getStoreCategoryCatalogue() {
   ]);
   await requirePlatformAdminRead();
   const categories = await prisma.commercePromptTemplateCategory.findMany({
-    orderBy: [
-      { displayOrder: "asc" },
-      { displayName: "asc" },
-      { id: "asc" },
-    ],
+    orderBy: [{ displayOrder: "asc" }, { displayName: "asc" }, { id: "asc" }],
     include: {
       defaultTemplate: {
         select: {
@@ -196,8 +193,6 @@ export type StoreCategoryCatalogue = Awaited<
   ReturnType<typeof getStoreCategoryCatalogue>
 >;
 
-
-
 export async function createStoreCategoryBundle(
   transaction: StoreCategoryTransaction,
   input: CreateStoreCategoryBundleInput,
@@ -217,7 +212,8 @@ export async function createStoreCategoryBundle(
       referenceTaxonomyVersion: input.category.referenceTaxonomy.version,
       referenceTaxonomyCategoryId: input.category.referenceTaxonomy.categoryId,
       referenceTaxonomyCategoryName: input.category.referenceTaxonomy.name,
-      referenceTaxonomyCategoryFullName: input.category.referenceTaxonomy.fullName,
+      referenceTaxonomyCategoryFullName:
+        input.category.referenceTaxonomy.fullName,
       enabled: false,
       editVersion: 1,
       createdByAdminId: actorAdminId,
@@ -241,14 +237,15 @@ export async function createStoreCategoryBundle(
     select: { id: true },
   });
 
-  const categoryUpdated = await transaction.commercePromptTemplateCategory.updateMany({
-    where: { id: category.id, editVersion: 1 },
-    data: {
-      defaultTemplateId: template.id,
-      editVersion: { increment: 1 },
-      updatedByAdminId: actorAdminId,
-    },
-  });
+  const categoryUpdated =
+    await transaction.commercePromptTemplateCategory.updateMany({
+      where: { id: category.id, editVersion: 1 },
+      data: {
+        defaultTemplateId: template.id,
+        editVersion: { increment: 1 },
+        updatedByAdminId: actorAdminId,
+      },
+    });
   if (categoryUpdated.count !== 1) stale("category");
 
   for (const mapping of input.shopifyMappings) {
@@ -345,10 +342,11 @@ export async function mutateStoreCategoryCatalogue(
 
   if (mutation.kind === "update-category") {
     const { input } = mutation;
-    const existing = await transaction.commercePromptTemplateCategory.findUnique({
-      where: { id: input.id },
-      include: { defaultTemplate: true },
-    });
+    const existing =
+      await transaction.commercePromptTemplateCategory.findUnique({
+        where: { id: input.id },
+        include: { defaultTemplate: true },
+      });
     if (!existing) missing("category");
     if (existing.editVersion !== input.expectedEditVersion) stale("category");
     if (!existing.enabled && input.enabled) {
@@ -363,17 +361,19 @@ export async function mutateStoreCategoryCatalogue(
         existing.displayOrder !== input.displayOrder;
       if (metadataChange) enabledCategoryImmutable();
     }
-    const updated = await transaction.commercePromptTemplateCategory.updateMany({
-      where: { id: input.id, editVersion: input.expectedEditVersion },
-      data: {
-        displayName: input.displayName,
-        description: input.description,
-        displayOrder: input.displayOrder,
-        enabled: input.enabled,
-        editVersion: { increment: 1 },
-        updatedByAdminId: actorAdminId,
+    const updated = await transaction.commercePromptTemplateCategory.updateMany(
+      {
+        where: { id: input.id, editVersion: input.expectedEditVersion },
+        data: {
+          displayName: input.displayName,
+          description: input.description,
+          displayOrder: input.displayOrder,
+          enabled: input.enabled,
+          editVersion: { increment: 1 },
+          updatedByAdminId: actorAdminId,
+        },
       },
-    });
+    );
     if (updated.count !== 1) stale("category");
     const action: CommerceAuditAction =
       existing.enabled && !input.enabled
@@ -390,19 +390,22 @@ export async function mutateStoreCategoryCatalogue(
 
   if (mutation.kind === "create-template") {
     const { input } = mutation;
-    const category = await transaction.commercePromptTemplateCategory.findUnique({
-      where: { id: input.categoryId },
-      select: {
-        id: true,
-        enabled: true,
-        taxonomyMappings: { select: { conditionKey: true } },
-      },
-    });
+    const category =
+      await transaction.commercePromptTemplateCategory.findUnique({
+        where: { id: input.categoryId },
+        select: {
+          id: true,
+          enabled: true,
+          taxonomyMappings: { select: { conditionKey: true } },
+        },
+      });
     if (!category) missing("category");
     if (category.enabled) enabledCategoryImmutable();
     const conditionKeys = category.taxonomyMappings.map((mapping) => {
       if (!mapping.conditionKey) {
-        throw new Error("Configure every mapping condition key before saving prompt templates.");
+        throw new Error(
+          "Configure every mapping condition key before saving prompt templates.",
+        );
       }
       return mapping.conditionKey;
     });
@@ -450,7 +453,9 @@ export async function mutateStoreCategoryCatalogue(
     if (existing.category.enabled) enabledCategoryImmutable();
     const conditionKeys = existing.category.taxonomyMappings.map((mapping) => {
       if (!mapping.conditionKey) {
-        throw new Error("Configure every mapping condition key before saving prompt templates.");
+        throw new Error(
+          "Configure every mapping condition key before saving prompt templates.",
+        );
       }
       return mapping.conditionKey;
     });
@@ -513,28 +518,43 @@ export async function mutateStoreCategoryCatalogue(
     >`SELECT "id", "editVersion" FROM "commerce"."CommercePromptTemplateCategory" WHERE "id" = ${input.categoryId} FOR UPDATE`;
     const lock = locked[0];
     if (!lock) missing("category");
-    if (lock.editVersion !== input.expectedCategoryEditVersion) stale("category");
-    const category = await transaction.commercePromptTemplateCategory.findUnique({
-      where: { id: input.categoryId },
-      select: { id: true, editVersion: true, enabled: true },
-    });
+    if (lock.editVersion !== input.expectedCategoryEditVersion)
+      stale("category");
+    const category =
+      await transaction.commercePromptTemplateCategory.findUnique({
+        where: { id: input.categoryId },
+        select: { id: true, editVersion: true, enabled: true },
+      });
     if (!category) missing("category");
-    if (category.editVersion !== input.expectedCategoryEditVersion) stale("category");
+    if (category.editVersion !== input.expectedCategoryEditVersion)
+      stale("category");
     if (category.enabled) enabledCategoryImmutable();
     const template = await transaction.commercePromptTemplate.findUnique({
       where: { id: input.templateId },
     });
-    if (!template || template.categoryId !== category.id || !template.enabled || !template.promptText.trim()) {
-      throw new Error("Default template must be enabled, non-empty, and belong to this category.");
+    if (
+      !template ||
+      template.categoryId !== category.id ||
+      !template.enabled ||
+      !template.promptText.trim()
+    ) {
+      throw new Error(
+        "Default template must be enabled, non-empty, and belong to this category.",
+      );
     }
-    const updated = await transaction.commercePromptTemplateCategory.updateMany({
-      where: { id: category.id, editVersion: input.expectedCategoryEditVersion },
-      data: {
-        defaultTemplateId: template.id,
-        editVersion: { increment: 1 },
-        updatedByAdminId: actorAdminId,
+    const updated = await transaction.commercePromptTemplateCategory.updateMany(
+      {
+        where: {
+          id: category.id,
+          editVersion: input.expectedCategoryEditVersion,
+        },
+        data: {
+          defaultTemplateId: template.id,
+          editVersion: { increment: 1 },
+          updatedByAdminId: actorAdminId,
+        },
       },
-    });
+    );
     if (updated.count !== 1) stale("category");
     await audit(transaction, {
       action: "UPDATE_PROMPT_TEMPLATE_CATEGORY",
@@ -549,10 +569,11 @@ export async function mutateStoreCategoryCatalogue(
 
   if (mutation.kind === "create-taxonomy-mapping") {
     const { input } = mutation;
-    const category = await transaction.commercePromptTemplateCategory.findUnique({
-      where: { id: input.categoryId },
-      select: { id: true, enabled: true },
-    });
+    const category =
+      await transaction.commercePromptTemplateCategory.findUnique({
+        where: { id: input.categoryId },
+        select: { id: true, enabled: true },
+      });
     if (!category) missing("category");
     if (category.enabled) enabledCategoryImmutable();
     await transaction.commerceStoreCategoryTaxonomyMapping.create({
@@ -588,32 +609,36 @@ export async function mutateStoreCategoryCatalogue(
 
   if (mutation.kind === "update-taxonomy-mapping") {
     const { input } = mutation;
-    const existing = await transaction.commerceStoreCategoryTaxonomyMapping.findUnique({
-      where: { id: input.id },
-      include: { category: { select: { enabled: true } } },
-    });
+    const existing =
+      await transaction.commerceStoreCategoryTaxonomyMapping.findUnique({
+        where: { id: input.id },
+        include: { category: { select: { enabled: true } } },
+      });
     if (!existing) missing("taxonomy mapping");
     if (existing.category.enabled) enabledCategoryImmutable();
     if (existing.editVersion !== input.expectedEditVersion) {
       throw new Error("Taxonomy mapping changed; reload and retry.");
     }
     if (existing.conditionKey && existing.conditionKey !== input.conditionKey) {
-      throw new Error("Mapping condition key is immutable after it is assigned.");
+      throw new Error(
+        "Mapping condition key is immutable after it is assigned.",
+      );
     }
     const changedFields = [
       existing.conditionKey !== input.conditionKey ? "conditionKey" : null,
       existing.displayName !== input.displayName ? "displayName" : null,
       existing.weight !== input.weight ? "weight" : null,
     ].filter((field): field is string => field !== null);
-    const updated = await transaction.commerceStoreCategoryTaxonomyMapping.updateMany({
-      where: { id: existing.id, editVersion: input.expectedEditVersion },
-      data: {
-        conditionKey: input.conditionKey,
-        displayName: input.displayName,
-        weight: input.weight,
-        editVersion: { increment: 1 },
-      },
-    });
+    const updated =
+      await transaction.commerceStoreCategoryTaxonomyMapping.updateMany({
+        where: { id: existing.id, editVersion: input.expectedEditVersion },
+        data: {
+          conditionKey: input.conditionKey,
+          displayName: input.displayName,
+          weight: input.weight,
+          editVersion: { increment: 1 },
+        },
+      });
     if (updated.count !== 1) {
       throw new Error("Taxonomy mapping changed; reload and retry.");
     }
@@ -632,24 +657,27 @@ export async function mutateStoreCategoryCatalogue(
   }
 
   const { input } = mutation;
-  const existing = await transaction.commerceStoreCategoryTaxonomyMapping.findUnique({
-    where: { id: input.id },
-    include: { category: { select: { enabled: true } } },
-  });
+  const existing =
+    await transaction.commerceStoreCategoryTaxonomyMapping.findUnique({
+      where: { id: input.id },
+      include: { category: { select: { enabled: true } } },
+    });
   if (!existing) missing("taxonomy mapping");
   if (existing.category.enabled) enabledCategoryImmutable();
   if (existing.editVersion !== input.expectedEditVersion) {
     throw new Error("Taxonomy mapping changed; reload and retry.");
   }
-  const deleted = await transaction.commerceStoreCategoryTaxonomyMapping.deleteMany({
-    where: {
-      id: existing.id,
-      categoryId: existing.categoryId,
-      shopifyTaxonomyCategoryId: existing.shopifyTaxonomyCategoryId,
-      editVersion: input.expectedEditVersion,
-    },
-  });
-  if (deleted.count !== 1) throw new Error("Taxonomy mapping changed; reload and retry.");
+  const deleted =
+    await transaction.commerceStoreCategoryTaxonomyMapping.deleteMany({
+      where: {
+        id: existing.id,
+        categoryId: existing.categoryId,
+        shopifyTaxonomyCategoryId: existing.shopifyTaxonomyCategoryId,
+        editVersion: input.expectedEditVersion,
+      },
+    });
+  if (deleted.count !== 1)
+    throw new Error("Taxonomy mapping changed; reload and retry.");
   await audit(transaction, {
     action: "UPDATE_PROMPT_TEMPLATE_CATEGORY",
     actorAdminId,

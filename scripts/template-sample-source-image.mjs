@@ -15,30 +15,66 @@ const SUPPORTED_INPUT_FORMATS = new Set(["png", "jpeg", "webp"]);
 // Preserve that region for the square example; keep the whole source for the
 // horizontal logo preview, and fill the cover area for the hero example.
 export const SINGLE_SOURCE_PRESETS = Object.freeze({
-  LOGO: Object.freeze({ width: 1200, height: 630, fit: "contain", position: "centre" }),
-  SQUARE_LOGO: Object.freeze({ width: 512, height: 512, fit: "cover", position: "northwest" }),
-  COVER_IMAGE: Object.freeze({ width: 1200, height: 630, fit: "cover", position: "centre" }),
+  LOGO: Object.freeze({
+    width: 1200,
+    height: 630,
+    fit: "contain",
+    position: "centre",
+  }),
+  SQUARE_LOGO: Object.freeze({
+    width: 512,
+    height: 512,
+    fit: "cover",
+    position: "northwest",
+  }),
+  COVER_IMAGE: Object.freeze({
+    width: 1200,
+    height: 630,
+    fit: "cover",
+    position: "centre",
+  }),
 });
 
 export async function deriveTemplateSamplesFromSource(sourceBytes) {
-  if (!Buffer.isBuffer(sourceBytes) || sourceBytes.length === 0 || sourceBytes.length > MAX_SOURCE_BYTES) {
-    throw new Error("--source-image must be a non-empty image file of at most 20 MiB.");
+  if (
+    !Buffer.isBuffer(sourceBytes) ||
+    sourceBytes.length === 0 ||
+    sourceBytes.length > MAX_SOURCE_BYTES
+  ) {
+    throw new Error(
+      "--source-image must be a non-empty image file of at most 20 MiB.",
+    );
   }
 
   let metadata;
   try {
-    metadata = await sharp(sourceBytes, { limitInputPixels: MAX_SOURCE_PIXELS, failOn: "error" }).metadata();
+    metadata = await sharp(sourceBytes, {
+      limitInputPixels: MAX_SOURCE_PIXELS,
+      failOn: "error",
+    }).metadata();
   } catch (error) {
-    throw new Error(`Could not decode --source-image: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Could not decode --source-image: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
-  if (!SUPPORTED_INPUT_FORMATS.has(metadata.format) || !metadata.width || !metadata.height ||
-      metadata.width * metadata.height > MAX_SOURCE_PIXELS || (metadata.pages ?? 1) !== 1) {
-    throw new Error("--source-image must be a single-frame PNG, JPEG or WebP with at most 40 million pixels.");
+  if (
+    !SUPPORTED_INPUT_FORMATS.has(metadata.format) ||
+    !metadata.width ||
+    !metadata.height ||
+    metadata.width * metadata.height > MAX_SOURCE_PIXELS ||
+    (metadata.pages ?? 1) !== 1
+  ) {
+    throw new Error(
+      "--source-image must be a single-frame PNG, JPEG or WebP with at most 40 million pixels.",
+    );
   }
 
   const result = {};
   for (const [role, preset] of Object.entries(SINGLE_SOURCE_PRESETS)) {
-    const bytes = await sharp(sourceBytes, { limitInputPixels: MAX_SOURCE_PIXELS, failOn: "error" })
+    const bytes = await sharp(sourceBytes, {
+      limitInputPixels: MAX_SOURCE_PIXELS,
+      failOn: "error",
+    })
       .rotate()
       .resize(preset.width, preset.height, {
         fit: preset.fit,
@@ -50,10 +86,15 @@ export async function deriveTemplateSamplesFromSource(sourceBytes) {
       .toBuffer();
 
     if (bytes.length > MAX_OUTPUT_BYTES) {
-      throw new Error(`Derived ${role} is larger than 4 MiB; use a smaller/simpler source image.`);
+      throw new Error(
+        `Derived ${role} is larger than 4 MiB; use a smaller/simpler source image.`,
+      );
     }
     const dimensions = inspectPng(bytes);
-    if (dimensions.width !== preset.width || dimensions.height !== preset.height) {
+    if (
+      dimensions.width !== preset.width ||
+      dimensions.height !== preset.height
+    ) {
       throw new Error(`Derived ${role} has unexpected dimensions.`);
     }
     result[role] = { bytes, ...dimensions };

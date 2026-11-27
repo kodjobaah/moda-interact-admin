@@ -72,7 +72,8 @@ export function PromotionCampaignForm({
   shops: { id: string; domain: string }[];
 }) {
   const persistedEnglishTitle = campaign?.englishMerchantTitle ?? "";
-  const persistedEnglishDescription = campaign?.englishMerchantDescription ?? "";
+  const persistedEnglishDescription =
+    campaign?.englishMerchantDescription ?? "";
   const [scope, setScope] = useState<PromotionScope>(
     campaign?.scope ?? "GLOBAL",
   );
@@ -88,8 +89,8 @@ export function PromotionCampaignForm({
   const editable = !campaign || campaign.status === "DRAFT";
   const sourceMatchesPersisted = Boolean(
     campaign &&
-      merchantTitle.trim() === persistedEnglishTitle.trim() &&
-      merchantDescription.trim() === persistedEnglishDescription.trim(),
+    merchantTitle.trim() === persistedEnglishTitle.trim() &&
+    merchantDescription.trim() === persistedEnglishDescription.trim(),
   );
   const translationsRetained = Boolean(
     campaign && sourceMatchesPersisted && campaign.translationCount === 20,
@@ -107,15 +108,15 @@ export function PromotionCampaignForm({
   });
   const uploadedTranslationMatchesCurrent = Boolean(
     translationResult?.valid &&
-      translationResult.package &&
-      translationResult.package._meta.campaignId ===
-        translationTemplate._meta.campaignId &&
-      translationResult.package._meta.campaignInternalName ===
-        translationTemplate._meta.campaignInternalName &&
-      translationResult.package._meta.sourceMerchantTitle ===
-        translationTemplate._meta.sourceMerchantTitle &&
-      translationResult.package._meta.sourceMerchantDescription ===
-        translationTemplate._meta.sourceMerchantDescription,
+    translationResult.package &&
+    translationResult.package._meta.campaignId ===
+      translationTemplate._meta.campaignId &&
+    translationResult.package._meta.campaignInternalName ===
+      translationTemplate._meta.campaignInternalName &&
+    translationResult.package._meta.sourceMerchantTitle ===
+      translationTemplate._meta.sourceMerchantTitle &&
+    translationResult.package._meta.sourceMerchantDescription ===
+      translationTemplate._meta.sourceMerchantDescription,
   );
   const translationsReady =
     translationsRetained || uploadedTranslationMatchesCurrent;
@@ -153,7 +154,11 @@ export function PromotionCampaignForm({
         value={campaign ? "update" : "create"}
       />
       {campaign ? <input type="hidden" name="id" value={campaign.id} /> : null}
-      <input type="hidden" name="translationJson" value={validTranslationJson} />
+      <input
+        type="hidden"
+        name="translationJson"
+        value={validTranslationJson}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-gray-700 sm:col-span-2">
           Internal campaign name

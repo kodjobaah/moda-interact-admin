@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { createLogger } from "@modainteract/moda-interact-shared/logging";
-import { CommerceEmbeddingPurpose, type CommerceEnvironment } from "@prisma/client";
+import {
+  CommerceEmbeddingPurpose,
+  type CommerceEnvironment,
+} from "@prisma/client";
 import Redis from "ioredis";
 
 import { resolveDeploymentEnvironmentName } from "../auth/environment.ts";
@@ -282,9 +285,15 @@ function createSyncOutputRelay(syncRunId: string, stream: SyncOutputStream) {
 
     const fields = { syncRunId, stream, message };
     if (stream === "stderr") {
-      taxonomyIndexLogger.warn("admin.reference_taxonomy.sync.progress", fields);
+      taxonomyIndexLogger.warn(
+        "admin.reference_taxonomy.sync.progress",
+        fields,
+      );
     } else {
-      taxonomyIndexLogger.info("admin.reference_taxonomy.sync.progress", fields);
+      taxonomyIndexLogger.info(
+        "admin.reference_taxonomy.sync.progress",
+        fields,
+      );
     }
   };
 
@@ -314,7 +323,11 @@ async function runTaxonomySyncScript(
   config: EmbeddingRuntimeConfiguration,
   syncRunId: string,
 ): Promise<void> {
-  const script = path.join(process.cwd(), "scripts", "sync-shopify-taxonomy.mjs");
+  const script = path.join(
+    process.cwd(),
+    "scripts",
+    "sync-shopify-taxonomy.mjs",
+  );
   const startedAt = Date.now();
 
   await new Promise<void>((resolve, reject) => {
@@ -362,7 +375,9 @@ async function runTaxonomySyncScript(
         durationMs: Date.now() - startedAt,
         cause,
       });
-      reject(new Error("Reference taxonomy synchronization could not be started."));
+      reject(
+        new Error("Reference taxonomy synchronization could not be started."),
+      );
     });
     child.once("close", (code, signal) => {
       stdoutRelay.flush();
@@ -372,11 +387,14 @@ async function runTaxonomySyncScript(
 
       const durationMs = Date.now() - startedAt;
       if (code === 0) {
-        taxonomyIndexLogger.info("admin.reference_taxonomy.sync.child.completed", {
-          syncRunId,
-          durationMs,
-          exitCode: code,
-        });
+        taxonomyIndexLogger.info(
+          "admin.reference_taxonomy.sync.child.completed",
+          {
+            syncRunId,
+            durationMs,
+            exitCode: code,
+          },
+        );
         resolve();
         return;
       }
@@ -407,7 +425,9 @@ async function withManagementLock<T>(operation: () => Promise<T>): Promise<T> {
   );
   if (acquired !== "OK") {
     await redis.quit().catch(() => redis.disconnect());
-    throw new Error("Reference taxonomy index management is already in progress.");
+    throw new Error(
+      "Reference taxonomy index management is already in progress.",
+    );
   }
   try {
     return await operation();

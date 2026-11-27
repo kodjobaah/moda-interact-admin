@@ -19,13 +19,17 @@ const queueMonitorModuleDirectory = path.join(
 );
 
 async function readQueueMonitorSources() {
-  const entries = await readdir(queueMonitorModuleDirectory, { withFileTypes: true });
+  const entries = await readdir(queueMonitorModuleDirectory, {
+    withFileTypes: true,
+  });
   const modulePaths = entries
     .filter((entry) => entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name))
     .map((entry) => path.join(queueMonitorModuleDirectory, entry.name))
     .sort();
   const sources = await Promise.all(
-    [componentPath, ...modulePaths].map((filePath) => readFile(filePath, "utf8")),
+    [componentPath, ...modulePaths].map((filePath) =>
+      readFile(filePath, "utf8"),
+    ),
   );
   return sources.join("\n");
 }
@@ -80,13 +84,19 @@ test("queue names switch diagnostics without resetting an open drawer", async ()
   assert.ok(selectQueue, "expected a queue selection handler");
   assert.match(source, /queue\.openDetails/);
   assert.doesNotMatch(source, />View details<|>Details<\/span>/);
-  assert.match(selectQueue[1], /if \(!selectedQueueName\) setDrawerWidth\(null\)/);
+  assert.match(
+    selectQueue[1],
+    /if \(!selectedQueueName\) setDrawerWidth\(null\)/,
+  );
   assert.match(selectQueue[1], /prepareForQueueSelection\(\)/);
 
   const queueSelectedTransition = source.match(
     /case "queue-selected":([\s\S]*?)case "refresh-requested":/,
   );
-  assert.ok(queueSelectedTransition, "expected a queue-selected jobs transition");
+  assert.ok(
+    queueSelectedTransition,
+    "expected a queue-selected jobs transition",
+  );
   assert.match(queueSelectedTransition[1], /queueJobs: null/);
   assert.match(queueSelectedTransition[1], /showAllJobs: false/);
   assert.match(queueSelectedTransition[1], /queueJobPage: 1/);
@@ -105,14 +115,20 @@ test("queue names switch diagnostics without resetting an open drawer", async ()
   const detailInvalidatedTransition = source.match(
     /case "selection-invalidated":([\s\S]*?)case "request-succeeded":/,
   );
-  assert.ok(detailInvalidatedTransition, "expected a detail invalidation transition");
+  assert.ok(
+    detailInvalidatedTransition,
+    "expected a detail invalidation transition",
+  );
   assert.match(detailInvalidatedTransition[1], /selectedJobId: null/);
   assert.match(detailInvalidatedTransition[1], /jobDetail: null/);
   assert.match(
     detailInvalidatedTransition[1],
     /action\.reason === "queue-selection" \|\| action\.reason === "jobs-replaced"/,
   );
-  assert.match(detailInvalidatedTransition[1], /jobDetailError: null, jobDetailLoading: false/);
+  assert.match(
+    detailInvalidatedTransition[1],
+    /jobDetailError: null, jobDetailLoading: false/,
+  );
 });
 
 test("queue drawer uses the bounded Shop, Status, Direction filter contract", async () => {
@@ -120,8 +136,14 @@ test("queue drawer uses the bounded Shop, Status, Direction filter contract", as
 
   assert.match(source, /\/api\/admin\/queues\/jobs\?/);
   assert.match(source, /changeShop\(event\.target\.value\)/);
-  assert.match(source, /changeStatus\(event\.target\.value as typeof queueJobStatus\)/);
-  assert.match(source, /changeDirection\(event\.target\.value as typeof queueJobDirection\)/);
+  assert.match(
+    source,
+    /changeStatus\(event\.target\.value as typeof queueJobStatus\)/,
+  );
+  assert.match(
+    source,
+    /changeDirection\(event\.target\.value as typeof queueJobDirection\)/,
+  );
   assert.match(source, /onClick=\{viewAll\}/);
   assert.match(source, /status: state\.queueJobStatus/);
   assert.match(source, /shop: state\.queueJobShop/);
@@ -161,7 +183,10 @@ test("queue drawer keeps the full browser paginated and state-safe", async () =>
     /case "selection-cleared":([\s\S]*?)case "selection-invalidated":/,
   );
   assert.ok(detailClearedTransition, "expected a cleared detail transition");
-  assert.match(detailClearedTransition[1], /return createInitialQueueJobDetailState\(\)/);
+  assert.match(
+    detailClearedTransition[1],
+    /return createInitialQueueJobDetailState\(\)/,
+  );
   assert.match(
     source,
     /function createInitialQueueJobDetailState\(\): QueueJobDetailState \{\s+return \{\s+selectedJobId: null,\s+jobDetail: null,\s+jobDetailError: null,\s+jobDetailLoading: false,\s+\};/,
@@ -171,15 +196,30 @@ test("queue drawer keeps the full browser paginated and state-safe", async () =>
 test("selecting a job stops queue auto-refresh until the detail view is closed", async () => {
   const source = await readQueueMonitorSources();
 
-  assert.match(source, /suspendAutoRefresh: jobDetailState\.selectedJobId !== null/);
+  assert.match(
+    source,
+    /suspendAutoRefresh: jobDetailState\.selectedJobId !== null/,
+  );
   assert.match(
     source,
     /if \(selectedQueueName && !jobDetailState\.selectedJobId\) \{\s+refreshQueueJobs\(\);\s+\}/,
   );
-  assert.match(source, /if \(suspendAutoRefresh\) requestRef\.current\?\.abort\(\)/);
-  assert.match(source, /if \(suspendAutoRefresh \|\| refreshMs === 0\) return undefined/);
-  assert.match(source, /disabled=\{loading \|\| jobDetailState\.selectedJobId !== null\}/);
-  assert.match(source, /disabled=\{queueJobsLoading \|\| selectedJobId !== null\}/);
+  assert.match(
+    source,
+    /if \(suspendAutoRefresh\) requestRef\.current\?\.abort\(\)/,
+  );
+  assert.match(
+    source,
+    /if \(suspendAutoRefresh \|\| refreshMs === 0\) return undefined/,
+  );
+  assert.match(
+    source,
+    /disabled=\{loading \|\| jobDetailState\.selectedJobId !== null\}/,
+  );
+  assert.match(
+    source,
+    /disabled=\{queueJobsLoading \|\| selectedJobId !== null\}/,
+  );
   assert.match(source, /queue\.refreshStoppedForJob/);
 });
 
@@ -201,7 +241,6 @@ test("queue drawer exposes persistent auto-refresh controls while browsing jobs"
   );
 });
 
-
 test("queue drawer exposes breadcrumb navigation for the queue list and selected jobs", async () => {
   const source = await readQueueMonitorSources();
 
@@ -213,24 +252,37 @@ test("queue drawer exposes breadcrumb navigation for the queue list and selected
   assert.match(source, /adminI18n\.t\("queue\.recentJobs"\)/);
   assert.match(source, /adminI18n\.t\("queue\.allJobs"\)/);
   assert.match(source, /adminI18n\.t\("queue\.jobDetails"\)/);
-  assert.match(source, /<nav[\s\S]*aria-label=\{adminI18n\.t\("queue\.breadcrumbs"\)\}/);
+  assert.match(
+    source,
+    /<nav[\s\S]*aria-label=\{adminI18n\.t\("queue\.breadcrumbs"\)\}/,
+  );
 });
-
 
 test("queue jobs distinguish internal shop IDs from orphan jobs", async () => {
   const source = await readQueueMonitorSources();
 
-  assert.match(source, /QueueJobAttribution = "known" \| "identified" \| "unresolved" \| "orphan"/);
+  assert.match(
+    source,
+    /QueueJobAttribution = "known" \| "identified" \| "unresolved" \| "orphan"/,
+  );
   assert.match(source, /queue\.shopIdLabel/);
-  assert.match(source, /formatQueueJobShop\(job\.shop, job\.attribution, job\.shopDomain\)/);
-  assert.match(source, /formatQueueJobShop\(jobDetail\.shop, jobDetail\.attribution, jobDetail\.shopDomain\)/);
+  assert.match(
+    source,
+    /formatQueueJobShop\(job\.shop, job\.attribution, job\.shopDomain\)/,
+  );
+  assert.match(
+    source,
+    /formatQueueJobShop\(jobDetail\.shop, jobDetail\.attribution, jobDetail\.shopDomain\)/,
+  );
 });
-
 
 test("queue shop labels prefer resolved domains while retaining shop ID fallback", async () => {
   const source = await readQueueMonitorSources();
   const shopHelper = await readFile(
-    path.join(repositoryRoot, "src/components/admin/queue-monitor/queue-job-shop.ts"),
+    path.join(
+      repositoryRoot,
+      "src/components/admin/queue-monitor/queue-job-shop.ts",
+    ),
     "utf8",
   );
   const directorySource = await readFile(
@@ -243,7 +295,10 @@ test("queue shop labels prefer resolved domains while retaining shop ID fallback
   assert.match(shopHelper, /if \(shopDomain\) return shopDomain/);
   assert.match(directorySource, /prisma\.shop\.findMany/);
   assert.match(directorySource, /select: \{ id: true, domain: true \}/);
-  assert.match(directorySource, /Queue diagnostics must remain usable when PostgreSQL is unavailable/);
+  assert.match(
+    directorySource,
+    /Queue diagnostics must remain usable when PostgreSQL is unavailable/,
+  );
   assert.match(directorySource, /facet\.value\.startsWith\("id:"\)/);
   assert.match(directorySource, /label: domain/);
 });

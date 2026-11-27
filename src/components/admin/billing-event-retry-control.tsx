@@ -9,7 +9,9 @@ import {
 } from "@/app/actions/billing-events";
 import { adminI18n } from "@/i18n";
 
-function actionMessage(state: Exclude<RetryBillingEventActionState, null>): string {
+function actionMessage(
+  state: Exclude<RetryBillingEventActionState, null>,
+): string {
   const keys = {
     QUEUED: "billing.retryEventResult.QUEUED",
     ALREADY_DUE: "billing.retryEventResult.ALREADY_DUE",

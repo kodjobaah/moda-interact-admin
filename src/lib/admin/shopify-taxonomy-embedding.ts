@@ -127,7 +127,6 @@ export function loadShopifyTaxonomyQueryEmbeddingConfig(
   };
 }
 
-
 export type ShopifyTaxonomyRuntimeEmbeddingConfiguration = {
   embeddingProvider: string;
   embeddingModel: string;
@@ -200,7 +199,9 @@ export function loadShopifyTaxonomyQueryEmbeddingConfigFromRuntime(
 }
 
 export function shopifyTaxonomyVectorBuffer(vector: number[]): Buffer {
-  const buffer = Buffer.allocUnsafe(vector.length * Float32Array.BYTES_PER_ELEMENT);
+  const buffer = Buffer.allocUnsafe(
+    vector.length * Float32Array.BYTES_PER_ELEMENT,
+  );
   vector.forEach((value, index) => buffer.writeFloatLE(value, index * 4));
   return buffer;
 }

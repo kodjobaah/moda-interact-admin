@@ -37,7 +37,9 @@ function FeatureDrawer({
 
   return (
     <AdminDetailDrawer
-      title={create ? "Create feature" : `Edit ${feature?.displayName ?? "feature"}`}
+      title={
+        create ? "Create feature" : `Edit ${feature?.displayName ?? "feature"}`
+      }
       closeHref={closeHref}
     >
       {create ? (
@@ -53,7 +55,8 @@ function FeatureDrawer({
               required
             />
             <span className="mt-1 block text-xs font-normal text-gray-500">
-              Permanent machine identifier. Use lowercase letters, numbers and underscores.
+              Permanent machine identifier. Use lowercase letters, numbers and
+              underscores.
             </span>
           </label>
 
@@ -110,7 +113,9 @@ function FeatureDrawer({
                 <dt className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   Activation
                 </dt>
-                <dd className="mt-1 text-gray-900">{activationModeLabel(feature)}</dd>
+                <dd className="mt-1 text-gray-900">
+                  {activationModeLabel(feature)}
+                </dd>
               </div>
             </dl>
             <p className="mt-4 text-xs text-gray-500">
@@ -161,7 +166,9 @@ function FeatureDrawer({
 
           {!feature.systemRequired ? (
             <section className="border-t border-gray-200 pt-5">
-              <h3 className="text-sm font-semibold text-gray-900">Availability</h3>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Availability
+              </h3>
               <p className="mt-1 text-sm text-gray-600">
                 {feature.active
                   ? "Deactivation blocks new use globally without deleting existing plan mappings or merchant preferences."
@@ -202,9 +209,12 @@ export function FeatureCatalogue({
       <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-950">Feature catalogue</h2>
+            <h2 className="text-lg font-semibold text-gray-950">
+              Feature catalogue
+            </h2>
             <p className="mt-1 max-w-3xl text-sm text-gray-600">
-              Manage dynamic feature definitions and global availability. Editing controls stay hidden until needed.
+              Manage dynamic feature definitions and global availability.
+              Editing controls stay hidden until needed.
             </p>
           </div>
           <Link
@@ -298,7 +308,11 @@ export function FeatureCatalogue({
       {createDrawerOpen ? (
         <FeatureDrawer create params={params} />
       ) : selectedFeature ? (
-        <FeatureDrawer feature={selectedFeature} create={false} params={params} />
+        <FeatureDrawer
+          feature={selectedFeature}
+          create={false}
+          params={params}
+        />
       ) : null}
     </>
   );

@@ -12,7 +12,7 @@ export function positiveInt(value: SearchParamValue, fallback = 1): number {
 }
 
 export function cleanSearch(value: SearchParamValue): string {
-  return (firstParam(value) ?? '').trim().slice(0, 120);
+  return (firstParam(value) ?? "").trim().slice(0, 120);
 }
 
 export function paramsToRecord(
@@ -32,7 +32,7 @@ export function buildUrl(
   const query = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
-    if (value === null || value === undefined || value === '') return;
+    if (value === null || value === undefined || value === "") return;
     query.set(key, String(value));
   });
 
@@ -50,7 +50,7 @@ export function withParamUpdates(
   };
 
   Object.entries(updates).forEach(([key, value]) => {
-    if (value === null || value === undefined || value === '') {
+    if (value === null || value === undefined || value === "") {
       delete next[key];
     } else {
       next[key] = value;

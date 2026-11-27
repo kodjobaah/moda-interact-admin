@@ -2,7 +2,8 @@ export function parseShopifyTaxonomyText(text, expectedVersion, sourceUrl) {
   const fail = (message) => {
     throw new Error(`Shopify taxonomy preparation failed: ${message}`);
   };
-  if (typeof text !== "string" || !text.trim()) fail("distribution is missing content");
+  if (typeof text !== "string" || !text.trim())
+    fail("distribution is missing content");
 
   const lines = text.trim().split(/\r?\n/);
   const versionPrefix = "# Shopify Product Taxonomy - Categories:";
@@ -21,14 +22,16 @@ export function parseShopifyTaxonomyText(text, expectedVersion, sourceUrl) {
   for (const line of lines) {
     if (!line || line.startsWith("#")) continue;
     const separatorIndex = line.indexOf(" : ");
-    if (separatorIndex < 1) fail("distribution contains an invalid category row");
+    if (separatorIndex < 1)
+      fail("distribution contains an invalid category row");
 
     const id = line.slice(0, separatorIndex).trim();
     const fullName = line.slice(separatorIndex + 3).trim();
     if (!id.startsWith("gid://shopify/TaxonomyCategory/")) {
       fail(`distribution contains an invalid category id ${id}`);
     }
-    if (!fullName) fail(`distribution contains an empty category name for ${id}`);
+    if (!fullName)
+      fail(`distribution contains an empty category name for ${id}`);
     if (ids.has(id)) fail(`distribution contains duplicate category id ${id}`);
     if (fullNameToId.has(fullName)) {
       fail(`distribution contains duplicate category path ${fullName}`);

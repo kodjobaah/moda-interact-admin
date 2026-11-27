@@ -25,24 +25,43 @@ export function useMetaTemplateStatus(initial: MetaStatusView) {
     setRefreshing(true);
     try {
       const next = await readWhatsAppMetaTemplateStatus(initial.definitionId);
-      if (sequence.current === request) { setStatus(next); setError(null); }
+      if (sequence.current === request) {
+        setStatus(next);
+        setError(null);
+      }
     } catch {
-      if (sequence.current === request) setError("Could not refresh local provider observations. Try again.");
-    } finally { if (sequence.current === request) setRefreshing(false); }
+      if (sequence.current === request)
+        setError("Could not refresh local provider observations. Try again.");
+    } finally {
+      if (sequence.current === request) setRefreshing(false);
+    }
   }, [initial.definitionId]);
   useEffect(() => {
     if (selectedId) return;
     let count = 0;
     const requestSequence = sequence;
     const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible" || count >= MAX_AUTO_REFRESHES) {
+      if (
+        document.visibilityState !== "visible" ||
+        count >= MAX_AUTO_REFRESHES
+      ) {
         if (count >= MAX_AUTO_REFRESHES) window.clearInterval(timer);
         return;
       }
       count++;
       void refresh();
     }, REFRESH_INTERVAL_MS);
-    return () => { window.clearInterval(timer); requestSequence.current++; };
+    return () => {
+      window.clearInterval(timer);
+      requestSequence.current++;
+    };
   }, [selectedId, refresh]);
-  return { status, selectedId, setSelectedId: selectRecord, refreshing, error, refresh };
+  return {
+    status,
+    selectedId,
+    setSelectedId: selectRecord,
+    refreshing,
+    error,
+    refresh,
+  };
 }

@@ -2,9 +2,9 @@ import type {
   CustomerListItem,
   PageResult,
   RecoveryListItem,
-} from '@/lib/admin/types';
-import { CustomerTable } from './customer-table';
-import { RecoveryTable } from './recovery-table';
+} from "@/lib/admin/types";
+import { CustomerTable } from "./customer-table";
+import { RecoveryTable } from "./recovery-table";
 
 export function RecoveryLogs({
   customers,

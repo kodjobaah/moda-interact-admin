@@ -93,7 +93,7 @@ R2 objects deliberately before deleting the database records and pass
 `--external-assets-handled`. The tool deliberately does not contain storage
 credentials or issue remote object deletions.
 
-## What this does *not* remove
+## What this does _not_ remove
 
 - Redis/BullMQ waiting, active, delayed or retried jobs; ensure workers are
   stopped and queues are cleared separately in disposable environments.

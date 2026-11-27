@@ -13,7 +13,8 @@ export function canManagePlatformSecrets(principal: {
   role: string;
   developmentBypass: boolean;
 }): boolean {
-  if (principal.role !== "SUPER_ADMIN" || !ACTOR_ID.test(principal.id)) return false;
+  if (principal.role !== "SUPER_ADMIN" || !ACTOR_ID.test(principal.id))
+    return false;
   if (!principal.developmentBypass) return true;
   // A claimed bypass identity must never work in a production Node process.
   if (process.env.NODE_ENV === "production") return false;

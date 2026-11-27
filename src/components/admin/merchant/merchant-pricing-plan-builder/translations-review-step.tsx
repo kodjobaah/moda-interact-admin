@@ -91,7 +91,8 @@ export function TranslationsReviewStep({
         <ul className="list-disc pl-5">
           {events.map((event) => (
             <li key={event.clientKey}>
-              {event.adminLabel}: {event.creditsGrantedPerUnit} credits per event
+              {event.adminLabel}: {event.creditsGrantedPerUnit} credits per
+              event
               {event.pricingMode === "FIXED"
                 ? ` · ${formatBuilderEventPrice(event, currency)} per event · ${event.maximumUnitsPerBillingPeriod ?? "Unlimited"}`
                 : ` · ${event.pricingMode === "GRADUATED" ? "graduated pricing" : "volume pricing"} across ${event.tiers?.length ?? 0} tiers`}
@@ -150,11 +151,18 @@ export function TranslationsReviewStep({
       </label>
 
       {saveBlockers.length ? (
-        <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-          <p className="font-semibold">Save draft is unavailable until these items are fixed:</p>
+        <div
+          role="alert"
+          className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+        >
+          <p className="font-semibold">
+            Save draft is unavailable until these items are fixed:
+          </p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {saveBlockers.map((blocker) => (
-              <li key={`${blocker.step}:${blocker.message}`}>{blocker.message}</li>
+              <li key={`${blocker.step}:${blocker.message}`}>
+                {blocker.message}
+              </li>
             ))}
           </ul>
         </div>

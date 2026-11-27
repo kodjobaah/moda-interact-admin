@@ -174,8 +174,7 @@ export function TenantRecoverySettings({
               {providerName} discount catalogue
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-gray-600">
-              This catalogue is refreshed asynchronously by the recovery worker.
-              {" "}
+              This catalogue is refreshed asynchronously by the recovery worker.{" "}
               {
                 "Manual sync requests enqueue the provider's canonical discount reconciliation job; Admin never calls the commerce provider directly."
               }
@@ -293,10 +292,7 @@ export function TenantRecoverySettings({
               })}
               {policy.catalogue.discounts.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="py-3 text-gray-500"
-                  >
+                  <td colSpan={4} className="py-3 text-gray-500">
                     No discount rows are available.
                   </td>
                 </tr>

@@ -5,7 +5,10 @@ import {
 } from "@prisma/client";
 import { requirePlatformAdminRead } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
-import { validateShopifySubscriptionContract, type ShopifyContractValidation } from "./shopify-subscription-contract";
+import {
+  validateShopifySubscriptionContract,
+  type ShopifyContractValidation,
+} from "./shopify-subscription-contract";
 import type { PageResult } from "./types";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -51,23 +54,31 @@ export type UnmappedSubscriptionItem = {
 };
 
 export type UnmappedSubscriptionDetail = UnmappedSubscriptionItem & {
-  cataloguePlan: (NonNullable<UnmappedSubscriptionItem["cataloguePlan"]> & {
-    shopifyRecoveryUsageEventHandle: string | null;
-    features: string[];
-    usageEvents: Array<{
-      eventHandle: string;
-      adminLabel: string;
-      position: number;
-    }>;
-  }) | null;
-  operationalPlan: (NonNullable<UnmappedSubscriptionItem["operationalPlan"]> & {
-    features: string[];
-  }) | null;
+  cataloguePlan:
+    | (NonNullable<UnmappedSubscriptionItem["cataloguePlan"]> & {
+        shopifyRecoveryUsageEventHandle: string | null;
+        features: string[];
+        usageEvents: Array<{
+          eventHandle: string;
+          adminLabel: string;
+          position: number;
+        }>;
+      })
+    | null;
+  operationalPlan:
+    | (NonNullable<UnmappedSubscriptionItem["operationalPlan"]> & {
+        features: string[];
+      })
+    | null;
   shopifyContract: ShopifyContractValidation | null;
 };
 
-type CataloguePlanSummary = NonNullable<UnmappedSubscriptionItem["cataloguePlan"]>;
-type OperationalPlanSummary = NonNullable<UnmappedSubscriptionItem["operationalPlan"]>;
+type CataloguePlanSummary = NonNullable<
+  UnmappedSubscriptionItem["cataloguePlan"]
+>;
+type OperationalPlanSummary = NonNullable<
+  UnmappedSubscriptionItem["operationalPlan"]
+>;
 
 function boundedPage(page: number, pageSize: number) {
   const safePageSize = Math.min(
@@ -88,9 +99,7 @@ function expectedOperationalKind(
     : BillingPlanKind.PAID_METERED;
 }
 
-function expectedIncludedAllowance(
-  plan: CataloguePlanSummary,
-): number | null {
+function expectedIncludedAllowance(plan: CataloguePlanSummary): number | null {
   return plan.planKind === MerchantPricingPlanKind.PAID_METERED
     ? plan.includedRecoveryCredits
     : null;
@@ -209,10 +218,12 @@ function projectListItem(
   };
 }
 
-export async function getUnmappedSubscriptions(input: {
-  page?: number;
-  pageSize?: number;
-} = {}): Promise<PageResult<UnmappedSubscriptionItem>> {
+export async function getUnmappedSubscriptions(
+  input: {
+    page?: number;
+    pageSize?: number;
+  } = {},
+): Promise<PageResult<UnmappedSubscriptionItem>> {
   await requirePlatformAdminRead();
   const { page: requestedPage, pageSize } = boundedPage(
     input.page ?? 1,
@@ -224,7 +235,11 @@ export async function getUnmappedSubscriptions(input: {
   const page = Math.min(requestedPage, totalPages);
   const rows = await prisma.subscription.findMany({
     where,
-    orderBy: [{ lastSyncErrorAt: "desc" }, { updatedAt: "desc" }, { id: "asc" }],
+    orderBy: [
+      { lastSyncErrorAt: "desc" },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ],
     skip: (page - 1) * pageSize,
     take: pageSize,
     select: subscriptionSelect,
@@ -288,7 +303,14 @@ export async function getUnmappedSubscriptionDetail(
                 pricingMode: true,
                 currency: true,
                 fixedUnitAmountMinor: true,
-                tiers: { orderBy: { position: "asc" }, select: { upTo: true, amountPerUnitMinor: true, flatAmountMinor: true } },
+                tiers: {
+                  orderBy: { position: "asc" },
+                  select: {
+                    upTo: true,
+                    amountPerUnitMinor: true,
+                    flatAmountMinor: true,
+                  },
+                },
               },
             },
           },
@@ -315,9 +337,7 @@ export async function getUnmappedSubscriptionDetail(
   const base = projectListItem(
     row,
     new Map(
-      cataloguePlan
-        ? [[cataloguePlan.shopifyPlanHandle, cataloguePlan]]
-        : [],
+      cataloguePlan ? [[cataloguePlan.shopifyPlanHandle, cataloguePlan]] : [],
     ),
     new Map(
       operationalPlan
@@ -363,14 +383,14 @@ export async function getUnmappedSubscriptionDetail(
   return {
     ...base,
     shopifyContract,
-      cataloguePlan: {
-        ...cataloguePlan,
-        features: cataloguePlan.features.map((item) => item.feature.key),
-      },
+    cataloguePlan: {
+      ...cataloguePlan,
+      features: cataloguePlan.features.map((item) => item.feature.key),
+    },
     operationalPlan: operationalPlan
       ? {
           ...operationalPlan,
-            features: operationalPlan.features.map((item) => item.feature.key),
+          features: operationalPlan.features.map((item) => item.feature.key),
         }
       : null,
   };

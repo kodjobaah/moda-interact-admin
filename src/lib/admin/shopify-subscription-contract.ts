@@ -238,9 +238,7 @@ export async function validateShopifySubscriptionContract(input: {
         "The paid MerchantPricing plan has no recovery usage-event handle configured.",
       );
     } else if (
-      !provider.items.some(
-        (item) => item.handle.trim() === recoveryUsageHandle,
-      )
+      !provider.items.some((item) => item.handle.trim() === recoveryUsageHandle)
     ) {
       blockingMismatches.push(
         `Shopify active subscription does not contain the configured recovery usage-event handle ${recoveryUsageHandle}.`,

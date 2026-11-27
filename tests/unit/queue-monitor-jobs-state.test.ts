@@ -36,7 +36,9 @@ function populatedState(): QueueJobsState {
 }
 
 test("queue selection resets results and paging but retains shop/status/direction filters", () => {
-  const next = reduceQueueJobsState(populatedState(), { type: "queue-selected" });
+  const next = reduceQueueJobsState(populatedState(), {
+    type: "queue-selected",
+  });
 
   assert.equal(next.queueJobs, null);
   assert.equal(next.showAllJobs, false);

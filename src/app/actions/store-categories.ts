@@ -32,8 +32,7 @@ const storeCategoryLogger = createLogger({
 });
 
 export type CreateStoreCategoryBundleActionResult =
-  | { ok: true; categoryId: string }
-  | { ok: false; message: string };
+  { ok: true; categoryId: string } | { ok: false; message: string };
 
 async function assertTopLevelStoreCategoryReference(
   reference: StoreCategoryTaxonomyReference,
@@ -83,8 +82,10 @@ function uniqueConstraintMessage(error: unknown): string {
     typeof meta === "object" && meta !== null && "target" in meta
       ? String(meta.target)
       : "";
-  if (target.includes("slug")) return "A category with this slug already exists.";
-  if (target.includes("key")) return "A prompt template with this key already exists.";
+  if (target.includes("slug"))
+    return "A category with this slug already exists.";
+  if (target.includes("key"))
+    return "A prompt template with this key already exists.";
   if (target.includes("referenceTaxonomyCategoryId")) {
     return "This reference taxonomy category is already used by another Store Category.";
   }
@@ -105,16 +106,15 @@ function createStoreCategoryBundleFailureMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   if (
     message === "SUPER_ADMIN access is required." ||
-    message === "Store Category reference taxonomy must be a top-level category." ||
+    message ===
+      "Store Category reference taxonomy must be a top-level category." ||
     message ===
       "Reference taxonomy selection is stale; reselect the top-level category and retry."
   ) {
     return message;
   }
 
-  return (
-    "The Store Category could not be created. Check the admin server logs and retry."
-  );
+  return "The Store Category could not be created. Check the admin server logs and retry.";
 }
 
 function mutationFromForm(formData: FormData): StoreCategoryMutation {
@@ -153,11 +153,7 @@ export async function mutateStoreCategoryCatalogueAction(
     await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        await mutateStoreCategoryCatalogue(
-          transaction,
-          mutation,
-          principal.id,
-        );
+        await mutateStoreCategoryCatalogue(transaction, mutation, principal.id);
       },
       { isolationLevel: "Serializable" },
     );
@@ -202,7 +198,9 @@ export async function createStoreCategoryBundleAction(
       mappingCount,
     });
 
-    await assertTopLevelStoreCategoryReference(input.category.referenceTaxonomy);
+    await assertTopLevelStoreCategoryReference(
+      input.category.referenceTaxonomy,
+    );
 
     const categoryId = await prisma.$transaction(
       async (transaction) => {
@@ -225,12 +223,15 @@ export async function createStoreCategoryBundleAction(
     try {
       revalidatePath("/system-controls/store-categories");
     } catch (error) {
-      storeCategoryLogger.info("admin.store_category.bundle_create.revalidate", {
-        actorAdminId,
-        outcome: "failed",
-        categoryId,
-        reason: error instanceof Error ? error.message : "unknown",
-      });
+      storeCategoryLogger.info(
+        "admin.store_category.bundle_create.revalidate",
+        {
+          actorAdminId,
+          outcome: "failed",
+          categoryId,
+          reason: error instanceof Error ? error.message : "unknown",
+        },
+      );
     }
 
     return { ok: true, categoryId };
@@ -278,7 +279,10 @@ function translationRequestClientMessage(error: unknown): {
     "The selected translation model is unavailable or its provider credential is not configured.",
     "The translation/enablement request timed out while writing to PostgreSQL. Retry the request.",
   ];
-  if (allowedPrefixes.includes(message) || message.startsWith("Unknown mapping condition")) {
+  if (
+    allowedPrefixes.includes(message) ||
+    message.startsWith("Unknown mapping condition")
+  ) {
     return { message, refreshRequired };
   }
   if (
@@ -289,7 +293,8 @@ function translationRequestClientMessage(error: unknown): {
     return { message, refreshRequired };
   }
   return {
-    message: "The translation/enablement request could not be created. Check the admin server logs and retry.",
+    message:
+      "The translation/enablement request could not be created. Check the admin server logs and retry.",
     refreshRequired,
   };
 }
@@ -303,9 +308,8 @@ export async function requestStoreCategoryTranslationAction(
       throw new Error("SUPER_ADMIN access is required.");
     }
     const value = translationRequestPayload(payload);
-    const { requestStoreCategoryTranslation } = await import(
-      "@/lib/admin/store-category-translation-enablement"
-    );
+    const { requestStoreCategoryTranslation } =
+      await import("@/lib/admin/store-category-translation-enablement");
     const result = await requestStoreCategoryTranslation(
       {
         categoryId: value.categoryId,

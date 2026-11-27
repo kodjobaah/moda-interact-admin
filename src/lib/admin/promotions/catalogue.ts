@@ -6,11 +6,7 @@ import type {
 } from "@prisma/client";
 
 export type PromotionCatalogueState =
-  | "DRAFT"
-  | "SCHEDULED"
-  | "RUNNING"
-  | "EXPIRED"
-  | "CLOSED";
+  "DRAFT" | "SCHEDULED" | "RUNNING" | "EXPIRED" | "CLOSED";
 
 export const PROMOTION_CATALOGUE_PAGE_SIZES = [5, 10, 20, 50] as const;
 export const DEFAULT_PROMOTION_CATALOGUE_PAGE_SIZE = 5;

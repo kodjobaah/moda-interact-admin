@@ -58,41 +58,44 @@ export function PromotionCampaignCatalog({
       <div className="max-h-[calc(100vh-20rem)] min-h-64 overflow-y-auto">
         <div className="space-y-3 p-4 pb-2">
           {campaigns.items.map((campaign) => (
-          <article
-            key={campaign.id}
-            className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-gray-950">{campaign.name}</h3>
-                <p className="mt-1 text-xs text-gray-500">
-                  {campaign.scope} · {campaign.quantity} recovery credits
-                </p>
+            <article
+              key={campaign.id}
+              className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-gray-950">
+                    {campaign.name}
+                  </h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {campaign.scope} · {campaign.quantity} recovery credits
+                  </p>
+                </div>
+                <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+                  {campaign.state} · {campaign.status}
+                </span>
               </div>
-              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
-                {campaign.state} · {campaign.status}
-              </span>
-            </div>
-            <p className="mt-3 text-sm text-gray-600">
-              {campaign.scope === "GLOBAL"
-                ? "All eligible merchants"
-                : (campaign.targetPlanName ?? campaign.targetShopDomain)}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              {campaign.startsAt.toLocaleString()} to{" "}
-              {campaign.expiresAt.toLocaleString()} · created{" "}
-              {campaign.createdAt.toLocaleString()} by {campaign.creatorName}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              Last change: {campaign.lastLifecycleChange?.kind ?? "none"}{" "}
-              {campaign.lastLifecycleChange?.createdAt.toLocaleString() ?? ""}
-            </p>
-            <p className="mt-1 text-xs font-semibold text-gray-600">
-              Translations: {campaign.translationCount} / 20 languages complete
-            </p>
-            <PromotionCampaignActions campaign={campaign} params={params} />
-          </article>
-        ))}
+              <p className="mt-3 text-sm text-gray-600">
+                {campaign.scope === "GLOBAL"
+                  ? "All eligible merchants"
+                  : (campaign.targetPlanName ?? campaign.targetShopDomain)}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {campaign.startsAt.toLocaleString()} to{" "}
+                {campaign.expiresAt.toLocaleString()} · created{" "}
+                {campaign.createdAt.toLocaleString()} by {campaign.creatorName}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Last change: {campaign.lastLifecycleChange?.kind ?? "none"}{" "}
+                {campaign.lastLifecycleChange?.createdAt.toLocaleString() ?? ""}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-gray-600">
+                Translations: {campaign.translationCount} / 20 languages
+                complete
+              </p>
+              <PromotionCampaignActions campaign={campaign} params={params} />
+            </article>
+          ))}
           {campaigns.items.length === 0 ? (
             <p className="rounded-lg border border-dashed border-gray-300 p-8 text-sm text-gray-600">
               No promotion campaigns match these filters.

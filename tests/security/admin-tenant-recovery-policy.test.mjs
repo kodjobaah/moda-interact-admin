@@ -31,7 +31,10 @@ const overrideService = readFileSync(
 test("tenant recovery overrides are SUPER_ADMIN-only, complete, and audited", () => {
   assert.match(action, /requirePlatformAdminMutation/);
   assert.match(action, /SUPER_ADMIN access is required/);
-  assert.match(action, /ensureDevelopmentPlatformAdmin\(transaction, principal\)/);
+  assert.match(
+    action,
+    /ensureDevelopmentPlatformAdmin\(transaction, principal\)/,
+  );
   assert.match(action, /transaction\.platformAdmin\.findUnique/);
   assert.match(action, /getAll\(["']followUpEnabled["']\)/);
   assert.match(action, /Recovery delay is required/);
@@ -44,7 +47,10 @@ test("tenant recovery overrides are SUPER_ADMIN-only, complete, and audited", ()
   assert.match(overrideService, /beforeValue/);
   assert.match(overrideService, /afterValue/);
   assert.match(overrideService, /updatedByPlatformAdminId/);
-  assert.match(overrideService, /id: input\.policy\.fixedShopifyDiscountId,[\s\S]*?shopId: input\.shopId/);
+  assert.match(
+    overrideService,
+    /id: input\.policy\.fixedShopifyDiscountId,[\s\S]*?shopId: input\.shopId/,
+  );
   assert.match(
     overrideService,
     /isolationLevel: Prisma\.TransactionIsolationLevel\.Serializable/,
@@ -75,8 +81,17 @@ test("tenant UI shows merchant, override, effective, catalogue, and clear surfac
   assert.match(eligibility, /WooCoupon:/);
   assert.match(eligibility, /platform === "SHOPIFY"/);
   assert.match(component, /Merchant selection/);
-  assert.match(component, /discount\.isAvailable \? "Selected" : "Not selected"/);
-  assert.match(eligibility, /!discount\.shopifyDiscountNodeId\.startsWith\("woo:"\)/);
-  assert.match(eligibility, /!discount\.providerType\.startsWith\("WooCoupon:"\)/);
+  assert.match(
+    component,
+    /discount\.isAvailable \? "Selected" : "Not selected"/,
+  );
+  assert.match(
+    eligibility,
+    /!discount\.shopifyDiscountNodeId\.startsWith\("woo:"\)/,
+  );
+  assert.match(
+    eligibility,
+    /!discount\.providerType\.startsWith\("WooCoupon:"\)/,
+  );
   assert.doesNotMatch(component, /providerSnapshot|accessToken|secret/);
 });

@@ -35,8 +35,7 @@ function requireSuperAdmin(
 }
 
 export type PlatformBillingPolicyActionResult =
-  | { ok: true }
-  | { ok: false; message: string };
+  { ok: true } | { ok: false; message: string };
 
 const platformBillingPolicyPublicErrors = new Set([
   "SUPER_ADMIN access is required for this control.",
@@ -76,59 +75,79 @@ export async function mutatePlatformBillingPolicyAction(
     const values = parsePlatformBillingPolicyForm(formData);
     const adminId = await auditAdminId(principal);
 
-    await prisma.$transaction(async (transaction) => {
-      const before = await transaction.platformBillingPolicy.findUnique({
-        where: { id: "default" },
-      });
-      if (before && before.version !== values.expectedVersion) {
-        throw new Error("Platform policy changed. Reload the page before saving again.");
-      }
-      if (!before && values.expectedVersion !== -1) {
-        throw new Error("Platform policy changed. Reload the page before saving again.");
-      }
-      const fields = {
-        globalPauseNewRecoveries: values.globalPauseNewRecoveries,
-        globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
-        absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
-        defaultWarningPercent: values.defaultWarningPercent,
-        lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
-        defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
-        defaultOutboundHardLimit: values.defaultOutboundHardLimit,
-        terminalMessageReservedSlots: values.terminalMessageReservedSlots,
-        whatsappRecipientSuppressionDays: values.whatsappRecipientSuppressionDays,
-        minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
-      };
-      if (before) {
-        const changed = await transaction.platformBillingPolicy.updateMany({
-          where: { id: "default", version: values.expectedVersion },
-          data: { ...fields, version: { increment: 1 } },
+    await prisma.$transaction(
+      async (transaction) => {
+        const before = await transaction.platformBillingPolicy.findUnique({
+          where: { id: "default" },
         });
-        if (changed.count !== 1) throw new Error("Platform policy changed. Reload the page before saving again.");
-      } else {
-        // Preserve the historical create-on-missing path, but reject competing creators.
-        await transaction.platformBillingPolicy.create({
-          data: { id: "default", ...fields },
+        if (before && before.version !== values.expectedVersion) {
+          throw new Error(
+            "Platform policy changed. Reload the page before saving again.",
+          );
+        }
+        if (!before && values.expectedVersion !== -1) {
+          throw new Error(
+            "Platform policy changed. Reload the page before saving again.",
+          );
+        }
+        const fields = {
+          globalPauseNewRecoveries: values.globalPauseNewRecoveries,
+          globalPauseAutomatedWhatsapp: values.globalPauseAutomatedWhatsapp,
+          absoluteOutboundHardLimit: values.absoluteOutboundHardLimit,
+          defaultWarningPercent: values.defaultWarningPercent,
+          lifetimeFreeRecoveryAllowance: values.lifetimeFreeRecoveryAllowance,
+          defaultOutboundSoftLimit: values.defaultOutboundSoftLimit,
+          defaultOutboundHardLimit: values.defaultOutboundHardLimit,
+          terminalMessageReservedSlots: values.terminalMessageReservedSlots,
+          whatsappRecipientSuppressionDays:
+            values.whatsappRecipientSuppressionDays,
+          minimumUpgradePremiumBps: values.minimumUpgradePremiumBps,
+        };
+        if (before) {
+          const changed = await transaction.platformBillingPolicy.updateMany({
+            where: { id: "default", version: values.expectedVersion },
+            data: { ...fields, version: { increment: 1 } },
+          });
+          if (changed.count !== 1)
+            throw new Error(
+              "Platform policy changed. Reload the page before saving again.",
+            );
+        } else {
+          // Preserve the historical create-on-missing path, but reject competing creators.
+          await transaction.platformBillingPolicy.create({
+            data: { id: "default", ...fields },
+          });
+        }
+        const after = await transaction.platformBillingPolicy.findUniqueOrThrow(
+          { where: { id: "default" } },
+        );
+        await transaction.billingAuditEvent.create({
+          data: {
+            action: BillingAuditAction.PLATFORM_POLICY_CHANGED,
+            platformAdminId: adminId,
+            reason: values.reason,
+            relatedEntityType: "PlatformBillingPolicy",
+            relatedEntityId: after.id,
+            beforeValue: before as unknown as Prisma.InputJsonValue,
+            afterValue: after as unknown as Prisma.InputJsonValue,
+          },
         });
-      }
-      const after = await transaction.platformBillingPolicy.findUniqueOrThrow({ where: { id: "default" } });
-      await transaction.billingAuditEvent.create({
-        data: {
-          action: BillingAuditAction.PLATFORM_POLICY_CHANGED,
-          platformAdminId: adminId,
-          reason: values.reason,
-          relatedEntityType: "PlatformBillingPolicy",
-          relatedEntityId: after.id,
-          beforeValue: before as unknown as Prisma.InputJsonValue,
-          afterValue: after as unknown as Prisma.InputJsonValue,
-        },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     revalidatePath("/billing");
     revalidatePath("/system-controls/platform-policy");
     return { ok: true };
   } catch (cause) {
-    if (cause instanceof Prisma.PrismaClientKnownRequestError && (cause.code === "P2034" || cause.code === "P2002")) {
-      return { ok: false, message: "Platform policy changed. Reload the page before saving again." };
+    if (
+      cause instanceof Prisma.PrismaClientKnownRequestError &&
+      (cause.code === "P2034" || cause.code === "P2002")
+    ) {
+      return {
+        ok: false,
+        message:
+          "Platform policy changed. Reload the page before saving again.",
+      };
     }
     return { ok: false, message: platformBillingPolicyClientMessage(cause) };
   }
@@ -205,7 +224,10 @@ export async function mutateShopBillingOverrideAction(
     const effectiveTerminalReserved =
       values.terminalMessageReservedSlots ??
       platform.terminalMessageReservedSlots;
-    if (effectiveTerminalReserved < 1 || effectiveTerminalReserved >= effectiveHard) {
+    if (
+      effectiveTerminalReserved < 1 ||
+      effectiveTerminalReserved >= effectiveHard
+    ) {
       throw new Error(
         "Terminal message reserved slots must be at least 1 and lower than the effective hard limit.",
       );

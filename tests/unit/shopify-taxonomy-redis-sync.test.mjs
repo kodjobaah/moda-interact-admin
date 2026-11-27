@@ -37,7 +37,10 @@ const categories = [
     parentId: "gid://shopify/TaxonomyCategory/aa",
     hasChildren: false,
     ancestors: [
-      { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
+      {
+        id: "gid://shopify/TaxonomyCategory/aa",
+        name: "Apparel & Accessories",
+      },
     ],
   },
 ];
@@ -47,8 +50,14 @@ test("sync separates top-level categories from subcategories for two Redis vecto
 
   assert.equal(documents.topLevel.length, 1);
   assert.equal(documents.subcategories.length, 1);
-  assert.equal(documents.topLevel[0]?.rootId, "gid://shopify/TaxonomyCategory/aa");
-  assert.equal(documents.subcategories[0]?.rootId, "gid://shopify/TaxonomyCategory/aa");
+  assert.equal(
+    documents.topLevel[0]?.rootId,
+    "gid://shopify/TaxonomyCategory/aa",
+  );
+  assert.equal(
+    documents.subcategories[0]?.rootId,
+    "gid://shopify/TaxonomyCategory/aa",
+  );
   assert.equal(SHOPIFY_TAXONOMY_TOP_ALIAS, "idx:moda:shopify-taxonomy:top");
   assert.equal(
     SHOPIFY_TAXONOMY_SUBCATEGORY_ALIAS,
@@ -86,7 +95,6 @@ test("sync stores vectors as FLOAT32 and category IDs in deterministic Redis key
   );
 });
 
-
 test("sync uses a compact taxonomy-specific embedding dimension by default", () => {
   const config = loadTaxonomyEmbeddingConfig({
     EMBEDDING_PROVIDER: "openai",
@@ -111,7 +119,6 @@ test("sync allows a bounded taxonomy dimension override without reusing the glob
 
   assert.equal(config.dimensions, 384);
 });
-
 
 test("embedding batches report progress without exposing embedding payloads", async () => {
   const progress = [];
@@ -155,7 +162,6 @@ test("sync estimates raw vectors and HASH plus FLAT Redis storage", () => {
   assert.equal(estimateTaxonomyRedisBytes(14_606, 256), 41_585_664);
 });
 
-
 test("sync accepts Redis Search totals from RESP2 and RESP3 reply shapes", () => {
   assert.equal(parseSearchTotal([14_580]), 14_580);
   assert.equal(
@@ -167,14 +173,21 @@ test("sync accepts Redis Search totals from RESP2 and RESP3 reply shapes", () =>
     14_580,
   );
   assert.equal(
-    parseSearchTotal(new Map([["total_results", 14_580], ["results", []]])),
+    parseSearchTotal(
+      new Map([
+        ["total_results", 14_580],
+        ["results", []],
+      ]),
+    ),
     14_580,
   );
 });
 
 test("sync parses Redis memory info for preflight capacity checks", () => {
   assert.deepEqual(
-    parseRedisMemoryInfo("# Memory\r\nused_memory:10485760\r\nmaxmemory:67108864\r\n"),
+    parseRedisMemoryInfo(
+      "# Memory\r\nused_memory:10485760\r\nmaxmemory:67108864\r\n",
+    ),
     { usedMemory: 10_485_760, maxMemory: 67_108_864 },
   );
 });
@@ -209,7 +222,10 @@ test("sync reports the exact Redis pipeline rejection and category", () => {
     { categoryId: "gid://shopify/TaxonomyCategory/aa-1" },
   ];
   const failure = redisPipelineFailure(
-    [[null, 1], [new Error("OOM command not allowed when used memory > maxmemory"), null]],
+    [
+      [null, 1],
+      [new Error("OOM command not allowed when used memory > maxmemory"), null],
+    ],
     documents,
     0,
   );

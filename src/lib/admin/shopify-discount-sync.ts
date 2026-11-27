@@ -8,13 +8,19 @@ import { createShopifyDiscountSyncJobId } from "@modainteract/moda-interact-shar
 
 const QUEUE_OPERATION_TIMEOUT_MS = 2_500;
 
-async function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+async function withTimeout<T>(
+  promise: Promise<T>,
+  message: string,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       promise,
       new Promise<T>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), QUEUE_OPERATION_TIMEOUT_MS);
+        timer = setTimeout(
+          () => reject(new Error(message)),
+          QUEUE_OPERATION_TIMEOUT_MS,
+        );
       }),
     ]);
   } finally {
@@ -29,7 +35,9 @@ export async function enqueueAdminShopifyDiscountSync(input: {
 }): Promise<{ jobId: string; requestedAt: Date }> {
   const redisUrl = process.env.REDIS_URL?.trim();
   if (!redisUrl) {
-    throw new Error("Shopify discount sync is unavailable because REDIS_URL is not configured.");
+    throw new Error(
+      "Shopify discount sync is unavailable because REDIS_URL is not configured.",
+    );
   }
 
   const requestedAt = input.requestedAt ?? new Date();

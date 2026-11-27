@@ -51,11 +51,10 @@ test("creates the fixed ordinary Feature and audits its creation once", async ()
   const { transaction, calls, feature } = transactionDouble();
   const result = await ensureMerchantKnowledgeFeature(transaction, "admin-1");
   assert.equal(result, feature);
-  assert.deepEqual(calls.map(({ model }) => model), [
-    "findUnique",
-    "create",
-    "audit",
-  ]);
+  assert.deepEqual(
+    calls.map(({ model }) => model),
+    ["findUnique", "create", "audit"],
+  );
   assert.deepEqual(calls[1].args, {
     data: {
       key: "merchant_knowledge",
@@ -90,7 +89,10 @@ test("preserves a target-state Feature without writing", async () => {
   });
   const feature = await ensureMerchantKnowledgeFeature(transaction, "admin-1");
   assert.equal(feature.displayName, "Custom persisted name");
-  assert.deepEqual(calls.map(({ model }) => model), ["findUnique"]);
+  assert.deepEqual(
+    calls.map(({ model }) => model),
+    ["findUnique"],
+  );
 });
 
 test("transitions only the exact legacy state and audits once without side writes", async () => {
@@ -107,11 +109,10 @@ test("transitions only the exact legacy state and audits once without side write
   const feature = await ensureMerchantKnowledgeFeature(transaction, "admin-1");
 
   assert.equal(feature.activationMode, "MERCHANT_OPT_IN");
-  assert.deepEqual(calls.map(({ model }) => model), [
-    "findUnique",
-    "updateMany",
-    "audit",
-  ]);
+  assert.deepEqual(
+    calls.map(({ model }) => model),
+    ["findUnique", "updateMany", "audit"],
+  );
   assert.deepEqual(calls[1].args, {
     where: {
       id: "feature-mk",
@@ -151,10 +152,10 @@ test("fails closed without auditing when the exact legacy state changes concurre
     ensureMerchantKnowledgeFeature(transaction, "admin-1"),
     /Merchant Knowledge Feature has a conflicting configuration\./,
   );
-  assert.deepEqual(calls.map(({ model }) => model), [
-    "findUnique",
-    "updateMany",
-  ]);
+  assert.deepEqual(
+    calls.map(({ model }) => model),
+    ["findUnique", "updateMany"],
+  );
 });
 
 test("rejects conflicting identity or state without rewriting the Feature", async () => {
@@ -175,7 +176,10 @@ test("rejects conflicting identity or state without rewriting the Feature", asyn
       ensureMerchantKnowledgeFeature(transaction, "admin-1"),
       /Merchant Knowledge Feature has a conflicting configuration\./,
     );
-    assert.deepEqual(calls.map(({ model }) => model), ["findUnique"]);
+    assert.deepEqual(
+      calls.map(({ model }) => model),
+      ["findUnique"],
+    );
   }
 });
 
@@ -193,13 +197,23 @@ test("validates Shared C2 and permits only active database source-type pairs", (
     config,
   );
   assert.throws(
-    () => validateMerchantKnowledgeConfiguration({ ...config, maxKnowledgeSources: 0 }, []),
+    () =>
+      validateMerchantKnowledgeConfiguration(
+        { ...config, maxKnowledgeSources: 0 },
+        [],
+      ),
     /Merchant Knowledge configuration is invalid/,
   );
   assert.throws(
     () =>
       validateMerchantKnowledgeConfiguration(
-        { ...config, allowedSourceTypes: [config.allowedSourceTypes[0], config.allowedSourceTypes[0]] },
+        {
+          ...config,
+          allowedSourceTypes: [
+            config.allowedSourceTypes[0],
+            config.allowedSourceTypes[0],
+          ],
+        },
         [{ purposeKey: "FAQ", dataFormatKey: "CSV" }],
       ),
     /duplicate pairs/,
@@ -248,7 +262,9 @@ test("retains unrelated and inactive mapping configuration while assigning C2 ex
     merchantKnowledgeConfiguration,
   });
   assert.deepEqual(
-    Object.fromEntries(desired.map(({ featureId, configuration }) => [featureId, configuration])),
+    Object.fromEntries(
+      desired.map(({ featureId, configuration }) => [featureId, configuration]),
+    ),
     {
       "inactive-feature": { inactiveConfig: "keep" },
       "knowledge-feature": { retained: true, nested: { value: 7 } },
@@ -270,7 +286,10 @@ test("rollout report distinguishes missing, invalid, stale, and current configur
       allowedSourceTypes: [{ purposeKey: "FAQ", dataFormatKey: "CSV" }],
     },
   };
-  assert.equal(hasCurrentMerchantKnowledgeConfiguration([], activePairs), false);
+  assert.equal(
+    hasCurrentMerchantKnowledgeConfiguration([], activePairs),
+    false,
+  );
   assert.equal(
     hasCurrentMerchantKnowledgeConfiguration(
       [{ ...currentMapping, configuration: { schemaVersion: 2 } }],
@@ -285,9 +304,7 @@ test("rollout report distinguishes missing, invalid, stale, and current configur
           ...currentMapping,
           configuration: {
             ...currentMapping.configuration,
-            allowedSourceTypes: [
-              { purposeKey: "FAQ", dataFormatKey: "XLSX" },
-            ],
+            allowedSourceTypes: [{ purposeKey: "FAQ", dataFormatKey: "XLSX" }],
           },
         },
       ],

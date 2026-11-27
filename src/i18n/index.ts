@@ -46,7 +46,9 @@ export function adminBillingReportStateLabel(
   );
 }
 
-export function adminBillingPackStatusLabel(value: string | null | undefined): string {
+export function adminBillingPackStatusLabel(
+  value: string | null | undefined,
+): string {
   if (!value) return "—";
   const key = `billing.packStatus.${value}`;
   return Object.hasOwn(catalogue, key) ? adminI18n.t(key) : value;
@@ -115,7 +117,8 @@ export function adminQueueJobLabel(jobName: string): string {
   const keys: Record<string, string> = {
     "cart-activity": "queue.cartActivityJob",
     "evaluate-pending-recovery": "queue.pendingRecoveryCandidates",
-    "resume-capacity-blocked-recoveries": "queue.resumeCapacityBlockedRecoveriesJob",
+    "resume-capacity-blocked-recoveries":
+      "queue.resumeCapacityBlockedRecoveriesJob",
     "recovery-outreach-follow-up": "queue.recoveryOutreachFollowUpJob",
     "reconcile-shopify-discounts": "queue.reconcileShopifyDiscountsJob",
     "reconcile-subscription": "queue.reconcileSubscriptionJob",

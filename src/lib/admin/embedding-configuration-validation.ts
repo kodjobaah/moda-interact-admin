@@ -36,7 +36,10 @@ function requiredTrimmedString(
 export function validateEmbeddingPurpose(
   value: unknown,
 ): CommerceEmbeddingPurpose {
-  if (typeof value !== "string" || !PURPOSES.has(value as CommerceEmbeddingPurpose)) {
+  if (
+    typeof value !== "string" ||
+    !PURPOSES.has(value as CommerceEmbeddingPurpose)
+  ) {
     throw new Error("purpose is invalid.");
   }
   return value as CommerceEmbeddingPurpose;
@@ -93,7 +96,11 @@ export function validateEmbeddingConfigurationMutation(input: {
     throw new Error("embeddingDimensions is invalid.");
   }
 
-  const operationId = requiredTrimmedString(input.operationId, "operationId", 128);
+  const operationId = requiredTrimmedString(
+    input.operationId,
+    "operationId",
+    128,
+  );
   const reason = requiredTrimmedString(input.reason, "reason", 1000);
   const expectedEditVersion = input.expectedEditVersion;
   if (
@@ -132,7 +139,11 @@ export function validateEmbeddingConfigurationRemoval(input: {
   expectedEditVersion: number;
 } {
   const purpose = validateEmbeddingPurpose(input.purpose);
-  const operationId = requiredTrimmedString(input.operationId, "operationId", 128);
+  const operationId = requiredTrimmedString(
+    input.operationId,
+    "operationId",
+    128,
+  );
   const reason = requiredTrimmedString(input.reason, "reason", 1000);
   if (
     !Number.isSafeInteger(input.expectedEditVersion) ||

@@ -32,23 +32,26 @@ function translationSource() {
   });
 }
 
-function fakeTransaction(options: {
-  reusable?: boolean;
-  model?: boolean;
-} = {}) {
+function fakeTransaction(
+  options: {
+    reusable?: boolean;
+    model?: boolean;
+  } = {},
+) {
   const calls: Array<{ method: string; args: unknown }> = [];
   let runData: Record<string, unknown> | null = null;
   let itemData: Array<Record<string, unknown>> = [];
-  const model = options.model === false
-    ? null
-    : {
-        id: "model-1",
-        provider: "openai",
-        providerModelId: "gpt-test",
-        displayName: "Automatic model",
-        editVersion: 7,
-        credential: { id: "credential-1" },
-      };
+  const model =
+    options.model === false
+      ? null
+      : {
+          id: "model-1",
+          provider: "openai",
+          providerModelId: "gpt-test",
+          displayName: "Automatic model",
+          editVersion: 7,
+          credential: { id: "credential-1" },
+        };
   const reusable = options.reusable
     ? {
         id: "run-reused",
@@ -132,7 +135,9 @@ test("request transaction resolves only the enabled automatic default and stages
   assert.equal(result.reused, false);
   assert.equal(result.runId, "run-created");
   assert.equal(fake.getItems().length, MERCHANT_PRICING_LOCALES.length);
-  const modelCall = fake.calls.find(({ method }) => method === "model.findFirst");
+  const modelCall = fake.calls.find(
+    ({ method }) => method === "model.findFirst",
+  );
   assert.deepEqual(
     (modelCall?.args as { where: Record<string, unknown> }).where,
     {
@@ -165,8 +170,14 @@ test("identical active work is reused without creating another run or item set",
   );
   assert.equal(result.reused, true);
   assert.equal(result.runId, "run-reused");
-  assert.equal(fake.calls.some(({ method }) => method === "run.create"), false);
-  assert.equal(fake.calls.some(({ method }) => method === "item.createMany"), false);
+  assert.equal(
+    fake.calls.some(({ method }) => method === "run.create"),
+    false,
+  );
+  assert.equal(
+    fake.calls.some(({ method }) => method === "item.createMany"),
+    false,
+  );
 });
 
 test("missing automatic-default configuration fails before a run is created", async () => {
@@ -182,7 +193,10 @@ test("missing automatic-default configuration fails before a run is created", as
     }),
     new RegExp(MERCHANT_PRICING_TRANSLATION_ERRORS.automaticNotConfigured),
   );
-  assert.equal(fake.calls.some(({ method }) => method === "run.create"), false);
+  assert.equal(
+    fake.calls.some(({ method }) => method === "run.create"),
+    false,
+  );
 });
 
 test("ready package reconstruction verifies exact run source and all locale items", async () => {
@@ -250,7 +264,6 @@ test("ready package reconstruction rejects stale source identity", async () => {
   );
 });
 
-
 test("ready translation run application is compare-and-set and records plan provenance", async () => {
   const calls: unknown[] = [];
   const db = {
@@ -272,7 +285,10 @@ test("ready translation run application is compare-and-set and records plan prov
     data: Record<string, unknown>;
   };
   assert.equal(call.where.id, "run-ready");
-  assert.equal(call.where.status, MerchantPricingTranslationRunStatus.READY_TO_APPLY);
+  assert.equal(
+    call.where.status,
+    MerchantPricingTranslationRunStatus.READY_TO_APPLY,
+  );
   assert.equal(call.data.status, MerchantPricingTranslationRunStatus.APPLIED);
   assert.equal(call.data.appliedMerchantPricingPlanId, "plan-1");
   assert.equal(call.data.appliedAt, now);
@@ -303,16 +319,17 @@ test("draft run validation accepts in-progress and failed matching work but reje
     englishDescription: "English description",
     highlights: [],
   };
-  const dbFor = (status: MerchantPricingTranslationRunStatus) => ({
-    merchantPricingTranslationRun: {
-      findFirst: async () => ({
-        id: "run-draft",
-        shopifyPlanHandle: "starter",
-        sourceHash,
-        status,
-      }),
-    },
-  }) as never;
+  const dbFor = (status: MerchantPricingTranslationRunStatus) =>
+    ({
+      merchantPricingTranslationRun: {
+        findFirst: async () => ({
+          id: "run-draft",
+          shopifyPlanHandle: "starter",
+          sourceHash,
+          status,
+        }),
+      },
+    }) as never;
 
   const processing = await validateMerchantPricingTranslationRunForDraft(
     dbFor(MerchantPricingTranslationRunStatus.PROCESSING),
@@ -340,7 +357,6 @@ test("draft run validation accepts in-progress and failed matching work but reje
     new RegExp(MERCHANT_PRICING_TRANSLATION_ERRORS.runNotPersistable),
   );
 });
-
 
 test("draft save starts a translation run when the browser has not created one", async () => {
   const source = translationSource();
@@ -406,8 +422,14 @@ test("draft save starts a translation run when the browser has not created one",
   );
 
   assert.equal(result.runId, "run-after-save");
-  assert.equal(result.publicationStatus, MerchantPricingPlanPublicationStatus.TRANSLATING);
+  assert.equal(
+    result.publicationStatus,
+    MerchantPricingPlanPublicationStatus.TRANSLATING,
+  );
   assert.equal(createdRuns.length, 1);
   assert.ok(createdItems.length > 0);
-  assert.equal((createdRuns[0] as { sourceHash: string }).sourceHash, sourceHash);
+  assert.equal(
+    (createdRuns[0] as { sourceHash: string }).sourceHash,
+    sourceHash,
+  );
 });

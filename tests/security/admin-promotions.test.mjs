@@ -21,31 +21,52 @@ const sidebar = fs.readFileSync(
   "utf8",
 );
 const form = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-campaign-form.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-campaign-form.tsx",
+  ),
   "utf8",
 );
 const catalog = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-campaign-catalog.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-campaign-catalog.tsx",
+  ),
   "utf8",
 );
 const campaignActions = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-campaign-actions.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-campaign-actions.tsx",
+  ),
   "utf8",
 );
 const reactivation = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-campaign-reactivation.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-campaign-reactivation.tsx",
+  ),
   "utf8",
 );
 const reactivationDrawer = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-campaign-reactivation-drawer.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-campaign-reactivation-drawer.tsx",
+  ),
   "utf8",
 );
 const filters = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-campaign-filters.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-campaign-filters.tsx",
+  ),
   "utf8",
 );
 const drawer = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-campaign-drawer.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-campaign-drawer.tsx",
+  ),
   "utf8",
 );
 const data = fs.readFileSync(
@@ -73,7 +94,10 @@ const reportPage = fs.readFileSync(
   "utf8",
 );
 const promotionTranslations = fs.readFileSync(
-  path.join(root, "src/components/admin/promotions/promotion-translation-workbook.tsx"),
+  path.join(
+    root,
+    "src/components/admin/promotions/promotion-translation-workbook.tsx",
+  ),
   "utf8",
 );
 const translationDropzone = fs.readFileSync(
@@ -94,7 +118,9 @@ test("the promotions page gates target and campaign loading at the SUPER_ADMIN b
     page,
     /if \(principal\.role !== "SUPER_ADMIN"\) redirect\("\/"\)/,
   );
-  const dataLoad = page.indexOf("const campaignsPromise = getPromotionCampaigns");
+  const dataLoad = page.indexOf(
+    "const campaignsPromise = getPromotionCampaigns",
+  );
   assert.ok(page.indexOf('principal.role !== "SUPER_ADMIN"') < dataLoad);
 });
 

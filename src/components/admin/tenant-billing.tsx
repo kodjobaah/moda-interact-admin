@@ -6,7 +6,11 @@ import type {
   TenantBilling,
   TenantDetail,
 } from "@/lib/admin/types";
-import { adminBillingPackStatusLabel, adminBillingReportStateLabel, adminI18n } from "@/i18n";
+import {
+  adminBillingPackStatusLabel,
+  adminBillingReportStateLabel,
+  adminI18n,
+} from "@/i18n";
 import { withParamUpdates } from "@/lib/admin/query";
 import { Pagination } from "./pagination";
 import {
@@ -209,7 +213,9 @@ function Usage({ billing }: { billing: TenantBilling }) {
             value={
               billing.platformDefaultOutboundHardLimit === null
                 ? adminI18n.t("empty.unavailable")
-                : adminI18n.formatNumber(billing.platformDefaultOutboundHardLimit)
+                : adminI18n.formatNumber(
+                    billing.platformDefaultOutboundHardLimit,
+                  )
             }
           />
           <Value

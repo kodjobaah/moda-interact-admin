@@ -8,16 +8,16 @@ export async function createReadinessResponse(
 ) {
   try {
     await withTimeout(databasePing(), timeoutMs);
-    return Response.json({ status: 'ready' });
+    return Response.json({ status: "ready" });
   } catch {
-    return Response.json({ status: 'unavailable' }, { status: 503 });
+    return Response.json({ status: "unavailable" }, { status: 503 });
   }
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(
-      () => reject(new Error('PostgreSQL readiness check timed out')),
+      () => reject(new Error("PostgreSQL readiness check timed out")),
       timeoutMs,
     );
 

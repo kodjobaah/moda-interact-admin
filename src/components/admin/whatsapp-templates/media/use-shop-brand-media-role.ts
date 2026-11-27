@@ -15,10 +15,18 @@ export function useShopBrandMediaRole() {
       const result = await loadTemplateSampleMedia();
       if (sequence.current !== request) return;
       if (result.ok) setMedia(result.media);
-      else setMessage(result.code === "CONFIG_UNAVAILABLE" ? "Public sample media is not configured." : "Could not load sample images.");
+      else
+        setMessage(
+          result.code === "CONFIG_UNAVAILABLE"
+            ? "Public sample media is not configured."
+            : "Could not load sample images.",
+        );
     } catch {
-      if (sequence.current === request) setMessage("Could not load sample images.");
-    } finally { if (sequence.current === request) setPending(false); }
+      if (sequence.current === request)
+        setMessage("Could not load sample images.");
+    } finally {
+      if (sequence.current === request) setPending(false);
+    }
   }, []);
   const load = async () => {
     setPending(true);
@@ -27,9 +35,14 @@ export function useShopBrandMediaRole() {
   };
   useEffect(() => {
     let active = true;
-    queueMicrotask(() => { if (active) void fetchMedia(); });
+    queueMicrotask(() => {
+      if (active) void fetchMedia();
+    });
     const requests = sequence;
-    return () => { active = false; requests.current++; };
+    return () => {
+      active = false;
+      requests.current++;
+    };
   }, [fetchMedia]);
   return { media, pending, message, load };
 }

@@ -1,30 +1,65 @@
 import { layoutAst } from "../fixtures/arch075-common-layout";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { newMetaDraft, newWrapperDraft, formatEditorNodes, parseEditorNodes, insertEditorToken, ensureInitialBasketSummary, removeInitialBasketSummary } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
-import { compileTemplateAst, makeImmutableAuthoringRecord } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
+import {
+  newMetaDraft,
+  newWrapperDraft,
+  formatEditorNodes,
+  parseEditorNodes,
+  insertEditorToken,
+  ensureInitialBasketSummary,
+  removeInitialBasketSummary,
+} from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
+import {
+  compileTemplateAst,
+  makeImmutableAuthoringRecord,
+} from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
 import { validateTemplateAst } from "../../src/lib/admin/whatsapp-templates/authoring/validation.ts";
-import { eligibleVariables, SHOP_BRAND_VARIABLES, VARIABLE_REGISTRY } from "../../src/lib/admin/whatsapp-templates/authoring/registry.ts";
+import {
+  eligibleVariables,
+  SHOP_BRAND_VARIABLES,
+  VARIABLE_REGISTRY,
+} from "../../src/lib/admin/whatsapp-templates/authoring/registry.ts";
 import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
 import { stableJson } from "../../src/lib/admin/whatsapp-templates/authoring/canonical.ts";
-import { makeExamplePreview, makeDraftExamplePreview } from "../../src/lib/admin/whatsapp-templates/authoring/preview.ts";
+import {
+  makeExamplePreview,
+  makeDraftExamplePreview,
+} from "../../src/lib/admin/whatsapp-templates/authoring/preview.ts";
 import type { ContentNode } from "../../src/lib/admin/whatsapp-templates/authoring/types.ts";
 
 const invalid = (draft: unknown, path: string) => {
   const check = validateTemplateAst(draft);
   assert.equal(check.ok, false);
-  if (!check.ok) assert.ok(check.issues.some((i) => i.path.startsWith(path)), JSON.stringify(check.issues));
+  if (!check.ok)
+    assert.ok(
+      check.issues.some((i) => i.path.startsWith(path)),
+      JSON.stringify(check.issues),
+    );
 };
 
 test("all six Meta purposes are valid and typed variables are specific to offer variant", () => {
   for (const stage of ["INITIAL", "FOLLOW_UP"] as const) {
-    for (const offer of ["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"] as const) {
+    for (const offer of [
+      "NO_OFFER",
+      "CODE_OFFER",
+      "AUTOMATIC_OFFER",
+    ] as const) {
       const draft = newMetaDraft(stage, offer);
       assert.equal(validateTemplateAst(draft).ok, true);
       assert.equal(compileTemplateAst(draft).family, "META_RECOVERY");
-      assert.equal(eligibleVariables(draft).includes("checkout.itemsSummary"), stage === "INITIAL");
-      assert.equal(eligibleVariables(draft).includes("offer.code"), offer === "CODE_OFFER");
-      assert.equal(eligibleVariables(draft).includes("offer.description"), offer !== "NO_OFFER");
+      assert.equal(
+        eligibleVariables(draft).includes("checkout.itemsSummary"),
+        stage === "INITIAL",
+      );
+      assert.equal(
+        eligibleVariables(draft).includes("offer.code"),
+        offer === "CODE_OFFER",
+      );
+      assert.equal(
+        eligibleVariables(draft).includes("offer.description"),
+        offer !== "NO_OFFER",
+      );
     }
   }
 });
@@ -33,76 +68,240 @@ test("initial checkout code templates support one immutable multi-code text bind
   const draft = newMetaDraft("INITIAL", "CODE_OFFER");
   draft.promotionTarget = "CHECKOUT";
   draft.body = [
-    { type: "text", value: "Your basket " }, { type: "variable", name: "checkout.itemsSummary" },
-    { type: "text", value: " may qualify for " }, { type: "variable", name: "offer.description" },
-    { type: "text", value: ". Possible codes " }, { type: "variable", name: "offer.codes" },
-    { type: "text", value: ", subject to checkout eligibility.\n\nFrom " }, { type: "variable", name: "shop.name" },
-    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+    { type: "text", value: "Your basket " },
+    { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " may qualify for " },
+    { type: "variable", name: "offer.description" },
+    { type: "text", value: ". Possible codes " },
+    { type: "variable", name: "offer.codes" },
+    { type: "text", value: ", subject to checkout eligibility.\n\nFrom " },
+    { type: "variable", name: "shop.name" },
+    {
+      type: "text",
+      value:
+        ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes).",
+    },
   ];
   assert.ok(eligibleVariables(draft).includes("offer.codes"));
-  const checked = validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" });
-  assert.equal(checked.ok, true, checked.ok ? "" : JSON.stringify(checked.issues));
+  const checked = validateTemplateAst(draft, {
+    requireInitialReply: true,
+    contentLanguageTag: "en",
+  });
+  assert.equal(
+    checked.ok,
+    true,
+    checked.ok ? "" : JSON.stringify(checked.issues),
+  );
   const prepared = compileTemplateAst(draft);
-  if (prepared.family !== "META_RECOVERY") throw new Error("Expected Meta template.");
-  assert.deepEqual(prepared.parameterBindings.body.map(({ variable }) => variable),
-    ["checkout.itemsSummary", "offer.description", "offer.codes", "shop.name"]);
+  if (prepared.family !== "META_RECOVERY")
+    throw new Error("Expected Meta template.");
+  assert.deepEqual(
+    prepared.parameterBindings.body.map(({ variable }) => variable),
+    ["checkout.itemsSummary", "offer.description", "offer.codes", "shop.name"],
+  );
   assert.match(makeExamplePreview(prepared).body, /SAVE10, SHIPFREE/);
 
-  const conflicting = { ...draft, body: [...draft.body, { type: "variable" as const, name: "offer.code" as const }] };
+  const conflicting = {
+    ...draft,
+    body: [
+      ...draft.body,
+      { type: "variable" as const, name: "offer.code" as const },
+    ],
+  };
   invalid(conflicting, "body");
-  const repeated = { ...draft, body: [...draft.body, { type: "variable" as const, name: "offer.codes" as const }] };
+  const repeated = {
+    ...draft,
+    body: [
+      ...draft.body,
+      { type: "variable" as const, name: "offer.codes" as const },
+    ],
+  };
   invalid(repeated, "body");
-  const alternative = { ...draft, promotionTarget: "ALTERNATIVE_PRODUCT" as const,
-    body: [...draft.body, { type: "variable" as const, name: "offer.codes" as const }] };
+  const alternative = {
+    ...draft,
+    promotionTarget: "ALTERNATIVE_PRODUCT" as const,
+    body: [
+      ...draft.body,
+      { type: "variable" as const, name: "offer.codes" as const },
+    ],
+  };
   assert.ok(!eligibleVariables(alternative).includes("offer.codes"));
   invalid(alternative, "body");
 });
 
 test("new initial copy requires trusted shop identity and the specific-message Reply instruction", () => {
   const draft = newMetaDraft();
-  assert.equal(validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" }).ok, true);
-  assert.equal(draft.body.filter((node) => node.type === "variable" && node.name === "checkout.itemsSummary").length, 1);
-  const missingShop = { ...draft, body: draft.body.filter((node) => node.type !== "variable" || node.name !== "shop.name") };
-  const missingShopResult = validateTemplateAst(missingShop, { requireInitialReply: true, contentLanguageTag: "en" });
+  assert.equal(
+    validateTemplateAst(draft, {
+      requireInitialReply: true,
+      contentLanguageTag: "en",
+    }).ok,
+    true,
+  );
+  assert.equal(
+    draft.body.filter(
+      (node) =>
+        node.type === "variable" && node.name === "checkout.itemsSummary",
+    ).length,
+    1,
+  );
+  const missingShop = {
+    ...draft,
+    body: draft.body.filter(
+      (node) => node.type !== "variable" || node.name !== "shop.name",
+    ),
+  };
+  const missingShopResult = validateTemplateAst(missingShop, {
+    requireInitialReply: true,
+    contentLanguageTag: "en",
+  });
   assert.equal(missingShopResult.ok, false);
-  if (!missingShopResult.ok) assert.ok(missingShopResult.issues.some((issue) => issue.path === "body"));
-  const missingBasket = { ...draft, body: draft.body.filter((node) => node.type !== "variable" || node.name !== "checkout.itemsSummary") };
-  assert.equal(validateTemplateAst(missingBasket, { requireInitialReply: true, contentLanguageTag: "en" }).ok, false);
-  const duplicateBasket = { ...draft, body: [...draft.body, { type: "variable" as const, name: "checkout.itemsSummary" as const }] };
-  assert.equal(validateTemplateAst(duplicateBasket, { requireInitialReply: true, contentLanguageTag: "en" }).ok, false);
-  const headerOnly = { ...draft, header: [{ type: "variable" as const, name: "checkout.itemsSummary" as const }],
-    body: draft.body.filter((node) => node.type !== "variable" || node.name !== "checkout.itemsSummary") };
-  const headerOnlyResult = validateTemplateAst(headerOnly, { requireInitialReply: true, contentLanguageTag: "en" });
+  if (!missingShopResult.ok)
+    assert.ok(missingShopResult.issues.some((issue) => issue.path === "body"));
+  const missingBasket = {
+    ...draft,
+    body: draft.body.filter(
+      (node) =>
+        node.type !== "variable" || node.name !== "checkout.itemsSummary",
+    ),
+  };
+  assert.equal(
+    validateTemplateAst(missingBasket, {
+      requireInitialReply: true,
+      contentLanguageTag: "en",
+    }).ok,
+    false,
+  );
+  const duplicateBasket = {
+    ...draft,
+    body: [
+      ...draft.body,
+      { type: "variable" as const, name: "checkout.itemsSummary" as const },
+    ],
+  };
+  assert.equal(
+    validateTemplateAst(duplicateBasket, {
+      requireInitialReply: true,
+      contentLanguageTag: "en",
+    }).ok,
+    false,
+  );
+  const headerOnly = {
+    ...draft,
+    header: [
+      { type: "variable" as const, name: "checkout.itemsSummary" as const },
+    ],
+    body: draft.body.filter(
+      (node) =>
+        node.type !== "variable" || node.name !== "checkout.itemsSummary",
+    ),
+  };
+  const headerOnlyResult = validateTemplateAst(headerOnly, {
+    requireInitialReply: true,
+    contentLanguageTag: "en",
+  });
   assert.equal(headerOnlyResult.ok, false);
-  if (!headerOnlyResult.ok) assert.ok(headerOnlyResult.issues.some((issue) => issue.path.startsWith("header")));
-  const wrongReply = { ...draft, body: draft.body.map((node) => node.type === "text"
-    ? { ...node, value: node.value.replace("Reply option on this message", "message us") } : node) };
-  const result = validateTemplateAst(wrongReply, { requireInitialReply: true, contentLanguageTag: "en" });
+  if (!headerOnlyResult.ok)
+    assert.ok(
+      headerOnlyResult.issues.some((issue) => issue.path.startsWith("header")),
+    );
+  const wrongReply = {
+    ...draft,
+    body: draft.body.map((node) =>
+      node.type === "text"
+        ? {
+            ...node,
+            value: node.value.replace(
+              "Reply option on this message",
+              "message us",
+            ),
+          }
+        : node,
+    ),
+  };
+  const result = validateTemplateAst(wrongReply, {
+    requireInitialReply: true,
+    contentLanguageTag: "en",
+  });
   assert.equal(result.ok, false);
-  if (!result.ok) assert.ok(result.issues.some((issue) => issue.path === "body"));
-  const alt = { ...draft, promotionTarget: "ALTERNATIVE_PRODUCT" as const,
-    body: draft.body.map((node) => node.type === "text" ? { ...node, value: node.value.replace("this basket?", "this offer or your basket?") } : node) };
-  const alternativeResult = validateTemplateAst(alt, { requireInitialReply: true, contentLanguageTag: "en" });
-  assert.equal(alternativeResult.ok, false, "alternative target still needs its product proof bindings");
+  if (!result.ok)
+    assert.ok(result.issues.some((issue) => issue.path === "body"));
+  const alt = {
+    ...draft,
+    promotionTarget: "ALTERNATIVE_PRODUCT" as const,
+    body: draft.body.map((node) =>
+      node.type === "text"
+        ? {
+            ...node,
+            value: node.value.replace(
+              "this basket?",
+              "this offer or your basket?",
+            ),
+          }
+        : node,
+    ),
+  };
+  const alternativeResult = validateTemplateAst(alt, {
+    requireInitialReply: true,
+    contentLanguageTag: "en",
+  });
+  assert.equal(
+    alternativeResult.ok,
+    false,
+    "alternative target still needs its product proof bindings",
+  );
 });
 
 test("initial variant changes preserve one labelled basket node and restore follow-up eligibility", () => {
   const draft = newMetaDraft();
-  const withoutBasket = draft.body.filter((node) => node.type !== "variable" || node.name !== "checkout.itemsSummary");
+  const withoutBasket = draft.body.filter(
+    (node) => node.type !== "variable" || node.name !== "checkout.itemsSummary",
+  );
   const inserted = ensureInitialBasketSummary(withoutBasket);
-  assert.equal(inserted.filter((node) => node.type === "variable" && node.name === "checkout.itemsSummary").length, 1);
-  const bindingIndex = inserted.findIndex((node) => node.type === "variable" && node.name === "checkout.itemsSummary");
+  assert.equal(
+    inserted.filter(
+      (node) =>
+        node.type === "variable" && node.name === "checkout.itemsSummary",
+    ).length,
+    1,
+  );
+  const bindingIndex = inserted.findIndex(
+    (node) => node.type === "variable" && node.name === "checkout.itemsSummary",
+  );
   const labelNode = inserted[bindingIndex - 1];
-  assert.match(labelNode?.type === "text" ? labelNode.value : "", /Original abandoned basket:\s*$/);
-  const duplicated = ensureInitialBasketSummary([...inserted, { type: "variable", name: "checkout.itemsSummary" }]);
-  assert.equal(duplicated.filter((node) => node.type === "variable" && node.name === "checkout.itemsSummary").length, 1);
+  assert.match(
+    labelNode?.type === "text" ? labelNode.value : "",
+    /Original abandoned basket:\s*$/,
+  );
+  const duplicated = ensureInitialBasketSummary([
+    ...inserted,
+    { type: "variable", name: "checkout.itemsSummary" },
+  ]);
+  assert.equal(
+    duplicated.filter(
+      (node) =>
+        node.type === "variable" && node.name === "checkout.itemsSummary",
+    ).length,
+    1,
+  );
   const followUp = removeInitialBasketSummary(inserted);
-  assert.ok(!followUp.some((node) => node.type === "variable" && node.name === "checkout.itemsSummary"));
-  assert.equal(validateTemplateAst({ ...draft, stage: "FOLLOW_UP", body: followUp }).ok, true);
+  assert.ok(
+    !followUp.some(
+      (node) =>
+        node.type === "variable" && node.name === "checkout.itemsSummary",
+    ),
+  );
+  assert.equal(
+    validateTemplateAst({ ...draft, stage: "FOLLOW_UP", body: followUp }).ok,
+    true,
+  );
 });
 
 test("every initial offer and target requires one basket BODY binding for TEXT and IMAGE headers", () => {
-  const variants: Array<{ offer: "NO_OFFER" | "CODE_OFFER" | "AUTOMATIC_OFFER"; target?: "CHECKOUT" | "ALTERNATIVE_PRODUCT" }> = [
+  const variants: Array<{
+    offer: "NO_OFFER" | "CODE_OFFER" | "AUTOMATIC_OFFER";
+    target?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
+  }> = [
     { offer: "NO_OFFER" },
     { offer: "CODE_OFFER", target: "CHECKOUT" },
     { offer: "AUTOMATIC_OFFER", target: "CHECKOUT" },
@@ -110,7 +309,9 @@ test("every initial offer and target requires one basket BODY binding for TEXT a
     { offer: "AUTOMATIC_OFFER", target: "ALTERNATIVE_PRODUCT" },
   ];
   for (const variant of variants) {
-    for (const headerKind of variant.offer === "NO_OFFER" ? ["TEXT"] : ["TEXT", "IMAGE"]) {
+    for (const headerKind of variant.offer === "NO_OFFER"
+      ? ["TEXT"]
+      : ["TEXT", "IMAGE"]) {
       const draft = newMetaDraft("INITIAL", variant.offer);
       if (variant.target) draft.promotionTarget = variant.target;
       if (headerKind === "IMAGE") draft.shopBrandMediaRole = "CHECKOUT_PRODUCT";
@@ -119,35 +320,119 @@ test("every initial offer and target requires one basket BODY binding for TEXT a
         { type: "variable", name: "checkout.itemsSummary" },
       ];
       if (variant.target === "ALTERNATIVE_PRODUCT") {
-        body.push({ type: "text", value: ". A different product " }, { type: "variable", name: "promotion.productName" },
-          { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" });
-        if (variant.offer === "CODE_OFFER") body.push({ type: "text", value: " with code " }, { type: "variable", name: "promotion.code" });
-        body.push({ type: "text", value: ". This offer does not apply to your abandoned basket. Product details: " },
-          { type: "variable", name: "promotion.productUrl" });
-        draft.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
-      } else if (variant.target === "CHECKOUT" && variant.offer === "CODE_OFFER") {
-        body.push({ type: "text", value: " may qualify for " }, { type: "variable", name: "offer.description" },
-          { type: "text", value: " with code " }, { type: "variable", name: "offer.code" });
+        body.push(
+          { type: "text", value: ". A different product " },
+          { type: "variable", name: "promotion.productName" },
+          { type: "text", value: " has " },
+          { type: "variable", name: "promotion.offerDescription" },
+        );
+        if (variant.offer === "CODE_OFFER")
+          body.push(
+            { type: "text", value: " with code " },
+            { type: "variable", name: "promotion.code" },
+          );
+        body.push(
+          {
+            type: "text",
+            value:
+              ". This offer does not apply to your abandoned basket. Product details: ",
+          },
+          { type: "variable", name: "promotion.productUrl" },
+        );
+        draft.buttons = [
+          {
+            type: "url",
+            label: "Resume checkout",
+            urlPrefix: "https://shop.example/checkout?url=",
+            variable: "checkout.url",
+          },
+        ];
+      } else if (
+        variant.target === "CHECKOUT" &&
+        variant.offer === "CODE_OFFER"
+      ) {
+        body.push(
+          { type: "text", value: " may qualify for " },
+          { type: "variable", name: "offer.description" },
+          { type: "text", value: " with code " },
+          { type: "variable", name: "offer.code" },
+        );
       } else if (variant.target === "CHECKOUT") {
-        body.push({ type: "text", value: " may qualify for multiple possible automatic offers subject to checkout eligibility: " },
-          { type: "variable", name: "offer.description" });
+        body.push(
+          {
+            type: "text",
+            value:
+              " may qualify for multiple possible automatic offers subject to checkout eligibility: ",
+          },
+          { type: "variable", name: "offer.description" },
+        );
       }
-      body.push({ type: "text", value: ".\n\nFrom " }, { type: "variable", name: "shop.name" },
-        { type: "text", value: variant.target === "ALTERNATIVE_PRODUCT"
-          ? ". Need help with this offer or your basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)."
-          : ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." });
+      body.push(
+        { type: "text", value: ".\n\nFrom " },
+        { type: "variable", name: "shop.name" },
+        {
+          type: "text",
+          value:
+            variant.target === "ALTERNATIVE_PRODUCT"
+              ? ". Need help with this offer or your basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)."
+              : ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes).",
+        },
+      );
       draft.body = body;
 
-      const accepted = validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" });
-      assert.equal(accepted.ok, true, `${variant.offer}/${variant.target ?? "none"}/${headerKind}: ${accepted.ok ? "" : JSON.stringify(accepted.issues)}`);
-      const missing = { ...draft, body: body.filter((node) => node.type !== "variable" || node.name !== "checkout.itemsSummary") };
-      const missingResult = validateTemplateAst(missing, { requireInitialReply: true, contentLanguageTag: "en" });
-      assert.equal(missingResult.ok, false, `${variant.offer}/${variant.target ?? "none"}/${headerKind} must reject missing basket semantics`);
-      if (!missingResult.ok) assert.ok(missingResult.issues.some((issue) => issue.message.includes("exactly one checkout.itemsSummary")));
-      const duplicate = { ...draft, body: [...body, { type: "variable" as const, name: "checkout.itemsSummary" as const }] };
-      const duplicateResult = validateTemplateAst(duplicate, { requireInitialReply: true, contentLanguageTag: "en" });
-      assert.equal(duplicateResult.ok, false, `${variant.offer}/${variant.target ?? "none"}/${headerKind} must reject duplicate basket semantics`);
-      if (!duplicateResult.ok) assert.ok(duplicateResult.issues.some((issue) => issue.message.includes("exactly one checkout.itemsSummary")));
+      const accepted = validateTemplateAst(draft, {
+        requireInitialReply: true,
+        contentLanguageTag: "en",
+      });
+      assert.equal(
+        accepted.ok,
+        true,
+        `${variant.offer}/${variant.target ?? "none"}/${headerKind}: ${accepted.ok ? "" : JSON.stringify(accepted.issues)}`,
+      );
+      const missing = {
+        ...draft,
+        body: body.filter(
+          (node) =>
+            node.type !== "variable" || node.name !== "checkout.itemsSummary",
+        ),
+      };
+      const missingResult = validateTemplateAst(missing, {
+        requireInitialReply: true,
+        contentLanguageTag: "en",
+      });
+      assert.equal(
+        missingResult.ok,
+        false,
+        `${variant.offer}/${variant.target ?? "none"}/${headerKind} must reject missing basket semantics`,
+      );
+      if (!missingResult.ok)
+        assert.ok(
+          missingResult.issues.some((issue) =>
+            issue.message.includes("exactly one checkout.itemsSummary"),
+          ),
+        );
+      const duplicate = {
+        ...draft,
+        body: [
+          ...body,
+          { type: "variable" as const, name: "checkout.itemsSummary" as const },
+        ],
+      };
+      const duplicateResult = validateTemplateAst(duplicate, {
+        requireInitialReply: true,
+        contentLanguageTag: "en",
+      });
+      assert.equal(
+        duplicateResult.ok,
+        false,
+        `${variant.offer}/${variant.target ?? "none"}/${headerKind} must reject duplicate basket semantics`,
+      );
+      if (!duplicateResult.ok)
+        assert.ok(
+          duplicateResult.issues.some((issue) =>
+            issue.message.includes("exactly one checkout.itemsSummary"),
+          ),
+        );
     }
   }
 });
@@ -156,8 +441,11 @@ test("new initial multi-offer wording does not alter follow-up template validati
   const followUp = newMetaDraft("FOLLOW_UP", "AUTOMATIC_OFFER");
   followUp.promotionTarget = "CHECKOUT";
   followUp.body = [
-    { type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
-    { type: "text", value: " has offer " }, { type: "variable", name: "offer.description" }, { type: "text", value: " subject to eligibility." },
+    { type: "text", value: "Your basket: " },
+    { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " has offer " },
+    { type: "variable", name: "offer.description" },
+    { type: "text", value: " subject to eligibility." },
   ];
   assert.equal(validateTemplateAst(followUp).ok, true);
 });
@@ -166,18 +454,50 @@ test("automatic checkout templates require plural eligibility wording without a 
   const draft = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
   draft.promotionTarget = "CHECKOUT";
   draft.body = [
-    { type: "text", value: "Your basket " }, { type: "variable", name: "checkout.itemsSummary" },
-    { type: "text", value: " may qualify for multiple possible automatic offers, subject to checkout eligibility: " },
-    { type: "variable", name: "offer.description" }, { type: "text", value: ".\n\nFrom " },
+    { type: "text", value: "Your basket " },
+    { type: "variable", name: "checkout.itemsSummary" },
+    {
+      type: "text",
+      value:
+        " may qualify for multiple possible automatic offers, subject to checkout eligibility: ",
+    },
+    { type: "variable", name: "offer.description" },
+    { type: "text", value: ".\n\nFrom " },
     { type: "variable", name: "shop.name" },
-    { type: "text", value: ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes)." },
+    {
+      type: "text",
+      value:
+        ". Need help with this basket? Use WhatsApp's Reply option on this message, then type your question or send a voice note (up to 2 minutes).",
+    },
   ];
-  const checked = validateTemplateAst(draft, { requireInitialReply: true, contentLanguageTag: "en" });
-  assert.equal(checked.ok, true, checked.ok ? "" : JSON.stringify(checked.issues));
+  const checked = validateTemplateAst(draft, {
+    requireInitialReply: true,
+    contentLanguageTag: "en",
+  });
+  assert.equal(
+    checked.ok,
+    true,
+    checked.ok ? "" : JSON.stringify(checked.issues),
+  );
   assert.ok(!eligibleVariables(draft).includes("offer.codes"));
-  const singular = { ...draft, body: draft.body.map((node) => node.type === "text"
-    ? { ...node, value: node.value.replace("multiple possible automatic offers", "a possible automatic offer") } : node) };
-  const result = validateTemplateAst(singular, { requireInitialReply: true, contentLanguageTag: "en" });
+  const singular = {
+    ...draft,
+    body: draft.body.map((node) =>
+      node.type === "text"
+        ? {
+            ...node,
+            value: node.value.replace(
+              "multiple possible automatic offers",
+              "a possible automatic offer",
+            ),
+          }
+        : node,
+    ),
+  };
+  const result = validateTemplateAst(singular, {
+    requireInitialReply: true,
+    contentLanguageTag: "en",
+  });
   assert.equal(result.ok, false);
 });
 
@@ -185,76 +505,188 @@ test("checkout and alternative-product targets freeze distinct proof-backed bind
   const checkout = newMetaDraft("INITIAL", "CODE_OFFER");
   checkout.promotionTarget = "CHECKOUT";
   checkout.body = [
-    { type: "text", value: "Hi " }, { type: "variable", name: "customer.firstName" },
-    { type: "text", value: ", your basket " }, { type: "variable", name: "checkout.itemsSummary" },
-    { type: "text", value: " qualifies for " }, { type: "variable", name: "offer.description" },
-    { type: "text", value: " with code " }, { type: "variable", name: "offer.code" }, { type: "text", value: " subject to eligibility." },
+    { type: "text", value: "Hi " },
+    { type: "variable", name: "customer.firstName" },
+    { type: "text", value: ", your basket " },
+    { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " qualifies for " },
+    { type: "variable", name: "offer.description" },
+    { type: "text", value: " with code " },
+    { type: "variable", name: "offer.code" },
+    { type: "text", value: " subject to eligibility." },
   ];
-  checkout.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  checkout.buttons = [
+    {
+      type: "url",
+      label: "Resume checkout",
+      urlPrefix: "https://shop.example/checkout?url=",
+      variable: "checkout.url",
+    },
+  ];
   assert.equal(validateTemplateAst(checkout).ok, true);
   const checkoutPrepared = compileTemplateAst(checkout);
   assert.equal(checkoutPrepared.family, "META_RECOVERY");
   if (checkoutPrepared.family !== "META_RECOVERY") return;
   assert.equal(checkoutPrepared.parameterBindings.promotionTarget, "CHECKOUT");
-  assert.deepEqual(checkoutPrepared.parameterBindings.body.map((binding) => binding.variable),
-    ["customer.firstName", "checkout.itemsSummary", "offer.description", "offer.code"]);
-  assert.match(makeExamplePreview(checkoutPrepared).body, /Trail Jacket.*example discount.*SAMPLE10/);
+  assert.deepEqual(
+    checkoutPrepared.parameterBindings.body.map((binding) => binding.variable),
+    [
+      "customer.firstName",
+      "checkout.itemsSummary",
+      "offer.description",
+      "offer.code",
+    ],
+  );
+  assert.match(
+    makeExamplePreview(checkoutPrepared).body,
+    /Trail Jacket.*example discount.*SAMPLE10/,
+  );
 
   const alternative = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
   alternative.promotionTarget = "ALTERNATIVE_PRODUCT";
   alternative.body = [
-    { type: "text", value: "Original abandoned basket: " }, { type: "variable", name: "checkout.itemsSummary" },
-    { type: "text", value: ". A different product: " }, { type: "variable", name: "promotion.productName" },
-    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
-    { type: "text", value: ". This offer does not apply to your abandoned basket. See " },
-    { type: "variable", name: "promotion.productUrl" }, { type: "text", value: " for offer details." },
+    { type: "text", value: "Original abandoned basket: " },
+    { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: ". A different product: " },
+    { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " },
+    { type: "variable", name: "promotion.offerDescription" },
+    {
+      type: "text",
+      value: ". This offer does not apply to your abandoned basket. See ",
+    },
+    { type: "variable", name: "promotion.productUrl" },
+    { type: "text", value: " for offer details." },
   ];
   alternative.buttons = checkout.buttons;
   assert.equal(validateTemplateAst(alternative).ok, true);
   const alternativePrepared = compileTemplateAst(alternative);
   assert.equal(alternativePrepared.family, "META_RECOVERY");
   if (alternativePrepared.family !== "META_RECOVERY") return;
-  assert.equal(alternativePrepared.parameterBindings.promotionTarget, "ALTERNATIVE_PRODUCT");
-  assert.deepEqual(alternativePrepared.parameterBindings.body.map((binding) => binding.variable),
-    ["checkout.itemsSummary", "promotion.productName", "promotion.offerDescription", "promotion.productUrl"]);
-  assert.match(makeExamplePreview(alternativePrepared).body, /Original abandoned basket: 1 Trail Jacket, 2 Water Bottles.*different product.*Trail Running Jacket.*current sale price/);
-  assert.equal(alternativePrepared.parameterBindings.buttons[0].variable, "checkout.url");
+  assert.equal(
+    alternativePrepared.parameterBindings.promotionTarget,
+    "ALTERNATIVE_PRODUCT",
+  );
+  assert.deepEqual(
+    alternativePrepared.parameterBindings.body.map(
+      (binding) => binding.variable,
+    ),
+    [
+      "checkout.itemsSummary",
+      "promotion.productName",
+      "promotion.offerDescription",
+      "promotion.productUrl",
+    ],
+  );
+  assert.match(
+    makeExamplePreview(alternativePrepared).body,
+    /Original abandoned basket: 1 Trail Jacket, 2 Water Bottles.*different product.*Trail Running Jacket.*current sale price/,
+  );
+  assert.equal(
+    alternativePrepared.parameterBindings.buttons[0].variable,
+    "checkout.url",
+  );
 
   const ambiguous = { ...alternative, promotionTarget: "CHECKOUT" as const };
   invalid(ambiguous, "body");
-  invalid({ ...alternative, body: alternative.body.filter((node) => node.type !== "variable" || node.name !== "promotion.productUrl") }, "body");
+  invalid(
+    {
+      ...alternative,
+      body: alternative.body.filter(
+        (node) =>
+          node.type !== "variable" || node.name !== "promotion.productUrl",
+      ),
+    },
+    "body",
+  );
   invalid({ ...alternative, buttons: [] }, "buttons");
-  invalid({ ...alternative, body: alternative.body.filter((node) => node.type !== "text" || !node.value.includes("does not apply")) }, "body");
+  invalid(
+    {
+      ...alternative,
+      body: alternative.body.filter(
+        (node) =>
+          node.type !== "text" || !node.value.includes("does not apply"),
+      ),
+    },
+    "body",
+  );
 });
 test("automatic targets reject coupon bindings and code alternatives require a verified code", () => {
   const automatic = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
   automatic.promotionTarget = "CHECKOUT";
-  automatic.body = [{ type: "variable", name: "checkout.itemsSummary" }, { type: "variable", name: "offer.description" }];
-  invalid({ ...automatic, body: [...automatic.body, { type: "variable", name: "offer.code" }] }, "body");
+  automatic.body = [
+    { type: "variable", name: "checkout.itemsSummary" },
+    { type: "variable", name: "offer.description" },
+  ];
+  invalid(
+    {
+      ...automatic,
+      body: [...automatic.body, { type: "variable", name: "offer.code" }],
+    },
+    "body",
+  );
 
   const codeAlternative = newMetaDraft("INITIAL", "CODE_OFFER");
   codeAlternative.promotionTarget = "ALTERNATIVE_PRODUCT";
   codeAlternative.body = [
-    { type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
-    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
-    { type: "text", value: " with code " }, { type: "variable", name: "promotion.code" },
-    { type: "text", value: ". This offer does not apply to your abandoned basket. " },
-    { type: "variable", name: "promotion.productUrl" }, { type: "text", value: " for offer details." },
+    { type: "text", value: "A different product " },
+    { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " },
+    { type: "variable", name: "promotion.offerDescription" },
+    { type: "text", value: " with code " },
+    { type: "variable", name: "promotion.code" },
+    {
+      type: "text",
+      value: ". This offer does not apply to your abandoned basket. ",
+    },
+    { type: "variable", name: "promotion.productUrl" },
+    { type: "text", value: " for offer details." },
   ];
-  codeAlternative.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  codeAlternative.buttons = [
+    {
+      type: "url",
+      label: "Resume checkout",
+      urlPrefix: "https://shop.example/checkout?url=",
+      variable: "checkout.url",
+    },
+  ];
   assert.equal(validateTemplateAst(codeAlternative).ok, true);
-  invalid({ ...codeAlternative, body: codeAlternative.body.filter((node) => node.type !== "variable" || node.name !== "promotion.code") }, "body");
-  invalid({ ...codeAlternative, body: [...codeAlternative.body, { type: "variable", name: "offer.code" }] }, "body");
+  invalid(
+    {
+      ...codeAlternative,
+      body: codeAlternative.body.filter(
+        (node) => node.type !== "variable" || node.name !== "promotion.code",
+      ),
+    },
+    "body",
+  );
+  invalid(
+    {
+      ...codeAlternative,
+      body: [...codeAlternative.body, { type: "variable", name: "offer.code" }],
+    },
+    "body",
+  );
 });
 test("three wrapper audiences each require exactly one response slot", () => {
   for (const audience of ["SHARED", "AI", "HUMAN"] as const) {
-    const draft = audience === "SHARED" ? layoutAst() : newWrapperDraft(audience);
+    const draft =
+      audience === "SHARED" ? layoutAst() : newWrapperDraft(audience);
     assert.equal(validateTemplateAst(draft).ok, true);
     invalid({ ...draft, body: [] }, "body");
-    invalid({ ...draft, body: [...draft.body, { type: "slot", name: "response.body" }] }, "body");
+    invalid(
+      {
+        ...draft,
+        body: [...draft.body, { type: "slot", name: "response.body" }],
+      },
+      "body",
+    );
     const prepared = compileTemplateAst(draft);
     assert.equal(prepared.family, "MODA_CONVERSATION_WRAPPER");
-    assert.match(makeExamplePreview(prepared).body, /Example AI or merchant response/);
+    assert.match(
+      makeExamplePreview(prepared).body,
+      /Example AI or merchant response/,
+    );
   }
 });
 test("server validation rejects arbitrary nodes and fields, placeholder spoofing and ineligible offer variables", () => {
@@ -262,33 +694,67 @@ test("server validation rejects arbitrary nodes and fields, placeholder spoofing
   invalid({ ...draft, body: [{ type: "script", value: "x" }] }, "body");
   invalid({ ...draft, extra: "malicious" }, "root");
   invalid({ ...draft, body: [{ type: "text", value: "{{1}}" }] }, "body");
-  invalid({ ...draft, body: [{ type: "variable", name: "offer.code" }] }, "body");
-  invalid({ ...draft, body: [{ type: "variable", name: "random.member" }] }, "body");
+  invalid(
+    { ...draft, body: [{ type: "variable", name: "offer.code" }] },
+    "body",
+  );
+  invalid(
+    { ...draft, body: [{ type: "variable", name: "random.member" }] },
+    "body",
+  );
   invalid({ ...draft, sourceLanguageTag: "fr" }, "sourceLanguageTag");
   invalid({ ...draft, schemaVersion: 99 }, "schemaVersion");
   invalid({ ...draft, body: [null] }, "body");
-  invalid({ ...draft, header: [{ type: "variable", name: "checkout.url" }] }, "header");
-  invalid({ ...draft, body: [{ type: "text", value: "A".repeat(1100) }] }, "body");
+  invalid(
+    { ...draft, header: [{ type: "variable", name: "checkout.url" }] },
+    "header",
+  );
+  invalid(
+    { ...draft, body: [{ type: "text", value: "A".repeat(1100) }] },
+    "body",
+  );
 });
 test("wrapper checkout URL only inside a checkout.available conditional", () => {
   const draft = newWrapperDraft("AI");
-  invalid({ ...draft, header: [{ type: "variable", name: "checkout.url" }] }, "header");
-  const valid = { ...draft, conditionals: [{ when: "checkout.available", nodes: [{ type: "variable", name: "checkout.url" }] }] };
+  invalid(
+    { ...draft, header: [{ type: "variable", name: "checkout.url" }] },
+    "header",
+  );
+  const valid = {
+    ...draft,
+    conditionals: [
+      {
+        when: "checkout.available",
+        nodes: [{ type: "variable", name: "checkout.url" }],
+      },
+    ],
+  };
   assert.equal(validateTemplateAst(valid).ok, true);
-  invalid({ ...draft, conditionals: [{ when: "unknown", nodes: [] }] }, "conditionals");
+  invalid(
+    { ...draft, conditionals: [{ when: "unknown", nodes: [] }] },
+    "conditionals",
+  );
 });
 test("Meta body variables compile in occurrence order, repeated variables remain positional", () => {
   const draft = newMetaDraft("FOLLOW_UP", "CODE_OFFER");
   draft.body = [
-    { type: "text", value: "Hi " }, { type: "variable", name: "customer.firstName" },
-    { type: "text", value: ", use " }, { type: "variable", name: "offer.code" },
-    { type: "text", value: " at " }, { type: "variable", name: "shop.name" },
-    { type: "text", value: ". Code: " }, { type: "variable", name: "offer.code" }, { type: "text", value: " subject to eligibility." },
+    { type: "text", value: "Hi " },
+    { type: "variable", name: "customer.firstName" },
+    { type: "text", value: ", use " },
+    { type: "variable", name: "offer.code" },
+    { type: "text", value: " at " },
+    { type: "variable", name: "shop.name" },
+    { type: "text", value: ". Code: " },
+    { type: "variable", name: "offer.code" },
+    { type: "text", value: " subject to eligibility." },
   ];
   const prepared = compileTemplateAst(draft);
   assert.equal(prepared.family, "META_RECOVERY");
   if (prepared.family !== "META_RECOVERY") return;
-  assert.deepEqual(prepared.parameterBindings.body.map((b) => b.variable), ["customer.firstName", "offer.code", "shop.name", "offer.code"]);
+  assert.deepEqual(
+    prepared.parameterBindings.body.map((b) => b.variable),
+    ["customer.firstName", "offer.code", "shop.name", "offer.code"],
+  );
   assert.match(String(prepared.components[0].text), /\{\{1\}\}.*\{\{4\}\}/);
   assert.match(makeExamplePreview(prepared).body, /SAMPLE10.*SAMPLE10/);
   const record = makeImmutableAuthoringRecord(draft);
@@ -297,73 +763,151 @@ test("Meta body variables compile in occurrence order, repeated variables remain
 });
 test("restrict Meta dynamic buttons to one supported checkout URL binding", () => {
   const draft = newMetaDraft();
-  draft.buttons = [{ type: "url", label: "Checkout", urlPrefix: "https://store.example.com/redirect?next=", variable: "checkout.url" }];
+  draft.buttons = [
+    {
+      type: "url",
+      label: "Checkout",
+      urlPrefix: "https://store.example.com/redirect?next=",
+      variable: "checkout.url",
+    },
+  ];
   const prepared = compileTemplateAst(draft);
   assert.equal(prepared.family, "META_RECOVERY");
   if (prepared.family !== "META_RECOVERY") return;
-  assert.deepEqual(prepared.parameterBindings.buttons, [{ index: 0, subType: "url", variable: "checkout.url" }]);
+  assert.deepEqual(prepared.parameterBindings.buttons, [
+    { index: 0, subType: "url", variable: "checkout.url" },
+  ]);
   assert.equal(makeExamplePreview(prepared).buttons.length, 1);
-  invalid({ ...draft, buttons: [draft.buttons[0], draft.buttons[0]] }, "buttons");
-  invalid({ ...draft, buttons: [{ ...draft.buttons[0], variable: "offer.code" }] }, "buttons");
-  invalid({ ...draft, buttons: [{ ...draft.buttons[0], urlPrefix: "http://bad.example/" }] }, "buttons");
+  invalid(
+    { ...draft, buttons: [draft.buttons[0], draft.buttons[0]] },
+    "buttons",
+  );
+  invalid(
+    { ...draft, buttons: [{ ...draft.buttons[0], variable: "offer.code" }] },
+    "buttons",
+  );
+  invalid(
+    {
+      ...draft,
+      buttons: [{ ...draft.buttons[0], urlPrefix: "http://bad.example/" }],
+    },
+    "buttons",
+  );
 });
 test("alternative product templates freeze both approved dynamic CTA indexes and semantic bindings", () => {
   const draft = newMetaDraft("INITIAL", "AUTOMATIC_OFFER");
   draft.promotionTarget = "ALTERNATIVE_PRODUCT";
   draft.body = [
-    { type: "text", value: "A different product " }, { type: "variable", name: "promotion.productName" },
-    { type: "text", value: " has " }, { type: "variable", name: "promotion.offerDescription" },
-    { type: "text", value: ". This offer does not apply to your abandoned basket. " },
-    { type: "variable", name: "promotion.productUrl" }, { type: "text", value: " for offer details." },
+    { type: "text", value: "A different product " },
+    { type: "variable", name: "promotion.productName" },
+    { type: "text", value: " has " },
+    { type: "variable", name: "promotion.offerDescription" },
+    {
+      type: "text",
+      value: ". This offer does not apply to your abandoned basket. ",
+    },
+    { type: "variable", name: "promotion.productUrl" },
+    { type: "text", value: " for offer details." },
   ];
   draft.buttons = [
-    { type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/redirect?checkout=", variable: "checkout.url" },
-    { type: "url", label: "View offer", urlPrefix: "https://shop.example/redirect?product=", variable: "promotion.productUrl" },
+    {
+      type: "url",
+      label: "Resume checkout",
+      urlPrefix: "https://shop.example/redirect?checkout=",
+      variable: "checkout.url",
+    },
+    {
+      type: "url",
+      label: "View offer",
+      urlPrefix: "https://shop.example/redirect?product=",
+      variable: "promotion.productUrl",
+    },
   ];
   const record = makeImmutableAuthoringRecord(draft);
-  if (record.prepared.family !== "META_RECOVERY") throw new Error("Expected a Meta prepared snapshot.");
+  if (record.prepared.family !== "META_RECOVERY")
+    throw new Error("Expected a Meta prepared snapshot.");
   assert.deepEqual(record.prepared.parameterBindings.buttons, [
     { index: 0, subType: "url", variable: "checkout.url" },
     { index: 1, subType: "url", variable: "promotion.productUrl" },
   ]);
-  assert.deepEqual((record.prepared.components.find((component) => component.type === "BUTTONS") as any).buttons.map((button: any) => button.text),
-    ["Resume checkout", "View offer"]);
-  assert.match(JSON.stringify(record.prepared.components), /trail-running-jacket/);
-  invalid({ ...draft, buttons: [draft.buttons[0], { ...draft.buttons[1], variable: "checkout.url" }] }, "buttons");
+  assert.deepEqual(
+    (
+      record.prepared.components.find(
+        (component) => component.type === "BUTTONS",
+      ) as any
+    ).buttons.map((button: any) => button.text),
+    ["Resume checkout", "View offer"],
+  );
+  assert.match(
+    JSON.stringify(record.prepared.components),
+    /trail-running-jacket/,
+  );
+  invalid(
+    {
+      ...draft,
+      buttons: [
+        draft.buttons[0],
+        { ...draft.buttons[1], variable: "checkout.url" },
+      ],
+    },
+    "buttons",
+  );
   invalid({ ...draft, promotionTarget: "CHECKOUT" }, "buttons");
 });
 test("canonical hash ignores JSON object key insertion order", () => {
-  assert.equal(stableJson({ b: 2, a: { z: 9, c: 4 } }), stableJson({ a: { c: 4, z: 9 }, b: 2 }));
+  assert.equal(
+    stableJson({ b: 2, a: { z: 9, c: 4 } }),
+    stableJson({ a: { c: 4, z: 9 }, b: 2 }),
+  );
   assert.equal(templateHash({ b: 2, a: 1 }), templateHash({ a: 1, b: 2 }));
 });
-
 
 test("inline composer round-trips AST nodes and inserts semantic tokens at cursor", () => {
   const draft = newMetaDraft();
   const text = formatEditorNodes(draft.body);
   assert.match(text, /\{\{customer\.firstName\}\}/);
-  assert.deepEqual(parseEditorNodes(text, { variables: eligibleVariables(draft) }), draft.body);
+  assert.deepEqual(
+    parseEditorNodes(text, { variables: eligibleVariables(draft) }),
+    draft.body,
+  );
   const insertion = insertEditorToken("Hello Alex", "shop.name", 6, 10);
   assert.equal(insertion.text, "Hello {{shop.name}}");
   assert.equal(insertion.caret, insertion.text.length);
-  const nodes = parseEditorNodes(insertion.text, { variables: eligibleVariables(draft) });
-  assert.deepEqual(nodes, [{ type: "text", value: "Hello " }, { type: "variable", name: "shop.name" }]);
+  const nodes = parseEditorNodes(insertion.text, {
+    variables: eligibleVariables(draft),
+  });
+  assert.deepEqual(nodes, [
+    { type: "text", value: "Hello " },
+    { type: "variable", name: "shop.name" },
+  ]);
 });
 
 test("inline composer never upgrades unknown or ineligible token text to AST variables", () => {
   const draft = newMetaDraft();
-  const invalidOffer = parseEditorNodes("Hi {{offer.code}}", { variables: eligibleVariables(draft) });
+  const invalidOffer = parseEditorNodes("Hi {{offer.code}}", {
+    variables: eligibleVariables(draft),
+  });
   invalid({ ...draft, body: invalidOffer }, "body");
-  const unknown = parseEditorNodes("Hi {{random.field}}", { variables: eligibleVariables(draft) });
+  const unknown = parseEditorNodes("Hi {{random.field}}", {
+    variables: eligibleVariables(draft),
+  });
   invalid({ ...draft, body: unknown }, "body");
-  const response = parseEditorNodes("Before {{response.body}} after", { variables: [] , allowResponseSlot: true });
+  const response = parseEditorNodes("Before {{response.body}} after", {
+    variables: [],
+    allowResponseSlot: true,
+  });
   assert.equal(response.filter((node) => node.type === "slot").length, 1);
-  assert.equal(validateTemplateAst({ ...newWrapperDraft("AI"), body: response }).ok, true);
+  assert.equal(
+    validateTemplateAst({ ...newWrapperDraft("AI"), body: response }).ok,
+    true,
+  );
 });
 
 test("draft preview remains visible while a button is invalid without creating a prepared projection", () => {
   const draft = newMetaDraft();
-  draft.buttons = [{ type: "url", label: "Return to checkout", urlPrefix: "https://" }];
+  draft.buttons = [
+    { type: "url", label: "Return to checkout", urlPrefix: "https://" },
+  ];
   assert.equal(validateTemplateAst(draft).ok, false);
   const preview = makeDraftExamplePreview(draft);
   assert.match(preview.body, /Alex[\s\S]*Example Shop/);
@@ -373,32 +917,67 @@ test("draft preview remains visible while a button is invalid without creating a
 
 test("ShopBrand exposes every merchant-display content field as a semantic variable", () => {
   const expected = [
-    "shopBrand.brandName", "shopBrand.logoUrl", "shopBrand.logoAltText",
-    "shopBrand.logoWidth", "shopBrand.logoHeight", "shopBrand.squareLogoUrl",
-    "shopBrand.squareLogoAltText", "shopBrand.coverImageUrl",
+    "shopBrand.brandName",
+    "shopBrand.logoUrl",
+    "shopBrand.logoAltText",
+    "shopBrand.logoWidth",
+    "shopBrand.logoHeight",
+    "shopBrand.squareLogoUrl",
+    "shopBrand.squareLogoAltText",
+    "shopBrand.coverImageUrl",
   ];
   assert.deepEqual(SHOP_BRAND_VARIABLES, expected);
   for (const field of expected) {
     const name = field as (typeof SHOP_BRAND_VARIABLES)[number];
-    assert.equal(VARIABLE_REGISTRY[name].sourceField, `ShopBrand.${field.slice("shopBrand.".length)}`);
+    assert.equal(
+      VARIABLE_REGISTRY[name].sourceField,
+      `ShopBrand.${field.slice("shopBrand.".length)}`,
+    );
     assert.ok(VARIABLE_REGISTRY[name].sample.trim());
   }
-  for (const draft of [newMetaDraft(), newWrapperDraft("AI"), newWrapperDraft("HUMAN")]) {
-    assert.deepEqual(eligibleVariables(draft).filter((v) => v.startsWith("shopBrand.")), expected);
+  for (const draft of [
+    newMetaDraft(),
+    newWrapperDraft("AI"),
+    newWrapperDraft("HUMAN"),
+  ]) {
+    assert.deepEqual(
+      eligibleVariables(draft).filter((v) => v.startsWith("shopBrand.")),
+      expected,
+    );
     for (const name of expected) {
-      const nodes = parseEditorNodes(`From {{${name}}}`, { variables: eligibleVariables(draft) });
+      const nodes = parseEditorNodes(`From {{${name}}}`, {
+        variables: eligibleVariables(draft),
+      });
       // The parser can produce response slots for wrappers; Meta bodies cannot contain them.
-      const contentNodes = nodes.filter((node): node is ContentNode => node.type !== "slot");
+      const contentNodes = nodes.filter(
+        (node): node is ContentNode => node.type !== "slot",
+      );
       if (draft.family === "META_RECOVERY") {
-        const candidate = { ...draft, body: [...contentNodes, { type: "text" as const, value: " sends this update." }] };
+        const candidate = {
+          ...draft,
+          body: [
+            ...contentNodes,
+            { type: "text" as const, value: " sends this update." },
+          ],
+        };
         assert.equal(validateTemplateAst(candidate).ok, true, name);
-        assert.doesNotMatch(makeDraftExamplePreview(candidate).body, /\{\{shopBrand\./);
+        assert.doesNotMatch(
+          makeDraftExamplePreview(candidate).body,
+          /\{\{shopBrand\./,
+        );
       } else {
         // Retain the mandatory response.body slot when testing a wrapper body.
         const candidate = { ...draft, body: [...draft.body, ...nodes] };
         assert.equal(validateTemplateAst(candidate).ok, true, name);
-        assert.equal(validateTemplateAst({ ...draft, footer: contentNodes }).ok, true, name);
-        assert.doesNotMatch(makeDraftExamplePreview(candidate).body, /\{\{shopBrand\./);
+        assert.equal(
+          validateTemplateAst({ ...draft, footer: contentNodes }).ok,
+          true,
+          name,
+        );
+        assert.doesNotMatch(
+          makeDraftExamplePreview(candidate).body,
+          /\{\{shopBrand\./,
+        );
       }
     }
   }
@@ -410,56 +989,104 @@ test("Meta text header supports one brand variable, freezes its positional bindi
     { type: "text", value: "From " },
     { type: "variable", name: "shopBrand.brandName" },
   ];
-  draft.body = [{ type: "text", value: "Visit " }, { type: "variable", name: "shopBrand.logoUrl" }, { type: "text", value: " to view our logo." }];
+  draft.body = [
+    { type: "text", value: "Visit " },
+    { type: "variable", name: "shopBrand.logoUrl" },
+    { type: "text", value: " to view our logo." },
+  ];
   const prepared = compileTemplateAst(draft);
   assert.equal(prepared.family, "META_RECOVERY");
   if (prepared.family !== "META_RECOVERY") return;
-  assert.deepEqual(prepared.parameterBindings.header, [{ position: 1, variable: "shopBrand.brandName" }]);
-  assert.deepEqual(prepared.parameterBindings.body, [{ position: 1, variable: "shopBrand.logoUrl" }]);
+  assert.deepEqual(prepared.parameterBindings.header, [
+    { position: 1, variable: "shopBrand.brandName" },
+  ]);
+  assert.deepEqual(prepared.parameterBindings.body, [
+    { position: 1, variable: "shopBrand.logoUrl" },
+  ]);
   assert.deepEqual(prepared.components[0], {
-    type: "HEADER", format: "TEXT", text: "From {{1}}", example: { header_text: ["Example Brand"] },
+    type: "HEADER",
+    format: "TEXT",
+    text: "From {{1}}",
+    example: { header_text: ["Example Brand"] },
   });
   assert.match(makeExamplePreview(prepared).header, /From Example Brand/);
-  assert.match(makeExamplePreview(prepared).body, /example.com\/brand\/logo.png/);
-  invalid({ ...draft, header: [...draft.header, { type: "variable", name: "shopBrand.logoAltText" }] }, "header");
-  invalid({ ...draft, header: [{ type: "variable", name: "shopBrand.coverImageUrl" }] }, "header");
-  invalid({ ...draft, footer: [{ type: "variable", name: "shopBrand.brandName" }] }, "footer");
+  assert.match(
+    makeExamplePreview(prepared).body,
+    /example.com\/brand\/logo.png/,
+  );
+  invalid(
+    {
+      ...draft,
+      header: [
+        ...draft.header,
+        { type: "variable", name: "shopBrand.logoAltText" },
+      ],
+    },
+    "header",
+  );
+  invalid(
+    {
+      ...draft,
+      header: [{ type: "variable", name: "shopBrand.coverImageUrl" }],
+    },
+    "header",
+  );
+  invalid(
+    { ...draft, footer: [{ type: "variable", name: "shopBrand.brandName" }] },
+    "footer",
+  );
 });
 
 test("wrapper header body and footer accept ShopBrand variables as runtime tokens", () => {
   const draft = newWrapperDraft("AI");
   draft.header = [{ type: "variable", name: "shopBrand.brandName" }];
-  draft.body = [{ type: "text", value: "Reply: " }, { type: "slot", name: "response.body" },
-    { type: "text", value: " (" }, { type: "variable", name: "shopBrand.logoWidth" }, { type: "text", value: ")" }];
+  draft.body = [
+    { type: "text", value: "Reply: " },
+    { type: "slot", name: "response.body" },
+    { type: "text", value: " (" },
+    { type: "variable", name: "shopBrand.logoWidth" },
+    { type: "text", value: ")" },
+  ];
   draft.footer = [{ type: "variable", name: "shopBrand.logoAltText" }];
   const prepared = compileTemplateAst(draft);
   assert.equal(prepared.family, "MODA_CONVERSATION_WRAPPER");
   if (prepared.family !== "MODA_CONVERSATION_WRAPPER") return;
-  assert.deepEqual(prepared.header, [{ kind: "variable", name: "shopBrand.brandName" }]);
-  assert.deepEqual(prepared.footer, [{ kind: "variable", name: "shopBrand.logoAltText" }]);
+  assert.deepEqual(prepared.header, [
+    { kind: "variable", name: "shopBrand.brandName" },
+  ]);
+  assert.deepEqual(prepared.footer, [
+    { kind: "variable", name: "shopBrand.logoAltText" },
+  ]);
   const preview = makeExamplePreview(prepared);
   assert.equal(preview.header, "Example Brand");
   assert.equal(preview.footer, "Example Brand logo");
   assert.match(preview.body, /240/);
-  invalid({ ...draft, footer: [{ type: "variable", name: "shopBrand.secret" }] }, "footer");
+  invalid(
+    { ...draft, footer: [{ type: "variable", name: "shopBrand.secret" }] },
+    "footer",
+  );
 });
-
 
 test("pre-existing saved Meta projections without header bindings remain previewable", () => {
   const prepared = compileTemplateAst(newMetaDraft());
   assert.equal(prepared.family, "META_RECOVERY");
   if (prepared.family !== "META_RECOVERY") return;
-  const oldProjection = { ...prepared, parameterBindings: {
-    body: prepared.parameterBindings.body, buttons: prepared.parameterBindings.buttons,
-  } };
+  const oldProjection = {
+    ...prepared,
+    parameterBindings: {
+      body: prepared.parameterBindings.body,
+      buttons: prepared.parameterBindings.buttons,
+    },
+  };
   assert.match(makeExamplePreview(oldProjection).body, /Alex/);
 });
-
 
 test("taxonomy-backed shop category is a typed Meta body binding, never a shop-specific literal", () => {
   const draft = newMetaDraft();
   assert.ok(eligibleVariables(draft).includes("shop.categoryName"));
-  assert.ok(!eligibleVariables(newWrapperDraft()).includes("shop.categoryName"));
+  assert.ok(
+    !eligibleVariables(newWrapperDraft()).includes("shop.categoryName"),
+  );
   draft.body = [
     { type: "text", value: "We offer " },
     { type: "variable", name: "shop.categoryName" },
@@ -475,11 +1102,35 @@ test("taxonomy-backed shop category is a typed Meta body binding, never a shop-s
     { position: 1, variable: "shop.categoryName" },
     { position: 2, variable: "shop.name" },
   ]);
-  assert.equal((result.components[0] as { text: string }).text, "We offer {{1}}. Visit {{2}} again.");
-  assert.match(makeExamplePreview(result).body, /outdoor clothing and accessories/);
-  assert.equal(result.components[0].example && typeof result.components[0].example === "object", true);
-  assert.equal(VARIABLE_REGISTRY["shop.categoryName"].sourceField, "CommerceShopProfile.activeCategory.displayName");
-  invalid({ ...draft, header: [{ type: "variable", name: "shop.categoryName" }] }, "header");
-  invalid({ ...newWrapperDraft(), body: [{ type: "slot", name: "response.body" },
-    { type: "variable", name: "shop.categoryName" }] }, "body");
+  assert.equal(
+    (result.components[0] as { text: string }).text,
+    "We offer {{1}}. Visit {{2}} again.",
+  );
+  assert.match(
+    makeExamplePreview(result).body,
+    /outdoor clothing and accessories/,
+  );
+  assert.equal(
+    result.components[0].example &&
+      typeof result.components[0].example === "object",
+    true,
+  );
+  assert.equal(
+    VARIABLE_REGISTRY["shop.categoryName"].sourceField,
+    "CommerceShopProfile.activeCategory.displayName",
+  );
+  invalid(
+    { ...draft, header: [{ type: "variable", name: "shop.categoryName" }] },
+    "header",
+  );
+  invalid(
+    {
+      ...newWrapperDraft(),
+      body: [
+        { type: "slot", name: "response.body" },
+        { type: "variable", name: "shop.categoryName" },
+      ],
+    },
+    "body",
+  );
 });

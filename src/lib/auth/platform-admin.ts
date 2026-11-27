@@ -1,12 +1,12 @@
-import { PlatformAdminRole } from '@prisma/client';
-import { cache } from 'react';
+import { PlatformAdminRole } from "@prisma/client";
+import { cache } from "react";
 
-import { logAdminSecurityEvent } from './audit.ts';
+import { logAdminSecurityEvent } from "./audit.ts";
 import {
   assertPlatformAdminAuthRoutingConfiguration,
   isDevelopmentAuthBypass,
-} from './environment.ts';
-import { isAuthorizedPlatformAdmin } from './security-policy.ts';
+} from "./environment.ts";
+import { isAuthorizedPlatformAdmin } from "./security-policy.ts";
 
 export type PlatformAdminSession = {
   email?: string;
@@ -32,13 +32,13 @@ export type PlatformAdminPrincipal = {
 
 export class PlatformAdminUnauthorizedError extends Error {
   constructor() {
-    super('Platform administrator authorization is required.');
-    this.name = 'PlatformAdminUnauthorizedError';
+    super("Platform administrator authorization is required.");
+    this.name = "PlatformAdminUnauthorizedError";
   }
 }
 
 const DEVELOPMENT_PRINCIPAL: PlatformAdminPrincipal = {
-  id: 'development-platform-admin',
+  id: "development-platform-admin",
   role: PlatformAdminRole.SUPER_ADMIN,
   developmentBypass: true,
 };
@@ -46,48 +46,49 @@ const DEVELOPMENT_PRINCIPAL: PlatformAdminPrincipal = {
 export async function resolvePlatformAdminPrincipal(
   dependencies: PlatformAdminResolverDependencies,
 ): Promise<PlatformAdminPrincipal | null> {
-    if (isDevelopmentAuthBypass()) {
-      logAdminSecurityEvent('admin.auth.development_bypass', {
-        action: 'authenticate',
-        outcome: 'allowed',
-        developmentBypass: true,
-      });
-      return DEVELOPMENT_PRINCIPAL;
-    }
+  if (isDevelopmentAuthBypass()) {
+    logAdminSecurityEvent("admin.auth.development_bypass", {
+      action: "authenticate",
+      outcome: "allowed",
+      developmentBypass: true,
+    });
+    return DEVELOPMENT_PRINCIPAL;
+  }
 
-    assertPlatformAdminAuthRoutingConfiguration();
+  assertPlatformAdminAuthRoutingConfiguration();
 
-    const user = await dependencies.getSession();
-    const email = user?.email?.trim().toLowerCase();
-    const providerSubject = user?.providerSubject;
-    if (!email || !providerSubject) return null;
+  const user = await dependencies.getSession();
+  const email = user?.email?.trim().toLowerCase();
+  const providerSubject = user?.providerSubject;
+  if (!email || !providerSubject) return null;
 
-    const admin = await dependencies.findByEmail(email);
+  const admin = await dependencies.findByEmail(email);
 
-    if (!admin || !isAuthorizedPlatformAdmin(admin, providerSubject)) return null;
+  if (!admin || !isAuthorizedPlatformAdmin(admin, providerSubject)) return null;
 
-    return {
-      id: admin.id,
-      role: admin.role,
-      developmentBypass: false,
-    };
+  return {
+    id: admin.id,
+    role: admin.role,
+    developmentBypass: false,
+  };
 }
 
 const resolvePlatformAdminPrincipalCached = cache(() =>
   resolvePlatformAdminPrincipal({
     getSession: async () => {
-      const { auth } = await import('../../auth');
+      const { auth } = await import("../../auth");
       const session = await auth();
       return session?.user
         ? {
             email: session.user.email ?? undefined,
-            providerSubject: (session.user as typeof session.user & { providerSubject?: string })
-              .providerSubject,
+            providerSubject: (
+              session.user as typeof session.user & { providerSubject?: string }
+            ).providerSubject,
           }
         : null;
     },
     findByEmail: async (email) => {
-      const { prisma } = await import('../prisma');
+      const { prisma } = await import("../prisma");
       return prisma.platformAdmin.findUnique({
         where: { email },
         select: {
@@ -109,8 +110,8 @@ export async function getPlatformAdminPrincipal(): Promise<PlatformAdminPrincipa
 export async function requirePlatformAdminPage(): Promise<PlatformAdminPrincipal> {
   const principal = await getPlatformAdminPrincipal();
   if (!principal) {
-    const { redirect } = await import('next/navigation');
-    redirect('/login');
+    const { redirect } = await import("next/navigation");
+    redirect("/login");
     throw new PlatformAdminUnauthorizedError();
   }
   return principal;
@@ -120,9 +121,9 @@ function requirePrincipal(
   principal: PlatformAdminPrincipal | null,
 ): PlatformAdminPrincipal {
   if (!principal) {
-    logAdminSecurityEvent('admin.authorization.denied', {
-      outcome: 'denied',
-      reasonCode: 'platform_admin_required',
+    logAdminSecurityEvent("admin.authorization.denied", {
+      outcome: "denied",
+      reasonCode: "platform_admin_required",
     });
     throw new PlatformAdminUnauthorizedError();
   }

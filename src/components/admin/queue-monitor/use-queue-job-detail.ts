@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useReducer, useRef } from "react";
-import { fetchQueueJobDetail, QueueJobDetailHttpError } from "./queue-monitor.client.ts";
+import {
+  fetchQueueJobDetail,
+  QueueJobDetailHttpError,
+} from "./queue-monitor.client.ts";
 import type { QueueJobDetail, QueueJobStatus } from "./queue-monitor.types.ts";
 import type { QueueJobsSelectionInvalidationReason } from "./use-queue-jobs.ts";
 
@@ -15,7 +18,10 @@ export type QueueJobDetailState = {
 export type QueueJobDetailStateAction =
   | { type: "job-selected"; jobId: string }
   | { type: "selection-cleared" }
-  | { type: "selection-invalidated"; reason: QueueJobsSelectionInvalidationReason }
+  | {
+      type: "selection-invalidated";
+      reason: QueueJobsSelectionInvalidationReason;
+    }
   | { type: "request-succeeded"; detail: QueueJobDetail }
   | { type: "request-failed"; error: string }
   | { type: "request-finished" };
@@ -48,7 +54,8 @@ export function reduceQueueJobDetailState(
         ...state,
         selectedJobId: null,
         jobDetail: null,
-        ...(action.reason === "queue-selection" || action.reason === "jobs-replaced"
+        ...(action.reason === "queue-selection" ||
+        action.reason === "jobs-replaced"
           ? { jobDetailError: null, jobDetailLoading: false }
           : {}),
       };
@@ -106,15 +113,23 @@ export function useQueueJobDetail({
     const controller = new AbortController();
     requestRef.current?.abort();
     requestRef.current = controller;
-    void fetchQueueJobDetail({
-      queue: selectedQueueName,
-      status,
-      jobId: state.selectedJobId,
-    }, controller.signal)
+    void fetchQueueJobDetail(
+      {
+        queue: selectedQueueName,
+        status,
+        jobId: state.selectedJobId,
+      },
+      controller.signal,
+    )
       .then((detail) => dispatch({ type: "request-succeeded", detail }))
       .catch((error: unknown) => {
-        const message = getQueueJobDetailError(error, jobGoneError, unavailableError);
-        if (message !== null) dispatch({ type: "request-failed", error: message });
+        const message = getQueueJobDetailError(
+          error,
+          jobGoneError,
+          unavailableError,
+        );
+        if (message !== null)
+          dispatch({ type: "request-failed", error: message });
       })
       .finally(() => {
         if (requestRef.current === controller) {

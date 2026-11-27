@@ -18,22 +18,44 @@ function matchingEvidence(snapshot: SenderSnapshot, phoneId: string) {
         SELECT 1 FROM whatsapp."ConversationDeliveryPart" p WHERE p."messageId"=m.id AND ${part} AND (p."providerDispatchAdmittedAt" IS NOT NULL OR p."providerMessageId" IS NOT NULL OR p."acknowledgedAt" IS NOT NULL)))
   )`;
 }
-export async function assertNoLegacySenderUse(tx: Prisma.TransactionClient, snapshot: SenderSnapshot, phoneId: string): Promise<void> {
+export async function assertNoLegacySenderUse(
+  tx: Prisma.TransactionClient,
+  snapshot: SenderSnapshot,
+  phoneId: string,
+): Promise<void> {
   const evidence = matchingEvidence(snapshot, phoneId);
-  const general = await tx.$queryRaw<Array<{ blocked: boolean }>>(Prisma.sql`${evidence}
+  const general = await tx.$queryRaw<
+    Array<{ blocked: boolean }>
+  >(Prisma.sql`${evidence}
     SELECT EXISTS(SELECT 1 FROM evidence e JOIN whatsapp."Conversation" c ON c.id=e."conversationId"
       WHERE c."checkoutRecoveryId" IS NULL AND (e.inflight OR c.outcome='IN_PROGRESS' AND
       ((c."lastInboundAt" AT TIME ZONE 'UTC')>=CURRENT_TIMESTAMP-INTERVAL '24 hours' OR (e.confirmed AT TIME ZONE 'UTC')>=CURRENT_TIMESTAMP-INTERVAL '24 hours' OR e.part_confirmed>=CURRENT_TIMESTAMP-INTERVAL '24 hours'))) AS blocked`);
   if (general[0]?.blocked) throw new SenderPoolError("LEGACY_SENDER_IN_USE");
-  const candidate = await tx.$queryRaw<Array<{ blocked: boolean }>>(Prisma.sql`${evidence}
+  const candidate = await tx.$queryRaw<
+    Array<{ blocked: boolean }>
+  >(Prisma.sql`${evidence}
     SELECT EXISTS(SELECT 1 FROM evidence e JOIN whatsapp."Conversation" c ON c.id=e."conversationId"
       JOIN commerce."CheckoutRecovery" r ON r.id=c."checkoutRecoveryId"
       WHERE r.status IN ('DETECTED','MESSAGE_SENT','ENGAGED') AND NOT EXISTS(SELECT 1 FROM whatsapp."RecoverySenderAssignment" a WHERE a."conversationId"=c.id)) AS blocked`);
   if (!candidate[0]?.blocked) return;
-  const config = await tx.backgroundRuntimeConfig.findUnique({ where: { id: "default" }, select: { checkoutRecoveryLifetimeDays: true } });
+  const config = await tx.backgroundRuntimeConfig.findUnique({
+    where: { id: "default" },
+    select: { checkoutRecoveryLifetimeDays: true },
+  });
   const days = config?.checkoutRecoveryLifetimeDays;
-  if (typeof days !== "number" || !Number.isInteger(days) || days < 0 || days > 2147483647) throw new SenderPoolError("DB_UNAVAILABLE", new Error("Invalid recovery lifetime configuration"));
-  const recovery = await tx.$queryRaw<Array<{ blocked: boolean }>>(Prisma.sql`${evidence}
+  if (
+    typeof days !== "number" ||
+    !Number.isInteger(days) ||
+    days < 0 ||
+    days > 2147483647
+  )
+    throw new SenderPoolError(
+      "DB_UNAVAILABLE",
+      new Error("Invalid recovery lifetime configuration"),
+    );
+  const recovery = await tx.$queryRaw<
+    Array<{ blocked: boolean }>
+  >(Prisma.sql`${evidence}
     SELECT EXISTS(SELECT 1 FROM evidence e JOIN whatsapp."Conversation" c ON c.id=e."conversationId"
       JOIN commerce."CheckoutRecovery" r ON r.id=c."checkoutRecoveryId"
       WHERE r.status IN ('DETECTED','MESSAGE_SENT','ENGAGED') AND NOT EXISTS(SELECT 1 FROM whatsapp."RecoverySenderAssignment" a WHERE a."conversationId"=c.id)

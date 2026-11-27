@@ -59,10 +59,7 @@ function stateAction(
     );
   }
 
-  if (
-    item.resolutionState === "CATALOGUE_INACTIVE" &&
-    item.cataloguePlan
-  ) {
+  if (item.resolutionState === "CATALOGUE_INACTIVE" && item.cataloguePlan) {
     return (
       <Link
         href={buildUrl("/billing", {
@@ -391,15 +388,17 @@ export function UnmappedSubscriptionDrawer({
         ) : null}
 
         {cataloguePlan ? (
-          <section className={`rounded-lg border p-5 ${
-            shopifyContract?.status === "VERIFIED"
-              ? "border-green-200 bg-green-50"
-              : shopifyContract?.status === "MONETARY_MISMATCH"
-                ? "border-amber-200 bg-amber-50"
-                : shopifyContract?.status === "MISMATCH"
-                  ? "border-red-200 bg-red-50"
-                  : "border-amber-200 bg-amber-50"
-          }`}>
+          <section
+            className={`rounded-lg border p-5 ${
+              shopifyContract?.status === "VERIFIED"
+                ? "border-green-200 bg-green-50"
+                : shopifyContract?.status === "MONETARY_MISMATCH"
+                  ? "border-amber-200 bg-amber-50"
+                  : shopifyContract?.status === "MISMATCH"
+                    ? "border-red-200 bg-red-50"
+                    : "border-amber-200 bg-amber-50"
+            }`}
+          >
             <h3 className="text-base font-semibold text-gray-950">
               Shopify contract validation
             </h3>
@@ -421,11 +420,14 @@ export function UnmappedSubscriptionDrawer({
             ) : null}
             {shopifyContract?.providerItems.length ? (
               <div className="mt-4">
-                <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">Shopify subscription items</p>
+                <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                  Shopify subscription items
+                </p>
                 <ul className="mt-2 space-y-1 text-sm text-gray-800">
                   {shopifyContract.providerItems.map((item) => (
                     <li key={`${item.handle}-${item.pricingType}`}>
-                      <span className="font-medium">{item.handle}</span> — {item.pricingType} · {item.currency}
+                      <span className="font-medium">{item.handle}</span> —{" "}
+                      {item.pricingType} · {item.currency}
                     </li>
                   ))}
                 </ul>
@@ -506,7 +508,6 @@ export function UnmappedSubscriptionDrawer({
               />
             </label>
 
-
             {monetaryOverrideAvailable ? (
               <label className="flex gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
                 <input
@@ -532,8 +533,9 @@ export function UnmappedSubscriptionDrawer({
 
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               Saving repairs the global exact-handle BillingPlan and requests
-              reconciliation. It does not directly set this subscription to ACTIVE
-              or assign planId; Shopify will be re-read by billing reconciliation.
+              reconciliation. It does not directly set this subscription to
+              ACTIVE or assign planId; Shopify will be re-read by billing
+              reconciliation.
             </div>
 
             <button

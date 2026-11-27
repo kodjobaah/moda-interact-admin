@@ -34,14 +34,20 @@ export function BillingReconciliationConsoleDebug({
         console.info("[billing-reconciliation] status", status);
 
         if (!status.found) {
-          console.warn("[billing-reconciliation] subscription no longer exists", {
-            subscriptionId,
-          });
+          console.warn(
+            "[billing-reconciliation] subscription no longer exists",
+            {
+              subscriptionId,
+            },
+          );
           return;
         }
 
         if (status.status !== "UNMAPPED") {
-          console.info("[billing-reconciliation] reconciliation completed", status);
+          console.info(
+            "[billing-reconciliation] reconciliation completed",
+            status,
+          );
           return;
         }
 

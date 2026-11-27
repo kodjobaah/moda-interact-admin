@@ -21,15 +21,52 @@ function andClauses(
 }
 
 test("derives all five catalogue states from status and the time window", () => {
-  assert.equal(derivePromotionCatalogueState({ status: "DRAFT", startsAt, expiresAt }, now), "DRAFT");
-  assert.equal(derivePromotionCatalogueState({ status: "ACTIVE", startsAt, expiresAt }, now), "SCHEDULED");
-  assert.equal(derivePromotionCatalogueState({ status: "ACTIVE", startsAt: now, expiresAt }, now), "RUNNING");
-  assert.equal(derivePromotionCatalogueState({ status: "ACTIVE", startsAt: new Date("2026-09-01T00:00:00.000Z"), expiresAt: now }, now), "EXPIRED");
-  assert.equal(derivePromotionCatalogueState({ status: "CLOSED", startsAt, expiresAt }, now), "CLOSED");
+  assert.equal(
+    derivePromotionCatalogueState(
+      { status: "DRAFT", startsAt, expiresAt },
+      now,
+    ),
+    "DRAFT",
+  );
+  assert.equal(
+    derivePromotionCatalogueState(
+      { status: "ACTIVE", startsAt, expiresAt },
+      now,
+    ),
+    "SCHEDULED",
+  );
+  assert.equal(
+    derivePromotionCatalogueState(
+      { status: "ACTIVE", startsAt: now, expiresAt },
+      now,
+    ),
+    "RUNNING",
+  );
+  assert.equal(
+    derivePromotionCatalogueState(
+      {
+        status: "ACTIVE",
+        startsAt: new Date("2026-09-01T00:00:00.000Z"),
+        expiresAt: now,
+      },
+      now,
+    ),
+    "EXPIRED",
+  );
+  assert.equal(
+    derivePromotionCatalogueState(
+      { status: "CLOSED", startsAt, expiresAt },
+      now,
+    ),
+    "CLOSED",
+  );
 });
 
 test("projects visible target names and domains into a bounded case-insensitive query", () => {
-  const where = promotionCatalogueWhere({ scope: "PLAN", target: " Growth " }, now);
+  const where = promotionCatalogueWhere(
+    { scope: "PLAN", target: " Growth " },
+    now,
+  );
   const clauses = andClauses(where);
   assert.deepEqual(clauses[0], { scope: "PLAN" });
   const search = clauses[1];
@@ -43,7 +80,10 @@ test("projects visible target names and domains into a bounded case-insensitive 
 });
 
 test("bounds target input server-side while preserving exact scope filtering", () => {
-  const where = promotionCatalogueWhere({ scope: "SHOP", target: `  ${"x".repeat(300)}  ` }, now);
+  const where = promotionCatalogueWhere(
+    { scope: "SHOP", target: `  ${"x".repeat(300)}  ` },
+    now,
+  );
   const clauses = andClauses(where);
   assert.deepEqual(clauses[0], { scope: "SHOP" });
   const search = clauses[1];

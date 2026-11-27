@@ -2,10 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { ensureDevelopmentPlatformAdmin } from "@/lib/auth/development-platform-admin";
 import type { PlatformAdminPrincipal } from "@/lib/auth/platform-admin";
 import { isAdminDiscountAssignable } from "./discount-eligibility";
-import {
-  policySnapshot,
-  type RecoveryPolicySnapshot,
-} from "./recovery-policy";
+import { policySnapshot, type RecoveryPolicySnapshot } from "./recovery-policy";
 
 type OverrideInput = {
   shopId: string;
@@ -46,11 +43,12 @@ export async function saveTenantRecoveryPolicyOverride(
         if (!input.policy.fixedShopifyDiscountId) {
           throw new Error("A fixed discount is required.");
         }
-        const catalogue =
-          await transaction.shopifyDiscountCatalogue.findUnique({
+        const catalogue = await transaction.shopifyDiscountCatalogue.findUnique(
+          {
             where: { shopId: input.shopId },
             select: { status: true, syncGeneration: true },
-          });
+          },
+        );
         if (catalogue?.status !== "CURRENT") {
           throw new Error("The discount catalogue must be current.");
         }
@@ -91,10 +89,9 @@ export async function saveTenantRecoveryPolicyOverride(
         }
       }
 
-      const before =
-        await transaction.shopRecoveryPolicyOverride.findUnique({
-          where: { shopId: input.shopId },
-        });
+      const before = await transaction.shopRecoveryPolicyOverride.findUnique({
+        where: { shopId: input.shopId },
+      });
       await transaction.shopRecoveryPolicyOverrideAuditEvent.create({
         data: {
           shopId: input.shopId,
@@ -102,7 +99,10 @@ export async function saveTenantRecoveryPolicyOverride(
           action: "UPSERT",
           reason: input.reason,
           beforeValue: before
-            ? (policySnapshot(before, before.expiresAt) as Prisma.InputJsonValue)
+            ? (policySnapshot(
+                before,
+                before.expiresAt,
+              ) as Prisma.InputJsonValue)
             : undefined,
           afterValue: policySnapshot(
             input.policy,

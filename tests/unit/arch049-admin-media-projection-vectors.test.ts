@@ -8,7 +8,12 @@ import { sourceLocations } from "../../src/lib/admin/whatsapp-templates/compilat
 import { newMetaDraft } from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
 import type { MetaTemplateAst } from "../../src/lib/admin/whatsapp-templates/authoring/types.ts";
 
-const fixture = JSON.parse(readFileSync("tests/fixtures/arch049-admin-media-header-projection.json", "utf8"));
+const fixture = JSON.parse(
+  readFileSync(
+    "tests/fixtures/arch049-admin-media-header-projection.json",
+    "utf8",
+  ),
+);
 
 test("immutable Admin JSON fixture is the explicit role-aware BG004 handoff vector", () => {
   const ast = fixture.ast as MetaTemplateAst;
@@ -18,31 +23,71 @@ test("immutable Admin JSON fixture is the explicit role-aware BG004 handoff vect
     throw new Error("Expected a compiled Meta template");
   }
   assert.deepEqual(prepared.components, fixture.componentsSnapshot);
-  assert.deepEqual(imageHeaderRegistrationBindings(prepared), fixture.parameterBindingsSnapshot);
-  assert.equal(templateHash({ ...prepared, parameterBindings: fixture.parameterBindingsSnapshot }), fixture.submittedContentHash);
-  assert.equal(templateHash(prepared), "cea834dda354d2b4d83d32e1c7a685796a88c5cdb74af24e1077fe5b7246ffd2");
-  assert.deepEqual(Object.keys(fixture.parameterBindingsSnapshot).sort(),
-    ["schemaVersion", "headerMediaRole", "header", "body", "buttons"].sort());
+  assert.deepEqual(
+    imageHeaderRegistrationBindings(prepared),
+    fixture.parameterBindingsSnapshot,
+  );
+  assert.equal(
+    templateHash({
+      ...prepared,
+      parameterBindings: fixture.parameterBindingsSnapshot,
+    }),
+    fixture.submittedContentHash,
+  );
+  assert.equal(
+    templateHash(prepared),
+    "cea834dda354d2b4d83d32e1c7a685796a88c5cdb74af24e1077fe5b7246ffd2",
+  );
+  assert.deepEqual(
+    Object.keys(fixture.parameterBindingsSnapshot).sort(),
+    ["schemaVersion", "headerMediaRole", "header", "body", "buttons"].sort(),
+  );
   assert.equal(JSON.stringify(fixture).includes("header_handle"), false);
   assert.equal(JSON.stringify(fixture).includes("merchant.example"), false);
 });
 
 test("IMAGE role identity survives translation source extraction without a translator-defined header", () => {
-  const keys = sourceLocations(fixture.ast as MetaTemplateAst).map((segment) => segment.key);
+  const keys = sourceLocations(fixture.ast as MetaTemplateAst).map(
+    (segment) => segment.key,
+  );
   assert.deepEqual(keys, ["body"]);
   assert.equal(fixture.ast.shopBrandMediaRole, "LOGO");
-  assert.notEqual(templateHash({ schemaVersion: 1, family: "META_RECOVERY", category: "MARKETING",
-    components: fixture.componentsSnapshot,
-    parameterBindings: { ...fixture.parameterBindingsSnapshot, headerMediaRole: "SQUARE_LOGO" } }), fixture.submittedContentHash);
+  assert.notEqual(
+    templateHash({
+      schemaVersion: 1,
+      family: "META_RECOVERY",
+      category: "MARKETING",
+      components: fixture.componentsSnapshot,
+      parameterBindings: {
+        ...fixture.parameterBindingsSnapshot,
+        headerMediaRole: "SQUARE_LOGO",
+      },
+    }),
+    fixture.submittedContentHash,
+  );
 });
 
 test("CHECKOUT_PRODUCT role stays in the immutable source while translation handles text segments only", () => {
   const draft = newMetaDraft("INITIAL", "CODE_OFFER");
   draft.promotionTarget = "CHECKOUT";
   draft.shopBrandMediaRole = "CHECKOUT_PRODUCT";
-  draft.body = [{ type: "text", value: "Your basket: " }, { type: "variable", name: "checkout.itemsSummary" },
-    { type: "text", value: " has offer " }, { type: "variable", name: "offer.description" }, { type: "text", value: " with code " }, { type: "variable", name: "offer.code" }, { type: "text", value: " subject to eligibility." }];
-  draft.buttons = [{ type: "url", label: "Resume checkout", urlPrefix: "https://shop.example/checkout?url=", variable: "checkout.url" }];
+  draft.body = [
+    { type: "text", value: "Your basket: " },
+    { type: "variable", name: "checkout.itemsSummary" },
+    { type: "text", value: " has offer " },
+    { type: "variable", name: "offer.description" },
+    { type: "text", value: " with code " },
+    { type: "variable", name: "offer.code" },
+    { type: "text", value: " subject to eligibility." },
+  ];
+  draft.buttons = [
+    {
+      type: "url",
+      label: "Resume checkout",
+      urlPrefix: "https://shop.example/checkout?url=",
+      variable: "checkout.url",
+    },
+  ];
 
   const keys = sourceLocations(draft).map((segment) => segment.key);
   const prepared = compileTemplateAst(draft);
@@ -50,6 +95,14 @@ test("CHECKOUT_PRODUCT role stays in the immutable source while translation hand
   assert.equal(prepared.family, "META_RECOVERY");
   if (prepared.family !== "META_RECOVERY") return;
   assert.equal(prepared.parameterBindings.headerMediaRole, "CHECKOUT_PRODUCT");
-  assert.notEqual(templateHash(prepared), templateHash({ ...prepared,
-    parameterBindings: { ...prepared.parameterBindings, headerMediaRole: "LOGO" } }));
+  assert.notEqual(
+    templateHash(prepared),
+    templateHash({
+      ...prepared,
+      parameterBindings: {
+        ...prepared.parameterBindings,
+        headerMediaRole: "LOGO",
+      },
+    }),
+  );
 });

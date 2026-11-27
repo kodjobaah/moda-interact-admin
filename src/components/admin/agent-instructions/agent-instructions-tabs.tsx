@@ -29,7 +29,11 @@ export function AgentInstructionsTabs({
   onChange,
 }: AgentInstructionsTabsProps) {
   return (
-    <div className="border-b border-gray-200" role="tablist" aria-label="Agent Instructions scope">
+    <div
+      className="border-b border-gray-200"
+      role="tablist"
+      aria-label="Agent Instructions scope"
+    >
       <div className="flex flex-wrap gap-1">
         {tabs.map((tab) => {
           const active = activeTab === tab.id;

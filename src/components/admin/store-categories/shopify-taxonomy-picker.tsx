@@ -82,7 +82,9 @@ type ShopifyTaxonomyPickerProps = {
   selectionPendingLabel?: string;
   selectionDisabled?: boolean;
   onChange?: (taxonomyCategoryId: string) => void;
-  onSelectionChange?: (selection: StoreCategoryTaxonomyReference | null) => void;
+  onSelectionChange?: (
+    selection: StoreCategoryTaxonomyReference | null,
+  ) => void;
 };
 
 const inputClass =
@@ -105,10 +107,13 @@ async function fetchTaxonomy(
   params: URLSearchParams,
   signal: AbortSignal,
 ): Promise<TaxonomyResponse> {
-  const response = await fetch(`/api/admin/shopify-taxonomy?${params.toString()}`, {
-    cache: "no-store",
-    signal,
-  });
+  const response = await fetch(
+    `/api/admin/shopify-taxonomy?${params.toString()}`,
+    {
+      cache: "no-store",
+      signal,
+    },
+  );
   if (!response.ok) {
     let payload: TaxonomyApiError = {};
     try {
@@ -153,7 +158,10 @@ function TaxonomyPath({ fullName }: { fullName: string }) {
   return (
     <span className="flex flex-wrap items-center gap-1">
       {segments.map((segment, index) => (
-        <span key={`${segment}-${index}`} className="inline-flex items-center gap-1">
+        <span
+          key={`${segment}-${index}`}
+          className="inline-flex items-center gap-1"
+        >
           {index > 0 ? <span className="text-gray-400">›</span> : null}
           <span>{segment}</span>
         </span>
@@ -205,7 +213,8 @@ function useResolvedCategory(
         });
       })
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (error instanceof DOMException && error.name === "AbortError")
+          return;
         const notFound =
           error instanceof TaxonomyFetchError && error.code === "not_found";
         setResolution({
@@ -298,7 +307,7 @@ export function ShopifyTaxonomyPicker({
   const [internalValue, setInternalValue] = useState(defaultValue);
   const [committedSelection, setCommittedSelection] =
     useState<StoreCategoryTaxonomyReference | null>(fallbackSelection);
-  const selectedId = controlled ? value ?? "" : internalValue;
+  const selectedId = controlled ? (value ?? "") : internalValue;
 
   function clearUnresolvableSelection(notFoundId: string) {
     if (allowRawId || notFoundId !== selectedId) return;
@@ -317,7 +326,9 @@ export function ShopifyTaxonomyPicker({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [catalogueVersion, setCatalogueVersion] = useState<string | null>(null);
-  const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
+  const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(
+    null,
+  );
   const searchGenerationRef = useRef(0);
   const selectionCommitRef = useRef(false);
   const selectionUnlockTimerRef = useRef<number | null>(null);
@@ -404,7 +415,9 @@ export function ShopifyTaxonomyPicker({
             setCatalogueVersion(response.version);
             if (response.mode === "resolve") return;
             setResults(response.categories);
-            setBreadcrumbs(response.mode === "browse" ? response.breadcrumbs : []);
+            setBreadcrumbs(
+              response.mode === "browse" ? response.breadcrumbs : [],
+            );
           })
           .catch((fetchError: unknown) => {
             if (generation !== searchGenerationRef.current) return;
@@ -432,7 +445,8 @@ export function ShopifyTaxonomyPicker({
   }, [browseParentId, rootId, scope, searchMode, trimmedQuery]);
 
   const resolvedSelection = useMemo(() => {
-    if (committedSelection?.categoryId === selectedId) return committedSelection;
+    if (committedSelection?.categoryId === selectedId)
+      return committedSelection;
     if (selectedCategory && displayedVersion) {
       return taxonomySelection(selectedCategory, displayedVersion);
     }
@@ -452,7 +466,10 @@ export function ShopifyTaxonomyPicker({
   }, [resolvedSelection, selectedId]);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4" data-testid="shopify-taxonomy-picker">
+    <div
+      className="rounded-lg border border-gray-200 bg-white p-4"
+      data-testid="shopify-taxonomy-picker"
+    >
       {name ? (
         <>
           <input type="hidden" name={name} value={selectedId} />
@@ -496,7 +513,9 @@ export function ShopifyTaxonomyPicker({
                   </span>
                 </span>
               ) : (
-                <span className={selectedId ? "font-mono text-xs" : "text-gray-500"}>
+                <span
+                  className={selectedId ? "font-mono text-xs" : "text-gray-500"}
+                >
                   {selectionDescription}
                 </span>
               )}
@@ -528,7 +547,10 @@ export function ShopifyTaxonomyPicker({
       ) : null}
 
       <div className={showSelectionSummary || displayedVersion ? "mt-4" : ""}>
-        <label htmlFor={`${id}-search`} className="text-sm font-medium text-gray-700">
+        <label
+          htmlFor={`${id}-search`}
+          className="text-sm font-medium text-gray-700"
+        >
           Search reference taxonomy
         </label>
         <input
@@ -552,8 +574,13 @@ export function ShopifyTaxonomyPicker({
               Reference taxonomy
             </button>
             {breadcrumbs.map((breadcrumb) => (
-              <span key={breadcrumb.id} className="inline-flex items-center gap-1">
-                <span aria-hidden="true" className="text-gray-400">›</span>
+              <span
+                key={breadcrumb.id}
+                className="inline-flex items-center gap-1"
+              >
+                <span aria-hidden="true" className="text-gray-400">
+                  ›
+                </span>
                 <button
                   type="button"
                   className="font-medium text-[var(--brand-700)] hover:text-[var(--brand-900)]"
@@ -578,12 +605,16 @@ export function ShopifyTaxonomyPicker({
           </p>
         ) : results.length === 0 ? (
           <p className="p-4 text-sm text-gray-500">
-            {searchMode ? "No matching taxonomy categories." : "No child categories."}
+            {searchMode
+              ? "No matching taxonomy categories."
+              : "No child categories."}
           </p>
         ) : (
           <ul className="divide-y divide-gray-200">
             {results.map((category) => {
-              const unavailableSelection = unavailableSelectionsById.get(category.id);
+              const unavailableSelection = unavailableSelectionsById.get(
+                category.id,
+              );
               const unavailableReason = unavailableSelection?.reason;
               const alreadySelected = category.id === selectedId;
               const resultSelectionDisabled =
@@ -631,7 +662,7 @@ export function ShopifyTaxonomyPicker({
                       onClick={() => commitResultSelection(category)}
                     >
                       {unavailableSelection
-                        ? unavailableSelection.actionLabel ?? "Assigned"
+                        ? (unavailableSelection.actionLabel ?? "Assigned")
                         : alreadySelected
                           ? "Selected"
                           : pendingSelectionId === category.id
@@ -646,30 +677,34 @@ export function ShopifyTaxonomyPicker({
         )}
       </div>
 
-      {allowRawId ? <details className="mt-4">
-        <summary className="cursor-pointer text-sm font-medium text-gray-700">
-          Advanced taxonomy ID
-        </summary>
-        <div className="mt-2">
-          <label htmlFor={`${id}-raw`} className="text-xs text-gray-600">
-            Use only when the reference taxonomy ID cannot be selected from the picker. The ID must still resolve before the mapping can be saved.
-          </label>
-          <input
-            id={`${id}-raw`}
-            className={`mt-1 ${inputClass} font-mono text-xs`}
-            value={selectedId}
-            maxLength={255}
-            aria-required={required || undefined}
-            onChange={(event) => commit(event.target.value)}
-            placeholder="gid://shopify/TaxonomyCategory/aa-1"
-          />
-          {selectedUnavailable && selectedId ? (
-            <p className="mt-1 text-xs text-amber-700">
-              This ID could not be resolved in the current reference taxonomy.
-            </p>
-          ) : null}
-        </div>
-      </details> : null}
+      {allowRawId ? (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm font-medium text-gray-700">
+            Advanced taxonomy ID
+          </summary>
+          <div className="mt-2">
+            <label htmlFor={`${id}-raw`} className="text-xs text-gray-600">
+              Use only when the reference taxonomy ID cannot be selected from
+              the picker. The ID must still resolve before the mapping can be
+              saved.
+            </label>
+            <input
+              id={`${id}-raw`}
+              className={`mt-1 ${inputClass} font-mono text-xs`}
+              value={selectedId}
+              maxLength={255}
+              aria-required={required || undefined}
+              onChange={(event) => commit(event.target.value)}
+              placeholder="gid://shopify/TaxonomyCategory/aa-1"
+            />
+            {selectedUnavailable && selectedId ? (
+              <p className="mt-1 text-xs text-amber-700">
+                This ID could not be resolved in the current reference taxonomy.
+              </p>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
