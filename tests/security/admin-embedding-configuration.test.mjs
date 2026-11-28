@@ -67,10 +67,16 @@ test("embedding credentials use the shared keyring and purpose-bound AES-GCM AAD
   assert.match(service, /encryptCredential\(\{/);
   assert.match(service, /decryptCredential\(\{/);
   assert.match(service, /loadActiveSharedCredentialKeyring\(\)/);
-  assert.match(service, /parseCredentialKeyring\(process\.env\.MODA_ENCRYPTION_KEYS_JSON\)/);
+  assert.match(
+    service,
+    /parseCredentialKeyring\(process\.env\.MODA_ENCRYPTION_KEYS_JSON\)/,
+  );
   assert.match(service, /keyId: row\.keyId/);
   assert.match(sharedKeyring, /resolveActiveCredentialKey/);
-  assert.doesNotMatch(service, /createCipheriv|createDecipheriv|randomBytes|canonicalJson/);
+  assert.doesNotMatch(
+    service,
+    /createCipheriv|createDecipheriv|randomBytes|canonicalJson/,
+  );
   assert.doesNotMatch(service, /process\.env\.EMBEDDING_API_KEY/);
 });
 

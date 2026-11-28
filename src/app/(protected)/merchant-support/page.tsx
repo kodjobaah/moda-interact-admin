@@ -1,17 +1,28 @@
-import { AdminShell } from '@/components/admin/admin-shell';
-import { requirePlatformAdminPage } from '@/lib/auth/platform-admin';
+import { AdminShell } from "@/components/admin/admin-shell";
+import { requirePlatformAdminPage } from "@/lib/auth/platform-admin";
 import {
   getMerchantSupportThread,
   getPendingMerchantSupportThreads,
   type PendingSupportFilter,
-} from '@/lib/admin/merchant-support';
-import { cleanSearch, firstParam, paramsToRecord, positiveInt, type SearchParamRecord } from '@/lib/admin/query';
-import { MerchantSupportInbox } from '@/components/admin/merchant-support-inbox';
+} from "@/lib/admin/merchant-support";
+import {
+  cleanSearch,
+  firstParam,
+  paramsToRecord,
+  positiveInt,
+  type SearchParamRecord,
+} from "@/lib/admin/query";
+import { MerchantSupportInbox } from "@/components/admin/merchant-support-inbox";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
-const FILTERS: PendingSupportFilter[] = ['all', 'unassigned', 'assigned-to-me', 'assigned-to-others'];
+const FILTERS: PendingSupportFilter[] = [
+  "all",
+  "unassigned",
+  "assigned-to-me",
+  "assigned-to-others",
+];
 
 type PageProps = {
   searchParams: Promise<SearchParamRecord>;
@@ -22,9 +33,11 @@ export default async function MerchantSupportPage({ searchParams }: PageProps) {
   const rawParams = await searchParams;
   const params = paramsToRecord(rawParams);
   const filterValue = firstParam(rawParams.filter);
-  const filter: PendingSupportFilter = FILTERS.includes(filterValue as PendingSupportFilter)
+  const filter: PendingSupportFilter = FILTERS.includes(
+    filterValue as PendingSupportFilter,
+  )
     ? (filterValue as PendingSupportFilter)
-    : 'all';
+    : "all";
   const page = positiveInt(rawParams.page);
   const search = cleanSearch(rawParams.search);
   const threadId = firstParam(rawParams.thread);

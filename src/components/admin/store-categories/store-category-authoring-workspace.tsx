@@ -46,12 +46,12 @@ export function StoreCategoryAuthoringWorkspace({
   );
   const previousStep =
     currentStepIndex > 0
-      ? STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex - 1]?.step ?? null
+      ? (STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex - 1]?.step ?? null)
       : null;
   const nextStep =
     currentStepIndex >= 0 &&
     currentStepIndex < STORE_CATEGORY_AUTHORING_STEPS.length - 1
-      ? STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex + 1]?.step ?? null
+      ? (STORE_CATEGORY_AUTHORING_STEPS[currentStepIndex + 1]?.step ?? null)
       : null;
   const reviewStale =
     session.reviewedRevision !== null &&
@@ -128,14 +128,17 @@ export function StoreCategoryAuthoringWorkspace({
             ) : null}
           </div>
           <p className="mt-1 text-sm text-gray-600">
-            Nothing is written to PostgreSQL until the final Review step saves this disabled draft.
+            Nothing is written to PostgreSQL until the final Review step saves
+            this disabled draft.
           </p>
           <p className="mt-1 font-mono text-xs text-gray-400">
             Session {session.sessionId}
           </p>
           {!taxonomyReady ? (
             <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-              The reference taxonomy search index is not ready. Your browser draft is preserved, but synchronize the index before selecting taxonomy categories or creating this Store Category.
+              The reference taxonomy search index is not ready. Your browser
+              draft is preserved, but synchronize the index before selecting
+              taxonomy categories or creating this Store Category.
             </p>
           ) : null}
           {selectedReferenceAssignment ? (
@@ -143,9 +146,10 @@ export function StoreCategoryAuthoringWorkspace({
               className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800"
               role="status"
             >
-              The selected reference taxonomy category is already assigned to Store
-              Category “{selectedReferenceAssignment.storeCategoryDisplayName}”.
-              Return to Category and choose another reference category.
+              The selected reference taxonomy category is already assigned to
+              Store Category “
+              {selectedReferenceAssignment.storeCategoryDisplayName}”. Return to
+              Category and choose another reference category.
             </p>
           ) : null}
         </div>

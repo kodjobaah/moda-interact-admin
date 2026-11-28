@@ -1,6 +1,15 @@
-import type { RecoveryPromotionTarget, RecoveryTemplateFrozenBindings, RecoveryTemplateHeaderMediaRole, RecoveryTemplateSemanticKey } from "@modainteract/moda-interact-shared/recovery-template-bindings";
+import type {
+  RecoveryPromotionTarget,
+  RecoveryTemplateFrozenBindings,
+  RecoveryTemplateHeaderMediaRole,
+  RecoveryTemplateSemanticKey,
+} from "@modainteract/moda-interact-shared/recovery-template-bindings";
 
-import type { CommonRecoveryLayoutReference, ConversationProductImageBinding, RecoveryCompositeProfile } from "@modainteract/moda-interact-shared/commerce/presentation";
+import type {
+  CommonRecoveryLayoutReference,
+  ConversationProductImageBinding,
+  RecoveryCompositeProfile,
+} from "@modainteract/moda-interact-shared/commerce/presentation";
 
 /** Versioned Admin-owned source contract. No provider/DB/React dependencies. */
 export const TEMPLATE_AST_VERSION = 1 as const;
@@ -9,9 +18,13 @@ export type RecoveryStage = "INITIAL" | "FOLLOW_UP";
 export type OfferType = "NO_OFFER" | "CODE_OFFER" | "AUTOMATIC_OFFER";
 export type WrapperAudience = "SHARED" | "AI" | "HUMAN" | "ROUTER";
 export type ShopBrandVariable =
-  | "shopBrand.brandName" | "shopBrand.logoUrl" | "shopBrand.logoAltText"
-  | "shopBrand.logoWidth" | "shopBrand.logoHeight"
-  | "shopBrand.squareLogoUrl" | "shopBrand.squareLogoAltText"
+  | "shopBrand.brandName"
+  | "shopBrand.logoUrl"
+  | "shopBrand.logoAltText"
+  | "shopBrand.logoWidth"
+  | "shopBrand.logoHeight"
+  | "shopBrand.squareLogoUrl"
+  | "shopBrand.squareLogoAltText"
   | "shopBrand.coverImageUrl";
 export type SemanticVariable = RecoveryTemplateSemanticKey;
 export type PromotionTarget = RecoveryPromotionTarget;
@@ -22,7 +35,12 @@ export type VariableNode = { type: "variable"; name: SemanticVariable };
 export type ResponseNode = { type: "slot"; name: "response.body" };
 export type ContentNode = TextNode | VariableNode;
 export type WrapperNode = ContentNode | ResponseNode;
-export type UrlButton = { type: "url"; label: string; urlPrefix: string; variable?: "checkout.url" | "promotion.productUrl" };
+export type UrlButton = {
+  type: "url";
+  label: string;
+  urlPrefix: string;
+  variable?: "checkout.url" | "promotion.productUrl";
+};
 export type MetaTemplateAst = {
   schemaVersion: 1;
   family: "META_RECOVERY";
@@ -61,7 +79,10 @@ export type MetaPrepared = {
   components: Array<Record<string, unknown>>;
   parameterBindings: RecoveryTemplateFrozenBindings;
 };
-export type RuntimeToken = { kind: "text"; value: string } | { kind: "variable"; name: SemanticVariable } | { kind: "responseSlot"; name: "response.body" };
+export type RuntimeToken =
+  | { kind: "text"; value: string }
+  | { kind: "variable"; name: SemanticVariable }
+  | { kind: "responseSlot"; name: "response.body" };
 export type WrapperPrepared = {
   compositeProfile?: RecoveryCompositeProfile;
   compositeProfileSha256?: string;
@@ -82,8 +103,17 @@ export type ImmutableAuthoringRecord = {
 };
 export type TemplateListItem = {
   recoveryFormat?: "IMAGE" | "TEXT";
-  commonLayoutCoverage?: { active: boolean; localeCount: number; matchingCount: number };
-  progress?: { runStatus: string; translated: number; reviewed: number; total: number };
+  commonLayoutCoverage?: {
+    active: boolean;
+    localeCount: number;
+    matchingCount: number;
+  };
+  progress?: {
+    runStatus: string;
+    translated: number;
+    reviewed: number;
+    total: number;
+  };
   id: string;
   kind: string;
   purpose: string | null;

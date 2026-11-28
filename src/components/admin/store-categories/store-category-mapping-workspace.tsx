@@ -32,8 +32,7 @@ export function StoreCategoryMappingWorkspace({
   selectionDisabled = false,
   onAdd,
   renderMappingControls,
-  emptyMessage =
-    "No mappings added yet. Select a taxonomy category above, or continue without mappings.",
+  emptyMessage = "No mappings added yet. Select a taxonomy category above, or continue without mappings.",
 }: {
   pickerId: string;
   rootTaxonomy: StoreCategoryTaxonomyReference | null;
@@ -42,7 +41,9 @@ export function StoreCategoryMappingWorkspace({
   unavailableSelections?: UnavailableTaxonomySelection[];
   selectionDisabled?: boolean;
   onAdd: (taxonomy: StoreCategoryTaxonomyReference | null) => void;
-  renderMappingControls: (mapping: StoreCategoryMappingWorkspaceItem) => ReactNode;
+  renderMappingControls: (
+    mapping: StoreCategoryMappingWorkspaceItem,
+  ) => ReactNode;
   emptyMessage?: string;
 }) {
   const mappingSelections = mappings.flatMap((mapping) =>
@@ -74,10 +75,12 @@ export function StoreCategoryMappingWorkspace({
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h4 className="text-sm font-semibold text-gray-900">Add a mapping</h4>
+            <h4 className="text-sm font-semibold text-gray-900">
+              Add a mapping
+            </h4>
             <p className="mt-1 text-sm text-gray-600">
-              Search once below and choose a subcategory. The mapping is then managed
-              from the compact list underneath.
+              Search once below and choose a subcategory. The mapping is then
+              managed from the compact list underneath.
             </p>
           </div>
           {rootTaxonomy ? (
@@ -106,8 +109,8 @@ export function StoreCategoryMappingWorkspace({
             />
           ) : (
             <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              This Store Category does not have a reference taxonomy root. Choose or
-              repair the reference category before adding mappings.
+              This Store Category does not have a reference taxonomy root.
+              Choose or repair the reference category before adding mappings.
             </p>
           )}
         </div>
@@ -119,8 +122,9 @@ export function StoreCategoryMappingWorkspace({
             Added mappings ({mappings.length})
           </h4>
           <p className="mt-1 text-sm text-gray-600">
-            Leave weight at 1 for normal mappings. Increase it only when this mapping
-            should contribute more strongly when category scores are compared.
+            Leave weight at 1 for normal mappings. Increase it only when this
+            mapping should contribute more strongly when category scores are
+            compared.
           </p>
         </div>
 
@@ -150,7 +154,10 @@ export function StoreCategoryMappingWorkspace({
                       </div>
                       {mapping.displayName ? (
                         <p className="mt-1 text-sm text-gray-700">
-                          Merchant label: <span className="font-medium">{mapping.displayName}</span>
+                          Merchant label:{" "}
+                          <span className="font-medium">
+                            {mapping.displayName}
+                          </span>
                         </p>
                       ) : null}
                       {mapping.conditionKey ? (
@@ -164,8 +171,8 @@ export function StoreCategoryMappingWorkspace({
                     </>
                   ) : (
                     <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-                      This earlier browser draft contains an incomplete mapping. Select
-                      a category above to complete it, or remove it.
+                      This earlier browser draft contains an incomplete mapping.
+                      Select a category above to complete it, or remove it.
                     </p>
                   )}
                 </div>
@@ -178,8 +185,8 @@ export function StoreCategoryMappingWorkspace({
 
         {mappings.length > 0 ? (
           <p className="mt-3 text-xs text-gray-500">
-            To change a taxonomy category, remove its mapping and add the replacement
-            above.
+            To change a taxonomy category, remove its mapping and add the
+            replacement above.
           </p>
         ) : null}
       </div>

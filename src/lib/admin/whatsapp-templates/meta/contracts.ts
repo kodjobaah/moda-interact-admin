@@ -16,7 +16,11 @@ export type MetaLocaleSnapshot = {
     headerMediaRole?: RecoveryTemplateHeaderMediaRole;
     header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
-    buttons: Array<{ index: number; subType: "url"; variable: "checkout.url" | "promotion.productUrl" }>;
+    buttons: Array<{
+      index: number;
+      subType: "url";
+      variable: "checkout.url" | "promotion.productUrl";
+    }>;
   };
 };
 
@@ -69,20 +73,35 @@ export type MetaStatusView = {
 };
 
 /** Provider observations compare only to the server-derived component fingerprint. */
-export function hasMetaProviderDrift(row: Pick<MetaRegistrationView,
-  "driftDetectedAt" | "lastObservedContentHash" | "expectedProviderContentHash" | "lastObservedCategory">): boolean {
+export function hasMetaProviderDrift(
+  row: Pick<
+    MetaRegistrationView,
+    | "driftDetectedAt"
+    | "lastObservedContentHash"
+    | "expectedProviderContentHash"
+    | "lastObservedCategory"
+  >,
+): boolean {
   if (row.driftDetectedAt != null) return true;
   const observed = row.lastObservedContentHash;
   const category = row.lastObservedCategory;
   if (observed == null && category == null) return false;
   const expected = row.expectedProviderContentHash;
   if (typeof expected !== "string" || !DIGEST.test(expected)) return true;
-  return (observed != null && (typeof observed !== "string" || !DIGEST.test(observed) || observed !== expected)) ||
-    (category != null && category !== "MARKETING");
+  return (
+    (observed != null &&
+      (typeof observed !== "string" ||
+        !DIGEST.test(observed) ||
+        observed !== expected)) ||
+    (category != null && category !== "MARKETING")
+  );
 }
 
 export class MetaSubmissionError extends Error {
-  constructor(readonly reasonCode: string, message: string) {
+  constructor(
+    readonly reasonCode: string,
+    message: string,
+  ) {
     super(message);
     this.name = "MetaSubmissionError";
   }

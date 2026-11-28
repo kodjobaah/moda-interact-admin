@@ -327,7 +327,10 @@ test("platform policy is presented under System Controls instead of Billing Plan
   assert.match(billingPage, /getPlatformBillingPolicy/);
   assert.match(policyPage, /PlatformPolicyControls/);
   assert.match(policyPage, /getPlatformBillingPolicy/);
-  assert.doesNotMatch(`${billingPage}\n${policyPage}`, /<<<<<<<|=======|>>>>>>>/);
+  assert.doesNotMatch(
+    `${billingPage}\n${policyPage}`,
+    /<<<<<<<|=======|>>>>>>>/,
+  );
 });
 
 test("first-production tenant billing exposes no allowance-adjustment compatibility key", async () => {

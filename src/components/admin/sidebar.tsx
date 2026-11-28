@@ -85,7 +85,11 @@ export function Sidebar({
           <Icon name="message" className="h-5 w-5 text-[var(--brand-700)]" />
           {adminI18n.t("nav.merchantMessages")}
         </Link>
-        <Link href="/operational-incidents" aria-current={active === "operational-incidents" ? "page" : undefined} className={`${base} ${active === "operational-incidents" ? selected : idle}`}>
+        <Link
+          href="/operational-incidents"
+          aria-current={active === "operational-incidents" ? "page" : undefined}
+          className={`${base} ${active === "operational-incidents" ? selected : idle}`}
+        >
           <Icon name="box" className="h-5 w-5 text-[var(--brand-700)]" />
           Operational Incidents
         </Link>
@@ -166,9 +170,13 @@ export function Sidebar({
               >
                 {adminI18n.t("nav.platformPolicy")}
               </Link>
-              <Link href="/system-controls/platform-configuration"
-                aria-current={active === "platform-configuration" ? "page" : undefined}
-                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "platform-configuration" ? selected : idle}`}>
+              <Link
+                href="/system-controls/platform-configuration"
+                aria-current={
+                  active === "platform-configuration" ? "page" : undefined
+                }
+                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "platform-configuration" ? selected : idle}`}
+              >
                 Platform Configuration
               </Link>
               <Link
@@ -189,13 +197,17 @@ export function Sidebar({
               >
                 Store Categories
               </Link>
-              {administratorRole === "SUPER_ADMIN" && <Link
-                href="/system-controls/whatsapp-templates"
-                aria-current={active === "whatsapp-templates" ? "page" : undefined}
-                className={`${base} !rounded-md px-3 py-2 text-sm ${active === "whatsapp-templates" ? selected : idle}`}
-              >
-                WhatsApp Templates
-              </Link>}
+              {administratorRole === "SUPER_ADMIN" && (
+                <Link
+                  href="/system-controls/whatsapp-templates"
+                  aria-current={
+                    active === "whatsapp-templates" ? "page" : undefined
+                  }
+                  className={`${base} !rounded-md px-3 py-2 text-sm ${active === "whatsapp-templates" ? selected : idle}`}
+                >
+                  WhatsApp Templates
+                </Link>
+              )}
               <Link
                 href="/system-controls/agent-instructions"
                 aria-current={

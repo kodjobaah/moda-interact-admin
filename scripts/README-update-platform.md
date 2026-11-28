@@ -117,7 +117,7 @@ reason code, never the environment variable content or the key ID.
 An initial secret group needs all its required fields. If only a subset is
 present and the record does not exist, the group is reported as
 `skipped-incomplete` for both environments. `--update` can apply a subset to an
-existing *active* secret only when it can decrypt and validate the saved
+existing _active_ secret only when it can decrypt and validate the saved
 bundle. A disabled record requires a complete bundle to reactivate.
 
 Policy fields are validated using the Admin policy registry. A new partial
@@ -202,6 +202,5 @@ The focused tests exercise env parsing, mapping, two-environment insert/skip,
 policy and secret updates, revision/audit behavior, alias conflicts, and
 read-only dry runs. Live database execution should additionally be checked
 against the intended development PostgreSQL instance before general use.
-
 
 Encryption keys are deployment-owned. Configure `MODA_ENCRYPTION_KEYS_JSON` as a JSON map of key IDs to canonical base64 32-byte AES keys and `MODA_ENCRYPTION_ACTIVE_KEY_ID` as a member of that map. Both platform-secret and provider-credential writers use this pair. Preserve all historical wrapping and commerce key IDs/material in the unified map so existing ciphertext remains readable. The importer deliberately ignores this pair and `COMMERCE_CONNECTION_COMMAND_HMAC_KEY`; it never creates or updates `commerce.connectionKeys`. Existing database records and audit history are preserved. The command HMAC key is a separate signing secret, not an encryption key.

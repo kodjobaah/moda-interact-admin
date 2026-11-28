@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from "node:crypto";
 
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 import {
   AuthoredSupportBodySchema,
   MERCHANT_COMMUNICATIONS_JOB_NAMES,
@@ -8,27 +8,27 @@ import {
   MERCHANT_COMMUNICATIONS_SCHEMA_VERSION,
   PLATFORM_SUPPORT_LANGUAGE_TAG,
   requiresMerchantTranslation,
-} from '@modainteract/moda-interact-shared/merchant-communications';
-import { LanguageTagSchema } from '@modainteract/moda-interact-shared/internationalization';
+} from "@modainteract/moda-interact-shared/merchant-communications";
+import { LanguageTagSchema } from "@modainteract/moda-interact-shared/internationalization";
 import {
   createTranslationDispatchJobId,
   createTranslationReconcileJobId,
-} from '@modainteract/moda-interact-shared/merchant-communications/node';
-import { Queue } from 'bullmq';
+} from "@modainteract/moda-interact-shared/merchant-communications/node";
+import { Queue } from "bullmq";
 
 import {
   requirePlatformAdminMutation,
   requirePlatformAdminRead,
   type PlatformAdminPrincipal,
-} from '../auth/platform-admin.ts';
-import { logAdminSecurityEvent } from '../auth/audit.ts';
-import { ensureDevelopmentPlatformAdmin } from '../auth/development-platform-admin.ts';
-import { prisma } from '../prisma.ts';
+} from "../auth/platform-admin.ts";
+import { logAdminSecurityEvent } from "../auth/audit.ts";
+import { ensureDevelopmentPlatformAdmin } from "../auth/development-platform-admin.ts";
+import { prisma } from "../prisma.ts";
 
 const MAX_PAGE_SIZE = 50;
 const MAX_THREAD_MESSAGES = 100;
 
-type SupportQueue = Pick<Queue, 'add'>;
+type SupportQueue = Pick<Queue, "add">;
 
 type ThreadRow = {
   id: string;
@@ -67,7 +67,9 @@ type TransactionClient = {
 };
 
 type DatabaseClient = {
-  $transaction<T>(callback: (transaction: TransactionClient) => Promise<T>): Promise<T>;
+  $transaction<T>(
+    callback: (transaction: TransactionClient) => Promise<T>,
+  ): Promise<T>;
   $queryRaw<T>(query: Prisma.Sql): Promise<T>;
   $executeRaw(query: Prisma.Sql): Promise<number>;
 };
@@ -126,11 +128,11 @@ async function enqueueBestEffort(
   try {
     await queue.add(name, data, { jobId });
   } catch {
-    logAdminSecurityEvent('admin.support.enqueue_failed', {
-      action: 'enqueue_support_work',
-      resourceType: 'merchant_support',
-      outcome: 'failed',
-      reasonCode: 'redis_unavailable',
+    logAdminSecurityEvent("admin.support.enqueue_failed", {
+      action: "enqueue_support_work",
+      resourceType: "merchant_support",
+      outcome: "failed",
+      reasonCode: "redis_unavailable",
     });
   }
 }
@@ -170,10 +172,7 @@ export type MerchantSupportThreadDetail = {
 };
 
 export type PendingSupportFilter =
-  | 'all'
-  | 'unassigned'
-  | 'assigned-to-me'
-  | 'assigned-to-others';
+  "all" | "unassigned" | "assigned-to-me" | "assigned-to-others";
 
 export type SupportOwnerSummary = {
   id: string;
@@ -216,13 +215,13 @@ function pendingFilterSql(
   filter: PendingSupportFilter,
   principalId: string,
 ): Prisma.Sql {
-  if (filter === 'unassigned') {
+  if (filter === "unassigned") {
     return Prisma.sql`t."assignedPlatformAdminId" IS NULL`;
   }
-  if (filter === 'assigned-to-me') {
+  if (filter === "assigned-to-me") {
     return Prisma.sql`t."assignedPlatformAdminId" = ${principalId}`;
   }
-  if (filter === 'assigned-to-others') {
+  if (filter === "assigned-to-others") {
     return Prisma.sql`t."assignedPlatformAdminId" IS NOT NULL AND t."assignedPlatformAdminId" <> ${principalId}`;
   }
   return Prisma.sql`TRUE`;
@@ -253,9 +252,15 @@ async function readOwner(
   transaction: TransactionClient,
   threadId: string,
 ): Promise<SupportOwnerSummary | null> {
-  const rows = await transaction.$queryRaw<[
-    { ownerId: string | null; ownerDisplayName: string | null; ownerEmail: string | null }
-  ]>(Prisma.sql`
+  const rows = await transaction.$queryRaw<
+    [
+      {
+        ownerId: string | null;
+        ownerDisplayName: string | null;
+        ownerEmail: string | null;
+      },
+    ]
+  >(Prisma.sql`
     SELECT a."id" AS "ownerId", a."displayName" AS "ownerDisplayName", a."email" AS "ownerEmail"
     FROM "support"."MerchantSupportThread" t
     LEFT JOIN "public"."PlatformAdmin" a ON a."id" = t."assignedPlatformAdminId"
@@ -275,8 +280,8 @@ export async function getPendingMerchantSupportThreads(input: {
   const client = input.database ?? (prisma as unknown as DatabaseClient);
   const safePage = pageNumber(input.page);
   const safePageSize = pageSize(input.pageSize);
-  const filter = input.filter ?? 'all';
-  const search = input.search?.trim().slice(0, 120) ?? '';
+  const filter = input.filter ?? "all";
+  const search = input.search?.trim().slice(0, 120) ?? "";
   const pattern = `%${search}%`;
   const pendingFilter = pendingFilterSql(filter, principal.id);
   const where = Prisma.sql`
@@ -389,7 +394,7 @@ export async function takeMerchantSupportThreadOwnership(
       WHERE "id" = ${threadId} AND "assignedPlatformAdminId" IS NULL
     `);
     const owner = await readOwner(transaction, threadId);
-    if (!owner) throw new Error('Support thread not found.');
+    if (!owner) throw new Error("Support thread not found.");
     return { claimed: claimed === 1, owner };
   });
 }
@@ -407,7 +412,9 @@ export async function releaseMerchantSupportThreadOwnership(
       AND (${adminCanRelease(principal, null)} OR "assignedPlatformAdminId" = ${principal.id})
   `);
   if (released !== 1) {
-    throw new Error('Only the assigned platform administrator or a SUPER_ADMIN may release ownership.');
+    throw new Error(
+      "Only the assigned platform administrator or a SUPER_ADMIN may release ownership.",
+    );
   }
 }
 
@@ -417,25 +424,26 @@ export async function reassignMerchantSupportThreadOwnership(input: {
   database?: DatabaseClient;
 }): Promise<SupportOwnerSummary> {
   const principal = await requirePlatformAdminMutation();
-  if (principal.role !== 'SUPER_ADMIN') {
-    throw new Error('SUPER_ADMIN access is required.');
+  if (principal.role !== "SUPER_ADMIN") {
+    throw new Error("SUPER_ADMIN access is required.");
   }
   const client = input.database ?? (prisma as unknown as DatabaseClient);
   return client.$transaction(async (transaction) => {
-    const target = await transaction.$queryRaw<[
-      { id: string; displayName: string | null; email: string } 
-    ]>(Prisma.sql`
+    const target = await transaction.$queryRaw<
+      [{ id: string; displayName: string | null; email: string }]
+    >(Prisma.sql`
       SELECT "id", "displayName", "email"
       FROM "public"."PlatformAdmin"
       WHERE "id" = ${input.targetPlatformAdminId} AND "active" = true
     `);
-    if (!target[0]) throw new Error('An active platform administrator is required.');
+    if (!target[0])
+      throw new Error("An active platform administrator is required.");
     const updated = await transaction.$executeRaw(Prisma.sql`
       UPDATE "support"."MerchantSupportThread"
       SET "assignedPlatformAdminId" = ${input.targetPlatformAdminId}, "assignedAt" = NOW(), "updatedAt" = NOW()
       WHERE "id" = ${input.threadId}
     `);
-    if (updated !== 1) throw new Error('Support thread not found.');
+    if (updated !== 1) throw new Error("Support thread not found.");
     return {
       id: target[0].id,
       displayName: target[0].displayName,
@@ -458,7 +466,7 @@ export async function getMerchantSupportThreads(input: {
   await requirePlatformAdminRead();
   const safePage = pageNumber(input.page);
   const safePageSize = pageSize(input.pageSize);
-  const search = input.search?.trim().slice(0, 120) ?? '';
+  const search = input.search?.trim().slice(0, 120) ?? "";
   const pattern = `%${search}%`;
 
   const rows = await prisma.$queryRaw<ThreadRow[]>(Prisma.sql`
@@ -523,13 +531,15 @@ export async function getMerchantSupportThread(
     `);
 
     return transaction.$queryRaw<
-      Array<MessageRow & {
-        translationId: string | null;
-        translationTargetLanguageTag: string | null;
-        translatedBody: string | null;
-        translationStatus: string | null;
-        translationCreatedAt: Date | null;
-      }>
+      Array<
+        MessageRow & {
+          translationId: string | null;
+          translationTargetLanguageTag: string | null;
+          translatedBody: string | null;
+          translationStatus: string | null;
+          translationCreatedAt: Date | null;
+        }
+      >
     >(Prisma.sql`
       WITH bounded_messages AS (
         SELECT "id", "threadId", "kind", "state", "originalBody", "sourceLanguageTag",
@@ -569,7 +579,12 @@ export async function getMerchantSupportThread(
       };
       result.push(message);
     }
-    if (row.translationId && row.translationTargetLanguageTag && row.translationStatus && row.translationCreatedAt) {
+    if (
+      row.translationId &&
+      row.translationTargetLanguageTag &&
+      row.translationStatus &&
+      row.translationCreatedAt
+    ) {
       message.translations.push({
         id: row.translationId,
         targetLanguageTag: row.translationTargetLanguageTag,
@@ -596,7 +611,16 @@ export async function composeAdministrativeMessage(input: {
   const messageId = randomUUID();
   const result = await database.$transaction(async (transaction) => {
     await ensureDevelopmentPlatformAdmin(transaction, principal);
-    const rows = await transaction.$queryRaw<[{ shopId: string; assignedPlatformAdminId: string | null; merchantMessageVersion: number; defaultLanguageTag: string | null }]>(Prisma.sql`
+    const rows = await transaction.$queryRaw<
+      [
+        {
+          shopId: string;
+          assignedPlatformAdminId: string | null;
+          merchantMessageVersion: number;
+          defaultLanguageTag: string | null;
+        },
+      ]
+    >(Prisma.sql`
       SELECT t."shopId", t."assignedPlatformAdminId", t."merchantMessageVersion",
         s."defaultLanguageTag"
       FROM "support"."MerchantSupportThread" t
@@ -605,9 +629,11 @@ export async function composeAdministrativeMessage(input: {
       FOR UPDATE OF t
     `);
     const thread = rows[0];
-    if (!thread) throw new Error('Support thread not found.');
+    if (!thread) throw new Error("Support thread not found.");
     if (thread.assignedPlatformAdminId !== principal.id) {
-      throw new Error('Only the assigned platform administrator may send messages.');
+      throw new Error(
+        "Only the assigned platform administrator may send messages.",
+      );
     }
 
     const target = targetLanguage(thread.defaultLanguageTag);
@@ -615,7 +641,7 @@ export async function composeAdministrativeMessage(input: {
       PLATFORM_SUPPORT_LANGUAGE_TAG,
       target,
     );
-    const state = needsTranslation ? 'PROCESSING' : 'AVAILABLE';
+    const state = needsTranslation ? "PROCESSING" : "AVAILABLE";
     const now = new Date();
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO "support"."MerchantSupportMessage" (
@@ -665,7 +691,9 @@ export async function composeAdministrativeMessage(input: {
   if (result.translationId) {
     await enqueueDispatchBestEffort(
       result.translationId,
-      input.queue === undefined ? await getMerchantCommunicationsQueue() : input.queue,
+      input.queue === undefined
+        ? await getMerchantCommunicationsQueue()
+        : input.queue,
     );
   }
   return { messageId, translationId: result.translationId };
@@ -682,15 +710,17 @@ export async function requestFailedTranslationReconciliation(input: {
     input.database ?? (prisma as unknown as DatabaseClient);
   await database.$transaction(async (transaction) => {
     await ensureDevelopmentPlatformAdmin(transaction, principal);
-    const rows = await transaction.$queryRaw<[{ status: string; threadId: string }]>(Prisma.sql`
+    const rows = await transaction.$queryRaw<
+      [{ status: string; threadId: string }]
+    >(Prisma.sql`
       SELECT tr."status", m."threadId"
       FROM "support"."MerchantMessageTranslation" tr
       INNER JOIN "support"."MerchantSupportMessage" m ON m."id" = tr."messageId"
       WHERE tr."id" = ${input.translationId}
     `);
     const translation = rows[0];
-    if (!translation || translation.status !== 'FAILED') {
-      throw new Error('A failed translation is required.');
+    if (!translation || translation.status !== "FAILED") {
+      throw new Error("A failed translation is required.");
     }
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO "support"."MerchantTranslationReconciliationRequest" (
@@ -700,7 +730,9 @@ export async function requestFailedTranslationReconciliation(input: {
   });
   await enqueueReconcileBestEffort(
     requestId,
-    input.queue === undefined ? await getMerchantCommunicationsQueue() : input.queue,
+    input.queue === undefined
+      ? await getMerchantCommunicationsQueue()
+      : input.queue,
   );
   return requestId;
 }
@@ -711,7 +743,7 @@ export async function requestFailedTranslationsReconciliation(input: {
 }): Promise<string> {
   const principal = await requirePlatformAdminMutation();
   if (!adminCanRequestGlobalReconciliation(principal)) {
-    throw new Error('SUPER_ADMIN access is required.');
+    throw new Error("SUPER_ADMIN access is required.");
   }
   const requestId = randomUUID();
   const database: DatabaseClient =
@@ -726,7 +758,9 @@ export async function requestFailedTranslationsReconciliation(input: {
   });
   await enqueueReconcileBestEffort(
     requestId,
-    input.queue === undefined ? await getMerchantCommunicationsQueue() : input.queue,
+    input.queue === undefined
+      ? await getMerchantCommunicationsQueue()
+      : input.queue,
   );
   return requestId;
 }
@@ -742,24 +776,26 @@ export async function requestAdditionalTranslation(input: {
   const database: DatabaseClient =
     input.database ?? (prisma as unknown as DatabaseClient);
   const result = await database.$transaction(async (transaction) => {
-    const rows = await transaction.$queryRaw<[
-      { kind: string; sourceLanguageTag: string }
-    ]>(Prisma.sql`
+    const rows = await transaction.$queryRaw<
+      [{ kind: string; sourceLanguageTag: string }]
+    >(Prisma.sql`
       SELECT "kind", "sourceLanguageTag"
       FROM "support"."MerchantSupportMessage"
       WHERE "id" = ${input.messageId}
       FOR SHARE
     `);
     const message = rows[0];
-    if (!message) throw new Error('Support message not found.');
-    if (!requiresMerchantTranslation(message.sourceLanguageTag, target)) return null;
+    if (!message) throw new Error("Support message not found.");
+    if (!requiresMerchantTranslation(message.sourceLanguageTag, target))
+      return null;
     const directionByKind = {
-      MERCHANT: 'MERCHANT_TO_ADMIN',
-      ADMINISTRATIVE: 'ADMIN_TO_MERCHANT',
-      SYSTEM: 'SYSTEM_TO_MERCHANT',
+      MERCHANT: "MERCHANT_TO_ADMIN",
+      ADMINISTRATIVE: "ADMIN_TO_MERCHANT",
+      SYSTEM: "SYSTEM_TO_MERCHANT",
     } as const;
-    const direction = directionByKind[message.kind as keyof typeof directionByKind];
-    if (!direction) throw new Error('Unsupported support message kind.');
+    const direction =
+      directionByKind[message.kind as keyof typeof directionByKind];
+    if (!direction) throw new Error("Unsupported support message kind.");
 
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO "support"."MerchantMessageTranslation" (
@@ -771,9 +807,9 @@ export async function requestAdditionalTranslation(input: {
         ${message.sourceLanguageTag}, ${target}, 'PENDING', NOW(), NOW()
       ) ON CONFLICT ("messageId", "targetLanguageTag") DO NOTHING
     `);
-    const translations = await transaction.$queryRaw<[
-      { id: string; status: string }
-    ]>(Prisma.sql`
+    const translations = await transaction.$queryRaw<
+      [{ id: string; status: string }]
+    >(Prisma.sql`
       SELECT "id", "status"
       FROM "support"."MerchantMessageTranslation"
       WHERE "messageId" = ${input.messageId} AND "targetLanguageTag" = ${target}
@@ -784,16 +820,21 @@ export async function requestAdditionalTranslation(input: {
       : null;
   });
 
-  if (result?.status === 'PENDING') {
+  if (result?.status === "PENDING") {
     await enqueueDispatchBestEffort(
       result.id,
-      input.queue === undefined ? await getMerchantCommunicationsQueue() : input.queue,
+      input.queue === undefined
+        ? await getMerchantCommunicationsQueue()
+        : input.queue,
     );
   }
   return result?.id ?? null;
 }
 
-export function adminCanSend(principal: PlatformAdminPrincipal, ownerId: string | null): boolean {
+export function adminCanSend(
+  principal: PlatformAdminPrincipal,
+  ownerId: string | null,
+): boolean {
   return principal.id === ownerId;
 }
 
@@ -801,13 +842,13 @@ export function adminCanRelease(
   principal: PlatformAdminPrincipal,
   ownerId: string | null,
 ): boolean {
-  return principal.role === 'SUPER_ADMIN' || principal.id === ownerId;
+  return principal.role === "SUPER_ADMIN" || principal.id === ownerId;
 }
 
 export function adminCanRequestGlobalReconciliation(
   principal: PlatformAdminPrincipal,
 ): boolean {
-  return principal.role === 'SUPER_ADMIN';
+  return principal.role === "SUPER_ADMIN";
 }
 
 export function adminNeedsTranslation(source: string, target: string): boolean {

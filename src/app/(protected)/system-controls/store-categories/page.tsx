@@ -22,11 +22,12 @@ export default async function StoreCategoriesPage({
   searchParams,
 }: StoreCategoriesPageProps) {
   const principal = await requirePlatformAdminPage();
-  const [catalogue, taxonomyIndexStatus, translationConfiguration] = await Promise.all([
-    getStoreCategoryCatalogue(),
-    getReferenceTaxonomyIndexStatus(),
-    getTranslationConfigurationAdminData(),
-  ]);
+  const [catalogue, taxonomyIndexStatus, translationConfiguration] =
+    await Promise.all([
+      getStoreCategoryCatalogue(),
+      getReferenceTaxonomyIndexStatus(),
+      getTranslationConfigurationAdminData(),
+    ]);
   const params = await searchParams;
   const rawCategory = params.category;
   const selectedCategoryId = Array.isArray(rawCategory)

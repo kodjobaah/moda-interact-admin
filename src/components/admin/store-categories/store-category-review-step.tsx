@@ -39,7 +39,8 @@ export function StoreCategoryReviewStep({
             Review Store Category
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            This complete configuration will be saved as a disabled Store Category draft in one serializable PostgreSQL transaction.
+            This complete configuration will be saved as a disabled Store
+            Category draft in one serializable PostgreSQL transaction.
           </p>
         </div>
         <span
@@ -87,7 +88,9 @@ export function StoreCategoryReviewStep({
             {session.defaultTemplate.key}
           </p>
           <p className="mt-3 text-sm text-gray-600">
-            Enabled template · {session.defaultTemplate.promptText.trim().length.toLocaleString()} prompt characters
+            Enabled template ·{" "}
+            {session.defaultTemplate.promptText.trim().length.toLocaleString()}{" "}
+            prompt characters
           </p>
         </div>
 
@@ -106,9 +109,13 @@ export function StoreCategoryReviewStep({
           {session.shopifyMappings.length > 0 ? (
             <ul className="mt-3 space-y-2">
               {session.shopifyMappings.map((mapping) => (
-                <li key={mapping.clientId} className="rounded-md bg-gray-50 p-2 text-sm">
+                <li
+                  key={mapping.clientId}
+                  className="rounded-md bg-gray-50 p-2 text-sm"
+                >
                   <span className="block font-medium text-gray-900">
-                    {mapping.taxonomy?.fullName ?? "Taxonomy selection required"}
+                    {mapping.taxonomy?.fullName ??
+                      "Taxonomy selection required"}
                   </span>
                   {mapping.taxonomy ? (
                     <span className="mt-1 block font-mono text-xs text-gray-500">
@@ -140,13 +147,19 @@ export function StoreCategoryReviewStep({
             {validation.category.valid ? "✓" : "✕"} Category identity complete
           </li>
           <li>
-            {validation.defaultTemplate.valid ? "✓" : "✕"} Default prompt configured
+            {validation.defaultTemplate.valid ? "✓" : "✕"} Default prompt
+            configured
           </li>
           <li>
-            {validation.shopifyMappings.valid ? "✓" : "✕"} Category mappings valid
+            {validation.shopifyMappings.valid ? "✓" : "✕"} Category mappings
+            valid
           </li>
-          <li>{reviewCurrent ? "✓" : "✕"} Review matches current configuration</li>
-          <li>{validation.auditReason.valid ? "✓" : "✕"} Audit reason supplied</li>
+          <li>
+            {reviewCurrent ? "✓" : "✕"} Review matches current configuration
+          </li>
+          <li>
+            {validation.auditReason.valid ? "✓" : "✕"} Audit reason supplied
+          </li>
         </ul>
       </div>
 
@@ -167,11 +180,14 @@ export function StoreCategoryReviewStep({
         />
       </label>
       <StoreCategoryAuthoringErrorList issues={validation.auditReason.issues} />
-      <p className={`mt-2 text-sm ${
-        configurationValid && reviewCurrent && validation.auditReason.valid
-          ? "text-green-700"
-          : "text-amber-700"
-      }`} role="status">
+      <p
+        className={`mt-2 text-sm ${
+          configurationValid && reviewCurrent && validation.auditReason.valid
+            ? "text-green-700"
+            : "text-amber-700"
+        }`}
+        role="status"
+      >
         {configurationValid && reviewCurrent && validation.auditReason.valid
           ? "Ready to save. The disabled configuration will be committed atomically."
           : !validation.auditReason.valid

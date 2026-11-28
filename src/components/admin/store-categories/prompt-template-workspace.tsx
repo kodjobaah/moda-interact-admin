@@ -13,7 +13,9 @@ export function PromptTemplateWorkspace({
 }) {
   const selectedTemplate =
     selectedTemplateId && selectedTemplateId !== "new"
-      ? category.templates.find((template) => template.id === selectedTemplateId)
+      ? category.templates.find(
+          (template) => template.id === selectedTemplateId,
+        )
       : undefined;
   const creating =
     selectedTemplateId === "new" ||
@@ -25,11 +27,15 @@ export function PromptTemplateWorkspace({
   return (
     <section aria-labelledby="store-category-templates-title">
       <div className="mb-5">
-        <h3 id="store-category-templates-title" className="text-lg font-semibold text-gray-950">
+        <h3
+          id="store-category-templates-title"
+          className="text-lg font-semibold text-gray-950"
+        >
           Prompt templates
         </h3>
         <p className="mt-1 text-sm text-gray-600">
-          Maintain one template at a time. The category default is identified in the template list.
+          Maintain one template at a time. The category default is identified in
+          the template list.
         </p>
       </div>
 

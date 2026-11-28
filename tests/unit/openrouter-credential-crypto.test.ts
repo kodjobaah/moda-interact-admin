@@ -15,9 +15,11 @@ import { sealOpenRouterCredential } from "../../src/lib/admin/openrouter-credent
 const environment: CommerceEnvironment = "TEST";
 const keyId = "arch024-test-key";
 const key = new Uint8Array(Buffer.alloc(32, 11));
-const keyring = parseCredentialKeyring(JSON.stringify({
-  [keyId]: Buffer.from(key).toString("base64"),
-}));
+const keyring = parseCredentialKeyring(
+  JSON.stringify({
+    [keyId]: Buffer.from(key).toString("base64"),
+  }),
+);
 const secret = "  exact credential-é  ";
 
 function decrypt(
@@ -57,22 +59,36 @@ test("seals exact UTF-8 secret with interoperable Shared AAD", () => {
     false,
   );
   assert.equal(decrypt(sealed), secret);
-  assert.equal(decryptCredential({
-    keyring,
-    envelope: sealed,
-    aad: createCommerceOpenRouterCredentialAad({ environment, keyId }),
-  }), secret);
-  assert.throws(() => decryptCredential({
-    keyring,
-    envelope: sealed,
-    aad: createCommerceOpenRouterCredentialAad({ environment: "PRODUCTION", keyId }),
-  }));
+  assert.equal(
+    decryptCredential({
+      keyring,
+      envelope: sealed,
+      aad: createCommerceOpenRouterCredentialAad({ environment, keyId }),
+    }),
+    secret,
+  );
+  assert.throws(() =>
+    decryptCredential({
+      keyring,
+      envelope: sealed,
+      aad: createCommerceOpenRouterCredentialAad({
+        environment: "PRODUCTION",
+        keyId,
+      }),
+    }),
+  );
   assert.throws(() => decrypt(sealed, "PRODUCTION"));
   assert.throws(() => decrypt(sealed, environment, "another-key"));
   const changedTag = { ...sealed, authTag: new Uint8Array(sealed.authTag) };
   changedTag.authTag[0] ^= 1;
   assert.throws(() => decrypt(changedTag));
-  assert.throws(() => decryptCredential({ keyring, envelope: changedTag, aad: createCommerceOpenRouterCredentialAad({ environment, keyId }) }));
+  assert.throws(() =>
+    decryptCredential({
+      keyring,
+      envelope: changedTag,
+      aad: createCommerceOpenRouterCredentialAad({ environment, keyId }),
+    }),
+  );
   const changedCiphertext = {
     ...sealed,
     ciphertext: new Uint8Array(sealed.ciphertext),

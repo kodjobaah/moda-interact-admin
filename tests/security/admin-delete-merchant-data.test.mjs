@@ -1,21 +1,30 @@
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { test } from 'node:test';
-import { deleteImmutableShopPrompts } from '../../scripts/merchant-prompt-cleanup.mjs';
-import { deleteImmutableShopAudits } from '../../scripts/merchant-audit-cleanup.mjs';
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import { deleteImmutableShopPrompts } from "../../scripts/merchant-prompt-cleanup.mjs";
+import { deleteImmutableShopAudits } from "../../scripts/merchant-audit-cleanup.mjs";
 import {
   deleteMerchantDatabaseRows,
   deleteImmutableWooConsentEvidence,
   merchantInventory,
   parseOptions,
   validateDeletion,
-} from '../../scripts/merchant-data-deletion-core.mjs';
+} from "../../scripts/merchant-data-deletion-core.mjs";
 
-const shop = { id: 'shop-fixture', domain: 'example.myshopify.com', platform: 'SHOPIFY' };
-const env = { DATABASE_URL: 'postgresql://dev:dev@localhost:5432/moda_dev', NODE_ENV: 'development' };
+const shop = {
+  id: "shop-fixture",
+  domain: "example.myshopify.com",
+  platform: "SHOPIFY",
+};
+const env = {
+  DATABASE_URL: "postgresql://dev:dev@localhost:5432/moda_dev",
+  NODE_ENV: "development",
+};
 const allowed = {
-  command: 'delete', shop: shop.id,
-  confirmShop: shop.domain, confirmTestData: true,
+  command: "delete",
+  shop: shop.id,
+  confirmShop: shop.domain,
+  confirmTestData: true,
   confirmWorkersStopped: true,
   externalAssetsHandled: false,
   allowRemoteDevelopmentDb: false,
@@ -24,101 +33,273 @@ const allowed = {
   confirmImmutableConsentPurge: false,
 };
 
-test('parses a merchant-specific preview and explicit deletion request', () => {
-  assert.deepEqual(parseOptions(['status', '--shop', shop.id]), {
-    ...allowed, command: 'status', confirmShop: undefined,
-    confirmTestData: false, confirmWorkersStopped: false,
+test("parses a merchant-specific preview and explicit deletion request", () => {
+  assert.deepEqual(parseOptions(["status", "--shop", shop.id]), {
+    ...allowed,
+    command: "status",
+    confirmShop: undefined,
+    confirmTestData: false,
+    confirmWorkersStopped: false,
   });
-  assert.deepEqual(parseOptions([
-    'delete', `--shop=${shop.id}`, '--confirm-shop', shop.domain,
-    '--confirm-test-data', '--confirm-workers-stopped',
-  ]), allowed);
-  assert.throws(() => parseOptions(['delete', '--confirm-test-data']), /--shop/);
-  assert.throws(() => parseOptions(['delete', '--shop', shop.id, '--all']), /Unknown/);
+  assert.deepEqual(
+    parseOptions([
+      "delete",
+      `--shop=${shop.id}`,
+      "--confirm-shop",
+      shop.domain,
+      "--confirm-test-data",
+      "--confirm-workers-stopped",
+    ]),
+    allowed,
+  );
+  assert.throws(
+    () => parseOptions(["delete", "--confirm-test-data"]),
+    /--shop/,
+  );
+  assert.throws(
+    () => parseOptions(["delete", "--shop", shop.id, "--all"]),
+    /Unknown/,
+  );
 });
 
-test('refuses deletion without both confirmations and an exact shop domain', () => {
-  assert.throws(() => validateDeletion({ ...allowed, confirmTestData: false }, shop, {}, env), /--confirm-test-data/);
-  assert.throws(() => validateDeletion({ ...allowed, confirmWorkersStopped: false }, shop, {}, env), /--confirm-workers-stopped/);
-  assert.throws(() => validateDeletion({ ...allowed, confirmShop: 'other.myshopify.com' }, shop, {}, env), /exactly match/);
-  assert.doesNotThrow(() => validateDeletion(allowed, shop, { merchantKnowledgeUploadedAssets: 0 }, env));
+test("refuses deletion without both confirmations and an exact shop domain", () => {
+  assert.throws(
+    () =>
+      validateDeletion({ ...allowed, confirmTestData: false }, shop, {}, env),
+    /--confirm-test-data/,
+  );
+  assert.throws(
+    () =>
+      validateDeletion(
+        { ...allowed, confirmWorkersStopped: false },
+        shop,
+        {},
+        env,
+      ),
+    /--confirm-workers-stopped/,
+  );
+  assert.throws(
+    () =>
+      validateDeletion(
+        { ...allowed, confirmShop: "other.myshopify.com" },
+        shop,
+        {},
+        env,
+      ),
+    /exactly match/,
+  );
+  assert.doesNotThrow(() =>
+    validateDeletion(
+      allowed,
+      shop,
+      { merchantKnowledgeUploadedAssets: 0 },
+      env,
+    ),
+  );
 });
 
-test('refuses production, unknown databases and remote targets without separate acknowledgement', () => {
-  assert.throws(() => validateDeletion(allowed, shop, {}, { ...env, NODE_ENV: 'production' }), /Production/);
-  assert.throws(() => validateDeletion(allowed, shop, {}, { ...env, MODA_ENVIRONMENT: 'prod' }), /Production/);
-  assert.throws(() => validateDeletion(allowed, shop, {}, { ...env, DATABASE_URL: undefined }), /DATABASE_URL/);
-  assert.throws(() => validateDeletion(allowed, shop, {}, { ...env, DATABASE_URL: 'postgresql://test@example.com/db' }), /Remote database/);
-  assert.doesNotThrow(() => validateDeletion({ ...allowed, allowRemoteDevelopmentDb: true }, shop, {}, { ...env, DATABASE_URL: 'postgresql://test@example.com/db' }));
+test("refuses production, unknown databases and remote targets without separate acknowledgement", () => {
+  assert.throws(
+    () =>
+      validateDeletion(allowed, shop, {}, { ...env, NODE_ENV: "production" }),
+    /Production/,
+  );
+  assert.throws(
+    () =>
+      validateDeletion(allowed, shop, {}, { ...env, MODA_ENVIRONMENT: "prod" }),
+    /Production/,
+  );
+  assert.throws(
+    () =>
+      validateDeletion(allowed, shop, {}, { ...env, DATABASE_URL: undefined }),
+    /DATABASE_URL/,
+  );
+  assert.throws(
+    () =>
+      validateDeletion(
+        allowed,
+        shop,
+        {},
+        { ...env, DATABASE_URL: "postgresql://test@example.com/db" },
+      ),
+    /Remote database/,
+  );
+  assert.doesNotThrow(() =>
+    validateDeletion(
+      { ...allowed, allowRemoteDevelopmentDb: true },
+      shop,
+      {},
+      { ...env, DATABASE_URL: "postgresql://test@example.com/db" },
+    ),
+  );
 });
 
-test('requires explicit authorization for immutable prompt cleanup', () => {
-  assert.throws(() => validateDeletion(allowed, shop, { commerceAgentPrompts: 1 }, env), /--confirm-immutable-prompt-purge/);
-  assert.doesNotThrow(() => validateDeletion({ ...allowed, confirmImmutablePromptPurge: true }, shop, { commerceAgentPrompts: 1 }, env));
-  assert.equal(parseOptions(['delete', '--shop', shop.id, '--confirm-immutable-prompt-purge']).confirmImmutablePromptPurge, true);
+test("requires explicit authorization for immutable prompt cleanup", () => {
+  assert.throws(
+    () => validateDeletion(allowed, shop, { commerceAgentPrompts: 1 }, env),
+    /--confirm-immutable-prompt-purge/,
+  );
+  assert.doesNotThrow(() =>
+    validateDeletion(
+      { ...allowed, confirmImmutablePromptPurge: true },
+      shop,
+      { commerceAgentPrompts: 1 },
+      env,
+    ),
+  );
+  assert.equal(
+    parseOptions([
+      "delete",
+      "--shop",
+      shop.id,
+      "--confirm-immutable-prompt-purge",
+    ]).confirmImmutablePromptPurge,
+    true,
+  );
 });
 
-test('requires separate authorization for immutable commerce audit cleanup', () => {
-  assert.throws(() => validateDeletion(allowed, shop, { commerceAuditEvents: 1 }, env), /--confirm-immutable-audit-purge/);
-  assert.throws(() => validateDeletion(allowed, shop, { commerceExternalConnectionAudits: 1 }, env), /--confirm-immutable-audit-purge/);
-  assert.doesNotThrow(() => validateDeletion({ ...allowed, confirmImmutableAuditPurge: true }, shop, {
-    commerceAuditEvents: 1,
-    commerceExternalConnectionAudits: 1,
-  }, env));
-  assert.equal(parseOptions(['delete', '--shop', shop.id, '--confirm-immutable-audit-purge']).confirmImmutableAuditPurge, true);
+test("requires separate authorization for immutable commerce audit cleanup", () => {
+  assert.throws(
+    () => validateDeletion(allowed, shop, { commerceAuditEvents: 1 }, env),
+    /--confirm-immutable-audit-purge/,
+  );
+  assert.throws(
+    () =>
+      validateDeletion(
+        allowed,
+        shop,
+        { commerceExternalConnectionAudits: 1 },
+        env,
+      ),
+    /--confirm-immutable-audit-purge/,
+  );
+  assert.doesNotThrow(() =>
+    validateDeletion(
+      { ...allowed, confirmImmutableAuditPurge: true },
+      shop,
+      {
+        commerceAuditEvents: 1,
+        commerceExternalConnectionAudits: 1,
+      },
+      env,
+    ),
+  );
+  assert.equal(
+    parseOptions([
+      "delete",
+      "--shop",
+      shop.id,
+      "--confirm-immutable-audit-purge",
+    ]).confirmImmutableAuditPurge,
+    true,
+  );
 });
 
-test('requires explicit authorization for immutable Woo consent evidence cleanup', () => {
-  assert.throws(() => validateDeletion(allowed, shop, { whatsAppConsentEvidence: 1 }, env), /--confirm-immutable-consent-purge/);
-  assert.doesNotThrow(() => validateDeletion({ ...allowed, confirmImmutableConsentPurge: true }, shop, {
-    whatsAppConsentEvidence: 1,
-  }, env));
-  assert.equal(parseOptions(['delete', '--shop', shop.id, '--confirm-immutable-consent-purge']).confirmImmutableConsentPurge, true);
+test("requires explicit authorization for immutable Woo consent evidence cleanup", () => {
+  assert.throws(
+    () => validateDeletion(allowed, shop, { whatsAppConsentEvidence: 1 }, env),
+    /--confirm-immutable-consent-purge/,
+  );
+  assert.doesNotThrow(() =>
+    validateDeletion(
+      { ...allowed, confirmImmutableConsentPurge: true },
+      shop,
+      {
+        whatsAppConsentEvidence: 1,
+      },
+      env,
+    ),
+  );
+  assert.equal(
+    parseOptions([
+      "delete",
+      "--shop",
+      shop.id,
+      "--confirm-immutable-consent-purge",
+    ]).confirmImmutableConsentPurge,
+    true,
+  );
 });
 
-test('consent evidence purge verifies, suspends and restores only its append-only guard', async () => {
+test("consent evidence purge verifies, suspends and restores only its append-only guard", async () => {
   const events = [];
   const tx = {
-    whatsAppConsentEvidence: { count: async ({ where }) => {
-      assert.deepEqual(where, { shopId: shop.id });
-      return 1;
-    } },
-    $queryRaw: async () => [{
-      tableName: 'WhatsAppConsentEvidence',
-      triggerName: 'arch045_woo_evidence_guard',
-      enabledState: 'O',
-      internal: false,
-    }],
-    $executeRaw: async (parts) => { events.push(parts.join('')); },
-    $executeRawUnsafe: async (sql) => { events.push(sql); },
+    whatsAppConsentEvidence: {
+      count: async ({ where }) => {
+        assert.deepEqual(where, { shopId: shop.id });
+        return 1;
+      },
+    },
+    $queryRaw: async () => [
+      {
+        tableName: "WhatsAppConsentEvidence",
+        triggerName: "arch045_woo_evidence_guard",
+        enabledState: "O",
+        internal: false,
+      },
+    ],
+    $executeRaw: async (parts) => {
+      events.push(parts.join(""));
+    },
+    $executeRawUnsafe: async (sql) => {
+      events.push(sql);
+    },
   };
-  const erase = async (name, args) => { events.push({ name, args }); };
+  const erase = async (name, args) => {
+    events.push({ name, args });
+  };
 
   await assert.rejects(
     deleteImmutableWooConsentEvidence(tx, shop.id, erase, false),
     /--confirm-immutable-consent-purge/,
   );
   await deleteImmutableWooConsentEvidence(tx, shop.id, erase, true);
-  assert.deepEqual(events.map((event) => typeof event === 'string' ? event : event.name), [
-    "SET LOCAL lock_timeout = '5s'",
-    'ALTER TABLE commerce."WhatsAppConsentEvidence" DISABLE TRIGGER arch045_woo_evidence_guard',
-    'whatsAppConsentEvidence',
-    'ALTER TABLE commerce."WhatsAppConsentEvidence" ENABLE TRIGGER arch045_woo_evidence_guard',
-  ]);
+  assert.deepEqual(
+    events.map((event) => (typeof event === "string" ? event : event.name)),
+    [
+      "SET LOCAL lock_timeout = '5s'",
+      'ALTER TABLE commerce."WhatsAppConsentEvidence" DISABLE TRIGGER arch045_woo_evidence_guard',
+      "whatsAppConsentEvidence",
+      'ALTER TABLE commerce."WhatsAppConsentEvidence" ENABLE TRIGGER arch045_woo_evidence_guard',
+    ],
+  );
   assert.deepEqual(events[2].args, { where: { shopId: shop.id } });
 });
 
-test('requires separate acknowledgement for uploaded assets not erased from R2', () => {
-  assert.throws(() => validateDeletion(allowed, shop, { merchantKnowledgeUploadedAssets: 1 }, env), /R2/);
-  assert.doesNotThrow(() => validateDeletion({ ...allowed, externalAssetsHandled: true }, shop, { merchantKnowledgeUploadedAssets: 1 }, env));
+test("requires separate acknowledgement for uploaded assets not erased from R2", () => {
+  assert.throws(
+    () =>
+      validateDeletion(
+        allowed,
+        shop,
+        { merchantKnowledgeUploadedAssets: 1 },
+        env,
+      ),
+    /R2/,
+  );
+  assert.doesNotThrow(() =>
+    validateDeletion(
+      { ...allowed, externalAssetsHandled: true },
+      shop,
+      { merchantKnowledgeUploadedAssets: 1 },
+      env,
+    ),
+  );
 });
 
-test('preview counts merchant-scoped rows without executing writes', async () => {
+test("preview counts merchant-scoped rows without executing writes", async () => {
   const calls = [];
-  const client = new Proxy({}, { get: (_, model) => ({ count: async (args) => {
-    calls.push({ model, where: args.where });
-    return 3;
-  } }) });
+  const client = new Proxy(
+    {},
+    {
+      get: (_, model) => ({
+        count: async (args) => {
+          calls.push({ model, where: args.where });
+          return 3;
+        },
+      }),
+    },
+  );
   const result = await merchantInventory(client, shop);
   assert.equal(result.sessions, 3);
   assert.equal(result.commerceAgentPrompts, 3);
@@ -129,93 +310,192 @@ test('preview counts merchant-scoped rows without executing writes', async () =>
   assert.equal(result.commerceExternalConnectionAudits, 3);
   assert.equal(result.commerceModelPolicies, 3);
   assert.equal(result.whatsAppTemplatePublicationTargets, 3);
-  assert.deepEqual(calls.find((entry) => entry.model === 'session').where, { shop: shop.domain });
-  for (const call of calls.filter((entry) => entry.model !== 'session' && entry.model !== 'conversation' &&
-    entry.model !== 'commerceAgentPromptRevision' && entry.model !== 'commerceAuditEvent')) {
+  assert.deepEqual(calls.find((entry) => entry.model === "session").where, {
+    shop: shop.domain,
+  });
+  for (const call of calls.filter(
+    (entry) =>
+      entry.model !== "session" &&
+      entry.model !== "conversation" &&
+      entry.model !== "commerceAgentPromptRevision" &&
+      entry.model !== "commerceAuditEvent",
+  )) {
     assert.equal(call.where.shopId, shop.id);
   }
 });
 
-test('deletion is targeted and ordered around restrictive foreign keys', async () => {
+test("deletion is targeted and ordered around restrictive foreign keys", async () => {
   const calls = [];
-  const tx = new Proxy({}, {
-    get: (_, model) => model === 'commerceAgentPrompt' ? {
-      count: async () => 0,
-      deleteMany: async (args) => { calls.push({ model, ...args }); return { count: 1 }; },
-    } : model === '$executeRaw' ? async (parts, shopId) => {
-      calls.push({ model: 'merchantTranslationReconciliationRequest', shopId, sql: parts.join('?') });
-      return 2;
-    } : model === 'commerceAuditEvent' || model === 'commerceExternalConnectionAudit' ? {
-      count: async () => 0,
-      deleteMany: async (args) => { calls.push({ model, ...args }); return { count: 0 }; },
-    } : model === 'shop' ? { delete: async (args) => {
-      calls.push({ model: 'shop', ...args });
-      return { id: shop.id };
-    } } : { count: async () => 0, deleteMany: async (args) => {
-      calls.push({ model, ...args });
-      return { count: 1 };
-    } },
-  });
+  const tx = new Proxy(
+    {},
+    {
+      get: (_, model) =>
+        model === "commerceAgentPrompt"
+          ? {
+              count: async () => 0,
+              deleteMany: async (args) => {
+                calls.push({ model, ...args });
+                return { count: 1 };
+              },
+            }
+          : model === "$executeRaw"
+            ? async (parts, shopId) => {
+                calls.push({
+                  model: "merchantTranslationReconciliationRequest",
+                  shopId,
+                  sql: parts.join("?"),
+                });
+                return 2;
+              }
+            : model === "commerceAuditEvent" ||
+                model === "commerceExternalConnectionAudit"
+              ? {
+                  count: async () => 0,
+                  deleteMany: async (args) => {
+                    calls.push({ model, ...args });
+                    return { count: 0 };
+                  },
+                }
+              : model === "shop"
+                ? {
+                    delete: async (args) => {
+                      calls.push({ model: "shop", ...args });
+                      return { id: shop.id };
+                    },
+                  }
+                : {
+                    count: async () => 0,
+                    deleteMany: async (args) => {
+                      calls.push({ model, ...args });
+                      return { count: 1 };
+                    },
+                  },
+    },
+  );
   const result = await deleteMerchantDatabaseRows(tx, shop);
   const position = (model) => calls.findIndex((call) => call.model === model);
   assert.equal(result.shop, 1);
   assert.equal(result.customer, 1);
   assert.equal(result.merchantTranslationReconciliationRequest, 2);
-  assert.ok(position('whatsAppConsentEvidence') < position('customer'));
-  assert.ok(position('customer') < position('shop'));
-  assert.ok(position('usageReservation') < position('promotionalCreditGrant'));
-  assert.ok(position('merchantPromotionSelection') < position('promotionalCreditGrant'));
-  assert.ok(position('recoveryCreditRefund') < position('recoveryCreditPurchase'));
-  assert.ok(position('recoveryCreditPurchase') < position('billingPeriod'));
-  assert.ok(position('merchantKnowledgeSource') < position('merchantKnowledgeUploadedAsset'));
-  assert.ok(position('commerceAgentConfiguration') < position('commerceAgentPromptRevision'));
-  assert.ok(position('commerceAgentPromptRevision') < position('commerceAgentPrompt'));
-  assert.ok(position('commerceModelCatalogueEntry') < position('commerceModelAvailability'));
-  assert.ok(position('commerceAuditEvent') < position('commerceAgentConfiguration'));
-  assert.ok(position('commerceExternalConnectionAudit') < position('commerceExternalCredential'));
-  assert.ok(position('commerceModelPolicy') < position('shop'));
-  assert.ok(position('whatsAppTemplatePublicationTarget') < position('shop'));
-  assert.ok(position('billingPeriod') < position('shop'));
-  assert.ok(position('shop') < position('session'));
-  assert.deepEqual(calls.find((call) => call.model === 'shop').where, { id: shop.id });
-  assert.deepEqual(calls.find((call) => call.model === 'customer').where, { shopId: shop.id });
-  assert.deepEqual(calls.find((call) => call.model === 'whatsAppTemplatePublicationTarget').where, { shopId: shop.id });
-  assert.deepEqual(calls.find((call) => call.model === 'session').where, { shop: shop.domain });
+  assert.ok(position("whatsAppConsentEvidence") < position("customer"));
+  assert.ok(position("customer") < position("shop"));
+  assert.ok(position("usageReservation") < position("promotionalCreditGrant"));
+  assert.ok(
+    position("merchantPromotionSelection") < position("promotionalCreditGrant"),
+  );
+  assert.ok(
+    position("recoveryCreditRefund") < position("recoveryCreditPurchase"),
+  );
+  assert.ok(position("recoveryCreditPurchase") < position("billingPeriod"));
+  assert.ok(
+    position("merchantKnowledgeSource") <
+      position("merchantKnowledgeUploadedAsset"),
+  );
+  assert.ok(
+    position("commerceAgentConfiguration") <
+      position("commerceAgentPromptRevision"),
+  );
+  assert.ok(
+    position("commerceAgentPromptRevision") < position("commerceAgentPrompt"),
+  );
+  assert.ok(
+    position("commerceModelCatalogueEntry") <
+      position("commerceModelAvailability"),
+  );
+  assert.ok(
+    position("commerceAuditEvent") < position("commerceAgentConfiguration"),
+  );
+  assert.ok(
+    position("commerceExternalConnectionAudit") <
+      position("commerceExternalCredential"),
+  );
+  assert.ok(position("commerceModelPolicy") < position("shop"));
+  assert.ok(position("whatsAppTemplatePublicationTarget") < position("shop"));
+  assert.ok(position("billingPeriod") < position("shop"));
+  assert.ok(position("shop") < position("session"));
+  assert.deepEqual(calls.find((call) => call.model === "shop").where, {
+    id: shop.id,
+  });
+  assert.deepEqual(calls.find((call) => call.model === "customer").where, {
+    shopId: shop.id,
+  });
+  assert.deepEqual(
+    calls.find((call) => call.model === "whatsAppTemplatePublicationTarget")
+      .where,
+    { shopId: shop.id },
+  );
+  assert.deepEqual(calls.find((call) => call.model === "session").where, {
+    shop: shop.domain,
+  });
   for (const entry of calls) {
-    assert.ok(entry.model === 'shop' || entry.model === 'session' || entry.model === 'merchantTranslationReconciliationRequest' ||
-      JSON.stringify(entry.where).includes(shop.id), `Unscoped deletion in ${entry.model}`);
+    assert.ok(
+      entry.model === "shop" ||
+        entry.model === "session" ||
+        entry.model === "merchantTranslationReconciliationRequest" ||
+        JSON.stringify(entry.where).includes(shop.id),
+      `Unscoped deletion in ${entry.model}`,
+    );
   }
-  assert.equal(calls.find((call) => call.model === 'merchantTranslationReconciliationRequest').shopId, shop.id);
+  assert.equal(
+    calls.find(
+      (call) => call.model === "merchantTranslationReconciliationRequest",
+    ).shopId,
+    shop.id,
+  );
 });
 
-test('confirmed audit cleanup verifies and restores only the two application guards', async () => {
+test("confirmed audit cleanup verifies and restores only the two application guards", async () => {
   const events = [];
   const tx = {
     commerceAuditEvent: { count: async () => 2 },
     commerceExternalConnectionAudit: { count: async () => 1 },
     $queryRaw: async () => [
-      { tableName: 'CommerceAuditEvent', triggerName: 'arch021_audit_immutable', enabledState: 'O', internal: false },
-      { tableName: 'CommerceExternalConnectionAudit', triggerName: 'CommerceExternalConnectionAudit_immutable_trigger', enabledState: 'O', internal: false },
+      {
+        tableName: "CommerceAuditEvent",
+        triggerName: "arch021_audit_immutable",
+        enabledState: "O",
+        internal: false,
+      },
+      {
+        tableName: "CommerceExternalConnectionAudit",
+        triggerName: "CommerceExternalConnectionAudit_immutable_trigger",
+        enabledState: "O",
+        internal: false,
+      },
     ],
-    $executeRaw: async (parts) => { events.push(parts.join('')); },
-    $executeRawUnsafe: async (sql) => { events.push(sql); },
+    $executeRaw: async (parts) => {
+      events.push(parts.join(""));
+    },
+    $executeRawUnsafe: async (sql) => {
+      events.push(sql);
+    },
   };
-  await deleteImmutableShopAudits(tx, shop.id, async (name, args) => { events.push({ name, args }); }, true);
-  assert.deepEqual(events.map((event) => typeof event === 'string' ? event : event.name), [
-    "SET LOCAL lock_timeout = '5s'",
-    'ALTER TABLE commerce."CommerceAuditEvent" DISABLE TRIGGER arch021_audit_immutable',
-    'ALTER TABLE commerce."CommerceExternalConnectionAudit" DISABLE TRIGGER "CommerceExternalConnectionAudit_immutable_trigger"',
-    'commerceAuditEvent',
-    'commerceExternalConnectionAudit',
-    'ALTER TABLE commerce."CommerceAuditEvent" ENABLE TRIGGER arch021_audit_immutable',
-    'ALTER TABLE commerce."CommerceExternalConnectionAudit" ENABLE TRIGGER "CommerceExternalConnectionAudit_immutable_trigger"',
-  ]);
-  const deletes = events.filter((event) => typeof event !== 'string');
+  await deleteImmutableShopAudits(
+    tx,
+    shop.id,
+    async (name, args) => {
+      events.push({ name, args });
+    },
+    true,
+  );
+  assert.deepEqual(
+    events.map((event) => (typeof event === "string" ? event : event.name)),
+    [
+      "SET LOCAL lock_timeout = '5s'",
+      'ALTER TABLE commerce."CommerceAuditEvent" DISABLE TRIGGER arch021_audit_immutable',
+      'ALTER TABLE commerce."CommerceExternalConnectionAudit" DISABLE TRIGGER "CommerceExternalConnectionAudit_immutable_trigger"',
+      "commerceAuditEvent",
+      "commerceExternalConnectionAudit",
+      'ALTER TABLE commerce."CommerceAuditEvent" ENABLE TRIGGER arch021_audit_immutable',
+      'ALTER TABLE commerce."CommerceExternalConnectionAudit" ENABLE TRIGGER "CommerceExternalConnectionAudit_immutable_trigger"',
+    ],
+  );
+  const deletes = events.filter((event) => typeof event !== "string");
   assert.equal(deletes[0].args.where.OR[0].shopId, shop.id);
   assert.deepEqual(deletes[1].args, { where: { shopId: shop.id } });
 });
 
-test('audit cleanup refuses unconfirmed purge and fails closed for altered triggers', async () => {
+test("audit cleanup refuses unconfirmed purge and fails closed for altered triggers", async () => {
   let inspected = false;
   const tx = {
     commerceAuditEvent: { count: async () => 1 },
@@ -223,100 +503,204 @@ test('audit cleanup refuses unconfirmed purge and fails closed for altered trigg
     $queryRaw: async () => {
       inspected = true;
       return [
-        { tableName: 'CommerceAuditEvent', triggerName: 'arch021_audit_immutable', enabledState: 'D', internal: false },
-        { tableName: 'CommerceExternalConnectionAudit', triggerName: 'CommerceExternalConnectionAudit_immutable_trigger', enabledState: 'O', internal: false },
+        {
+          tableName: "CommerceAuditEvent",
+          triggerName: "arch021_audit_immutable",
+          enabledState: "D",
+          internal: false,
+        },
+        {
+          tableName: "CommerceExternalConnectionAudit",
+          triggerName: "CommerceExternalConnectionAudit_immutable_trigger",
+          enabledState: "O",
+          internal: false,
+        },
       ];
     },
-    $executeRaw: async () => assert.fail('must not alter triggers'),
-    $executeRawUnsafe: async () => assert.fail('must not alter triggers'),
+    $executeRaw: async () => assert.fail("must not alter triggers"),
+    $executeRawUnsafe: async () => assert.fail("must not alter triggers"),
   };
-  await assert.rejects(deleteImmutableShopAudits(tx, shop.id, async () => {}, false), /--confirm-immutable-audit-purge/);
+  await assert.rejects(
+    deleteImmutableShopAudits(tx, shop.id, async () => {}, false),
+    /--confirm-immutable-audit-purge/,
+  );
   assert.equal(inspected, false);
-  await assert.rejects(deleteImmutableShopAudits(tx, shop.id, async () => {}, true), /expected enabled state/);
+  await assert.rejects(
+    deleteImmutableShopAudits(tx, shop.id, async () => {}, true),
+    /expected enabled state/,
+  );
 });
 
-test('prompt cleanup refuses any unconfirmed attempt to bypass ARCH-021 immutability', async () => {
+test("prompt cleanup refuses any unconfirmed attempt to bypass ARCH-021 immutability", async () => {
   const events = [];
   const tx = {
-    commerceAgentPrompt: { count: async ({ where }) => {
-      assert.deepEqual(where, { shopId: shop.id });
-      return 2;
-    } },
-    $queryRaw: async () => { events.push('inspect'); return []; },
-    $executeRawUnsafe: async () => { events.push('ddl'); },
+    commerceAgentPrompt: {
+      count: async ({ where }) => {
+        assert.deepEqual(where, { shopId: shop.id });
+        return 2;
+      },
+    },
+    $queryRaw: async () => {
+      events.push("inspect");
+      return [];
+    },
+    $executeRawUnsafe: async () => {
+      events.push("ddl");
+    },
   };
-  await assert.rejects(deleteImmutableShopPrompts(tx, shop.id, async () => {}, false), /--confirm-immutable-prompt-purge/);
+  await assert.rejects(
+    deleteImmutableShopPrompts(tx, shop.id, async () => {}, false),
+    /--confirm-immutable-prompt-purge/,
+  );
   assert.deepEqual(events, []);
 });
 
-test('prompt cleanup fails closed on missing or altered trigger modes', async () => {
+test("prompt cleanup fails closed on missing or altered trigger modes", async () => {
   const events = [];
   const tx = {
     commerceAgentPrompt: { count: async () => 1 },
     $queryRaw: async () => [
-      { tableName: 'CommerceAgentPromptRevision', triggerName: 'arch021_agent_prompt_revision_guard', enabledState: 'O', internal: false },
-      { tableName: 'CommerceAgentPrompt', triggerName: 'arch021_agent_prompt_guard', enabledState: 'O', internal: false },
+      {
+        tableName: "CommerceAgentPromptRevision",
+        triggerName: "arch021_agent_prompt_revision_guard",
+        enabledState: "O",
+        internal: false,
+      },
+      {
+        tableName: "CommerceAgentPrompt",
+        triggerName: "arch021_agent_prompt_guard",
+        enabledState: "O",
+        internal: false,
+      },
     ],
-    $executeRawUnsafe: async () => { events.push('ddl'); },
+    $executeRawUnsafe: async () => {
+      events.push("ddl");
+    },
   };
-  await assert.rejects(deleteImmutableShopPrompts(tx, shop.id, async () => {}, true), /expected enabled state/);
+  await assert.rejects(
+    deleteImmutableShopPrompts(tx, shop.id, async () => {}, true),
+    /expected enabled state/,
+  );
   assert.deepEqual(events, []);
 });
 
-test('confirmed prompt cleanup suspends only two application guards and restores original modes', async () => {
+test("confirmed prompt cleanup suspends only two application guards and restores original modes", async () => {
   const events = [];
   const tx = {
     commerceAgentPrompt: { count: async () => 2 },
     $queryRaw: async () => [
-      { tableName: 'CommerceAgentPromptRevision', triggerName: 'arch021_agent_prompt_revision_guard', enabledState: 'A', internal: false },
-      { tableName: 'CommerceAgentPrompt', triggerName: 'arch021_agent_prompt_guard', enabledState: 'O', internal: false },
+      {
+        tableName: "CommerceAgentPromptRevision",
+        triggerName: "arch021_agent_prompt_revision_guard",
+        enabledState: "A",
+        internal: false,
+      },
+      {
+        tableName: "CommerceAgentPrompt",
+        triggerName: "arch021_agent_prompt_guard",
+        enabledState: "O",
+        internal: false,
+      },
     ],
-    $executeRaw: async (parts) => { events.push(parts.join('')); },
-    $executeRawUnsafe: async (sql) => { events.push(sql); },
+    $executeRaw: async (parts) => {
+      events.push(parts.join(""));
+    },
+    $executeRawUnsafe: async (sql) => {
+      events.push(sql);
+    },
   };
-  await deleteImmutableShopPrompts(tx, shop.id, async (name, args) => {
-    events.push({ name, args });
-  }, true);
-  assert.deepEqual(events.map((value) => typeof value === 'string' ? value : value.name), [
-    "SET LOCAL lock_timeout = '5s'",
-    'ALTER TABLE commerce."CommerceAgentPromptRevision" DISABLE TRIGGER arch021_agent_prompt_revision_guard',
-    'ALTER TABLE commerce."CommerceAgentPrompt" DISABLE TRIGGER arch021_agent_prompt_guard',
-    'commerceAgentPromptRevision',
-    'commerceAgentPrompt',
-    'ALTER TABLE commerce."CommerceAgentPromptRevision" ENABLE ALWAYS TRIGGER arch021_agent_prompt_revision_guard',
-    'ALTER TABLE commerce."CommerceAgentPrompt" ENABLE TRIGGER arch021_agent_prompt_guard',
-  ]);
-  const deletes = events.filter((value) => typeof value !== 'string');
-  assert.deepEqual(deletes[0].args, { where: { prompt: { is: { shopId: shop.id } } } });
+  await deleteImmutableShopPrompts(
+    tx,
+    shop.id,
+    async (name, args) => {
+      events.push({ name, args });
+    },
+    true,
+  );
+  assert.deepEqual(
+    events.map((value) => (typeof value === "string" ? value : value.name)),
+    [
+      "SET LOCAL lock_timeout = '5s'",
+      'ALTER TABLE commerce."CommerceAgentPromptRevision" DISABLE TRIGGER arch021_agent_prompt_revision_guard',
+      'ALTER TABLE commerce."CommerceAgentPrompt" DISABLE TRIGGER arch021_agent_prompt_guard',
+      "commerceAgentPromptRevision",
+      "commerceAgentPrompt",
+      'ALTER TABLE commerce."CommerceAgentPromptRevision" ENABLE ALWAYS TRIGGER arch021_agent_prompt_revision_guard',
+      'ALTER TABLE commerce."CommerceAgentPrompt" ENABLE TRIGGER arch021_agent_prompt_guard',
+    ],
+  );
+  const deletes = events.filter((value) => typeof value !== "string");
+  assert.deepEqual(deletes[0].args, {
+    where: { prompt: { is: { shopId: shop.id } } },
+  });
   assert.deepEqual(deletes[1].args, { where: { shopId: shop.id } });
 });
 
-test('prompt cleanup propagates failed deletion for transaction rollback rather than re-enabling inside an aborted transaction', async () => {
+test("prompt cleanup propagates failed deletion for transaction rollback rather than re-enabling inside an aborted transaction", async () => {
   const events = [];
   const tx = {
     commerceAgentPrompt: { count: async () => 1 },
     $queryRaw: async () => [
-      { tableName: 'CommerceAgentPromptRevision', triggerName: 'arch021_agent_prompt_revision_guard', enabledState: 'A', internal: false },
-      { tableName: 'CommerceAgentPrompt', triggerName: 'arch021_agent_prompt_guard', enabledState: 'O', internal: false },
+      {
+        tableName: "CommerceAgentPromptRevision",
+        triggerName: "arch021_agent_prompt_revision_guard",
+        enabledState: "A",
+        internal: false,
+      },
+      {
+        tableName: "CommerceAgentPrompt",
+        triggerName: "arch021_agent_prompt_guard",
+        enabledState: "O",
+        internal: false,
+      },
     ],
     $executeRaw: async () => {},
-    $executeRawUnsafe: async (sql) => { events.push(sql); },
+    $executeRawUnsafe: async (sql) => {
+      events.push(sql);
+    },
   };
-  await assert.rejects(deleteImmutableShopPrompts(tx, shop.id, async () => { throw new Error('FK blocked'); }, true), /FK blocked/);
-  assert.equal(events.filter((sql) => sql.includes('DISABLE TRIGGER')).length, 2);
-  assert.equal(events.filter((sql) => sql.includes('ENABLE')).length, 0);
+  await assert.rejects(
+    deleteImmutableShopPrompts(
+      tx,
+      shop.id,
+      async () => {
+        throw new Error("FK blocked");
+      },
+      true,
+    ),
+    /FK blocked/,
+  );
+  assert.equal(
+    events.filter((sql) => sql.includes("DISABLE TRIGGER")).length,
+    2,
+  );
+  assert.equal(events.filter((sql) => sql.includes("ENABLE")).length, 0);
 });
 
-test('schema direct restrictive Shop foreign keys are explicitly handled', () => {
-  const schema = readFileSync(new URL('../../database/prisma/schema.prisma', import.meta.url), 'utf8');
+test("schema direct restrictive Shop foreign keys are explicitly handled", () => {
+  const schema = readFileSync(
+    new URL("../../database/prisma/schema.prisma", import.meta.url),
+    "utf8",
+  );
   const names = [];
   for (const match of schema.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)) {
-    if (/\bShop\??\s+@relation\([^\n]*onDelete: Restrict/.test(match[2])) names.push(match[1]);
+    if (/\bShop\??\s+@relation\([^\n]*onDelete: Restrict/.test(match[2]))
+      names.push(match[1]);
   }
-  assert.deepEqual(names.sort(), [
-    'CommerceAgentConfiguration', 'CommerceAgentPrompt', 'CommerceAuditEvent',
-    'CommerceExternalConnectionAudit', 'CommerceExternalCredential',
-    'CommerceModelAvailability', 'CommerceModelPolicy', 'CommerceStudioMerchantAccess',
-    'PromotionCampaign', 'PromotionalCreditGrant', 'WhatsAppTemplatePublicationTarget',
-  ].sort());
+  assert.deepEqual(
+    names.sort(),
+    [
+      "CommerceAgentConfiguration",
+      "CommerceAgentPrompt",
+      "CommerceAuditEvent",
+      "CommerceExternalConnectionAudit",
+      "CommerceExternalCredential",
+      "CommerceModelAvailability",
+      "CommerceModelPolicy",
+      "CommerceStudioMerchantAccess",
+      "PromotionCampaign",
+      "PromotionalCreditGrant",
+      "WhatsAppTemplatePublicationTarget",
+    ].sort(),
+  );
 });

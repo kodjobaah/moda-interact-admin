@@ -8,36 +8,100 @@ import { metaBodyIssues, projectMetaBody } from "./meta-body";
 import { eligibleHeaderVariables, eligibleVariables } from "./registry";
 import { splitInitialReplyBody } from "./initial-reply-instructions";
 import { RecoveryTemplateHeaderMediaRoleSchema } from "@modainteract/moda-interact-shared/recovery-template-bindings";
-import type { AuthoringIssue, ContentNode, PromotionTarget, TemplateAst } from "./types";
+import type {
+  AuthoringIssue,
+  ContentNode,
+  PromotionTarget,
+  TemplateAst,
+} from "./types";
 
 const MAX_JSON_BYTES = 32_768;
 const MAX_NODES = 80;
 const TOKEN_PATTERN = /\{\{[^{}]*\}\}|\{\{|\}\}/;
-const ownKeys = (o: Record<string, unknown>, keys: string[]) => Object.keys(o).every((k) => keys.includes(k));
-const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-const enumMember = (v: unknown, choices: readonly string[]): v is string => typeof v === "string" && choices.includes(v);
+const ownKeys = (o: Record<string, unknown>, keys: string[]) =>
+  Object.keys(o).every((k) => keys.includes(k));
+const object = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === "object" && !Array.isArray(v);
+const enumMember = (v: unknown, choices: readonly string[]): v is string =>
+  typeof v === "string" && choices.includes(v);
 
-export function validateTemplateStructure(raw: unknown, options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {}): { ok: true; value: TemplateAst } | { ok: false; issues: AuthoringIssue[] } {
+export function validateTemplateStructure(
+  raw: unknown,
+  options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {},
+): { ok: true; value: TemplateAst } | { ok: false; issues: AuthoringIssue[] } {
   const issues: AuthoringIssue[] = [];
-  const fail = (path: string, message: string) => issues.push({ path, message });
-  if (!object(raw)) return { ok: false, issues: [{ path: "root", message: "Expected a template object." }] };
+  const fail = (path: string, message: string) =>
+    issues.push({ path, message });
+  if (!object(raw))
+    return {
+      ok: false,
+      issues: [{ path: "root", message: "Expected a template object." }],
+    };
   let byteSize = Infinity;
-  try { byteSize = new TextEncoder().encode(JSON.stringify(raw)).length; } catch { /* rejects below */ }
-  if (byteSize > MAX_JSON_BYTES) fail("root", "Template exceeds 32 KiB or is not serialisable.");
-  if (raw.schemaVersion !== 1) fail("schemaVersion", "Unsupported AST version.");
-  if (raw.sourceLanguageTag !== "en") fail("sourceLanguageTag", "Select English (en) as the source language.");
+  try {
+    byteSize = new TextEncoder().encode(JSON.stringify(raw)).length;
+  } catch {
+    /* rejects below */
+  }
+  if (byteSize > MAX_JSON_BYTES)
+    fail("root", "Template exceeds 32 KiB or is not serialisable.");
+  if (raw.schemaVersion !== 1)
+    fail("schemaVersion", "Unsupported AST version.");
+  if (raw.sourceLanguageTag !== "en")
+    fail("sourceLanguageTag", "Select English (en) as the source language.");
   if (!enumMember(raw.family, ["META_RECOVERY", "MODA_CONVERSATION_WRAPPER"])) {
     fail("family", "Unknown template family.");
     return { ok: false, issues };
   }
-  const router = raw.family === "MODA_CONVERSATION_WRAPPER" && raw.audience === "ROUTER";
-  if (router && (!Array.isArray(raw.conditionals) || raw.conditionals.length !== 0)) fail("conditionals", "Router templates cannot contain checkout conditionals.");
+  const router =
+    raw.family === "MODA_CONVERSATION_WRAPPER" && raw.audience === "ROUTER";
+  if (
+    router &&
+    (!Array.isArray(raw.conditionals) || raw.conditionals.length !== 0)
+  )
+    fail(
+      "conditionals",
+      "Router templates cannot contain checkout conditionals.",
+    );
   const family = raw.family;
   const meta = family === "META_RECOVERY";
-  const common = ["schemaVersion", "family", "sourceLanguageTag", "header", "body", "footer"];
-  if (!ownKeys(raw, meta ? [...common, "stage", "offerType", "promotionTarget", "buttons", "shopBrandMediaRole", "commonLayout"] : [...common, "audience", "conditionals", "productImage", "compositeProfile"])) fail("root", "Unknown template fields.");
+  const common = [
+    "schemaVersion",
+    "family",
+    "sourceLanguageTag",
+    "header",
+    "body",
+    "footer",
+  ];
+  if (
+    !ownKeys(
+      raw,
+      meta
+        ? [
+            ...common,
+            "stage",
+            "offerType",
+            "promotionTarget",
+            "buttons",
+            "shopBrandMediaRole",
+            "commonLayout",
+          ]
+        : [
+            ...common,
+            "audience",
+            "conditionals",
+            "productImage",
+            "compositeProfile",
+          ],
+    )
+  )
+    fail("root", "Unknown template fields.");
   if (!meta && raw.compositeProfile !== undefined) {
-    if (raw.audience !== "SHARED") fail("compositeProfile", "Composite layout belongs only to the common SHARED template.");
+    if (raw.audience !== "SHARED")
+      fail(
+        "compositeProfile",
+        "Composite layout belongs only to the common SHARED template.",
+      );
     const error = compositeProfileError(raw.compositeProfile);
     if (error) fail("compositeProfile", error);
   }
@@ -45,199 +109,572 @@ export function validateTemplateStructure(raw: unknown, options: { contentLangua
   if (meta && raw.commonLayout !== undefined) {
     try {
       const ref = requireCommonLayout(raw.commonLayout);
-      if (options.contentLanguageTag && ref.languageTag !== options.contentLanguageTag) fail("commonLayout", "Common layout language must match this locale.");
+      if (
+        options.contentLanguageTag &&
+        ref.languageTag !== options.contentLanguageTag
+      )
+        fail("commonLayout", "Common layout language must match this locale.");
       else trustedCommonLayout = true;
-    } catch { fail("commonLayout", "Select a valid saved common shop layout."); }
-    if (!Array.isArray(raw.header) || raw.header.length) fail("header", "Common shop identity belongs in the body. Review and explicitly remove the old text header before using the common layout.");
-    if (raw.shopBrandMediaRole !== undefined && !["LOGO", "SQUARE_LOGO"].includes(String(raw.shopBrandMediaRole))) fail("shopBrandMediaRole", "Choose a genuine logo or square logo IMAGE header, or leave the header absent for TEXT fallback.");
-    if (raw.shopBrandMediaRole === undefined && Array.isArray(raw.body) && raw.body.some(node =>
-        node && typeof node === "object" && node.type === "variable" && typeof node.name === "string" && node.name.startsWith("shopBrand."))) {
-      fail("body", "A TEXT fallback must not depend on merchant branding. Use shop.name instead of shopBrand variables.");
+    } catch {
+      fail("commonLayout", "Select a valid saved common shop layout.");
+    }
+    if (!Array.isArray(raw.header) || raw.header.length)
+      fail(
+        "header",
+        "Common shop identity belongs in the body. Review and explicitly remove the old text header before using the common layout.",
+      );
+    if (
+      raw.shopBrandMediaRole !== undefined &&
+      !["LOGO", "SQUARE_LOGO"].includes(String(raw.shopBrandMediaRole))
+    )
+      fail(
+        "shopBrandMediaRole",
+        "Choose a genuine logo or square logo IMAGE header, or leave the header absent for TEXT fallback.",
+      );
+    if (
+      raw.shopBrandMediaRole === undefined &&
+      Array.isArray(raw.body) &&
+      raw.body.some(
+        (node) =>
+          node &&
+          typeof node === "object" &&
+          node.type === "variable" &&
+          typeof node.name === "string" &&
+          node.name.startsWith("shopBrand."),
+      )
+    ) {
+      fail(
+        "body",
+        "A TEXT fallback must not depend on merchant branding. Use shop.name instead of shopBrand variables.",
+      );
     }
   }
   if (meta) {
-    if (!enumMember(raw.stage, ["INITIAL", "FOLLOW_UP"])) fail("stage", "Select a recovery stage.");
-    if (!enumMember(raw.offerType, ["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"])) fail("offerType", "Select an offer type.");
-    if (raw.promotionTarget !== undefined && !enumMember(raw.promotionTarget, ["CHECKOUT", "ALTERNATIVE_PRODUCT"])) fail("promotionTarget", "Select a supported promotion target.");
-    if (raw.offerType === "NO_OFFER" && raw.promotionTarget !== undefined) fail("promotionTarget", "No-offer templates cannot select a promotion target.");
-  } else if (!enumMember(raw.audience, ["SHARED", "AI", "HUMAN", "ROUTER"])) fail("audience", "Select a wrapper audience.");
+    if (!enumMember(raw.stage, ["INITIAL", "FOLLOW_UP"]))
+      fail("stage", "Select a recovery stage.");
+    if (
+      !enumMember(raw.offerType, ["NO_OFFER", "CODE_OFFER", "AUTOMATIC_OFFER"])
+    )
+      fail("offerType", "Select an offer type.");
+    if (
+      raw.promotionTarget !== undefined &&
+      !enumMember(raw.promotionTarget, ["CHECKOUT", "ALTERNATIVE_PRODUCT"])
+    )
+      fail("promotionTarget", "Select a supported promotion target.");
+    if (raw.offerType === "NO_OFFER" && raw.promotionTarget !== undefined)
+      fail(
+        "promotionTarget",
+        "No-offer templates cannot select a promotion target.",
+      );
+  } else if (!enumMember(raw.audience, ["SHARED", "AI", "HUMAN", "ROUTER"]))
+    fail("audience", "Select a wrapper audience.");
 
   if (!meta && Object.hasOwn(raw, "productImage")) {
-    if (raw.audience !== "AI") fail("productImage", "Optional product images are supported only for AI response wrappers.");
-    if (!ConversationProductImageBindingSchema.safeParse(raw.productImage).success) {
-      fail("productImage", "Use the optional verified product image above the response; URLs and other image bindings are not supported.");
+    if (raw.audience !== "AI")
+      fail(
+        "productImage",
+        "Optional product images are supported only for AI response wrappers.",
+      );
+    if (
+      !ConversationProductImageBindingSchema.safeParse(raw.productImage).success
+    ) {
+      fail(
+        "productImage",
+        "Use the optional verified product image above the response; URLs and other image bindings are not supported.",
+      );
     }
   }
 
-  const checkNodes = (input: unknown, path: string, maxChars: number, allowed: Array<"text" | "variable" | "slot">) => {
-    if (!Array.isArray(input) || input.length > MAX_NODES) { fail(path, "Expected up to 80 content nodes."); return; }
+  const checkNodes = (
+    input: unknown,
+    path: string,
+    maxChars: number,
+    allowed: Array<"text" | "variable" | "slot">,
+  ) => {
+    if (!Array.isArray(input) || input.length > MAX_NODES) {
+      fail(path, "Expected up to 80 content nodes.");
+      return;
+    }
     for (const [i, n] of input.entries()) {
       const key = `${path}.${i}`;
-      if (!object(n) || !enumMember(n.type, allowed)) { fail(key, "Unsupported content node."); continue; }
+      if (!object(n) || !enumMember(n.type, allowed)) {
+        fail(key, "Unsupported content node.");
+        continue;
+      }
       if (n.type === "text") {
-        if (!ownKeys(n, ["type", "value"]) || typeof n.value !== "string" || n.value.length > maxChars || TOKEN_PATTERN.test(n.value)) {
-          fail(key, `Text must be at most ${maxChars} characters; use the variable palette rather than raw {{...}} placeholders.`);
+        if (
+          !ownKeys(n, ["type", "value"]) ||
+          typeof n.value !== "string" ||
+          n.value.length > maxChars ||
+          TOKEN_PATTERN.test(n.value)
+        ) {
+          fail(
+            key,
+            `Text must be at most ${maxChars} characters; use the variable palette rather than raw {{...}} placeholders.`,
+          );
         }
       } else if (n.type === "variable") {
         // One semantic registry; unrecognised/offer-ineligible variables are refused.
         const draft = raw as unknown as TemplateAst;
-        const allowedVariables = meta && path === "header" ? eligibleHeaderVariables(draft) : eligibleVariables(draft);
-        if (!ownKeys(n, ["type", "name"]) || !enumMember(n.name, allowedVariables)) fail(key, "Unknown or ineligible semantic variable for this component.");
-        if (!meta && n.name === "checkout.url" && !path.startsWith("conditionals.")) fail(key, "Checkout links in wrappers require a checkout.available conditional.");
-      } else if (!ownKeys(n, ["type", "name"]) || n.name !== "response.body" || meta || path !== "body") fail(key, "Response slot is only supported once in a wrapper body.");
+        const allowedVariables =
+          meta && path === "header"
+            ? eligibleHeaderVariables(draft)
+            : eligibleVariables(draft);
+        if (
+          !ownKeys(n, ["type", "name"]) ||
+          !enumMember(n.name, allowedVariables)
+        )
+          fail(
+            key,
+            "Unknown or ineligible semantic variable for this component.",
+          );
+        if (
+          !meta &&
+          n.name === "checkout.url" &&
+          !path.startsWith("conditionals.")
+        )
+          fail(
+            key,
+            "Checkout links in wrappers require a checkout.available conditional.",
+          );
+      } else if (
+        !ownKeys(n, ["type", "name"]) ||
+        n.name !== "response.body" ||
+        meta ||
+        path !== "body"
+      )
+        fail(key, "Response slot is only supported once in a wrapper body.");
     }
     let nextPosition = 0;
     const projectionLength = (input as unknown[]).reduce<number>((count, n) => {
       if (!object(n)) return count;
-      if (n.type === "text") return count + (typeof n.value === "string" ? n.value.length : 0);
-      if (n.type === "variable" && meta && path === "body") return count + `{{${++nextPosition}}}`.length;
+      if (n.type === "text")
+        return count + (typeof n.value === "string" ? n.value.length : 0);
+      if (n.type === "variable" && meta && path === "body")
+        return count + `{{${++nextPosition}}}`.length;
       return count + 5;
     }, 0);
-    if (projectionLength > maxChars) fail(path, `Rendered content exceeds ${maxChars} characters.`);
+    if (projectionLength > maxChars)
+      fail(path, `Rendered content exceeds ${maxChars} characters.`);
   };
   checkNodes(raw.header, "header", meta ? 60 : 1500, ["text", "variable"]);
-  checkNodes(raw.body, "body", meta ? 1024 : 4000, meta ? ["text", "variable"] : ["text", "variable", "slot"]);
-  checkNodes(raw.footer, "footer", meta ? 60 : 1500, meta ? ["text"] : ["text", "variable"]);
-  if (!Array.isArray(raw.body) || raw.body.length === 0 || (raw.body as unknown[]).every((n) => object(n) && n.type === "text" && typeof n.value === "string" && !n.value.trim())) fail("body", "Body cannot be empty.");
+  checkNodes(
+    raw.body,
+    "body",
+    meta ? 1024 : 4000,
+    meta ? ["text", "variable"] : ["text", "variable", "slot"],
+  );
+  checkNodes(
+    raw.footer,
+    "footer",
+    meta ? 60 : 1500,
+    meta ? ["text"] : ["text", "variable"],
+  );
+  if (
+    !Array.isArray(raw.body) ||
+    raw.body.length === 0 ||
+    (raw.body as unknown[]).every(
+      (n) =>
+        object(n) &&
+        n.type === "text" &&
+        typeof n.value === "string" &&
+        !n.value.trim(),
+    )
+  )
+    fail("body", "Body cannot be empty.");
   if (meta) {
     if (raw.shopBrandMediaRole !== undefined) {
-      if (!RecoveryTemplateHeaderMediaRoleSchema.safeParse(raw.shopBrandMediaRole).success) {
+      if (
+        !RecoveryTemplateHeaderMediaRoleSchema.safeParse(raw.shopBrandMediaRole)
+          .success
+      ) {
         fail("shopBrandMediaRole", "Choose a supported IMAGE header role.");
       }
       if (!Array.isArray(raw.header) || raw.header.length !== 0) {
-        fail("header", "IMAGE headers cannot also contain text or text variables.");
+        fail(
+          "header",
+          "IMAGE headers cannot also contain text or text variables.",
+        );
       }
-      if (raw.shopBrandMediaRole === "CHECKOUT_PRODUCT" &&
-          (raw.offerType === "NO_OFFER" || !enumMember(raw.promotionTarget, ["CHECKOUT", "ALTERNATIVE_PRODUCT"]))) {
-        fail("promotionTarget", "Product IMAGE headers require an offer and an explicit checkout or alternative-product target.");
+      if (
+        raw.shopBrandMediaRole === "CHECKOUT_PRODUCT" &&
+        (raw.offerType === "NO_OFFER" ||
+          !enumMember(raw.promotionTarget, ["CHECKOUT", "ALTERNATIVE_PRODUCT"]))
+      ) {
+        fail(
+          "promotionTarget",
+          "Product IMAGE headers require an offer and an explicit checkout or alternative-product target.",
+        );
       }
     }
     const maxButtons = raw.promotionTarget === "ALTERNATIVE_PRODUCT" ? 2 : 1;
-    if (!Array.isArray(raw.buttons) || raw.buttons.length > maxButtons) fail("buttons", `At most ${maxButtons} URL button${maxButtons === 1 ? "" : "s"} supported for this target.`);
-    else for (const [i, b] of raw.buttons.entries()) {
-      const key = `buttons.${i}`;
-      if (!object(b) || !ownKeys(b, ["type", "label", "urlPrefix", "variable"]) || b.type !== "url" || typeof b.label !== "string" || !b.label.trim() || b.label.length > 25) { fail(key, "Unsupported URL button or invalid label (max 25). "); continue; }
-      if (typeof b.urlPrefix !== "string" || b.urlPrefix.length > 1900 || TOKEN_PATTERN.test(b.urlPrefix)) { fail(key, "Invalid URL prefix."); continue; }
-      try { const url = new URL(b.urlPrefix); if (url.protocol !== "https:" || url.username || url.password || url.hostname.endsWith(".invalid") || !url.hostname.includes(".")) fail(key, "URL requires a genuine HTTPS host."); } catch { fail(key, "URL requires a valid HTTPS prefix."); }
-      if (b.variable !== undefined && b.variable !== "checkout.url" && b.variable !== "promotion.productUrl") fail(key, "Unsupported dynamic URL parameter.");
-      if (b.variable === "promotion.productUrl" && raw.promotionTarget !== "ALTERNATIVE_PRODUCT") fail(key, "Product URL buttons require an alternative-product target.");
-      if (b.variable && !/[/?=&]$/.test(b.urlPrefix)) fail(key, "Dynamic URL prefix must end at a path or query parameter boundary.");
-    }
+    if (!Array.isArray(raw.buttons) || raw.buttons.length > maxButtons)
+      fail(
+        "buttons",
+        `At most ${maxButtons} URL button${maxButtons === 1 ? "" : "s"} supported for this target.`,
+      );
+    else
+      for (const [i, b] of raw.buttons.entries()) {
+        const key = `buttons.${i}`;
+        if (
+          !object(b) ||
+          !ownKeys(b, ["type", "label", "urlPrefix", "variable"]) ||
+          b.type !== "url" ||
+          typeof b.label !== "string" ||
+          !b.label.trim() ||
+          b.label.length > 25
+        ) {
+          fail(key, "Unsupported URL button or invalid label (max 25). ");
+          continue;
+        }
+        if (
+          typeof b.urlPrefix !== "string" ||
+          b.urlPrefix.length > 1900 ||
+          TOKEN_PATTERN.test(b.urlPrefix)
+        ) {
+          fail(key, "Invalid URL prefix.");
+          continue;
+        }
+        try {
+          const url = new URL(b.urlPrefix);
+          if (
+            url.protocol !== "https:" ||
+            url.username ||
+            url.password ||
+            url.hostname.endsWith(".invalid") ||
+            !url.hostname.includes(".")
+          )
+            fail(key, "URL requires a genuine HTTPS host.");
+        } catch {
+          fail(key, "URL requires a valid HTTPS prefix.");
+        }
+        if (
+          b.variable !== undefined &&
+          b.variable !== "checkout.url" &&
+          b.variable !== "promotion.productUrl"
+        )
+          fail(key, "Unsupported dynamic URL parameter.");
+        if (
+          b.variable === "promotion.productUrl" &&
+          raw.promotionTarget !== "ALTERNATIVE_PRODUCT"
+        )
+          fail(
+            key,
+            "Product URL buttons require an alternative-product target.",
+          );
+        if (b.variable && !/[/?=&]$/.test(b.urlPrefix))
+          fail(
+            key,
+            "Dynamic URL prefix must end at a path or query parameter boundary.",
+          );
+      }
     if (Array.isArray(raw.buttons)) {
-      const dynamicVariables = raw.buttons.filter((button): button is Record<string, unknown> => object(button) && typeof button.variable === "string")
+      const dynamicVariables = raw.buttons
+        .filter(
+          (button): button is Record<string, unknown> =>
+            object(button) && typeof button.variable === "string",
+        )
         .map((button) => button.variable);
-      if (new Set(dynamicVariables).size !== dynamicVariables.length) fail("buttons", "Each dynamic URL binding may be used only once.");
-      if (raw.buttons.length === 2 && (raw.promotionTarget !== "ALTERNATIVE_PRODUCT" ||
-          !dynamicVariables.includes("checkout.url") || !dynamicVariables.includes("promotion.productUrl"))) {
-        fail("buttons", "Two URL buttons require an alternative-product target with distinct checkout and product URL bindings.");
+      if (new Set(dynamicVariables).size !== dynamicVariables.length)
+        fail("buttons", "Each dynamic URL binding may be used only once.");
+      if (
+        raw.buttons.length === 2 &&
+        (raw.promotionTarget !== "ALTERNATIVE_PRODUCT" ||
+          !dynamicVariables.includes("checkout.url") ||
+          !dynamicVariables.includes("promotion.productUrl"))
+      ) {
+        fail(
+          "buttons",
+          "Two URL buttons require an alternative-product target with distinct checkout and product URL bindings.",
+        );
       }
     }
     const headerNodes = Array.isArray(raw.header) ? raw.header : [];
-    if (headerNodes.filter((n) => object(n) && n.type === "variable").length > 1) {
+    if (
+      headerNodes.filter((n) => object(n) && n.type === "variable").length > 1
+    ) {
       fail("header", "Meta text headers support at most one variable.");
     }
     const bodyNodes = Array.isArray(raw.body) ? raw.body : [];
-    if (bodyNodes.filter((n) => object(n) && n.type === "variable").length > 10) fail("body", "Meta supports at most 10 body variables in this editor.");
-    const bodyVariables = bodyNodes.filter((n): n is Record<string, unknown> => object(n) && n.type === "variable").map((n) => n.name);
+    if (bodyNodes.filter((n) => object(n) && n.type === "variable").length > 10)
+      fail("body", "Meta supports at most 10 body variables in this editor.");
+    const bodyVariables = bodyNodes
+      .filter(
+        (n): n is Record<string, unknown> => object(n) && n.type === "variable",
+      )
+      .map((n) => n.name);
     if (raw.stage === "INITIAL" && options.requireInitialReply) {
-      if (bodyVariables.filter((variable) => variable === "checkout.itemsSummary").length !== 1) {
-        fail("body", "Initial recovery copy must include exactly one checkout.itemsSummary binding in its visible body.");
+      if (
+        bodyVariables.filter((variable) => variable === "checkout.itemsSummary")
+          .length !== 1
+      ) {
+        fail(
+          "body",
+          "Initial recovery copy must include exactly one checkout.itemsSummary binding in its visible body.",
+        );
       }
       if (!trustedCommonLayout && !bodyVariables.includes("shop.name")) {
-        fail("body", "Initial recovery copy must identify the merchant with the trusted shop.name binding in its visible body.");
+        fail(
+          "body",
+          "Initial recovery copy must identify the merchant with the trusted shop.name binding in its visible body.",
+        );
       }
       // requireCommonLayout already verifies the digest and requires exactly one trusted
       // shop.name in the common header, which is compiled into the provider BODY.
-      const reply = splitInitialReplyBody(bodyNodes as ContentNode[], raw.promotionTarget as PromotionTarget | undefined,
-        options.contentLanguageTag ?? "en", trustedCommonLayout);
-      if (!reply) fail("body", trustedCommonLayout
-        ? "Initial copy must end with the reviewed contextual Reply paragraph (specific message, text or voice note, up to 2 minutes). The common layout already identifies the shop."
-        : "Initial copy must end with a separate shop.name-bound contextual Reply instruction with reviewed wording (specific message, text or voice note, up to 2 minutes).");
+      const reply = splitInitialReplyBody(
+        bodyNodes as ContentNode[],
+        raw.promotionTarget as PromotionTarget | undefined,
+        options.contentLanguageTag ?? "en",
+        trustedCommonLayout,
+      );
+      if (!reply)
+        fail(
+          "body",
+          trustedCommonLayout
+            ? "Initial copy must end with the reviewed contextual Reply paragraph (specific message, text or voice note, up to 2 minutes). The common layout already identifies the shop."
+            : "Initial copy must end with a separate shop.name-bound contextual Reply instruction with reviewed wording (specific message, text or voice note, up to 2 minutes).",
+        );
     }
     if (raw.offerType !== "NO_OFFER" && raw.promotionTarget !== undefined) {
-      const required = raw.promotionTarget === "ALTERNATIVE_PRODUCT"
-        ? ["promotion.productName", "promotion.productUrl", "promotion.offerDescription", ...(raw.offerType === "CODE_OFFER" ? ["promotion.code"] : [])]
-        : ["checkout.itemsSummary", "offer.description"];
-      for (const variable of required) if (!bodyVariables.includes(variable)) fail("body", `This variant requires the ${variable} proof-backed binding.`);
-      if (raw.offerType === "CODE_OFFER" && raw.promotionTarget === "CHECKOUT") {
-        const codeBindings = bodyVariables.filter((variable) => variable === "offer.code" || variable === "offer.codes");
-        if (codeBindings.length === 0) fail("body", "Checkout code offers require one verified offer.code or offer.codes binding.");
-        if (codeBindings.length > 1 || (bodyVariables.includes("offer.code") && bodyVariables.includes("offer.codes"))) {
-          fail("body", "Choose one immutable single-code or multi-code binding per approved template revision.");
+      const required =
+        raw.promotionTarget === "ALTERNATIVE_PRODUCT"
+          ? [
+              "promotion.productName",
+              "promotion.productUrl",
+              "promotion.offerDescription",
+              ...(raw.offerType === "CODE_OFFER" ? ["promotion.code"] : []),
+            ]
+          : ["checkout.itemsSummary", "offer.description"];
+      for (const variable of required)
+        if (!bodyVariables.includes(variable))
+          fail(
+            "body",
+            `This variant requires the ${variable} proof-backed binding.`,
+          );
+      if (
+        raw.offerType === "CODE_OFFER" &&
+        raw.promotionTarget === "CHECKOUT"
+      ) {
+        const codeBindings = bodyVariables.filter(
+          (variable) => variable === "offer.code" || variable === "offer.codes",
+        );
+        if (codeBindings.length === 0)
+          fail(
+            "body",
+            "Checkout code offers require one verified offer.code or offer.codes binding.",
+          );
+        if (
+          codeBindings.length > 1 ||
+          (bodyVariables.includes("offer.code") &&
+            bodyVariables.includes("offer.codes"))
+        ) {
+          fail(
+            "body",
+            "Choose one immutable single-code or multi-code binding per approved template revision.",
+          );
         }
-        if (bodyVariables.includes("offer.codes") && bodyVariables.filter((variable) => variable === "offer.codes").length !== 1) {
+        if (
+          bodyVariables.includes("offer.codes") &&
+          bodyVariables.filter((variable) => variable === "offer.codes")
+            .length !== 1
+        ) {
           fail("body", "A multi-code template may bind offer.codes only once.");
         }
       }
-      if (raw.offerType === "AUTOMATIC_OFFER" && raw.promotionTarget === "CHECKOUT" &&
-          (bodyVariables.includes("offer.code") || bodyVariables.includes("offer.codes") || bodyVariables.includes("promotion.code"))) {
+      if (
+        raw.offerType === "AUTOMATIC_OFFER" &&
+        raw.promotionTarget === "CHECKOUT" &&
+        (bodyVariables.includes("offer.code") ||
+          bodyVariables.includes("offer.codes") ||
+          bodyVariables.includes("promotion.code"))
+      ) {
         fail("body", "Automatic offers do not use coupon-code bindings.");
       }
-      if (raw.stage === "INITIAL" && options.requireInitialReply &&
-          (options.contentLanguageTag === undefined || options.contentLanguageTag === "en")) {
-        const copy = bodyNodes.filter((n) => object(n) && n.type === "text").map((n) => String(n.value)).join(" ").toLowerCase();
-        if (raw.offerType === "CODE_OFFER" && raw.promotionTarget === "CHECKOUT" && bodyVariables.includes("offer.codes") &&
-            (!/(?:possible|available)\s+codes?/.test(copy) || !/subject to (?:checkout )?eligibility/.test(copy))) {
-          fail("body", "Multi-code checkout copy must describe possible codes and state that they are subject to checkout eligibility.");
+      if (
+        raw.stage === "INITIAL" &&
+        options.requireInitialReply &&
+        (options.contentLanguageTag === undefined ||
+          options.contentLanguageTag === "en")
+      ) {
+        const copy = bodyNodes
+          .filter((n) => object(n) && n.type === "text")
+          .map((n) => String(n.value))
+          .join(" ")
+          .toLowerCase();
+        if (
+          raw.offerType === "CODE_OFFER" &&
+          raw.promotionTarget === "CHECKOUT" &&
+          bodyVariables.includes("offer.codes") &&
+          (!/(?:possible|available)\s+codes?/.test(copy) ||
+            !/subject to (?:checkout )?eligibility/.test(copy))
+        ) {
+          fail(
+            "body",
+            "Multi-code checkout copy must describe possible codes and state that they are subject to checkout eligibility.",
+          );
         }
-        if (raw.offerType === "AUTOMATIC_OFFER" && raw.promotionTarget === "CHECKOUT" &&
-            (!/\b(?:multiple|several)\b[^.!?]{0,80}\b(?:offers|discounts)\b|\b(?:possible|available|eligible)\s+(?:automatic\s+)?(?:offers|discounts)\b|\bchoose from\b[^.!?]{0,80}\b(?:offers|discounts)\b/.test(copy) ||
-             !/subject to checkout eligibility/.test(copy))) {
-          fail("body", "Automatic checkout copy must describe multiple possible offers subject to checkout eligibility.");
+        if (
+          raw.offerType === "AUTOMATIC_OFFER" &&
+          raw.promotionTarget === "CHECKOUT" &&
+          (!/\b(?:multiple|several)\b[^.!?]{0,80}\b(?:offers|discounts)\b|\b(?:possible|available|eligible)\s+(?:automatic\s+)?(?:offers|discounts)\b|\bchoose from\b[^.!?]{0,80}\b(?:offers|discounts)\b/.test(
+            copy,
+          ) ||
+            !/subject to checkout eligibility/.test(copy))
+        ) {
+          fail(
+            "body",
+            "Automatic checkout copy must describe multiple possible offers subject to checkout eligibility.",
+          );
         }
       }
-      if (raw.offerType === "AUTOMATIC_OFFER" && bodyVariables.some((variable) => variable === "offer.code" || variable === "offer.codes" || variable === "promotion.code")) {
+      if (
+        raw.offerType === "AUTOMATIC_OFFER" &&
+        bodyVariables.some(
+          (variable) =>
+            variable === "offer.code" ||
+            variable === "offer.codes" ||
+            variable === "promotion.code",
+        )
+      ) {
         fail("body", "Automatic offers do not use coupon-code bindings.");
       }
-      if (raw.promotionTarget === "ALTERNATIVE_PRODUCT" &&
-          (!Array.isArray(raw.buttons) || !raw.buttons.some((button) => object(button) && button.variable === "checkout.url"))) {
-        fail("buttons", "Alternative-product templates must retain the trusted checkout resume button.");
+      if (
+        raw.promotionTarget === "ALTERNATIVE_PRODUCT" &&
+        (!Array.isArray(raw.buttons) ||
+          !raw.buttons.some(
+            (button) => object(button) && button.variable === "checkout.url",
+          ))
+      ) {
+        fail(
+          "buttons",
+          "Alternative-product templates must retain the trusted checkout resume button.",
+        );
       }
       if (raw.promotionTarget === "ALTERNATIVE_PRODUCT") {
-        const copy = bodyNodes.filter((n) => object(n) && n.type === "text").map((n) => String(n.value)).join(" ").toLowerCase();
-        if (!/different product/.test(copy) || !/does not apply to (?:the )?(?:items in )?your abandoned basket/.test(copy)) {
-          fail("body", "Alternative-product copy must identify a different product and state that its offer does not apply to the abandoned basket.");
+        const copy = bodyNodes
+          .filter((n) => object(n) && n.type === "text")
+          .map((n) => String(n.value))
+          .join(" ")
+          .toLowerCase();
+        if (
+          !/different product/.test(copy) ||
+          !/does not apply to (?:the )?(?:items in )?your abandoned basket/.test(
+            copy,
+          )
+        ) {
+          fail(
+            "body",
+            "Alternative-product copy must identify a different product and state that its offer does not apply to the abandoned basket.",
+          );
         }
       }
     }
   } else {
-    if (!Array.isArray(raw.conditionals) || raw.conditionals.length > 1) fail("conditionals", "Only one checkout-aware conditional is supported.");
-    else for (const [i, c] of raw.conditionals.entries()) {
-      if (!object(c) || !ownKeys(c, ["when", "nodes"]) || c.when !== "checkout.available") fail(`conditionals.${i}`, "Unsupported conditional.");
-      else checkNodes(c.nodes, `conditionals.${i}.nodes`, 1500, ["text", "variable"]);
-    }
-    const count = Array.isArray(raw.body) ? raw.body.filter((n) => object(n) && n.type === "slot" && n.name === "response.body").length : 0;
-    if (count !== 1) fail("body", "Exactly one response.body slot is required.");
+    if (!Array.isArray(raw.conditionals) || raw.conditionals.length > 1)
+      fail("conditionals", "Only one checkout-aware conditional is supported.");
+    else
+      for (const [i, c] of raw.conditionals.entries()) {
+        if (
+          !object(c) ||
+          !ownKeys(c, ["when", "nodes"]) ||
+          c.when !== "checkout.available"
+        )
+          fail(`conditionals.${i}`, "Unsupported conditional.");
+        else
+          checkNodes(c.nodes, `conditionals.${i}.nodes`, 1500, [
+            "text",
+            "variable",
+          ]);
+      }
+    const count = Array.isArray(raw.body)
+      ? raw.body.filter(
+          (n) => object(n) && n.type === "slot" && n.name === "response.body",
+        ).length
+      : 0;
+    if (count !== 1)
+      fail("body", "Exactly one response.body slot is required.");
   }
-  return issues.length ? { ok: false, issues } : { ok: true, value: raw as TemplateAst };
+  return issues.length
+    ? { ok: false, issues }
+    : { ok: true, value: raw as TemplateAst };
 }
 
 /** New authoring/reconstruction admission always validates the final provider BODY. */
-export function validateTemplateAst(raw: unknown, options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {}): ReturnType<typeof validateTemplateStructure> {
+export function validateTemplateAst(
+  raw: unknown,
+  options: { contentLanguageTag?: string; requireInitialReply?: boolean } = {},
+): ReturnType<typeof validateTemplateStructure> {
   const checked = validateTemplateStructure(raw, options);
   if (!checked.ok) return checked;
   if (checked.value.family === "MODA_CONVERSATION_WRAPPER") {
     if (checked.value.audience === "ROUTER") {
-      const error = neutralRouterProjectionError(prepareValidatedTemplateProjection(checked.value, []));
-      if (error) return { ok: false, issues: [{ path: "body", message: error }] };
+      const error = neutralRouterProjectionError(
+        prepareValidatedTemplateProjection(checked.value, []),
+      );
+      if (error)
+        return { ok: false, issues: [{ path: "body", message: error }] };
     }
-    if (checked.value.audience === "SHARED" && !checked.value.compositeProfile) return { ok: false, issues: [{ path: "compositeProfile", message: "The current common template requires a saved composite profile. Clone historical content and explicitly define its layout before saving or activating." }] };
+    if (checked.value.audience === "SHARED" && !checked.value.compositeProfile)
+      return {
+        ok: false,
+        issues: [
+          {
+            path: "compositeProfile",
+            message:
+              "The current common template requires a saved composite profile. Clone historical content and explicitly define its layout before saving or activating.",
+          },
+        ],
+      };
     if (checked.value.audience === "SHARED") {
       const prepared = prepareValidatedTemplateProjection(checked.value, []);
-      if (prepared.family !== "MODA_CONVERSATION_WRAPPER") throw new Error("Invalid common family.");
+      if (prepared.family !== "MODA_CONVERSATION_WRAPPER")
+        throw new Error("Invalid common family.");
       const error = commonLayoutPolicyError(prepared);
-      if (error) return { ok: false, issues: [{ path: prepared.footer.some(token => token.kind !== "text" || token.value !== "") ? "footer" : "conditionals", message: error }] };
+      if (error)
+        return {
+          ok: false,
+          issues: [
+            {
+              path: prepared.footer.some(
+                (token) => token.kind !== "text" || token.value !== "",
+              )
+                ? "footer"
+                : "conditionals",
+              message: error,
+            },
+          ],
+        };
     }
     return checked;
   }
   try {
     const projected = projectMetaBody(checked.value);
     const issues = metaBodyIssues(projected.text);
-    if (checked.value.commonLayout && projected.bindings.filter(binding => binding.variable === "checkout.url").length !== 1) {
-      issues.push({ path: "body", message: "Common Meta BODY must bind checkout.url exactly once through the common checkout footer. Review and remove any duplicate inline checkout binding in a new source." });
+    if (
+      checked.value.commonLayout &&
+      projected.bindings.filter(
+        (binding) => binding.variable === "checkout.url",
+      ).length !== 1
+    ) {
+      issues.push({
+        path: "body",
+        message:
+          "Common Meta BODY must bind checkout.url exactly once through the common checkout footer. Review and remove any duplicate inline checkout binding in a new source.",
+      });
     }
     return issues.length ? { ok: false, issues } : checked;
   } catch (error) {
-    return { ok: false, issues: [{ path: "body", message: error instanceof Error ? error.message : "Unable to project the final Meta BODY." }] };
+    return {
+      ok: false,
+      issues: [
+        {
+          path: "body",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Unable to project the final Meta BODY.",
+        },
+      ],
+    };
   }
 }

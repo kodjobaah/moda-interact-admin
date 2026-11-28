@@ -49,9 +49,7 @@ import {
   validateMerchantKnowledgeConfiguration,
 } from "@/lib/admin/merchant-knowledge-plan-policy";
 import { persistMerchantPricingPlanFeatures } from "@/lib/admin/merchant/merchant-pricing-plan-feature-persistence";
-import {
-  ensureMerchantPricingTranslationRunForDraftSave,
-} from "@/lib/admin/merchant/merchant-pricing-translation-runs";
+import { ensureMerchantPricingTranslationRunForDraftSave } from "@/lib/admin/merchant/merchant-pricing-translation-runs";
 
 const merchantPricingInclude = {
   currentTranslationRun: {
@@ -834,7 +832,9 @@ export async function mutateMerchantPricingPlanAction(
   const payload = parsePayload(formData);
   const translationRunId = parseTranslationRunId(formData);
   const economicsOverrideRequest = parseEconomicsOverrideRequest(formData);
-  const createPlanPolicy = !payload.id ? parseCreatePlanPolicyDraft(formData.get("commercePolicyDraft")) : null;
+  const createPlanPolicy = !payload.id
+    ? parseCreatePlanPolicyDraft(formData.get("commercePolicyDraft"))
+    : null;
 
   // Load the expensive catalogue snapshot and perform deterministic validation
   // before opening the interactive transaction. The transaction below only
@@ -990,157 +990,269 @@ export async function mutateMerchantPricingPlanAction(
   let mutationResult: { planId: string; linkedTranslationRunId: string | null };
   try {
     mutationResult = await prisma.$transaction(async (transaction) => {
-    // Optimistic concurrency fence: the expensive snapshot was loaded before
-    // the transaction. Verify that no plan or catalogue position changed in
-    // the meantime before using that snapshot for an atomic write.
-    const currentRevision = await transaction.merchantPricingPlan.findMany({
-      orderBy: { cataloguePosition: "asc" },
-      select: {
-        id: true,
-        cataloguePosition: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!catalogueRevisionMatches(rows, currentRevision)) {
-      actionError(
-        "The pricing catalogue changed while this update was being validated. Reload the plan and try again.",
-      );
-    }
-
-    const currentPolicy = await transaction.platformBillingPolicy.findUnique({
-      where: { id: "default" },
-      select: { minimumUpgradePremiumBps: true, version: true },
-    });
-    if (
-      (currentPolicy?.version ?? null) !== (policy?.version ?? null) ||
-      (currentPolicy?.minimumUpgradePremiumBps ?? 2000) !==
-        minimumUpgradePremiumBps
-    ) {
-      actionError(
-        "The billing economics policy changed while this update was being validated. Reload the plan and try again.",
-      );
-    }
-
-    if (commerceModelChanged && payload.commerceModelId !== null) {
-      await assertMerchantPricingPlanModelSelectable({
-        db: transaction,
-        modelId: payload.commerceModelId,
-      });
-    }
-
-    const translationRun = contentChanged
-      ? await ensureMerchantPricingTranslationRunForDraftSave(transaction, {
-          merchantPricingPlanId: existing?.id ?? null,
-          runId: translationRunId,
-          principalId: adminId,
-          expected: {
-            planHandle: payload.shopifyPlanHandle,
-            planName: payload.name,
-            englishDescription: payload.englishDescription,
-            highlights: payload.highlights,
-          },
-        })
-      : null;
-
-    const economicsOverride = await resolveEconomicsOverrideForSave({
-      transaction,
-      principal,
-      adminId,
-      request: economicsOverrideRequest,
-      projection,
-      minimumUpgradePremiumBps,
-    });
-    const afterOverrideSnapshot = economicsOverrideSnapshot(economicsOverride);
-    const overrideAuditRequired = isCreate
-      ? economicsOverride.economicsOverrideEnabled
-      : JSON.stringify(beforeOverrideSnapshot) !==
-        JSON.stringify(afterOverrideSnapshot);
-
-    const merchantKnowledgeFeature = await ensureMerchantKnowledgeFeature(
-      transaction,
-      adminId,
-    );
-    const activeSourceTypeRows =
-      await transaction.merchantKnowledgePurposeDataFormat.findMany({
-        where: {
-          purpose: { active: true },
-          dataFormat: { active: true },
-        },
+      // Optimistic concurrency fence: the expensive snapshot was loaded before
+      // the transaction. Verify that no plan or catalogue position changed in
+      // the meantime before using that snapshot for an atomic write.
+      const currentRevision = await transaction.merchantPricingPlan.findMany({
+        orderBy: { cataloguePosition: "asc" },
         select: {
-          purpose: { select: { key: true } },
-          dataFormat: { select: { key: true } },
+          id: true,
+          cataloguePosition: true,
+          updatedAt: true,
         },
       });
-    const merchantKnowledgeConfiguration =
-      validateMerchantKnowledgeConfiguration(
-        payload.merchantKnowledgeConfiguration,
-        activeSourceTypeRows.map(({ purpose, dataFormat }) => ({
-          purposeKey: purpose.key,
-          dataFormatKey: dataFormat.key,
-        })),
-      );
 
-    const activeFeatures = await transaction.feature.findMany({
-      where: { active: true },
-      select: { id: true, key: true, systemRequired: true },
-    });
-    const existingFeatureMappings = existing
-      ? await transaction.merchantPricingPlanFeature.findMany({
-          where: { merchantPricingPlanId: existing.id },
-          include: {
-            feature: { select: { id: true, key: true, active: true } },
-          },
-        })
-      : [];
-    const requestedFeatureKeys = payload.supportedFeatureKeys.includes(
-      MERCHANT_KNOWLEDGE_FEATURE_KEY,
-    )
-      ? payload.supportedFeatureKeys
-      : [...payload.supportedFeatureKeys, MERCHANT_KNOWLEDGE_FEATURE_KEY];
-    const requestedFeatures = await transaction.feature.findMany({
-      where: { key: { in: requestedFeatureKeys } },
-      select: { id: true, key: true, active: true },
-    });
-    if (requestedFeatures.length !== requestedFeatureKeys.length)
-      actionError("One or more selected features do not exist.");
-    if (requestedFeatures.some((feature) => !feature.active))
-      actionError(
-        "Inactive features must be reactivated before they can be newly selected.",
-      );
-    const requestedKeys = new Set(payload.supportedFeatureKeys);
-    if (requestedKeys.size !== payload.supportedFeatureKeys.length)
-      actionError("Supported feature keys must be unique.");
-    const desiredPlanFeatures = buildDesiredPlanFeatures({
-      activeFeatures,
-      existingMappings: existingFeatureMappings,
-      requestedFeatures,
-      merchantKnowledgeFeatureId: merchantKnowledgeFeature.id,
-      merchantKnowledgeConfiguration,
-    });
-    if (isCreate) {
-      for (const row of [...rows]
-        .reverse()
-        .filter((row) => row.cataloguePosition >= position)) {
-        await transaction.merchantPricingPlan.update({
-          where: { id: row.id },
-          data: { cataloguePosition: row.cataloguePosition + 1 },
+      if (!catalogueRevisionMatches(rows, currentRevision)) {
+        actionError(
+          "The pricing catalogue changed while this update was being validated. Reload the plan and try again.",
+        );
+      }
+
+      const currentPolicy = await transaction.platformBillingPolicy.findUnique({
+        where: { id: "default" },
+        select: { minimumUpgradePremiumBps: true, version: true },
+      });
+      if (
+        (currentPolicy?.version ?? null) !== (policy?.version ?? null) ||
+        (currentPolicy?.minimumUpgradePremiumBps ?? 2000) !==
+          minimumUpgradePremiumBps
+      ) {
+        actionError(
+          "The billing economics policy changed while this update was being validated. Reload the plan and try again.",
+        );
+      }
+
+      if (commerceModelChanged && payload.commerceModelId !== null) {
+        await assertMerchantPricingPlanModelSelectable({
+          db: transaction,
+          modelId: payload.commerceModelId,
         });
       }
 
-      const created = await transaction.merchantPricingPlan.create({
+      const translationRun = contentChanged
+        ? await ensureMerchantPricingTranslationRunForDraftSave(transaction, {
+            merchantPricingPlanId: existing?.id ?? null,
+            runId: translationRunId,
+            principalId: adminId,
+            expected: {
+              planHandle: payload.shopifyPlanHandle,
+              planName: payload.name,
+              englishDescription: payload.englishDescription,
+              highlights: payload.highlights,
+            },
+          })
+        : null;
+
+      const economicsOverride = await resolveEconomicsOverrideForSave({
+        transaction,
+        principal,
+        adminId,
+        request: economicsOverrideRequest,
+        projection,
+        minimumUpgradePremiumBps,
+      });
+      const afterOverrideSnapshot =
+        economicsOverrideSnapshot(economicsOverride);
+      const overrideAuditRequired = isCreate
+        ? economicsOverride.economicsOverrideEnabled
+        : JSON.stringify(beforeOverrideSnapshot) !==
+          JSON.stringify(afterOverrideSnapshot);
+
+      const merchantKnowledgeFeature = await ensureMerchantKnowledgeFeature(
+        transaction,
+        adminId,
+      );
+      const activeSourceTypeRows =
+        await transaction.merchantKnowledgePurposeDataFormat.findMany({
+          where: {
+            purpose: { active: true },
+            dataFormat: { active: true },
+          },
+          select: {
+            purpose: { select: { key: true } },
+            dataFormat: { select: { key: true } },
+          },
+        });
+      const merchantKnowledgeConfiguration =
+        validateMerchantKnowledgeConfiguration(
+          payload.merchantKnowledgeConfiguration,
+          activeSourceTypeRows.map(({ purpose, dataFormat }) => ({
+            purposeKey: purpose.key,
+            dataFormatKey: dataFormat.key,
+          })),
+        );
+
+      const activeFeatures = await transaction.feature.findMany({
+        where: { active: true },
+        select: { id: true, key: true, systemRequired: true },
+      });
+      const existingFeatureMappings = existing
+        ? await transaction.merchantPricingPlanFeature.findMany({
+            where: { merchantPricingPlanId: existing.id },
+            include: {
+              feature: { select: { id: true, key: true, active: true } },
+            },
+          })
+        : [];
+      const requestedFeatureKeys = payload.supportedFeatureKeys.includes(
+        MERCHANT_KNOWLEDGE_FEATURE_KEY,
+      )
+        ? payload.supportedFeatureKeys
+        : [...payload.supportedFeatureKeys, MERCHANT_KNOWLEDGE_FEATURE_KEY];
+      const requestedFeatures = await transaction.feature.findMany({
+        where: { key: { in: requestedFeatureKeys } },
+        select: { id: true, key: true, active: true },
+      });
+      if (requestedFeatures.length !== requestedFeatureKeys.length)
+        actionError("One or more selected features do not exist.");
+      if (requestedFeatures.some((feature) => !feature.active))
+        actionError(
+          "Inactive features must be reactivated before they can be newly selected.",
+        );
+      const requestedKeys = new Set(payload.supportedFeatureKeys);
+      if (requestedKeys.size !== payload.supportedFeatureKeys.length)
+        actionError("Supported feature keys must be unique.");
+      const desiredPlanFeatures = buildDesiredPlanFeatures({
+        activeFeatures,
+        existingMappings: existingFeatureMappings,
+        requestedFeatures,
+        merchantKnowledgeFeatureId: merchantKnowledgeFeature.id,
+        merchantKnowledgeConfiguration,
+      });
+      if (isCreate) {
+        for (const row of [...rows]
+          .reverse()
+          .filter((row) => row.cataloguePosition >= position)) {
+          await transaction.merchantPricingPlan.update({
+            where: { id: row.id },
+            data: { cataloguePosition: row.cataloguePosition + 1 },
+          });
+        }
+
+        const created = await transaction.merchantPricingPlan.create({
+          data: {
+            shopifyPlanHandle: payload.shopifyPlanHandle,
+            commerceModelId: payload.commerceModelId,
+            displayName: payload.name,
+            planKind: payload.planKind as MerchantPricingPlanKind,
+            isActive: false,
+            publicationStatus: translationRun!.publicationStatus,
+            currentTranslationRunId: translationRun!.runId,
+            cataloguePosition: position,
+            shopifyRecoveryUsageEventHandle:
+              payload.shopifyRecoveryUsageEventHandle,
+            materializedAt: null,
+            featured: payload.featured,
+            includedRecoveryCredits: payload.includedRecoveryCredits,
+            allowancePeriod:
+              payload.allowancePeriod as MerchantPricingAllowancePeriod,
+            billingPeriod: MerchantPricingBillingPeriod.EVERY_30_DAYS,
+            recurringAmountMinor: payload.recurringAmountMinor,
+            currency: payload.currency,
+            ...economicsOverride,
+            translations: {
+              create: {
+                locale: "en",
+                merchantDescription: payload.englishDescription.trim(),
+              },
+            },
+            highlights: {
+              create: payload.highlights.map((highlight, position) => ({
+                contentKey: highlight.contentKey,
+                position,
+                translations: {
+                  create: {
+                    locale: "en",
+                    merchantTitle: highlight.title.trim(),
+                    merchantDescription: highlight.description.trim(),
+                  },
+                },
+              })),
+            },
+            usageEvents: {
+              create: payload.usageEvents.map((event, eventPosition) =>
+                eventData(event, eventPosition, payload.currency),
+              ),
+            },
+          },
+        });
+        CommercePricingPlanModelAssignmentSchema.parse({
+          merchantPricingPlanId: created.id,
+          shopifyPlanHandle: created.shopifyPlanHandle,
+          modelId: created.commerceModelId,
+        });
+
+        if (createPlanPolicy) {
+          await mutateLivePlanPolicy(
+            transaction,
+            {
+              planId: created.id,
+              budget: createPlanPolicy.budget,
+              expectedEditVersion: 0,
+              reason: createPlanPolicy.reason,
+            },
+            resolveAdminCommerceEnvironment(),
+            adminId,
+          );
+        }
+
+        await persistMerchantPricingPlanFeatures(transaction, {
+          merchantPricingPlanId: created.id,
+          desiredFeatures: desiredPlanFeatures,
+          replaceExisting: false,
+        });
+
+        if (overrideAuditRequired) {
+          await auditEconomicsOverrideChange(
+            transaction,
+            adminId,
+            created.id,
+            beforeOverrideSnapshot,
+            afterOverrideSnapshot,
+          );
+        }
+
+        await transaction.billingAuditEvent.create({
+          data: {
+            action: "PLAN_CATALOG_CHANGED",
+            platformAdminId: adminId,
+            reason: payload.reason,
+            ...(commerceModelChanged
+              ? {
+                  beforeValue: { commerceModelId: null },
+                  afterValue: { commerceModelId: payload.commerceModelId },
+                }
+              : {}),
+            relatedEntityType: "MerchantPricingPlan",
+            relatedEntityId: created.id,
+          },
+        });
+        return {
+          planId: created.id,
+          linkedTranslationRunId: translationRun?.runId ?? null,
+        };
+      }
+
+      const updated = await transaction.merchantPricingPlan.update({
+        where: { id: existing.id },
         data: {
-          shopifyPlanHandle: payload.shopifyPlanHandle,
           commerceModelId: payload.commerceModelId,
           displayName: payload.name,
           planKind: payload.planKind as MerchantPricingPlanKind,
-          isActive: false,
-          publicationStatus: translationRun!.publicationStatus,
-          currentTranslationRunId: translationRun!.runId,
-          cataloguePosition: position,
           shopifyRecoveryUsageEventHandle:
             payload.shopifyRecoveryUsageEventHandle,
-          materializedAt: null,
+          isActive:
+            contentChanged ||
+            existing.publicationStatus !==
+              MerchantPricingPlanPublicationStatus.READY
+              ? false
+              : payload.isActive,
+          ...(translationRun
+            ? {
+                publicationStatus: translationRun.publicationStatus,
+                currentTranslationRunId: translationRun.runId,
+              }
+            : {}),
           featured: payload.featured,
           includedRecoveryCredits: payload.includedRecoveryCredits,
           allowancePeriod:
@@ -1149,55 +1261,96 @@ export async function mutateMerchantPricingPlanAction(
           recurringAmountMinor: payload.recurringAmountMinor,
           currency: payload.currency,
           ...economicsOverride,
-          translations: {
-            create: {
-              locale: "en",
-              merchantDescription: payload.englishDescription.trim(),
-            },
-          },
-          highlights: {
-            create: payload.highlights.map((highlight, position) => ({
-              contentKey: highlight.contentKey,
-              position,
-              translations: {
-                create: {
-                  locale: "en",
-                  merchantTitle: highlight.title.trim(),
-                  merchantDescription: highlight.description.trim(),
+          ...(translationRun
+            ? {
+                translations: {
+                  deleteMany: {},
+                  create: {
+                    locale: "en",
+                    merchantDescription: payload.englishDescription.trim(),
+                  },
                 },
-              },
-            })),
-          },
-          usageEvents: {
-            create: payload.usageEvents.map((event, eventPosition) =>
-              eventData(event, eventPosition, payload.currency),
-            ),
-          },
+                highlights: {
+                  deleteMany: {},
+                  create: payload.highlights.map((highlight, position) => ({
+                    contentKey: highlight.contentKey,
+                    position,
+                    translations: {
+                      create: {
+                        locale: "en",
+                        merchantTitle: highlight.title.trim(),
+                        merchantDescription: highlight.description.trim(),
+                      },
+                    },
+                  })),
+                },
+              }
+            : {}),
+          ...(rewriteUsageEvents
+            ? {
+                usageEvents: {
+                  deleteMany: {},
+                  create: payload.usageEvents.map((event, eventPosition) =>
+                    eventData(event, eventPosition, payload.currency),
+                  ),
+                },
+              }
+            : {}),
         },
       });
+      if (reorderHighlights) {
+        await reorderMerchantPricingHighlights(
+          transaction,
+          existing.id,
+          payload.highlights,
+        );
+      }
+
       CommercePricingPlanModelAssignmentSchema.parse({
-        merchantPricingPlanId: created.id,
-        shopifyPlanHandle: created.shopifyPlanHandle,
-        modelId: created.commerceModelId,
+        merchantPricingPlanId: updated.id,
+        shopifyPlanHandle: updated.shopifyPlanHandle,
+        modelId: updated.commerceModelId,
       });
 
-      if (createPlanPolicy) {
-        await mutateLivePlanPolicy(transaction, {
-          planId: created.id, budget: createPlanPolicy.budget, expectedEditVersion: 0, reason: createPlanPolicy.reason,
-        }, resolveAdminCommerceEnvironment(), adminId);
+      let materializedBillingPlanId: string | undefined;
+      if (existing.materializedAt) {
+        const billingPlan = await transaction.billingPlan.findUnique({
+          where: { shopifyPlanHandle: existing.shopifyPlanHandle },
+          include: { features: true },
+        });
+        if (!billingPlan)
+          actionError(
+            "The durable pricing plan has no matching operational BillingPlan; the edit was aborted.",
+          );
+        await transaction.billingPlan.update({
+          where: { id: billingPlan.id },
+          data: {
+            name: payload.name,
+            shopifyUsageEventHandle:
+              payload.planKind === "FREE"
+                ? null
+                : payload.shopifyRecoveryUsageEventHandle!.trim(),
+            includedRecoveryConversationAllowance:
+              payload.planKind === "FREE"
+                ? null
+                : payload.includedRecoveryCredits,
+          },
+        });
+        materializedBillingPlanId = billingPlan.id;
       }
 
       await persistMerchantPricingPlanFeatures(transaction, {
-        merchantPricingPlanId: created.id,
+        merchantPricingPlanId: existing.id,
         desiredFeatures: desiredPlanFeatures,
-        replaceExisting: false,
+        replaceExisting: true,
+        materializedBillingPlanId,
       });
 
       if (overrideAuditRequired) {
         await auditEconomicsOverrideChange(
           transaction,
           adminId,
-          created.id,
+          existing.id,
           beforeOverrideSnapshot,
           afterOverrideSnapshot,
         );
@@ -1210,162 +1363,18 @@ export async function mutateMerchantPricingPlanAction(
           reason: payload.reason,
           ...(commerceModelChanged
             ? {
-                beforeValue: { commerceModelId: null },
+                beforeValue: { commerceModelId: existing.commerceModelId },
                 afterValue: { commerceModelId: payload.commerceModelId },
               }
             : {}),
           relatedEntityType: "MerchantPricingPlan",
-          relatedEntityId: created.id,
+          relatedEntityId: existing.id,
         },
       });
       return {
-        planId: created.id,
+        planId: existing.id,
         linkedTranslationRunId: translationRun?.runId ?? null,
       };
-    }
-
-    const updated = await transaction.merchantPricingPlan.update({
-      where: { id: existing.id },
-      data: {
-        commerceModelId: payload.commerceModelId,
-        displayName: payload.name,
-        planKind: payload.planKind as MerchantPricingPlanKind,
-        shopifyRecoveryUsageEventHandle:
-          payload.shopifyRecoveryUsageEventHandle,
-        isActive:
-          contentChanged ||
-          existing.publicationStatus !==
-            MerchantPricingPlanPublicationStatus.READY
-            ? false
-            : payload.isActive,
-        ...(translationRun
-          ? {
-              publicationStatus: translationRun.publicationStatus,
-              currentTranslationRunId: translationRun.runId,
-            }
-          : {}),
-        featured: payload.featured,
-        includedRecoveryCredits: payload.includedRecoveryCredits,
-        allowancePeriod:
-          payload.allowancePeriod as MerchantPricingAllowancePeriod,
-        billingPeriod: MerchantPricingBillingPeriod.EVERY_30_DAYS,
-        recurringAmountMinor: payload.recurringAmountMinor,
-        currency: payload.currency,
-        ...economicsOverride,
-        ...(translationRun
-          ? {
-              translations: {
-                deleteMany: {},
-                create: {
-                  locale: "en",
-                  merchantDescription: payload.englishDescription.trim(),
-                },
-              },
-              highlights: {
-                deleteMany: {},
-                create: payload.highlights.map((highlight, position) => ({
-                  contentKey: highlight.contentKey,
-                  position,
-                  translations: {
-                    create: {
-                      locale: "en",
-                      merchantTitle: highlight.title.trim(),
-                      merchantDescription: highlight.description.trim(),
-                    },
-                  },
-                })),
-              },
-            }
-          : {}),
-        ...(rewriteUsageEvents
-          ? {
-              usageEvents: {
-                deleteMany: {},
-                create: payload.usageEvents.map((event, eventPosition) =>
-                  eventData(event, eventPosition, payload.currency),
-                ),
-              },
-            }
-          : {}),
-      },
-    });
-    if (reorderHighlights) {
-      await reorderMerchantPricingHighlights(
-        transaction,
-        existing.id,
-        payload.highlights,
-      );
-    }
-
-    CommercePricingPlanModelAssignmentSchema.parse({
-      merchantPricingPlanId: updated.id,
-      shopifyPlanHandle: updated.shopifyPlanHandle,
-      modelId: updated.commerceModelId,
-    });
-
-    let materializedBillingPlanId: string | undefined;
-    if (existing.materializedAt) {
-      const billingPlan = await transaction.billingPlan.findUnique({
-        where: { shopifyPlanHandle: existing.shopifyPlanHandle },
-        include: { features: true },
-      });
-      if (!billingPlan)
-        actionError(
-          "The durable pricing plan has no matching operational BillingPlan; the edit was aborted.",
-        );
-      await transaction.billingPlan.update({
-        where: { id: billingPlan.id },
-        data: {
-          name: payload.name,
-          shopifyUsageEventHandle:
-            payload.planKind === "FREE"
-              ? null
-              : payload.shopifyRecoveryUsageEventHandle!.trim(),
-          includedRecoveryConversationAllowance:
-            payload.planKind === "FREE"
-              ? null
-              : payload.includedRecoveryCredits,
-        },
-      });
-      materializedBillingPlanId = billingPlan.id;
-    }
-
-    await persistMerchantPricingPlanFeatures(transaction, {
-      merchantPricingPlanId: existing.id,
-      desiredFeatures: desiredPlanFeatures,
-      replaceExisting: true,
-      materializedBillingPlanId,
-    });
-
-    if (overrideAuditRequired) {
-      await auditEconomicsOverrideChange(
-        transaction,
-        adminId,
-        existing.id,
-        beforeOverrideSnapshot,
-        afterOverrideSnapshot,
-      );
-    }
-
-    await transaction.billingAuditEvent.create({
-      data: {
-        action: "PLAN_CATALOG_CHANGED",
-        platformAdminId: adminId,
-        reason: payload.reason,
-        ...(commerceModelChanged
-          ? {
-              beforeValue: { commerceModelId: existing.commerceModelId },
-              afterValue: { commerceModelId: payload.commerceModelId },
-            }
-          : {}),
-        relatedEntityType: "MerchantPricingPlan",
-        relatedEntityId: existing.id,
-      },
-    });
-    return {
-      planId: existing.id,
-      linkedTranslationRunId: translationRun?.runId ?? null,
-    };
     }, MERCHANT_PRICING_TRANSACTION_OPTIONS);
   } catch (error) {
     if (contentChanged) {
@@ -1381,11 +1390,14 @@ export async function mutateMerchantPricingPlanAction(
     throw error;
   }
   if (mutationResult.linkedTranslationRunId) {
-    merchantPricingLogger.info("admin.merchant_pricing.translation_draft_saved", {
-      translationRunId: mutationResult.linkedTranslationRunId,
-      merchantPricingPlanId: mutationResult.planId,
-      shopifyPlanHandle: payload.shopifyPlanHandle,
-    });
+    merchantPricingLogger.info(
+      "admin.merchant_pricing.translation_draft_saved",
+      {
+        translationRunId: mutationResult.linkedTranslationRunId,
+        merchantPricingPlanId: mutationResult.planId,
+        shopifyPlanHandle: payload.shopifyPlanHandle,
+      },
+    );
   }
   revalidatePath("/billing");
   redirect("/billing?view=plans");

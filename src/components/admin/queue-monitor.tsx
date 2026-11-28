@@ -17,7 +17,11 @@ import {
   type QueueJobsSelectionInvalidationReason,
 } from "./queue-monitor/use-queue-jobs";
 
-export function QueueMonitor({ canRemoveFailedJobs }: { canRemoveFailedJobs: boolean }) {
+export function QueueMonitor({
+  canRemoveFailedJobs,
+}: {
+  canRemoveFailedJobs: boolean;
+}) {
   const [selectedQueueName, setSelectedQueueName] = useState<string | null>(
     null,
   );

@@ -65,10 +65,9 @@ test("ARCH-014 implementation modules do not use operational plan or economics s
     "src/components/admin/merchant/merchant-pricing-plan-catalog.tsx",
   ];
   const [action, ...nonActionSources] = await Promise.all(paths.map(source));
-  const nonActionModules = [
-    ...nonActionSources,
-    await builderSource(),
-  ].join("\n");
+  const nonActionModules = [...nonActionSources, await builderSource()].join(
+    "\n",
+  );
   for (const forbidden of [
     "BillingEconomicsSnapshot",
     "BillingUpgradeEconomicsEdge",
@@ -208,7 +207,10 @@ test("usage-event builder exposes currency-aware labels and blocks unbounded fre
   );
   assert.match(builder, /Unlimited/);
   assert.match(builder, /ZERO_COST_USAGE_EVENT_MESSAGE/);
-  assert.match(builder, /draft\.events\.some\(\s*hasUnboundedZeroCostFixedEvent/);
+  assert.match(
+    builder,
+    /draft\.events\.some\(\s*hasUnboundedZeroCostFixedEvent/,
+  );
   assert.match(builder, /draft\.events\.map\(serializeBuilderEvent\)/);
   assert.match(builder, /Usage events \(\{events\.length}\/5\)/);
 });
@@ -223,20 +225,28 @@ test("Merchant Pricing Step 7 uses automatic durable translations instead of wor
   );
   assert.match(builder, /name="translationRunId"/);
   assert.match(translationStep, /MerchantPricingAutomaticTranslationStatus/);
-  assert.match(status, /Moda Interact automatically translates the English merchant content/);
+  assert.match(
+    status,
+    /Moda Interact automatically translates the English merchant content/,
+  );
   assert.match(status, /20 \/ 20 languages ready/);
   assert.match(status, /Retry translations/);
   assert.match(status, /Translation has not started/);
   assert.match(status, /Save the draft/);
   assert.match(translationStep, /start automatic translation/);
-  assert.match(translationStep, /Save draft is unavailable until these items are fixed/);
+  assert.match(
+    translationStep,
+    /Save draft is unavailable until these items are fixed/,
+  );
   assert.match(status, /System Controls \/ Translations/);
   assert.doesNotMatch(
     `${builder}\n${translationStep}\n${status}`,
     /Download pre-populated translation spreadsheet|Drop your completed \.xlsx spreadsheet here|Choose spreadsheet|translationJson/,
   );
   await assert.rejects(
-    source("src/components/admin/merchant/merchant-pricing-translation-workbook.tsx"),
+    source(
+      "src/components/admin/merchant/merchant-pricing-translation-workbook.tsx",
+    ),
   );
 });
 
@@ -346,7 +356,10 @@ test("Commerce model pricing assignments remain Platform-admin-only and repairab
   assert.ok(billingPlan);
   assert.doesNotMatch(billingPlan, /commerceModelId|modelId/);
 
-  assert.match(builder, /commerceModelId: (?:draft\.)?commerceModelId \|\| null/);
+  assert.match(
+    builder,
+    /commerceModelId: (?:draft\.)?commerceModelId \|\| null/,
+  );
   assert.match(builder, /Use Platform default/);
   assert.match(
     builder,

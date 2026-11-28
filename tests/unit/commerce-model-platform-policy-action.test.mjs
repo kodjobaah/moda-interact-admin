@@ -1,43 +1,84 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import { loadPolicyModule } from './helpers/commerce-model-policy-module-harness.mjs';
+import assert from "node:assert/strict";
+import test from "node:test";
+import { loadPolicyModule } from "./helpers/commerce-model-policy-module-harness.mjs";
 
-const fields = loadPolicyModule('src/lib/admin/commerce-model-policy-fields.ts', {});
+const fields = loadPolicyModule(
+  "src/lib/admin/commerce-model-policy-fields.ts",
+  {},
+);
 const authDenied = class PlatformAdminUnauthorizedError extends Error {};
 
-function fixture(role = 'SUPER_ADMIN') {
+function fixture(role = "SUPER_ADMIN") {
   let transactionCount = 0;
   let commitCount = 0;
   let revalidated = 0;
   let auditFails = false;
   let casLost = false;
-  const stored = { budget: { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 }, editVersion: 3 };
+  const stored = {
+    budget: {
+      deadlineMs: 60000,
+      outputTokens: 800,
+      initialOutreachToolCalls: 16,
+    },
+    editVersion: 3,
+  };
   const events = [];
   const readQueries = [];
   let stage;
   const prisma = {
-    commerceModelPolicy: { findMany: async (query) => {
-      readQueries.push({ kind: "policy", query });
-      return [{ id: "live-platform", environment: "DEVELOPMENT", context: "LIVE", scope: "PLATFORM",
-        budget: stored.budget, budgetSchemaVersion: 1, editVersion: stored.editVersion, updatedAt: new Date("2026-10-13") }];
-    } },
-    commerceAuditEvent: { findMany: async (query) => { readQueries.push({ kind: "history", query }); return []; } },
+    commerceModelPolicy: {
+      findMany: async (query) => {
+        readQueries.push({ kind: "policy", query });
+        return [
+          {
+            id: "live-platform",
+            environment: "DEVELOPMENT",
+            context: "LIVE",
+            scope: "PLATFORM",
+            budget: stored.budget,
+            budgetSchemaVersion: 1,
+            editVersion: stored.editVersion,
+            updatedAt: new Date("2026-10-13"),
+          },
+        ];
+      },
+    },
+    commerceAuditEvent: {
+      findMany: async (query) => {
+        readQueries.push({ kind: "history", query });
+        return [];
+      },
+    },
     async $transaction(callback, options) {
       transactionCount++;
-      assert.equal(options.isolationLevel, 'Serializable');
+      assert.equal(options.isolationLevel, "Serializable");
       stage = { ...stored, budget: { ...stored.budget }, events: [] };
       const tx = {
         commerceModelPolicy: {
           findMany: async ({ where }) => {
-            assert.deepEqual(where, { environment: 'DEVELOPMENT', context: 'LIVE', scope: 'PLATFORM' });
-            return [{ id: 'live-platform', environment: 'DEVELOPMENT', context: 'LIVE', scope: 'PLATFORM',
-              budget: stage.budget, budgetSchemaVersion: 1, editVersion: stage.editVersion, updatedAt: new Date('2026-10-13') }];
+            assert.deepEqual(where, {
+              environment: "DEVELOPMENT",
+              context: "LIVE",
+              scope: "PLATFORM",
+            });
+            return [
+              {
+                id: "live-platform",
+                environment: "DEVELOPMENT",
+                context: "LIVE",
+                scope: "PLATFORM",
+                budget: stage.budget,
+                budgetSchemaVersion: 1,
+                editVersion: stage.editVersion,
+                updatedAt: new Date("2026-10-13"),
+              },
+            ];
           },
           updateMany: async ({ where, data }) => {
             if (casLost) return { count: 0 };
             assert.equal(where.editVersion, stage.editVersion);
-            assert.equal(where.context, 'LIVE');
-            assert.equal(where.scope, 'PLATFORM');
+            assert.equal(where.context, "LIVE");
+            assert.equal(where.scope, "PLATFORM");
             stage.budget = data.budget;
             stage.editVersion += data.editVersion.increment;
             return { count: 1 };
@@ -45,7 +86,7 @@ function fixture(role = 'SUPER_ADMIN') {
         },
         commerceAuditEvent: {
           create: async ({ data }) => {
-            if (auditFails) throw Error('database audit insert failed');
+            if (auditFails) throw Error("database audit insert failed");
             stage.events.push(data);
           },
         },
@@ -59,63 +100,108 @@ function fixture(role = 'SUPER_ADMIN') {
       return result;
     },
   };
-  const service = loadPolicyModule('src/lib/admin/commerce-model-platform-policy.ts', {
-    './commerce-environment.ts': { resolveAdminCommerceEnvironment: () => 'DEVELOPMENT' },
-    './commerce-model-policy-fields.ts': fields,
-    '@/lib/auth/platform-admin': {
-      requirePlatformAdminRead: async () => {
-        if (!role) throw new authDenied();
-        return { id: 'admin-1', role };
+  const service = loadPolicyModule(
+    "src/lib/admin/commerce-model-platform-policy.ts",
+    {
+      "./commerce-environment.ts": {
+        resolveAdminCommerceEnvironment: () => "DEVELOPMENT",
       },
-      PlatformAdminUnauthorizedError: authDenied,
+      "./commerce-model-policy-fields.ts": fields,
+      "@/lib/auth/platform-admin": {
+        requirePlatformAdminRead: async () => {
+          if (!role) throw new authDenied();
+          return { id: "admin-1", role };
+        },
+        PlatformAdminUnauthorizedError: authDenied,
+      },
+      "@/lib/prisma": { prisma },
     },
-    '@/lib/prisma': { prisma },
-  });
-  const action = loadPolicyModule('src/app/actions/commerce-model-platform-policy.ts', {
-    'next/cache': { revalidatePath: (path) => { assert.equal(path, '/system-controls/platform-policy'); revalidated++; } },
-    '@/lib/auth/platform-admin': { requirePlatformAdminMutation: async () => ({ id: 'admin-1', role }) },
-    '@/lib/auth/development-platform-admin': { ensureDevelopmentPlatformAdmin: async () => {} },
-    '@/lib/admin/commerce-environment': { resolveAdminCommerceEnvironment: () => 'DEVELOPMENT' },
-    '@/lib/admin/commerce-model-policy-fields': fields,
-    '@/lib/admin/commerce-model-platform-policy': service,
-    '@/lib/prisma': { prisma },
-  });
+  );
+  const action = loadPolicyModule(
+    "src/app/actions/commerce-model-platform-policy.ts",
+    {
+      "next/cache": {
+        revalidatePath: (path) => {
+          assert.equal(path, "/system-controls/platform-policy");
+          revalidated++;
+        },
+      },
+      "@/lib/auth/platform-admin": {
+        requirePlatformAdminMutation: async () => ({ id: "admin-1", role }),
+      },
+      "@/lib/auth/development-platform-admin": {
+        ensureDevelopmentPlatformAdmin: async () => {},
+      },
+      "@/lib/admin/commerce-environment": {
+        resolveAdminCommerceEnvironment: () => "DEVELOPMENT",
+      },
+      "@/lib/admin/commerce-model-policy-fields": fields,
+      "@/lib/admin/commerce-model-platform-policy": service,
+      "@/lib/prisma": { prisma },
+    },
+  );
   const form = (overrides = {}) => {
-    const entries = { deadlineMs: '70000', outputTokens: '1200', initialOutreachToolCalls: '16', expectedEditVersion: '3', reason: 'Increase budget for testing', ...overrides };
+    const entries = {
+      deadlineMs: "70000",
+      outputTokens: "1200",
+      initialOutreachToolCalls: "16",
+      expectedEditVersion: "3",
+      reason: "Increase budget for testing",
+      ...overrides,
+    };
     const data = new FormData();
     for (const [key, value] of Object.entries(entries)) data.set(key, value);
     return data;
   };
   return {
-    action, service, form, stored, events, readQueries,
-    failAudit: () => { auditFails = true; },
-    loseCas: () => { casLost = true; },
+    action,
+    service,
+    form,
+    stored,
+    events,
+    readQueries,
+    failAudit: () => {
+      auditFails = true;
+    },
+    loseCas: () => {
+      casLost = true;
+    },
     counts: () => ({ transactionCount, commitCount, revalidated }),
   };
 }
 
-test('non-SUPER_ADMIN cannot read LIVE policy or audit history', async () => {
-  for (const role of ['ADMIN', 'SUPPORT']) {
+test("non-SUPER_ADMIN cannot read LIVE policy or audit history", async () => {
+  for (const role of ["ADMIN", "SUPPORT"]) {
     const f = fixture(role);
-    await assert.rejects(f.service.getLivePlatformPolicyDashboard(0), authDenied);
+    await assert.rejects(
+      f.service.getLivePlatformPolicyDashboard(0),
+      authDenied,
+    );
     assert.equal(f.readQueries.length, 0);
     assert.equal(f.counts().transactionCount, 0);
   }
 });
 
-test('SUPER_ADMIN can load LIVE policy; read uses resolved environment', async () => {
+test("SUPER_ADMIN can load LIVE policy; read uses resolved environment", async () => {
   const f = fixture();
   const result = await f.service.getLivePlatformPolicyDashboard(0);
   assert.equal(result.policy.id, "live-platform");
   assert.equal(result.history.length, 0);
-  assert.deepEqual(f.readQueries[0].query.where, { environment: "DEVELOPMENT", context: "LIVE", scope: "PLATFORM" });
+  assert.deepEqual(f.readQueries[0].query.where, {
+    environment: "DEVELOPMENT",
+    context: "LIVE",
+    scope: "PLATFORM",
+  });
   assert.deepEqual(f.readQueries[1].query.where, {
-    modelPolicyId: "live-platform", environment: "DEVELOPMENT", action: "SET_LIVE_PLATFORM_BUDGET", actorType: "PLATFORM_ADMIN",
+    modelPolicyId: "live-platform",
+    environment: "DEVELOPMENT",
+    action: "SET_LIVE_PLATFORM_BUDGET",
+    actorType: "PLATFORM_ADMIN",
   });
 });
 
-test('save action rejects unauthorized role before transaction', async () => {
-  for (const role of ['ADMIN', 'SUPPORT']) {
+test("save action rejects unauthorized role before transaction", async () => {
+  for (const role of ["ADMIN", "SUPPORT"]) {
     const f = fixture(role);
     const result = await f.action.saveLivePlatformBudgetAction(f.form());
     assert.equal(result.ok, false);
@@ -124,99 +210,198 @@ test('save action rejects unauthorized role before transaction', async () => {
   }
 });
 
-test('save action returns field errors without executing a transaction', async () => {
+test("save action returns field errors without executing a transaction", async () => {
   const f = fixture();
-  const result = await f.action.saveLivePlatformBudgetAction(f.form({ deadlineMs: '-1', reason: '' }));
+  const result = await f.action.saveLivePlatformBudgetAction(
+    f.form({ deadlineMs: "-1", reason: "" }),
+  );
   assert.equal(result.ok, false);
   assert.ok(result.fieldErrors.deadlineMs);
   assert.ok(result.fieldErrors.reason);
   assert.equal(f.counts().transactionCount, 0);
 });
 
-test('save action commits updated LIVE policy and audit together', async () => {
+test("save action commits updated LIVE policy and audit together", async () => {
   const f = fixture();
   const result = await f.action.saveLivePlatformBudgetAction(f.form());
   assert.deepEqual(result, { ok: true });
-  assert.deepEqual(f.stored.budget, { deadlineMs: 70000, outputTokens: 1200, initialOutreachToolCalls: 16 });
+  assert.deepEqual(f.stored.budget, {
+    deadlineMs: 70000,
+    outputTokens: 1200,
+    initialOutreachToolCalls: 16,
+  });
   assert.equal(f.stored.editVersion, 4);
   assert.equal(f.events.length, 1);
-  assert.equal(f.events[0].action, 'SET_LIVE_PLATFORM_BUDGET');
+  assert.equal(f.events[0].action, "SET_LIVE_PLATFORM_BUDGET");
   assert.equal(f.events[0].metadata.previousEditVersion, 3);
   assert.equal(f.events[0].metadata.nextEditVersion, 4);
-  assert.deepEqual(f.counts(), { transactionCount: 1, commitCount: 1, revalidated: 1 });
+  assert.deepEqual(f.counts(), {
+    transactionCount: 1,
+    commitCount: 1,
+    revalidated: 1,
+  });
 });
 
-test('stale version and concurrent CAS loss return recoverable conflicts without writes', async () => {
+test("stale version and concurrent CAS loss return recoverable conflicts without writes", async () => {
   const stale = fixture();
-  assert.equal((await stale.action.saveLivePlatformBudgetAction(stale.form({ expectedEditVersion: '2' }))).conflict, true);
+  assert.equal(
+    (
+      await stale.action.saveLivePlatformBudgetAction(
+        stale.form({ expectedEditVersion: "2" }),
+      )
+    ).conflict,
+    true,
+  );
   assert.equal(stale.counts().commitCount, 0);
   const concurrent = fixture();
   concurrent.loseCas();
-  assert.equal((await concurrent.action.saveLivePlatformBudgetAction(concurrent.form())).conflict, true);
-  assert.deepEqual(concurrent.stored.budget, { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 });
+  assert.equal(
+    (await concurrent.action.saveLivePlatformBudgetAction(concurrent.form()))
+      .conflict,
+    true,
+  );
+  assert.deepEqual(concurrent.stored.budget, {
+    deadlineMs: 60000,
+    outputTokens: 800,
+    initialOutreachToolCalls: 16,
+  });
   assert.equal(concurrent.events.length, 0);
 });
 
-test('audit insertion failure rolls back action transaction and avoids revalidation', async () => {
+test("audit insertion failure rolls back action transaction and avoids revalidation", async () => {
   const f = fixture();
   f.failAudit();
   const result = await f.action.saveLivePlatformBudgetAction(f.form());
   assert.equal(result.ok, false);
-  assert.deepEqual(f.stored.budget, { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 16 });
+  assert.deepEqual(f.stored.budget, {
+    deadlineMs: 60000,
+    outputTokens: 800,
+    initialOutreachToolCalls: 16,
+  });
   assert.equal(f.stored.editVersion, 3);
   assert.equal(f.events.length, 0);
-  assert.deepEqual(f.counts(), { transactionCount: 1, commitCount: 0, revalidated: 0 });
+  assert.deepEqual(f.counts(), {
+    transactionCount: 1,
+    commitCount: 0,
+    revalidated: 0,
+  });
 });
 
-test('missing outreach value in an old cached form cannot reset a saved non-default value', async () => {
+test("missing outreach value in an old cached form cannot reset a saved non-default value", async () => {
   const f = fixture();
   f.stored.budget.initialOutreachToolCalls = 32;
   const data = f.form();
-  data.delete('initialOutreachToolCalls');
+  data.delete("initialOutreachToolCalls");
   const result = await f.action.saveLivePlatformBudgetAction(data);
   assert.equal(result.ok, false);
   assert.ok(result.fieldErrors.initialOutreachToolCalls);
   assert.equal(f.stored.budget.initialOutreachToolCalls, 32);
   assert.equal(f.stored.editVersion, 3);
-  assert.deepEqual(f.counts(), { transactionCount: 0, commitCount: 0, revalidated: 0 });
+  assert.deepEqual(f.counts(), {
+    transactionCount: 0,
+    commitCount: 0,
+    revalidated: 0,
+  });
   assert.equal(f.events.length, 0);
 });
 
-test('an outreach-only edit uses the existing atomic policy and audit transaction', async () => {
+test("an outreach-only edit uses the existing atomic policy and audit transaction", async () => {
   const f = fixture();
-  const result = await f.action.saveLivePlatformBudgetAction(f.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32' }));
+  const result = await f.action.saveLivePlatformBudgetAction(
+    f.form({
+      deadlineMs: "60000",
+      outputTokens: "800",
+      initialOutreachToolCalls: "32",
+    }),
+  );
   assert.deepEqual(result, { ok: true });
-  assert.deepEqual(f.stored.budget, { deadlineMs: 60000, outputTokens: 800, initialOutreachToolCalls: 32 });
+  assert.deepEqual(f.stored.budget, {
+    deadlineMs: 60000,
+    outputTokens: 800,
+    initialOutreachToolCalls: 32,
+  });
   assert.equal(f.events.length, 1);
-  assert.equal(f.events[0].metadata.previousBudget.initialOutreachToolCalls, 16);
+  assert.equal(
+    f.events[0].metadata.previousBudget.initialOutreachToolCalls,
+    16,
+  );
   assert.equal(f.events[0].metadata.nextBudget.initialOutreachToolCalls, 32);
-  assert.deepEqual(f.counts(), { transactionCount: 1, commitCount: 1, revalidated: 1 });
+  assert.deepEqual(f.counts(), {
+    transactionCount: 1,
+    commitCount: 1,
+    revalidated: 1,
+  });
 
   const failed = fixture();
   failed.failAudit();
-  assert.equal((await failed.action.saveLivePlatformBudgetAction(failed.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32' }))).ok, false);
+  assert.equal(
+    (
+      await failed.action.saveLivePlatformBudgetAction(
+        failed.form({
+          deadlineMs: "60000",
+          outputTokens: "800",
+          initialOutreachToolCalls: "32",
+        }),
+      )
+    ).ok,
+    false,
+  );
   assert.equal(failed.stored.budget.initialOutreachToolCalls, 16);
   assert.equal(failed.stored.editVersion, 3);
   assert.equal(failed.events.length, 0);
-  assert.deepEqual(failed.counts(), { transactionCount: 1, commitCount: 0, revalidated: 0 });
+  assert.deepEqual(failed.counts(), {
+    transactionCount: 1,
+    commitCount: 0,
+    revalidated: 0,
+  });
 });
 
-test('saving an unchanged outreach budget is a no-op without an audit or revalidation', async () => {
+test("saving an unchanged outreach budget is a no-op without an audit or revalidation", async () => {
   const f = fixture();
-  assert.equal((await f.action.saveLivePlatformBudgetAction(f.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '16' }))).ok, false);
+  assert.equal(
+    (
+      await f.action.saveLivePlatformBudgetAction(
+        f.form({
+          deadlineMs: "60000",
+          outputTokens: "800",
+          initialOutreachToolCalls: "16",
+        }),
+      )
+    ).ok,
+    false,
+  );
   assert.equal(f.stored.editVersion, 3);
   assert.equal(f.events.length, 0);
   assert.equal(f.counts().commitCount, 0);
   assert.equal(f.counts().revalidated, 0);
 });
 
-test('outreach-only edits retain stale-version and concurrent CAS protection', async () => {
+test("outreach-only edits retain stale-version and concurrent CAS protection", async () => {
   const stale = fixture();
-  const data = stale.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32', expectedEditVersion: '2' });
-  assert.equal((await stale.action.saveLivePlatformBudgetAction(data)).conflict, true);
+  const data = stale.form({
+    deadlineMs: "60000",
+    outputTokens: "800",
+    initialOutreachToolCalls: "32",
+    expectedEditVersion: "2",
+  });
+  assert.equal(
+    (await stale.action.saveLivePlatformBudgetAction(data)).conflict,
+    true,
+  );
   const raced = fixture();
   raced.loseCas();
-  assert.equal((await raced.action.saveLivePlatformBudgetAction(raced.form({ deadlineMs: '60000', outputTokens: '800', initialOutreachToolCalls: '32' }))).conflict, true);
+  assert.equal(
+    (
+      await raced.action.saveLivePlatformBudgetAction(
+        raced.form({
+          deadlineMs: "60000",
+          outputTokens: "800",
+          initialOutreachToolCalls: "32",
+        }),
+      )
+    ).conflict,
+    true,
+  );
   for (const f of [stale, raced]) {
     assert.equal(f.stored.budget.initialOutreachToolCalls, 16);
     assert.equal(f.stored.editVersion, 3);

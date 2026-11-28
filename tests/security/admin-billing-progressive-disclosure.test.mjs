@@ -4,15 +4,22 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { test } from "node:test";
 
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const read = (relativePath) => readFile(path.join(repositoryRoot, relativePath), "utf8");
+const repositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+const read = (relativePath) =>
+  readFile(path.join(repositoryRoot, relativePath), "utf8");
 
 test("global billing exposes URL-backed views with overview fallback", async () => {
   const [page, tabs] = await Promise.all([
     read("src/app/(protected)/billing/page.tsx"),
     read("src/components/admin/billing-tabs.tsx"),
   ]);
-  assert.match(page, /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*"unmapped",\s*"sync-errors",\s*\]/);
+  assert.match(
+    page,
+    /allowedViews: BillingView\[\] = \[\s*"overview",\s*"plans",\s*"packs",\s*"refunds",\s*"events",\s*"unmapped",\s*"sync-errors",\s*\]/,
+  );
   assert.match(page, /rawRequestedView = firstParam\(rawParams\.view\)/);
   assert.match(page, /rawRequestedView === "controls"/);
   assert.match(page, /: "overview"/);
@@ -28,14 +35,26 @@ test("billing route loads only the selected view and selected detail", async () 
     page,
     /view === "plans" && planSection === "pricing"\s*\n\s*\? await getMerchantPricingPlans\(\{[\s\S]*planPage[\s\S]*planPageSize[\s\S]*\}\)/,
   );
-  assert.match(page, /view === "packs"\s*\n\s*\? await getRecoveryCreditPurchases/);
+  assert.match(
+    page,
+    /view === "packs"\s*\n\s*\? await getRecoveryCreditPurchases/,
+  );
   assert.match(page, /view === "events"\s*\n\s*\? await getBillingLedger/);
-  assert.match(page, /view === "sync-errors"\s*\n\s*\? await getBillingSyncErrors/);
-  assert.doesNotMatch(page, /view === "controls" \? await getPlatformBillingPolicy\(\)/);
+  assert.match(
+    page,
+    /view === "sync-errors"\s*\n\s*\? await getBillingSyncErrors/,
+  );
+  assert.doesNotMatch(
+    page,
+    /view === "controls" \? await getPlatformBillingPolicy\(\)/,
+  );
   assert.match(page, /getMerchantPricingPlanById/);
   assert.match(page, /getRecoveryCreditPurchaseDetail/);
   assert.match(page, /getBillingLedgerItem/);
-  assert.doesNotMatch(page, /getBillingPlans|getBillingPlanById|getBillingPlanEconomics|BillingPlanCatalog|BillingPlanDrawer/);
+  assert.doesNotMatch(
+    page,
+    /getBillingPlans|getBillingPlanById|getBillingPlanEconomics|BillingPlanCatalog|BillingPlanDrawer/,
+  );
 });
 
 test("App Events filters preserve the events view and reset only event selection", async () => {
@@ -46,12 +65,18 @@ test("App Events filters preserve the events view and reset only event selection
   assert.match(overview, /<input type="hidden" name="view" value="events" \/>/);
   assert.match(overview, /pageParam="eventPage"/);
   assert.match(overview, /eventId: item\.id/);
-  assert.match(drawers, /withParamUpdates\("\/billing", params, \{ eventId: null \}\)/);
+  assert.match(
+    drawers,
+    /withParamUpdates\("\/billing", params, \{ eventId: null \}\)/,
+  );
 });
 
 test("recovery-pack receipt guidance distinguishes pending and submitted events", async () => {
   const drawers = await read("src/components/admin/billing-drawers.tsx");
-  assert.match(drawers, /const eventReported = event\?\.shopifyReportState === "REPORTED"/);
+  assert.match(
+    drawers,
+    /const eventReported = event\?\.shopifyReportState === "REPORTED"/,
+  );
   assert.match(drawers, /\{eventReported \? \(/);
   assert.match(drawers, /eventReported && purchase\.status === "REQUESTED"/);
   assert.doesNotMatch(drawers, /\{purchase\.status === "REQUESTED" \? \(/);
@@ -68,7 +93,10 @@ test("overview and plans use progressive disclosure", async () => {
   assert.match(page, /view === "plans" \? \(/);
   assert.match(page, /planSection === "pricing" && plans/);
   assert.match(page, /planSection === "features"/);
-  assert.match(page, /<BillingPlansNavigation current=\{planSection\} params=\{params\} \/>/);
+  assert.match(
+    page,
+    /<BillingPlansNavigation current=\{planSection\} params=\{params\} \/>/,
+  );
   assert.doesNotMatch(overview, /providerResponseSummary.*<\/td>/s);
   assert.doesNotMatch(overview, /<BillingPlanCatalog/);
   assert.match(
@@ -81,7 +109,10 @@ test("overview and plans use progressive disclosure", async () => {
   assert.match(drawers, /export function MerchantPricingPlanDrawer/);
   assert.match(catalogue, /mutateMerchantPricingPlanAction/);
   assert.match(catalogue, /drawer: "register-plan"/);
-  assert.doesNotMatch(`${page}\n${drawers}`, /BillingPlanCatalog|BillingPlanDrawer/);
+  assert.doesNotMatch(
+    `${page}\n${drawers}`,
+    /BillingPlanCatalog|BillingPlanDrawer/,
+  );
 });
 
 test("pack and event detail reads remain protected and diagnostics are drawer-only", async () => {
@@ -90,10 +121,19 @@ test("pack and event detail reads remain protected and diagnostics are drawer-on
     read("src/components/admin/billing-drawers.tsx"),
     read("src/components/admin/billing-overview.tsx"),
   ]);
-  assert.match(billing, /export async function getRecoveryCreditPurchaseDetail/);
+  assert.match(
+    billing,
+    /export async function getRecoveryCreditPurchaseDetail/,
+  );
   assert.match(billing, /export async function getBillingLedgerItem/);
   assert.match(drawers, /getBillingLedgerItem|BillingEventDrawer/);
-  for (const diagnostic of ["providerErrorCode", "providerResponseSummary", "reportAttemptCount", "lastReportAttemptAt", "shopifyEventHandle"]) {
+  for (const diagnostic of [
+    "providerErrorCode",
+    "providerResponseSummary",
+    "reportAttemptCount",
+    "lastReportAttemptAt",
+    "shopifyEventHandle",
+  ]) {
     assert.match(drawers, new RegExp(diagnostic));
     assert.doesNotMatch(events, new RegExp(`${diagnostic}[^\\n]*<`));
   }
@@ -109,8 +149,14 @@ test("drawer links preserve active filters and close only their selection", asyn
   assert.match(tabs, /relevantParams/);
   assert.match(packs, /\.\.\.params.*purchaseId/);
   assert.match(overview, /\.\.\.params.*eventId/);
-  assert.match(drawers, /withParamUpdates\("\/billing", params, \{ purchaseId: null \}\)/);
-  assert.match(drawers, /withParamUpdates\("\/billing", params, \{ eventId: null \}\)/);
+  assert.match(
+    drawers,
+    /withParamUpdates\("\/billing", params, \{ purchaseId: null \}\)/,
+  );
+  assert.match(
+    drawers,
+    /withParamUpdates\("\/billing", params, \{ eventId: null \}\)/,
+  );
 });
 
 test("global billing visible labels use the translation catalogue", async () => {
@@ -121,25 +167,42 @@ test("global billing visible labels use the translation catalogue", async () => 
     read("src/components/admin/billing-drawers.tsx"),
     read("src/i18n/locales/en.json"),
   ]);
-  for (const key of ["billing.tabs", "billing.plansDescription", "billing.recoveryPacksDescription", "billing.allStatuses", "billing.createdAt", "billing.status"]) {
+  for (const key of [
+    "billing.tabs",
+    "billing.plansDescription",
+    "billing.recoveryPacksDescription",
+    "billing.allStatuses",
+    "billing.createdAt",
+    "billing.status",
+  ]) {
     assert.match(catalogue, new RegExp(`\\"${key}\\"`));
   }
-  assert.doesNotMatch(`${page}\n${tabs}\n${packs}\n${drawers}`, />\s*(Overview|Plans|Recovery packs|App Events|Controls|Details|Status)\s*</);
+  assert.doesNotMatch(
+    `${page}\n${tabs}\n${packs}\n${drawers}`,
+    />\s*(Overview|Plans|Recovery packs|App Events|Controls|Details|Status)\s*</,
+  );
 });
 
 test("platform policy is isolated from Billing Plans and existing mutation security stays intact", async () => {
-  const [billingPage, policyPage, controls, platformPolicyForm, security] = await Promise.all([
-    read("src/app/(protected)/billing/page.tsx"),
-    read("src/app/(protected)/system-controls/platform-policy/page.tsx"),
-    read("src/components/admin/billing-controls.tsx"),
-    read("src/components/admin/platform-policy-form.tsx"),
-    read("tests/security/admin-merchant-pricing-plan.test.mjs"),
-  ]);
-  assert.doesNotMatch(billingPage, /PlatformPolicyControls|view === "controls" && policy/);
+  const [billingPage, policyPage, controls, platformPolicyForm, security] =
+    await Promise.all([
+      read("src/app/(protected)/billing/page.tsx"),
+      read("src/app/(protected)/system-controls/platform-policy/page.tsx"),
+      read("src/components/admin/billing-controls.tsx"),
+      read("src/components/admin/platform-policy-form.tsx"),
+      read("tests/security/admin-merchant-pricing-plan.test.mjs"),
+    ]);
+  assert.doesNotMatch(
+    billingPage,
+    /PlatformPolicyControls|view === "controls" && policy/,
+  );
   assert.match(billingPage, /redirect\("\/system-controls\/platform-policy"\)/);
   assert.match(policyPage, /<PlatformPolicyControls policy=\{policy\}/);
   assert.match(policyPage, /<AdminShell active="platform-policy">/);
   assert.match(controls, /PlatformPolicyForm/);
   assert.match(platformPolicyForm, /mutatePlatformBillingPolicyAction/);
-  assert.match(security, /mutateMerchantPricingPlanAction|requirePlatformAdmin/);
+  assert.match(
+    security,
+    /mutateMerchantPricingPlanAction|requirePlatformAdmin/,
+  );
 });

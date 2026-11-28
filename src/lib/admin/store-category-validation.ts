@@ -7,7 +7,6 @@ import {
 export const STORE_CATEGORY_SLUG_PATTERN = /^[a-z][a-z0-9-]{0,127}$/;
 export const PROMPT_TEMPLATE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,127}$/;
 
-
 export type CreateStoreCategoryBundleInput = {
   category: {
     referenceTaxonomy: StoreCategoryTaxonomyReference;
@@ -120,7 +119,11 @@ function requiredText(
   return result;
 }
 
-function optionalText(formData: FormData, name: string, maximum: number): string {
+function optionalText(
+  formData: FormData,
+  name: string,
+  maximum: number,
+): string {
   const result = value(formData, name)?.trim() ?? "";
   if (result.length > maximum) {
     throw new Error(`${name} must be at most ${maximum} characters.`);
@@ -150,7 +153,6 @@ function enabled(formData: FormData): boolean {
   }
   return raw === "true";
 }
-
 
 function conditionKeyValue(value: string): string {
   const parsed = StoreCategoryPromptConditionKeySchema.safeParse(value);
@@ -260,7 +262,9 @@ export function parseSelectDefaultTemplateForm(
   };
 }
 
-function taxonomyReferenceFromForm(formData: FormData): StoreCategoryTaxonomyReference {
+function taxonomyReferenceFromForm(
+  formData: FormData,
+): StoreCategoryTaxonomyReference {
   const source = requiredText(formData, "taxonomySource", 64);
   if (source !== STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE) {
     throw new Error("taxonomySource is invalid.");
@@ -280,7 +284,9 @@ export function parseCreateTaxonomyMappingForm(
   return {
     categoryId: requiredText(formData, "categoryId", 255),
     taxonomy: taxonomyReferenceFromForm(formData),
-    conditionKey: conditionKeyValue(requiredText(formData, "conditionKey", 128)),
+    conditionKey: conditionKeyValue(
+      requiredText(formData, "conditionKey", 128),
+    ),
     displayName: requiredText(formData, "displayName", 255),
     weight: integer(formData, "weight", 1, 1_000_000),
     reason: reason(formData),
@@ -292,7 +298,9 @@ export function parseUpdateTaxonomyMappingForm(
 ): UpdateTaxonomyMappingInput {
   return {
     id: requiredText(formData, "id", 255),
-    conditionKey: conditionKeyValue(requiredText(formData, "conditionKey", 128)),
+    conditionKey: conditionKeyValue(
+      requiredText(formData, "conditionKey", 128),
+    ),
     displayName: requiredText(formData, "displayName", 255),
     weight: integer(formData, "weight", 1, 1_000_000),
     expectedEditVersion: integer(
@@ -413,10 +421,14 @@ export function parseCreateStoreCategoryBundleInput(
       `shopifyMappings[${index}].taxonomy`,
     );
     if (seen.has(taxonomy.categoryId)) {
-      throw new Error("Each reference taxonomy category may be mapped only once.");
+      throw new Error(
+        "Each reference taxonomy category may be mapped only once.",
+      );
     }
     seen.add(taxonomy.categoryId);
-    const conditionKey = conditionKeyValue(objectText(value, "conditionKey", 128));
+    const conditionKey = conditionKeyValue(
+      objectText(value, "conditionKey", 128),
+    );
     if (seenConditionKeys.has(conditionKey)) {
       throw new Error("Each mapping condition key may be used only once.");
     }

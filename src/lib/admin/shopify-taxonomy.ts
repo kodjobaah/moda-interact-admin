@@ -14,12 +14,10 @@ import {
 } from "./embedding-configuration.ts";
 import { EMBEDDING_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "./embedding-configuration-validation.ts";
 
-export const SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS =
-  "idx:moda:shopify-taxonomy:top";
+export const SHOPIFY_TAXONOMY_TOP_INDEX_ALIAS = "idx:moda:shopify-taxonomy:top";
 export const SHOPIFY_TAXONOMY_SUBCATEGORY_INDEX_ALIAS =
   "idx:moda:shopify-taxonomy:sub";
-export const SHOPIFY_TAXONOMY_METADATA_KEY =
-  "moda:shopify-taxonomy:metadata";
+export const SHOPIFY_TAXONOMY_METADATA_KEY = "moda:shopify-taxonomy:metadata";
 
 const SHOPIFY_TAXONOMY_DEFAULT_LIMIT = 10;
 const SHOPIFY_TAXONOMY_MAX_LIMIT = 10;
@@ -62,9 +60,7 @@ type ScoredCategory = {
 };
 
 export type ShopifyTaxonomyUnavailableCode =
-  | "UNAVAILABLE"
-  | "EMBEDDING_CONFIGURATION"
-  | "EMBEDDING_REQUEST_FAILED";
+  "UNAVAILABLE" | "EMBEDDING_CONFIGURATION" | "EMBEDDING_REQUEST_FAILED";
 
 export class ShopifyTaxonomyUnavailableError extends Error {
   readonly code: ShopifyTaxonomyUnavailableCode;
@@ -139,7 +135,9 @@ function parseAncestors(value: string): ShopifyTaxonomyAncestor[] {
   });
 }
 
-function parseCategory(fields: Record<string, string>): ShopifyTaxonomyCategory {
+function parseCategory(
+  fields: Record<string, string>,
+): ShopifyTaxonomyCategory {
   const id = fields.categoryId?.trim();
   const name = fields.name?.trim();
   const fullName = fields.fullName?.trim();
@@ -268,11 +266,16 @@ function requiredMetadataString(
 export function parseShopifyTaxonomyMetadata(
   metadata: Record<string, string>,
 ): ShopifyTaxonomyMetadata {
-  const embeddingProvider = requiredMetadataString(metadata, "embeddingProvider");
+  const embeddingProvider = requiredMetadataString(
+    metadata,
+    "embeddingProvider",
+  );
   const embeddingDimensions = Number(
     requiredMetadataString(metadata, "embeddingDimensions"),
   );
-  const topLevelCount = Number(requiredMetadataString(metadata, "topLevelCount"));
+  const topLevelCount = Number(
+    requiredMetadataString(metadata, "topLevelCount"),
+  );
   const subcategoryCount = Number(
     requiredMetadataString(metadata, "subcategoryCount"),
   );
@@ -340,7 +343,9 @@ async function callSearch(
   if (options.sortByFullName) args.push("SORTBY", "fullName", "ASC");
   args.push(
     "RETURN",
-    options.vector ? CATEGORY_RETURN_FIELDS.length + 1 : CATEGORY_RETURN_FIELDS.length,
+    options.vector
+      ? CATEGORY_RETURN_FIELDS.length + 1
+      : CATEGORY_RETURN_FIELDS.length,
     ...CATEGORY_RETURN_FIELDS,
   );
   if (options.vector) args.push("vectorScore");
@@ -350,7 +355,9 @@ async function callSearch(
   return parseRedisSearchReply(reply);
 }
 
-async function withRedis<T>(operation: (redis: Redis) => Promise<T>): Promise<T> {
+async function withRedis<T>(
+  operation: (redis: Redis) => Promise<T>,
+): Promise<T> {
   const redis = getRedis();
   try {
     await ensureRedisReady(redis);
@@ -381,7 +388,9 @@ async function searchIndex(
   );
 }
 
-async function queryEmbeddingConfigFromIndex(metadata: ShopifyTaxonomyMetadata) {
+async function queryEmbeddingConfigFromIndex(
+  metadata: ShopifyTaxonomyMetadata,
+) {
   let runtime;
   try {
     runtime = await getEmbeddingRuntimeConfiguration(
@@ -422,7 +431,8 @@ export async function searchShopifyTaxonomy(input: {
   rootId?: string | null;
 }): Promise<{ version: string; categories: ShopifyTaxonomyCategory[] }> {
   const query = input.query.trim();
-  if (!query || query.length > 200) throw new ShopifyTaxonomyInvalidQueryError();
+  if (!query || query.length > 200)
+    throw new ShopifyTaxonomyInvalidQueryError();
   const limit = parseLimit(input.limitValue ?? null);
   const scope = input.scope ?? "all";
 
@@ -460,7 +470,10 @@ export async function searchShopifyTaxonomy(input: {
         limit,
         null,
       );
-      return { version: metadata.taxonomyVersion, categories: results.map((r) => r.category) };
+      return {
+        version: metadata.taxonomyVersion,
+        categories: results.map((r) => r.category),
+      };
     }
 
     if (scope === "subcategories") {
@@ -471,7 +484,10 @@ export async function searchShopifyTaxonomy(input: {
         limit,
         input.rootId?.trim() || null,
       );
-      return { version: metadata.taxonomyVersion, categories: results.map((r) => r.category) };
+      return {
+        version: metadata.taxonomyVersion,
+        categories: results.map((r) => r.category),
+      };
     }
 
     const [top, subcategories] = await Promise.all([
@@ -567,9 +583,7 @@ export async function resolveShopifyTaxonomyCategory(
   });
 }
 
-export async function browseShopifyTaxonomy(
-  parentId: string | null,
-): Promise<{
+export async function browseShopifyTaxonomy(parentId: string | null): Promise<{
   version: string;
   parent: ShopifyTaxonomyCategory | null;
   breadcrumbs: ShopifyTaxonomyAncestor[];

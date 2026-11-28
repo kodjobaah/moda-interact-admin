@@ -83,7 +83,9 @@ test("all translation mutations independently require SUPER_ADMIN before form pa
     assert.ok(start >= 0, `${name} should be exported`);
     const next = action.indexOf("export async function", start + 1);
     const body = action.slice(start, next < 0 ? undefined : next);
-    assert.ok(body.indexOf("requireSuperAdmin()") < body.indexOf("return finish("));
+    assert.ok(
+      body.indexOf("requireSuperAdmin()") < body.indexOf("return finish("),
+    );
   }
   assert.match(action, /principal\.role !== "SUPER_ADMIN"/);
   assert.match(action, /revalidatePath\("\/system-controls\/translations"\)/);
@@ -100,14 +102,16 @@ test("credential status never returns encrypted envelope fields and only OpenAI 
     /ciphertext|nonce|authTag|keyId|secret|fingerprint|hash/,
   );
   assert.match(validation, /TRANSLATION_PROVIDER = "openai"/);
-  assert.doesNotMatch(`${panel}\n${credential}\n${models}`, /name="provider"|Provider selector|<select/i);
+  assert.doesNotMatch(
+    `${panel}\n${credential}\n${models}`,
+    /name="provider"|Provider selector|<select/i,
+  );
   assert.match(credential, />OpenAI</);
 });
 
 test("translation credential uses the published Shared AAD and the existing Commerce keyring", () => {
-  const dependency = JSON.parse(packageJson).dependencies[
-    "@modainteract/moda-interact-shared"
-  ];
+  const dependency =
+    JSON.parse(packageJson).dependencies["@modainteract/moda-interact-shared"];
   assert.match(dependency, /^\d+\.\d+\.\d+$/);
   assert.match(cryptoSource, /createCommerceTranslationProviderCredentialAad/);
   assert.match(cryptoSource, /provider: input\.provider/);
@@ -118,8 +122,14 @@ test("translation credential uses the published Shared AAD and the existing Comm
 test("translation configuration UI has synchronous single-flight mutation guards", () => {
   for (const component of [credential, modelForm, automaticDefaultForm]) {
     assert.match(component, /const inFlight = useRef\(false\)/);
-    assert.match(component, /if \(inFlight\.current \|\| refreshRequired\) return;/);
-    assert.ok(component.indexOf("inFlight.current = true") < component.indexOf("await "));
+    assert.match(
+      component,
+      /if \(inFlight\.current \|\| refreshRequired\) return;/,
+    );
+    assert.ok(
+      component.indexOf("inFlight.current = true") <
+        component.indexOf("await "),
+    );
     assert.match(component, /flushSync\(\(\) => \{/);
     assert.match(component, /aria-busy=\{pending\}/);
     assert.match(component, /finally[\s\S]*?inFlight\.current = false/);
@@ -131,10 +141,22 @@ test("translation configuration UI has synchronous single-flight mutation guards
 test("service uses Serializable CAS mutations, audit events, and shared structured logging without executing translations", () => {
   assert.match(service, /isolationLevel: "Serializable"/);
   assert.match(service, /editVersion: \{ increment: 1 \}/);
-  assert.match(service, /CommerceAuditAction\.SET_TRANSLATION_PROVIDER_CREDENTIAL/);
-  assert.match(service, /CommerceAuditAction\.CREATE_TRANSLATION_MODEL_CONFIGURATION/);
-  assert.match(service, /CommerceAuditAction\.ENABLE_TRANSLATION_MODEL_CONFIGURATION/);
-  assert.match(service, /CommerceAuditAction\.DISABLE_TRANSLATION_MODEL_CONFIGURATION/);
+  assert.match(
+    service,
+    /CommerceAuditAction\.SET_TRANSLATION_PROVIDER_CREDENTIAL/,
+  );
+  assert.match(
+    service,
+    /CommerceAuditAction\.CREATE_TRANSLATION_MODEL_CONFIGURATION/,
+  );
+  assert.match(
+    service,
+    /CommerceAuditAction\.ENABLE_TRANSLATION_MODEL_CONFIGURATION/,
+  );
+  assert.match(
+    service,
+    /CommerceAuditAction\.DISABLE_TRANSLATION_MODEL_CONFIGURATION/,
+  );
   assert.match(service, /createLogger\(/);
   assert.match(service, /admin\.translation_provider_credential\.updated/);
   assert.match(service, /admin\.translation_model_configuration\.created/);
@@ -148,22 +170,52 @@ test("credential removal is blocked once model profiles reference the credential
   assert.match(service, /existing\._count\.models > 0/);
   assert.match(service, /credentialInUse/);
   assert.match(credential, /status\.modelCount === 0/);
-  assert.match(credential, /cannot be removed while translation model\s+profiles reference it/);
+  assert.match(
+    credential,
+    /cannot be removed while translation model\s+profiles reference it/,
+  );
 });
 
 test("automatic translation default is explicit, CAS-protected, atomic, and audited", () => {
   assert.match(configurationService, /automaticDefault: true/);
-  assert.match(modelService, /setTranslationModelConfigurationAutomaticDefault/);
-  assert.match(modelService, /validateTranslationModelAutomaticDefaultMutation/);
-  assert.match(modelService, /existing\.editVersion !== validated\.expectedEditVersion/);
+  assert.match(
+    modelService,
+    /setTranslationModelConfigurationAutomaticDefault/,
+  );
+  assert.match(
+    modelService,
+    /validateTranslationModelAutomaticDefaultMutation/,
+  );
+  assert.match(
+    modelService,
+    /existing\.editVersion !== validated\.expectedEditVersion/,
+  );
   assert.match(modelService, /if \(!existing\.enabled\)/);
-  assert.match(modelService, /automaticDefault: true,[\s\S]*?id: \{ not: existing\.id \}/);
-  assert.match(modelService, /automaticDefault: false,[\s\S]*?editVersion: \{ increment: 1 \}/);
-  assert.match(modelService, /enabled: true,[\s\S]*?automaticDefault: false,[\s\S]*?editVersion: validated\.expectedEditVersion/);
-  assert.match(modelService, /action: CommerceAuditAction\.UPDATE_TRANSLATION_MODEL_CONFIGURATION/);
+  assert.match(
+    modelService,
+    /automaticDefault: true,[\s\S]*?id: \{ not: existing\.id \}/,
+  );
+  assert.match(
+    modelService,
+    /automaticDefault: false,[\s\S]*?editVersion: \{ increment: 1 \}/,
+  );
+  assert.match(
+    modelService,
+    /enabled: true,[\s\S]*?automaticDefault: false,[\s\S]*?editVersion: validated\.expectedEditVersion/,
+  );
+  assert.match(
+    modelService,
+    /action: CommerceAuditAction\.UPDATE_TRANSLATION_MODEL_CONFIGURATION/,
+  );
   assert.match(modelService, /change: "automaticDefault"/);
-  assert.match(modelService, /admin\.translation_model_configuration\.automatic_default_set/);
-  assert.match(action, /setTranslationModelConfigurationAutomaticDefaultAction/);
+  assert.match(
+    modelService,
+    /admin\.translation_model_configuration\.automatic_default_set/,
+  );
+  assert.match(
+    action,
+    /setTranslationModelConfigurationAutomaticDefaultAction/,
+  );
   assert.match(action, /expectedEditVersion: positiveInteger/);
 });
 

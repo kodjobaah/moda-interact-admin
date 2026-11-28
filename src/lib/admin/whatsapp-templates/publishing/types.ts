@@ -6,15 +6,26 @@ export type PublicationScope =
   | { mode: "selected"; shopIds: string[] }
   | { mode: "all" };
 /** Admin UI intent; durable shop operations retain their historical scope shape. */
-export type PublicationIntent = PublicationScope | { mode: "all_future" } | { mode: "future" };
+export type PublicationIntent =
+  PublicationScope | { mode: "all_future" } | { mode: "future" };
 export type DefaultPublicationImpact = {
-  purpose: string; format: import("../recovery-defaults/contracts").RecoveryDefaultFormat; currentTemplateName: string | null; proposedTemplateName: string;
+  purpose: string;
+  format: import("../recovery-defaults/contracts").RecoveryDefaultFormat;
+  currentTemplateName: string | null;
+  proposedTemplateName: string;
 };
 export type PublicationConfirmation =
-  | { kind: "operation"; progress: PublicationProgress; defaultConfigured: boolean }
+  | {
+      kind: "operation";
+      progress: PublicationProgress;
+      defaultConfigured: boolean;
+    }
   | { kind: "default_only"; purpose: string };
-export type PublicationIntentRequest = Omit<ConfirmationRequest, "scope"> & { scope: PublicationIntent };
-export type ImpactKind = "new" | "unchanged" | "replaced" | "override" | "conflict";
+export type PublicationIntentRequest = Omit<ConfirmationRequest, "scope"> & {
+  scope: PublicationIntent;
+};
+export type ImpactKind =
+  "new" | "unchanged" | "replaced" | "override" | "conflict";
 export type BrandAvailability = "configured" | "missing" | "unverifiable";
 export type BrandIndicator = { key: string; availability: BrandAvailability };
 export type CompiledTemplateView = {
@@ -29,27 +40,40 @@ export type CompiledTemplateView = {
   body: string | null;
   footer: string | null;
   buttons: Array<{ text: string; url: string; type: string }> | null;
-  bindings: { promotionTarget?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
+  bindings: {
+    promotionTarget?: "CHECKOUT" | "ALTERNATIVE_PRODUCT";
     headerMediaRole?: RecoveryTemplateHeaderMediaRole;
     header: Array<{ position: number; variable: string }>;
     body: Array<{ position: number; variable: string }>;
-    buttons: Array<{ index: number; variable: string }> } | null;
+    buttons: Array<{ index: number; variable: string }>;
+  } | null;
 };
 export type LanguageComparison = {
-  shopId: string; languageTag: string; impact: ImpactKind;
-  previous: CompiledTemplateView; proposed: CompiledTemplateView;
+  shopId: string;
+  languageTag: string;
+  impact: ImpactKind;
+  previous: CompiledTemplateView;
+  proposed: CompiledTemplateView;
   brand: BrandIndicator[];
 };
 export type PublicationShopImpact = {
-  shopId: string; domain: string; platform: string;
+  shopId: string;
+  domain: string;
+  platform: string;
   counts: Record<ImpactKind, number>;
   brand: BrandIndicator[];
 };
 export type PublicationPreview = {
-  definitionId: string; fingerprint: string; issuedAt: string;
-  totalShops: number; totalTargets: number;
-  excludedCount: number; exclusionReasons: Array<{ reason: string; count: number }>;
-  page: number; pageSize: number; hasNext: boolean;
+  definitionId: string;
+  fingerprint: string;
+  issuedAt: string;
+  totalShops: number;
+  totalTargets: number;
+  excludedCount: number;
+  exclusionReasons: Array<{ reason: string; count: number }>;
+  page: number;
+  pageSize: number;
+  hasNext: boolean;
   shops: PublicationShopImpact[];
   impactCounts: Record<ImpactKind, number>;
   brandFields: string[];
@@ -57,14 +81,27 @@ export type PublicationPreview = {
   defaultImpact?: DefaultPublicationImpact;
 };
 export type ConfirmationRequest = {
-  definitionId: string; scope: PublicationScope; previewFingerprint: string; previewIssuedAt: string;
-  operationKey: string; reason: string; acknowledgeOverrides: boolean;
+  definitionId: string;
+  scope: PublicationScope;
+  previewFingerprint: string;
+  previewIssuedAt: string;
+  operationKey: string;
+  reason: string;
+  acknowledgeOverrides: boolean;
 };
 export type PublicationProgress = {
-  operationId: string; status: string;
-  totalShops: number; succeededShops: number; failedShops: number; pendingShops: number;
-  totalTargets: number; succeededTargets: number; failedTargets: number; pendingTargets: number;
-  nextPageCursor: string | null; failureCode: string | null;
+  operationId: string;
+  status: string;
+  totalShops: number;
+  succeededShops: number;
+  failedShops: number;
+  pendingShops: number;
+  totalTargets: number;
+  succeededTargets: number;
+  failedTargets: number;
+  pendingTargets: number;
+  nextPageCursor: string | null;
+  failureCode: string | null;
   defaultConfigured?: boolean;
 };
 

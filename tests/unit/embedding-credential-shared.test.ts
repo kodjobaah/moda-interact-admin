@@ -11,7 +11,9 @@ import {
 const secret = "embed-test-credential-α";
 const keyId = "embed_2026";
 const configuredKey = Buffer.alloc(32, 0x42).toString("base64");
-const keyring = parseCredentialKeyring(JSON.stringify({ [keyId]: configuredKey }));
+const keyring = parseCredentialKeyring(
+  JSON.stringify({ [keyId]: configuredKey }),
+);
 const activeKeyId = resolveActiveCredentialKey(keyring, keyId);
 const identity = {
   environment: "PRODUCTION" as const,
@@ -26,7 +28,12 @@ test("Admin embedding ciphertext decrypts using published Shared without a write
     aad,
     '{"credentialType":"EMBEDDING","environment":"PRODUCTION","keyId":"embed_2026","provider":"openai","purpose":"MERCHANT_KNOWLEDGE"}',
   );
-  const sealed = encryptCredential({ keyring, activeKeyId, plaintext: secret, aad });
+  const sealed = encryptCredential({
+    keyring,
+    activeKeyId,
+    plaintext: secret,
+    aad,
+  });
   // Mimic Prisma Bytes column reconstruction by an independent authorised reader.
   const persisted = {
     keyId: sealed.keyId,
@@ -34,12 +41,20 @@ test("Admin embedding ciphertext decrypts using published Shared without a write
     nonce: Uint8Array.from(sealed.nonce),
     authTag: Uint8Array.from(sealed.authTag),
   };
-  assert.equal(decryptCredential({ keyring, envelope: persisted, aad }), secret);
+  assert.equal(
+    decryptCredential({ keyring, envelope: persisted, aad }),
+    secret,
+  );
 });
 
 test("embedding AAD binds environment, purpose, provider and envelope key", () => {
   const aad = createCommerceEmbeddingCredentialAad(identity);
-  const envelope = encryptCredential({ keyring, activeKeyId, plaintext: secret, aad });
+  const envelope = encryptCredential({
+    keyring,
+    activeKeyId,
+    plaintext: secret,
+    aad,
+  });
   const variants = [
     { ...identity, environment: "TEST" as const },
     { ...identity, purpose: "REFERENCE_TAXONOMY" as const },
@@ -47,23 +62,42 @@ test("embedding AAD binds environment, purpose, provider and envelope key", () =
     { ...identity, keyId: "other_key" },
   ];
   for (const variant of variants) {
-    assert.throws(() => decryptCredential({
-      keyring, envelope, aad: createCommerceEmbeddingCredentialAad(variant),
-    }));
+    assert.throws(() =>
+      decryptCredential({
+        keyring,
+        envelope,
+        aad: createCommerceEmbeddingCredentialAad(variant),
+      }),
+    );
   }
 });
 
 test("embedding ciphertext, nonce and authTag tampering fail authentication", () => {
   const aad = createCommerceEmbeddingCredentialAad(identity);
-  const envelope = encryptCredential({ keyring, activeKeyId, plaintext: secret, aad });
+  const envelope = encryptCredential({
+    keyring,
+    activeKeyId,
+    plaintext: secret,
+    aad,
+  });
   for (const field of ["ciphertext", "nonce", "authTag"] as const) {
     const bytes = Uint8Array.from(envelope[field]);
     bytes[0] ^= 0xff;
-    assert.throws(() => decryptCredential({ keyring, aad, envelope: { ...envelope, [field]: bytes } }));
+    assert.throws(() =>
+      decryptCredential({
+        keyring,
+        aad,
+        envelope: { ...envelope, [field]: bytes },
+      }),
+    );
   }
-  assert.throws(() => decryptCredential({
-    keyring, aad, envelope: { ...envelope, keyId: "unknown" },
-  }));
+  assert.throws(() =>
+    decryptCredential({
+      keyring,
+      aad,
+      envelope: { ...envelope, keyId: "unknown" },
+    }),
+  );
 });
 
 test("malformed encryption configuration is rejected instead of generating keys", () => {

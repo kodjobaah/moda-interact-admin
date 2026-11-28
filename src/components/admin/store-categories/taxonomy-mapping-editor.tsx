@@ -22,7 +22,8 @@ function referenceTaxonomyForCategory(
   category: Category,
 ): StoreCategoryTaxonomyReference | null {
   if (
-    category.referenceTaxonomySource !== STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE ||
+    category.referenceTaxonomySource !==
+      STORE_CATEGORY_REFERENCE_TAXONOMY_SOURCE ||
     !category.referenceTaxonomyVersion ||
     !category.referenceTaxonomyCategoryId ||
     !category.referenceTaxonomyCategoryName ||
@@ -72,9 +73,9 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
     [category],
   );
   const [addReason, setAddReason] = useState("");
-  const [addPendingCategoryId, setAddPendingCategoryId] = useState<string | null>(
-    null,
-  );
+  const [addPendingCategoryId, setAddPendingCategoryId] = useState<
+    string | null
+  >(null);
   const [recentlyAddedCategoryId, setRecentlyAddedCategoryId] = useState<
     string | null
   >(null);
@@ -166,9 +167,10 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
             Category mappings
           </h3>
           <p className="mt-1 max-w-3xl text-sm text-gray-600">
-            Mappings still drive Store Category suggestion scores, but they now also
-            define merchant-visible choices and stable conditions such as
-            <span className="font-mono"> mappings.shoes</span> for the category prompt.
+            Mappings still drive Store Category suggestion scores, but they now
+            also define merchant-visible choices and stable conditions such as
+            <span className="font-mono"> mappings.shoes</span> for the category
+            prompt.
           </p>
         </div>
         <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
@@ -179,8 +181,8 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
 
       {category.enabled ? (
         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
-          This Store Category is enabled. Disable it before changing mapping identity,
-          labels, weights, or prompt conditions.
+          This Store Category is enabled. Disable it before changing mapping
+          identity, labels, weights, or prompt conditions.
         </p>
       ) : null}
 
@@ -206,7 +208,10 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
                 />
               </label>
               {addError ? (
-                <p className="mt-2 text-sm font-medium text-red-700" role="alert">
+                <p
+                  className="mt-2 text-sm font-medium text-red-700"
+                  role="alert"
+                >
                   {addError}
                 </p>
               ) : null}
@@ -277,9 +282,12 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
                         className={`${inputClass} font-mono`}
                         name="conditionKey"
                         defaultValue={suggestStoreCategoryMappingConditionKey(
-                          persistedMapping.taxonomyCategoryName ?? mapping.taxonomy.name,
+                          persistedMapping.taxonomyCategoryName ??
+                            mapping.taxonomy.name,
                           category.taxonomyMappings.flatMap((candidate) =>
-                            candidate.conditionKey ? [candidate.conditionKey] : [],
+                            candidate.conditionKey
+                              ? [candidate.conditionKey]
+                              : [],
                           ),
                         )}
                         pattern="[a-z][a-z0-9_]{0,127}"
@@ -325,7 +333,11 @@ export function TaxonomyMappingEditor({ category }: { category: Category }) {
                   action={mutateStoreCategoryCatalogueAction}
                   className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-end sm:justify-end"
                 >
-                  <input type="hidden" name="intent" value="remove-taxonomy-mapping" />
+                  <input
+                    type="hidden"
+                    name="intent"
+                    value="remove-taxonomy-mapping"
+                  />
                   <input type="hidden" name="id" value={persistedMapping.id} />
                   <input
                     type="hidden"

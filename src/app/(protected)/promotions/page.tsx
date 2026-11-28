@@ -58,9 +58,8 @@ export default async function PromotionsPage({ searchParams }: PageProps) {
   const selectedCampaignPromise = campaignId
     ? getPromotionCampaignById(campaignId)
     : Promise.resolve(null);
-  const targetsPromise = register || edit
-    ? getPromotionTargets()
-    : Promise.resolve(null);
+  const targetsPromise =
+    register || edit ? getPromotionTargets() : Promise.resolve(null);
 
   const [campaigns, selectedCampaign, targets] = await Promise.all([
     campaignsPromise,
@@ -75,14 +74,10 @@ export default async function PromotionsPage({ searchParams }: PageProps) {
   if (campaigns.page !== page) catalogueParams.page = String(campaigns.page);
   catalogueParams.pageSize = String(campaigns.pageSize);
 
-  const newCampaignHref = withParamUpdates(
-    "/promotions",
-    catalogueParams,
-    {
-      drawer: "create",
-      campaignId: null,
-    },
-  );
+  const newCampaignHref = withParamUpdates("/promotions", catalogueParams, {
+    drawer: "create",
+    campaignId: null,
+  });
 
   return (
     <AdminShell active="promotions">

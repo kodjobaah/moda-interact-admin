@@ -3,11 +3,17 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
 const page = await readFile(
-  new URL("../../src/app/(protected)/merchant-support/page.tsx", import.meta.url),
+  new URL(
+    "../../src/app/(protected)/merchant-support/page.tsx",
+    import.meta.url,
+  ),
   "utf8",
 );
 const inbox = await readFile(
-  new URL("../../src/components/admin/merchant-support-inbox.tsx", import.meta.url),
+  new URL(
+    "../../src/components/admin/merchant-support-inbox.tsx",
+    import.meta.url,
+  ),
   "utf8",
 );
 
@@ -41,9 +47,15 @@ test("merchant support UI separates read state and exposes every translation vie
   assert.match(inbox, /message\.translations\.map/);
   assert.match(inbox, /translation\.status === 'AVAILABLE'/);
   assert.match(inbox, /translation\.status === 'FAILED'/);
-  assert.match(inbox, /requestTranslationReconciliationAction\(\{ translationId: translation\.id \}\)/);
+  assert.match(
+    inbox,
+    /requestTranslationReconciliationAction\(\{ translationId: translation\.id \}\)/,
+  );
   assert.match(inbox, /setSelectedTranslationId\(null\)/);
-  assert.doesNotMatch(inbox, /latestTranslation|translationId: message\.translationId/);
+  assert.doesNotMatch(
+    inbox,
+    /latestTranslation|translationId: message\.translationId/,
+  );
 });
 
 test("global reconciliation and reassignment controls are SUPER_ADMIN gated", () => {
@@ -52,14 +64,17 @@ test("global reconciliation and reassignment controls are SUPER_ADMIN gated", ()
   assert.match(inbox, /requestFailedTranslationsReconciliationAction/);
 });
 
-test('merchant support search is a bounded accessible autocomplete', () => {
+test("merchant support search is a bounded accessible autocomplete", () => {
   assert.match(inbox, /getMerchantSupportShopSuggestionsAction/);
   assert.match(inbox, /setTimeout\(async \(\) =>/);
   assert.match(inbox, /}, 250\)/);
   assert.match(inbox, /query\.length < 2/);
   assert.match(inbox, /suggestionRequestSequence/);
   assert.match(inbox, /slice\(0, 8\)/);
-  assert.match(inbox, /tenantName\(suggestion\.brandName, suggestion\.domain\)/);
+  assert.match(
+    inbox,
+    /tenantName\(suggestion\.brandName, suggestion\.domain\)/,
+  );
   assert.match(inbox, /role="combobox"/);
   assert.match(inbox, /aria-autocomplete="list"/);
   assert.match(inbox, /role="listbox"/);
@@ -74,20 +89,68 @@ test('merchant support search is a bounded accessible autocomplete', () => {
   assert.doesNotMatch(inbox, /placeholder="Language tag"/);
 });
 
-test('translation language selector exposes the exact supported product languages', () => {
-  const values = [...inbox.matchAll(/\{ value: '([^']+)', label: '([^']+)' \}/g)];
-  assert.deepEqual(values.map(([, value]) => value), [
-    'cs', 'da', 'de', 'en', 'es', 'fi', 'fr', 'it', 'ja', 'ko',
-    'nb', 'nl', 'pl', 'pt-BR', 'pt-PT', 'sv', 'th', 'tr', 'zh-Hans', 'zh-Hant',
-  ]);
-  assert.deepEqual(values.map(([, , label]) => label), [
-    'Czech', 'Danish', 'German', 'English', 'Spanish', 'Finnish', 'French',
-    'Italian', 'Japanese', 'Korean', 'Norwegian Bokmål', 'Dutch', 'Polish',
-    'Portuguese (Brazil)', 'Portuguese (Portugal)', 'Swedish', 'Thai', 'Turkish',
-    'Chinese (Simplified)', 'Chinese (Traditional)',
-  ]);
+test("translation language selector exposes the exact supported product languages", () => {
+  const values = [
+    ...inbox.matchAll(/\{ value: '([^']+)', label: '([^']+)' \}/g),
+  ];
+  assert.deepEqual(
+    values.map(([, value]) => value),
+    [
+      "cs",
+      "da",
+      "de",
+      "en",
+      "es",
+      "fi",
+      "fr",
+      "it",
+      "ja",
+      "ko",
+      "nb",
+      "nl",
+      "pl",
+      "pt-BR",
+      "pt-PT",
+      "sv",
+      "th",
+      "tr",
+      "zh-Hans",
+      "zh-Hant",
+    ],
+  );
+  assert.deepEqual(
+    values.map(([, , label]) => label),
+    [
+      "Czech",
+      "Danish",
+      "German",
+      "English",
+      "Spanish",
+      "Finnish",
+      "French",
+      "Italian",
+      "Japanese",
+      "Korean",
+      "Norwegian Bokmål",
+      "Dutch",
+      "Polish",
+      "Portuguese (Brazil)",
+      "Portuguese (Portugal)",
+      "Swedish",
+      "Thai",
+      "Turkish",
+      "Chinese (Simplified)",
+      "Chinese (Traditional)",
+    ],
+  );
   assert.match(inbox, /SUPPORTED_TRANSLATION_LANGUAGE_OPTIONS/);
   assert.match(inbox, /<option value="">Select language…<\/option>/);
-  assert.match(inbox, /requestAdditionalTranslationAction\(\{ messageId: message\.id, targetLanguageTag \}\)/);
-  assert.doesNotMatch(inbox, /PLATFORM_SUPPORT_LANGUAGE_TAG|Intl\.DisplayNames|__other__|Other language|Custom BCP-47/);
+  assert.match(
+    inbox,
+    /requestAdditionalTranslationAction\(\{ messageId: message\.id, targetLanguageTag \}\)/,
+  );
+  assert.doesNotMatch(
+    inbox,
+    /PLATFORM_SUPPORT_LANGUAGE_TAG|Intl\.DisplayNames|__other__|Other language|Custom BCP-47/,
+  );
 });

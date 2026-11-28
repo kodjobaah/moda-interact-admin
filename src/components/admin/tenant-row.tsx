@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
-import Link from 'next/link';
-import { initials } from '@/lib/admin/format';
-import type { TenantListItem } from '@/lib/admin/types';
-import { Icon } from './icons';
-import { StatusBadge } from './status-badge';
-import { adminI18n } from '@/i18n';
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { initials } from "@/lib/admin/format";
+import type { TenantListItem } from "@/lib/admin/types";
+import { Icon } from "./icons";
+import { StatusBadge } from "./status-badge";
+import { adminI18n } from "@/i18n";
 
 export function TenantRow({
   tenant,
@@ -22,13 +22,13 @@ export function TenantRow({
   return (
     <>
       <tr
-        className={`transition-colors hover:bg-gray-50 ${selected ? 'bg-[var(--brand-50)]' : ''}`}
+        className={`transition-colors hover:bg-gray-50 ${selected ? "bg-[var(--brand-50)]" : ""}`}
       >
         <td className="px-3 py-4 sm:px-6">
           <Link href={href} className="flex min-w-0 items-center">
             <Icon
-              name={selected ? 'chevron-down' : 'chevron-right'}
-              className={`mr-4 h-4 w-4 ${selected ? 'text-[var(--brand-500)]' : 'text-gray-400'}`}
+              name={selected ? "chevron-down" : "chevron-right"}
+              className={`mr-4 h-4 w-4 ${selected ? "text-[var(--brand-500)]" : "text-gray-400"}`}
             />
             <div className="flex h-10 w-10 items-center justify-center rounded bg-[var(--brand-100)] font-bold text-[var(--brand-800)]">
               {initials(name)}
@@ -50,7 +50,9 @@ export function TenantRow({
         </td>
         <td className="px-6 py-4 text-sm text-gray-700">
           <Link href={href} className="block">
-            {tenant.planName ?? tenant.planHandle ?? adminI18n.t('tenant.noPlan')}
+            {tenant.planName ??
+              tenant.planHandle ??
+              adminI18n.t("tenant.noPlan")}
           </Link>
         </td>
       </tr>

@@ -169,8 +169,7 @@ export function presentMerchantPricingEconomicsResult({
     case "INVALID_USAGE_PRICING":
       return {
         title: "The top-up pricing cannot satisfy this comparison",
-        description:
-          `The configured usage pricing on ${lowerName} cannot produce a valid bounded top-up combination for the credits needed to reach ${higherName}.`,
+        description: `The configured usage pricing on ${lowerName} cannot produce a valid bounded top-up combination for the credits needed to reach ${higherName}.`,
         guidance:
           "Review the usage-event credit amounts, prices and maximum usage limits.",
       };

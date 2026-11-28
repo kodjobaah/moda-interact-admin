@@ -2,11 +2,10 @@ import type { MerchantPricingPlanDraftController } from "./use-merchant-pricing-
 
 type Controller = MerchantPricingPlanDraftController;
 
-type PortfolioEconomicsStepProps =
-  Pick<
-    Controller["draft"],
-    "currency" | "economicsOverrideEnabled" | "economicsOverrideReason"
-  > &
+type PortfolioEconomicsStepProps = Pick<
+  Controller["draft"],
+  "currency" | "economicsOverrideEnabled" | "economicsOverrideReason"
+> &
   Pick<
     Controller["actions"],
     "setEconomicsOverrideEnabled" | "setEconomicsOverrideReason"
@@ -78,7 +77,9 @@ export function PortfolioEconomicsStep({
                   <p>
                     {unboundedZeroCostEventLabel
                       ? `${unboundedZeroCostEventLabel} gives recovery credits for free with no usage limit.`
-                      : "One of the usage events gives recovery credits for free with no usage limit."} Enter a price greater than 0 or set a maximum number of uses per billing period.
+                      : "One of the usage events gives recovery credits for free with no usage limit."}{" "}
+                    Enter a price greater than 0 or set a maximum number of uses
+                    per billing period.
                   </p>
                 </div>
               ) : (
@@ -101,8 +102,8 @@ export function PortfolioEconomicsStep({
 
                 <div className="mt-1">
                   {result.lowerPlanId} to {result.higherPlanId}; additional
-                  credits: {result.additionalCreditsNeeded}; code: {result.code};
-                  status: {result.status}
+                  credits: {result.additionalCreditsNeeded}; code: {result.code}
+                  ; status: {result.status}
                 </div>
 
                 <div>
@@ -121,7 +122,8 @@ export function PortfolioEconomicsStep({
                   Stay + top-up:{" "}
                   {formatMinorUnits(result.stayAndTopUpCostMinor, currency)};
                   higher recurring:{" "}
-                  {formatMinorUnits(result.upgradeCostMinor, currency)}; premium:{" "}
+                  {formatMinorUnits(result.upgradeCostMinor, currency)};
+                  premium:{" "}
                   {Number.isFinite(result.premiumBps)
                     ? `${result.premiumBps} bps`
                     : "infinity/not applicable"}
@@ -136,16 +138,13 @@ export function PortfolioEconomicsStep({
         <details className="rounded border border-gray-200 bg-white p-3 text-gray-700">
           <summary className="cursor-pointer font-medium">
             {passedEconomics.length}{" "}
-            {passedEconomics.length === 1 ? "comparison" : "comparisons"}{" "}
-            passed
+            {passedEconomics.length === 1 ? "comparison" : "comparisons"} passed
           </summary>
 
           <ul className="mt-2 space-y-1 text-xs">
             {passedEconomics.map(({ result }) => {
-              const lowerPlan =
-                economicsState.plansById[result.lowerPlanId];
-              const higherPlan =
-                economicsState.plansById[result.higherPlanId];
+              const lowerPlan = economicsState.plansById[result.lowerPlanId];
+              const higherPlan = economicsState.plansById[result.higherPlanId];
 
               return (
                 <li key={`${result.lowerPlanId}-${result.higherPlanId}`}>

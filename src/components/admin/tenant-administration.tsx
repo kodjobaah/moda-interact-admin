@@ -5,13 +5,7 @@ import { adminI18n, adminStatusLabel } from "@/i18n";
 import type { HumanMessagingDashboard } from "@/lib/admin/human-messaging-contract";
 import { TenantHumanMessaging } from "./tenant-human-messaging";
 
-function SummaryValue({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function SummaryValue({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-xs font-medium text-gray-500">{label}</dt>
@@ -153,7 +147,9 @@ export function TenantAdministration({
         </section>
       </div>
 
-      {humanMessaging ? <TenantHumanMessaging dashboard={humanMessaging} params={params} /> : null}
+      {humanMessaging ? (
+        <TenantHumanMessaging dashboard={humanMessaging} params={params} />
+      ) : null}
 
       <section className="rounded-lg border border-gray-200 bg-gray-50 px-5 py-4">
         <h3 className="text-sm font-semibold text-gray-900">

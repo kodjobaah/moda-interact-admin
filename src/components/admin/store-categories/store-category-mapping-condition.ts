@@ -18,7 +18,9 @@ export function suggestStoreCategoryMappingConditionKey(
   label: string,
   usedKeys: Iterable<string>,
 ): string {
-  const used = new Set(Array.from(usedKeys, (entry) => entry.trim()).filter(Boolean));
+  const used = new Set(
+    Array.from(usedKeys, (entry) => entry.trim()).filter(Boolean),
+  );
   let base = normalizedBase(label);
   if (!base || !StoreCategoryPromptConditionKeySchema.safeParse(base).success) {
     base = "mapping";

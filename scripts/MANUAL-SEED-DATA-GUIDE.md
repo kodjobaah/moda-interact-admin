@@ -80,12 +80,12 @@ Scale
 
 The current manual-test included recovery-credit quantities are:
 
-| Plan | Recurring price | Included recovery credits |
-|---|---:|---:|
-| Free | £0 | 0* |
-| Starter | £35 | 2 |
-| Growth | £75 | 5 |
-| Scale | £149 | 6 |
+| Plan    | Recurring price | Included recovery credits |
+| ------- | --------------: | ------------------------: |
+| Free    |              £0 |                        0* |
+| Starter |             £35 |                         2 |
+| Growth  |             £75 |                         5 |
+| Scale   |            £149 |                         6 |
 
 `*` The Free plan's lifetime free recovery allowance is modelled separately from `MerchantPricingPlan.includedRecoveryCredits`. Therefore the MerchantPricing catalogue value is `0`, while the platform's lifetime-free entitlement may still provide the merchant's free recovery conversations.
 

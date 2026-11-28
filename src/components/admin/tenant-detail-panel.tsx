@@ -15,7 +15,10 @@ import { TenantBillingView } from "./tenant-billing";
 import { TenantRecoverySettings } from "./tenant-recovery-settings";
 import { adminI18n } from "@/i18n";
 import { LiveShopPolicyControls } from "./commerce-model-policy/live-shop-policy";
-import type { LiveShopPolicyView, LiveShopPolicyHistoryEntry } from "@/lib/admin/commerce-model-shop-policy";
+import type {
+  LiveShopPolicyView,
+  LiveShopPolicyHistoryEntry,
+} from "@/lib/admin/commerce-model-shop-policy";
 import type { HumanMessagingDashboard } from "@/lib/admin/human-messaging-contract";
 
 export function TenantDetailPanel({
@@ -45,7 +48,11 @@ export function TenantDetailPanel({
   humanMessaging: HumanMessagingDashboard | null;
   tab: "admin" | "recovery" | "logs" | "billing" | "commerce";
   canEditCommercePolicy: boolean;
-  shopPolicyDashboard: { policy: LiveShopPolicyView; history: LiveShopPolicyHistoryEntry[]; hasMore: boolean } | null;
+  shopPolicyDashboard: {
+    policy: LiveShopPolicyView;
+    history: LiveShopPolicyHistoryEntry[];
+    hasMore: boolean;
+  } | null;
   shopPolicyScope: string | null;
   shopPolicyHistoryPage: number;
   customers: PageResult<CustomerListItem> | null;
@@ -101,7 +108,10 @@ export function TenantDetailPanel({
     tab: "billing",
     billingView: "overview",
   });
-  const commerceHref = withParamUpdates("/", params, { ...commonReset, tab: "commerce" });
+  const commerceHref = withParamUpdates("/", params, {
+    ...commonReset,
+    tab: "commerce",
+  });
   const activeClass =
     "border-b-2 border-[var(--brand-700)] pb-2 font-semibold text-[var(--brand-700)]";
   const idleClass =
@@ -134,7 +144,14 @@ export function TenantDetailPanel({
         >
           {adminI18n.t("tenant.billing")}
         </Link>
-        {canEditCommercePolicy ? <Link href={commerceHref} className={tab === "commerce" ? activeClass : idleClass}>CommerceAgent</Link> : null}
+        {canEditCommercePolicy ? (
+          <Link
+            href={commerceHref}
+            className={tab === "commerce" ? activeClass : idleClass}
+          >
+            CommerceAgent
+          </Link>
+        ) : null}
       </div>
       {tab === "admin" ? (
         <TenantAdministration

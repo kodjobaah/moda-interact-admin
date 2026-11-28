@@ -11,7 +11,9 @@ import type { PageResult } from "@/lib/admin/types";
 import { MerchantPricingPlanDeleteButton } from "./merchant-pricing-plan-delete-button";
 import { adminI18n } from "@/i18n";
 
-function translationDraftFailed(plan: MerchantPricingPlanWithChildren): boolean {
+function translationDraftFailed(
+  plan: MerchantPricingPlanWithChildren,
+): boolean {
   return (
     plan.publicationStatus === "TRANSLATION_FAILED" ||
     plan.currentTranslationRun?.status === "FAILED"
@@ -151,128 +153,130 @@ export function MerchantPricingPlanCatalog({
                 const draft = plan.publicationStatus !== "READY";
                 return (
                   <article
-                  key={plan.id}
-                  className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-950">
-                        {plan.displayName}
-                      </h2>
-                      <p className="font-mono text-xs text-gray-500">
-                        {plan.shopifyPlanHandle}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
-                  </div>
-                  <dl className="mt-5 grid gap-3 border-t border-gray-100 pt-4 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="text-xs text-gray-500">
-                        Catalogue position
-                      </dt>
-                      <dd>{plan.cataloguePosition}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-gray-500">Kind</dt>
-                      <dd>{plan.planKind}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-gray-500">Recurring</dt>
-                      <dd>
-                        {new Intl.NumberFormat(undefined, {
-                          style: "currency",
-                          currency: plan.currency,
-                        }).format(plan.recurringAmountMinor / 100)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-gray-500">
-                        Included credits
-                      </dt>
-                      <dd>
-                        {adminI18n.formatNumber(plan.includedRecoveryCredits)} /{" "}
-                        {plan.allowancePeriod}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-gray-500">Usage events</dt>
-                      <dd>{plan.usageEvents.length}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-gray-500">Translations</dt>
-                      <dd>{plan.translations.length}/20</dd>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <dt className="text-xs text-gray-500">
-                        Publication status
-                      </dt>
-                      <dd
-                        className={
-                          translationDraftFailed(plan)
-                            ? "text-red-700"
-                            : undefined
-                        }
+                    key={plan.id}
+                    className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-950">
+                          {plan.displayName}
+                        </h2>
+                        <p className="font-mono text-xs text-gray-500">
+                          {plan.shopifyPlanHandle}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.className}`}
                       >
-                        {publicationMessage(plan)}
-                      </dd>
+                        {badge.label}
+                      </span>
                     </div>
-                    <div className="sm:col-span-2">
-                      <dt className="text-xs text-gray-500">
-                        Operational status
-                      </dt>
-                      <dd>
-                        {plan.materializedAt
-                          ? `Durable since ${adminI18n.formatDateTime(plan.materializedAt)}`
-                          : "Not yet materialised"}
-                      </dd>
-                    </div>
-                  </dl>
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <Link
-                      className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700"
-                      href={withParamUpdates("/billing", params, {
-                        view: "plans",
-                        planId: plan.id,
-                        drawer: null,
-                        pricingError: null,
-                      })}
-                    >
-                      {draft ? "Edit draft" : "Edit plan"}
-                    </Link>
-                    {plan.publicationStatus === "READY" ? (
-                      <form action={mutateMerchantPricingPlanAction}>
-                        <input type="hidden" name="intent" value="toggle" />
-                        <input type="hidden" name="id" value={plan.id} />
-                        <input
-                          type="hidden"
-                          name="reason"
-                          value={
-                            plan.isActive
-                              ? "Deactivated from MerchantPricing catalogue"
-                              : "Activated in MerchantPricing catalogue"
+                    <dl className="mt-5 grid gap-3 border-t border-gray-100 pt-4 text-sm sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs text-gray-500">
+                          Catalogue position
+                        </dt>
+                        <dd>{plan.cataloguePosition}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Kind</dt>
+                        <dd>{plan.planKind}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Recurring</dt>
+                        <dd>
+                          {new Intl.NumberFormat(undefined, {
+                            style: "currency",
+                            currency: plan.currency,
+                          }).format(plan.recurringAmountMinor / 100)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">
+                          Included credits
+                        </dt>
+                        <dd>
+                          {adminI18n.formatNumber(plan.includedRecoveryCredits)}{" "}
+                          / {plan.allowancePeriod}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Usage events</dt>
+                        <dd>{plan.usageEvents.length}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-gray-500">Translations</dt>
+                        <dd>{plan.translations.length}/20</dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs text-gray-500">
+                          Publication status
+                        </dt>
+                        <dd
+                          className={
+                            translationDraftFailed(plan)
+                              ? "text-red-700"
+                              : undefined
                           }
-                        />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700"
                         >
-                          {plan.isActive ? "Deactivate" : "Activate"}
-                        </button>
-                      </form>
-                    ) : null}
-                    {plan.planKind === "PAID_METERED" ? (
-                      <MerchantPricingPlanDeleteButton
-                        id={plan.id}
-                        displayName={plan.displayName}
-                        disabled={plan.isActive || Boolean(plan.materializedAt)}
-                        durable={Boolean(plan.materializedAt)}
-                      />
-                    ) : null}
-                  </div>
+                          {publicationMessage(plan)}
+                        </dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs text-gray-500">
+                          Operational status
+                        </dt>
+                        <dd>
+                          {plan.materializedAt
+                            ? `Durable since ${adminI18n.formatDateTime(plan.materializedAt)}`
+                            : "Not yet materialised"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Link
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700"
+                        href={withParamUpdates("/billing", params, {
+                          view: "plans",
+                          planId: plan.id,
+                          drawer: null,
+                          pricingError: null,
+                        })}
+                      >
+                        {draft ? "Edit draft" : "Edit plan"}
+                      </Link>
+                      {plan.publicationStatus === "READY" ? (
+                        <form action={mutateMerchantPricingPlanAction}>
+                          <input type="hidden" name="intent" value="toggle" />
+                          <input type="hidden" name="id" value={plan.id} />
+                          <input
+                            type="hidden"
+                            name="reason"
+                            value={
+                              plan.isActive
+                                ? "Deactivated from MerchantPricing catalogue"
+                                : "Activated in MerchantPricing catalogue"
+                            }
+                          />
+                          <button
+                            type="submit"
+                            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700"
+                          >
+                            {plan.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                        </form>
+                      ) : null}
+                      {plan.planKind === "PAID_METERED" ? (
+                        <MerchantPricingPlanDeleteButton
+                          id={plan.id}
+                          displayName={plan.displayName}
+                          disabled={
+                            plan.isActive || Boolean(plan.materializedAt)
+                          }
+                          durable={Boolean(plan.materializedAt)}
+                        />
+                      ) : null}
+                    </div>
                   </article>
                 );
               })}

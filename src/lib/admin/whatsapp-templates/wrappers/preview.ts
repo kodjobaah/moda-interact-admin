@@ -1,9 +1,15 @@
 import { neutralRouterProjectionError } from "./router-policy";
 import { VARIABLE_REGISTRY, SHOP_BRAND_VARIABLES } from "../authoring/registry";
-import type { RuntimeToken, SemanticVariable, ShopBrandVariable, WrapperPrepared } from "../authoring/types";
+import type {
+  RuntimeToken,
+  SemanticVariable,
+  ShopBrandVariable,
+  WrapperPrepared,
+} from "../authoring/types";
 
 export const EXAMPLE_RESPONSES = {
-  ROUTER: "Which store is your question about? Reply to the message from that store.",
+  ROUTER:
+    "Which store is your question about? Reply to the message from that store.",
   AI: "Example AI reply: I can help answer questions about these products.",
   HUMAN: "Example human reply: I can help you with your checkout.",
   SHARED: "Example AI or human reply: How can I help?",
@@ -12,10 +18,20 @@ export const EXAMPLE_RESPONSES = {
 export type WrapperPreviewContext =
   | { kind: "FICTIONAL" }
   | { kind: "NEUTRAL" }
-  | { kind: "SHOP_SCOPED"; shopBrand: Partial<Record<ShopBrandVariable, string | number | null>>;
-      customerFirstName?: string | null; shopName?: string | null; checkoutUrl?: string | null };
+  | {
+      kind: "SHOP_SCOPED";
+      shopBrand: Partial<Record<ShopBrandVariable, string | number | null>>;
+      customerFirstName?: string | null;
+      shopName?: string | null;
+      checkoutUrl?: string | null;
+    };
 
-export type VariableDisclosure = { name: SemanticVariable; label: string; placement: string; availability: string };
+export type VariableDisclosure = {
+  name: SemanticVariable;
+  label: string;
+  placement: string;
+  availability: string;
+};
 export type RenderedWrapperPreview = {
   productImage?: WrapperPrepared["productImage"];
   header: string;
@@ -27,13 +43,17 @@ export type RenderedWrapperPreview = {
 };
 
 /** Preview never stores response content and never performs a shop/checkout lookup. */
-export function renderWrapperPreview(prepared: WrapperPrepared, options: {
-  response: string;
-  checkoutAvailable: boolean;
-  context?: WrapperPreviewContext;
-}): RenderedWrapperPreview {
+export function renderWrapperPreview(
+  prepared: WrapperPrepared,
+  options: {
+    response: string;
+    checkoutAvailable: boolean;
+    context?: WrapperPreviewContext;
+  },
+): RenderedWrapperPreview {
   const context = options.context ?? { kind: "FICTIONAL" };
-  if (context.kind === "NEUTRAL" && neutralRouterProjectionError(prepared)) throw new Error("Refusing unsafe router preview.");
+  if (context.kind === "NEUTRAL" && neutralRouterProjectionError(prepared))
+    throw new Error("Refusing unsafe router preview.");
   const disclosures: VariableDisclosure[] = [];
   const shopBrands = new Set<string>(SHOP_BRAND_VARIABLES);
   const variable = (name: SemanticVariable, placement: string): string => {
@@ -45,16 +65,26 @@ export function renderWrapperPreview(prepared: WrapperPrepared, options: {
     let availability: string;
     if (context.kind === "FICTIONAL") {
       result = info.sample;
-      availability = shopBrands.has(name) ? "Example only; live ShopBrand field may be null." : "Illustrative value only.";
+      availability = shopBrands.has(name)
+        ? "Example only; live ShopBrand field may be null."
+        : "Illustrative value only.";
     } else if (context.kind === "NEUTRAL") {
       throw new Error("Router preview cannot resolve tenant variables.");
     } else {
       const value = shopBrands.has(name)
         ? context.shopBrand[name as ShopBrandVariable]
-        : name === "customer.firstName" ? context.customerFirstName
-        : name === "shop.name" ? context.shopName
-        : name === "checkout.url" ? context.checkoutUrl : undefined;
-      if (value === undefined || value === null || String(value).trim() === "") {
+        : name === "customer.firstName"
+          ? context.customerFirstName
+          : name === "shop.name"
+            ? context.shopName
+            : name === "checkout.url"
+              ? context.checkoutUrl
+              : undefined;
+      if (
+        value === undefined ||
+        value === null ||
+        String(value).trim() === ""
+      ) {
         result = `[Unavailable: ${name}]`;
         availability = "Missing optional/trusted field — no value substituted.";
       } else {
@@ -65,15 +95,26 @@ export function renderWrapperPreview(prepared: WrapperPrepared, options: {
     disclosures.push({ name, label: info.label, placement, availability });
     return result;
   };
-  const tokens = (parts: RuntimeToken[], placement: string) => parts.map((token) => {
-    if (token.kind === "text") return token.value;
-    if (token.kind === "responseSlot") return options.response;
-    return variable(token.name, placement);
-  }).join("");
-  const conditional = options.checkoutAvailable && (context.kind === "FICTIONAL" ||
-    (context.kind === "SHOP_SCOPED" && typeof context.checkoutUrl === "string" && /^https:\/\//.test(context.checkoutUrl)))
-    ? prepared.conditionals.map((section, i) => tokens(section.tokens, `checkout conditional ${i + 1}`)).join("\n")
-    : null;
+  const tokens = (parts: RuntimeToken[], placement: string) =>
+    parts
+      .map((token) => {
+        if (token.kind === "text") return token.value;
+        if (token.kind === "responseSlot") return options.response;
+        return variable(token.name, placement);
+      })
+      .join("");
+  const conditional =
+    options.checkoutAvailable &&
+    (context.kind === "FICTIONAL" ||
+      (context.kind === "SHOP_SCOPED" &&
+        typeof context.checkoutUrl === "string" &&
+        /^https:\/\//.test(context.checkoutUrl)))
+      ? prepared.conditionals
+          .map((section, i) =>
+            tokens(section.tokens, `checkout conditional ${i + 1}`),
+          )
+          .join("\n")
+      : null;
   return {
     ...(prepared.productImage ? { productImage: prepared.productImage } : {}),
     header: tokens(prepared.header, "header"),

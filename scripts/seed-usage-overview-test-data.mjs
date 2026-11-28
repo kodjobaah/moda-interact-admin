@@ -6,7 +6,10 @@ import { Queue } from "bullmq";
 import Redis from "ioredis";
 import { PrismaClient } from "@prisma/client";
 import { createRecoveryIdempotencyKey } from "@modainteract/moda-interact-shared/billing";
-import { buildPaidAllowanceFixtures, verifyPaidFixtureCleanup } from "./usage-overview-paid-allocations.mjs";
+import {
+  buildPaidAllowanceFixtures,
+  verifyPaidFixtureCleanup,
+} from "./usage-overview-paid-allocations.mjs";
 
 const prisma = new PrismaClient();
 
@@ -27,7 +30,11 @@ const FREE_COUNTER = "LIFETIME_FREE_RECOVERY_CREDITS";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 const RECENT_INBOUND_AGE_MS = 5 * 60 * 1000;
-const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 20_000, isolationLevel: "Serializable" };
+const TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 20_000,
+  isolationLevel: "Serializable",
+};
 
 function usage() {
   return `
@@ -133,20 +140,35 @@ function hasFlag(name) {
 function validateHumanScenarioOptions() {
   if (!hasFlag(WITH_HUMAN_FLAG)) {
     if (argument(TEST_RECIPIENT_FLAG) || hasFlag(CONFIRM_RECIPIENT_FLAG)) {
-      throw new Error(`Use ${WITH_HUMAN_FLAG} together with recipient options.`);
+      throw new Error(
+        `Use ${WITH_HUMAN_FLAG} together with recipient options.`,
+      );
     }
     return null;
   }
-  const environment = (process.env.DEPLOYMENT_ENVIRONMENT_NAME || process.env.NODE_ENV || "").toLowerCase();
-  if (!["local", "development", "test"].includes(environment) || process.env.NODE_ENV === "production") {
-    throw new Error(`${WITH_HUMAN_FLAG} is permitted only in an explicitly configured local/development/test environment.`);
+  const environment = (
+    process.env.DEPLOYMENT_ENVIRONMENT_NAME ||
+    process.env.NODE_ENV ||
+    ""
+  ).toLowerCase();
+  if (
+    !["local", "development", "test"].includes(environment) ||
+    process.env.NODE_ENV === "production"
+  ) {
+    throw new Error(
+      `${WITH_HUMAN_FLAG} is permitted only in an explicitly configured local/development/test environment.`,
+    );
   }
   if (!hasFlag(CONFIRM_RECIPIENT_FLAG)) {
-    throw new Error(`Use ${CONFIRM_RECIPIENT_FLAG} to confirm that you control the recipient and accept the risk of real sends.`);
+    throw new Error(
+      `Use ${CONFIRM_RECIPIENT_FLAG} to confirm that you control the recipient and accept the risk of real sends.`,
+    );
   }
   const e164Recipient = argument(TEST_RECIPIENT_FLAG);
   if (!e164Recipient || !/^\+[1-9][0-9]{6,14}$/.test(e164Recipient)) {
-    throw new Error(`${TEST_RECIPIENT_FLAG} must be a controlled E.164 WhatsApp number, e.g. +<countrycode><number>.`);
+    throw new Error(
+      `${TEST_RECIPIENT_FLAG} must be a controlled E.164 WhatsApp number, e.g. +<countrycode><number>.`,
+    );
   }
   // ARCH-028 persists WhatsApp recipients as ASCII digits (no leading '+').
   // Use the same canonical value for reachability and outreach records.
@@ -154,51 +176,106 @@ function validateHumanScenarioOptions() {
 }
 
 const handoverCases = [
-  { index: 1, name: "Grace", scenario: "AI, open 24-hour window, Take over then type/send" },
-  { index: 2, name: "Linus", scenario: "already HUMAN, open 24-hour window, type/send" },
-  { index: 3, name: "Margaret", scenario: "open window but no sequence-one recipient; test safe send failure" },
-  { index: 7, name: "Barbara", scenario: "HUMAN, closed window; template only if already approved for the shop" },
-  { index: 8, name: "Donald", scenario: "HUMAN, closed window, sequence-two follow-up already consumed" },
+  {
+    index: 1,
+    name: "Grace",
+    scenario: "AI, open 24-hour window, Take over then type/send",
+  },
+  {
+    index: 2,
+    name: "Linus",
+    scenario: "already HUMAN, open 24-hour window, type/send",
+  },
+  {
+    index: 3,
+    name: "Margaret",
+    scenario:
+      "open window but no sequence-one recipient; test safe send failure",
+  },
+  {
+    index: 7,
+    name: "Barbara",
+    scenario:
+      "HUMAN, closed window; template only if already approved for the shop",
+  },
+  {
+    index: 8,
+    name: "Donald",
+    scenario: "HUMAN, closed window, sequence-two follow-up already consumed",
+  },
 ];
 
-function humanCase(index) { return handoverCases.some((entry) => entry.index === index); }
-function recentInboundCase(index) { return index === 1 || index === 2 || index === 3; }
+function humanCase(index) {
+  return handoverCases.some((entry) => entry.index === index);
+}
+function recentInboundCase(index) {
+  return index === 1 || index === 2 || index === 3;
+}
 
 function basketFixture(recovery) {
   // Uses the saved recovery value and its currency; never calls a live product API.
-  return [{ title: "Fixture checkout product", variantTitle: "Standard", quantity: 1,
-    price: Number(recovery.totalPrice).toFixed(2), imageUrl: null }];
+  return [
+    {
+      title: "Fixture checkout product",
+      variantTitle: "Standard",
+      quantity: 1,
+      price: Number(recovery.totalPrice).toFixed(2),
+      imageUrl: null,
+    },
+  ];
 }
 
 async function checkHumanScenarioReadiness(shop, options) {
   if (!options) return { approvedTemplates: 0 };
-  if (shop.status !== "ACTIVE" || !["ACTIVE", "TRIALING"].includes(shop.subscription.status) ||
-      !shop.subscription.plan?.active) {
-    throw new Error("This shop needs an active/trial subscription on an active plan for HUMAN takeover testing.");
+  if (
+    shop.status !== "ACTIVE" ||
+    !["ACTIVE", "TRIALING"].includes(shop.subscription.status) ||
+    !shop.subscription.plan?.active
+  ) {
+    throw new Error(
+      "This shop needs an active/trial subscription on an active plan for HUMAN takeover testing.",
+    );
   }
   const entitlement = await prisma.billingPlanFeature.findFirst({
-    where: { planId: shop.subscription.planId, enabled: true,
-      feature: { key: "checkout_recovery", active: true } },
+    where: {
+      planId: shop.subscription.planId,
+      enabled: true,
+      feature: { key: "checkout_recovery", active: true },
+    },
     select: { id: true },
   });
   if (!entitlement) {
-    throw new Error("Checkout Recovery is not enabled for this BillingPlan; do not fabricate an entitlement.");
+    throw new Error(
+      "Checkout Recovery is not enabled for this BillingPlan; do not fabricate an entitlement.",
+    );
   }
   const suppressed = await prisma.whatsAppRecipientReachability.findUnique({
-    where: { shopId_recipient: { shopId: shop.id, recipient: options.recipient } },
+    where: {
+      shopId_recipient: { shopId: shop.id, recipient: options.recipient },
+    },
     select: { suppressUntil: true },
   });
   if (suppressed?.suppressUntil && suppressed.suppressUntil > new Date()) {
-    throw new Error("The controlled test recipient is currently suppressed. Choose an eligible controlled recipient.");
+    throw new Error(
+      "The controlled test recipient is currently suppressed. Choose an eligible controlled recipient.",
+    );
   }
   const restriction = await prisma.shopHumanMessagingRestriction.findUnique({
-    where: { shopId: shop.id }, select: { status: true },
+    where: { shopId: shop.id },
+    select: { status: true },
   });
   if (restriction?.status === "SUSPENDED") {
-    throw new Error("HUMAN messaging is suspended for this shop; use a separate shop to test active replies.");
+    throw new Error(
+      "HUMAN messaging is suspended for this shop; use a separate shop to test active replies.",
+    );
   }
   const approvedTemplates = await prisma.whatsAppTemplateVariant.count({
-    where: { shopId: shop.id, purpose: "checkout-recovery", enabled: true, status: "APPROVED" },
+    where: {
+      shopId: shop.id,
+      purpose: "checkout-recovery",
+      enabled: true,
+      status: "APPROVED",
+    },
   });
   return { approvedTemplates };
 }
@@ -209,19 +286,36 @@ function requireConfirmation() {
   }
   // Mutating fixture counters and usage is only safe against a disposable
   // development/test database, never against a merchant's real ledger.
-  const environment = (process.env.DEPLOYMENT_ENVIRONMENT_NAME || process.env.NODE_ENV || "").toLowerCase();
+  const environment = (
+    process.env.DEPLOYMENT_ENVIRONMENT_NAME ||
+    process.env.NODE_ENV ||
+    ""
+  ).toLowerCase();
   const nodeEnvironment = (process.env.NODE_ENV || "").toLowerCase();
-  if (["production", "prod"].includes(environment) || ["production", "prod"].includes(nodeEnvironment)) {
+  if (
+    ["production", "prod"].includes(environment) ||
+    ["production", "prod"].includes(nodeEnvironment)
+  ) {
     throw new Error("Usage fixtures are forbidden in production.");
   }
   let databaseName;
   try {
-    databaseName = decodeURIComponent(new URL(process.env.DATABASE_URL).pathname.replace(/^\//, ""));
+    databaseName = decodeURIComponent(
+      new URL(process.env.DATABASE_URL).pathname.replace(/^\//, ""),
+    );
   } catch {
-    throw new Error("Set DATABASE_URL to a disposable development/test PostgreSQL database.");
+    throw new Error(
+      "Set DATABASE_URL to a disposable development/test PostgreSQL database.",
+    );
   }
-  if (!/(?:^|[_-])(test|testing|dev|development|sandbox)(?:$|[_-])/i.test(databaseName)) {
-    throw new Error("Refusing to mutate a database without test/development in its name.");
+  if (
+    !/(?:^|[_-])(test|testing|dev|development|sandbox)(?:$|[_-])/i.test(
+      databaseName,
+    )
+  ) {
+    throw new Error(
+      "Refusing to mutate a database without test/development in its name.",
+    );
   }
 }
 
@@ -249,10 +343,7 @@ async function resolveShop(raw) {
   const normalized = String(raw).trim().toLowerCase();
   const shop = await prisma.shop.findFirst({
     where: {
-      OR: [
-        { id: raw },
-        { domain: normalized },
-      ],
+      OR: [{ id: raw }, { domain: normalized }],
     },
     include: {
       subscription: {
@@ -270,12 +361,22 @@ async function resolveShop(raw) {
       `Shop ${shop.domain} has no Subscription. Complete real platform onboarding first; this fixture will not fabricate one.`,
     );
   }
-  if (!shop.subscription.plan || !["FREE", "PAID_METERED"].includes(shop.subscription.plan.kind)) {
-    throw new Error(`Shop ${shop.domain} needs an existing FREE or PAID_METERED BillingPlan.`);
+  if (
+    !shop.subscription.plan ||
+    !["FREE", "PAID_METERED"].includes(shop.subscription.plan.kind)
+  ) {
+    throw new Error(
+      `Shop ${shop.domain} needs an existing FREE or PAID_METERED BillingPlan.`,
+    );
   }
-  if (shop.status !== "ACTIVE" || !["ACTIVE", "TRIALING"].includes(shop.subscription.status) ||
-      !shop.subscription.plan.active) {
-    throw new Error("The shop, its subscription and its BillingPlan must be active for usage fixtures.");
+  if (
+    shop.status !== "ACTIVE" ||
+    !["ACTIVE", "TRIALING"].includes(shop.subscription.status) ||
+    !shop.subscription.plan.active
+  ) {
+    throw new Error(
+      "The shop, its subscription and its BillingPlan must be active for usage fixtures.",
+    );
   }
   if (!["SHOPIFY", "WOOCOMMERCE"].includes(shop.platform)) {
     throw new Error(`Unsupported shop platform: ${shop.platform}`);
@@ -300,28 +401,39 @@ function recoveryFixtures(shopId, now) {
     "CANCELLED",
   ];
   const currencies = ["GBP", "USD", "EUR"];
-  const prices = [89.99, 124.5, 57.25, 38, 74.99, 44.5, 132, 65, 92.4, 51, 109.95, 149, 79.5];
+  const prices = [
+    89.99, 124.5, 57.25, 38, 74.99, 44.5, 132, 65, 92.4, 51, 109.95, 149, 79.5,
+  ];
 
   return statuses.map((status, index) => {
     const number = index + 1;
     const customerNumber = index === 12 ? null : index === 11 ? 1 : number;
     const detectedAt = new Date(now.getTime() - (number + 1) * DAY_MS);
     const lastActivity = new Date(detectedAt.getTime() + 4 * HOUR_MS);
-    const completedAt = status === "COMPLETED" ? new Date(lastActivity.getTime() + HOUR_MS) : null;
+    const completedAt =
+      status === "COMPLETED"
+        ? new Date(lastActivity.getTime() + HOUR_MS)
+        : null;
     const engagedAt = ["ENGAGED", "COMPLETED"].includes(status)
       ? new Date(lastActivity.getTime() + 30 * 60 * 1000)
       : null;
-    const messageSentAt = ["MESSAGE_SENT", "ENGAGED", "COMPLETED"].includes(status)
+    const messageSentAt = ["MESSAGE_SENT", "ENGAGED", "COMPLETED"].includes(
+      status,
+    )
       ? new Date(lastActivity.getTime())
       : null;
-    const expiredAt = status === "EXPIRED" ? new Date(lastActivity.getTime() + DAY_MS) : null;
+    const expiredAt =
+      status === "EXPIRED" ? new Date(lastActivity.getTime() + DAY_MS) : null;
 
     return {
       id: idFor(shopId, `recovery-${String(number).padStart(2, "0")}`),
       customerId: customerNumber
         ? idFor(shopId, `customer-${String(customerNumber).padStart(2, "0")}`)
         : null,
-      checkoutToken: idFor(shopId, `checkout-${String(number).padStart(2, "0")}`),
+      checkoutToken: idFor(
+        shopId,
+        `checkout-${String(number).padStart(2, "0")}`,
+      ),
       cartToken: idFor(shopId, `cart-${String(number).padStart(2, "0")}`),
       status,
       currency: currencies[index % currencies.length],
@@ -338,12 +450,30 @@ function recoveryFixtures(shopId, now) {
 
 function customerFixtures(shopId, shopDomain, now) {
   const firstNames = [
-    "Ada", "Grace", "Linus", "Margaret", "Alan", "Dorothy",
-    "Edsger", "Barbara", "Donald", "Frances", "Ken",
+    "Ada",
+    "Grace",
+    "Linus",
+    "Margaret",
+    "Alan",
+    "Dorothy",
+    "Edsger",
+    "Barbara",
+    "Donald",
+    "Frances",
+    "Ken",
   ];
   const lastNames = [
-    "Lovelace", "Hopper", "Torvalds", "Hamilton", "Turing", "Vaughan",
-    "Dijkstra", "Liskov", "Knuth", "Allen", "Thompson",
+    "Lovelace",
+    "Hopper",
+    "Torvalds",
+    "Hamilton",
+    "Turing",
+    "Vaughan",
+    "Dijkstra",
+    "Liskov",
+    "Knuth",
+    "Allen",
+    "Thompson",
   ];
 
   return firstNames.map((firstName, index) => {
@@ -354,7 +484,10 @@ function customerFixtures(shopId, shopDomain, now) {
       firstName: `${firstName} ${shopDomain}`,
       lastName: lastNames[index],
       email: `usage-fixture-${number}@example.invalid`,
-      shopifyCustomerId: idFor(shopId, `shopify-customer-${String(number).padStart(2, "0")}`),
+      shopifyCustomerId: idFor(
+        shopId,
+        `shopify-customer-${String(number).padStart(2, "0")}`,
+      ),
       createdAt: new Date(now.getTime() - (number + 20) * DAY_MS),
       updatedAt: now,
     };
@@ -382,12 +515,14 @@ function conversationFixtures(shopId, recoveries, now, withHuman) {
     currencyCode: recovery.currency,
     timeZone: "Europe/London",
     summary: `Manual Usage Overview fixture conversation ${index + 1}`,
-    lastInboundAt: withHuman && recentInboundCase(index)
-      ? new Date(now.getTime() - RECENT_INBOUND_AGE_MS)
-      : new Date(recovery.lastExternalActivityAt.getTime() + 20 * 60 * 1000),
-    lastMessageAt: withHuman && recentInboundCase(index)
-      ? new Date(now.getTime() - RECENT_INBOUND_AGE_MS)
-      : new Date(recovery.lastExternalActivityAt.getTime() + 40 * 60 * 1000),
+    lastInboundAt:
+      withHuman && recentInboundCase(index)
+        ? new Date(now.getTime() - RECENT_INBOUND_AGE_MS)
+        : new Date(recovery.lastExternalActivityAt.getTime() + 20 * 60 * 1000),
+    lastMessageAt:
+      withHuman && recentInboundCase(index)
+        ? new Date(now.getTime() - RECENT_INBOUND_AGE_MS)
+        : new Date(recovery.lastExternalActivityAt.getTime() + 40 * 60 * 1000),
     ...(withHuman && [2, 7, 8].includes(index)
       ? { controlMode: "HUMAN", controlRevision: 1, controlChangedAt: now }
       : {}),
@@ -419,7 +554,10 @@ function messageFixtures(shopId, conversations, withHuman) {
         direction: "INBOUND",
         senderType: "CUSTOMER",
         status: "DELIVERED",
-        content: index % 2 === 0 ? "Yes please — I had a question about delivery." : "Thanks, I am still deciding.",
+        content:
+          index % 2 === 0
+            ? "Yes please — I had a question about delivery."
+            : "Thanks, I am still deciding.",
         createdAt: new Date(base + 10 * 60_000),
         sentAt: new Date(base + 10 * 60_000),
         deliveredAt: new Date(base + 10 * 60_000),
@@ -430,7 +568,10 @@ function messageFixtures(shopId, conversations, withHuman) {
         direction: "OUTBOUND",
         senderType: "AGENT",
         status: index === 4 ? "FAILED" : "SENT",
-        content: index === 4 ? "This fixture message deliberately failed." : "Of course — here is the information you need.",
+        content:
+          index === 4
+            ? "This fixture message deliberately failed."
+            : "Of course — here is the information you need.",
         createdAt: new Date(base + 20 * 60_000),
         sentAt: index === 4 ? null : new Date(base + 20 * 60_000),
       },
@@ -438,19 +579,30 @@ function messageFixtures(shopId, conversations, withHuman) {
     if (withHuman && recentInboundCase(index)) {
       const recentAt = conversation.lastInboundAt;
       rows.push({
-        id: idFor(shopId, `message-${n}-04`), conversationId: conversation.id,
-        direction: "INBOUND", senderType: "CUSTOMER", status: "DELIVERED",
+        id: idFor(shopId, `message-${n}-04`),
+        conversationId: conversation.id,
+        direction: "INBOUND",
+        senderType: "CUSTOMER",
+        status: "DELIVERED",
         providerMessageId: idFor(shopId, `provider-inbound-${n}`),
         content: "Hello — can you help me with my recovery?",
-        createdAt: recentAt, sentAt: recentAt, deliveredAt: recentAt,
+        createdAt: recentAt,
+        sentAt: recentAt,
+        deliveredAt: recentAt,
       });
     }
     if (withHuman && index === 8) {
       const followUpAt = new Date(base + 25 * HOUR_MS);
-      rows.push({ id: idFor(shopId, "message-09-follow-up"), conversationId: conversation.id,
-        direction: "OUTBOUND", senderType: "AGENT", status: "SENT",
+      rows.push({
+        id: idFor(shopId, "message-09-follow-up"),
+        conversationId: conversation.id,
+        direction: "OUTBOUND",
+        senderType: "AGENT",
+        status: "SENT",
         content: "Fixture: historical recovery follow-up already used.",
-        createdAt: followUpAt, sentAt: followUpAt, deliveredAt: null,
+        createdAt: followUpAt,
+        sentAt: followUpAt,
+        deliveredAt: null,
       });
     }
   });
@@ -463,17 +615,24 @@ function closedPeriodDefinitions(shop, currentPeriod) {
   const plan = subscription.plan;
 
   return [1, 2, 3].map((number) => {
-    const periodEnd = new Date(currentStart.getTime() - (number - 1) * 30 * DAY_MS - number * 1000);
+    const periodEnd = new Date(
+      currentStart.getTime() - (number - 1) * 30 * DAY_MS - number * 1000,
+    );
     const periodStart = new Date(periodEnd.getTime() - 30 * DAY_MS);
     return {
       id: idFor(shop.id, `billing-period-past-${number}`),
       shopId: shop.id,
       subscriptionId: subscription.id,
       planId: subscription.planId,
-      shopifyPlanHandleSnapshot: subscription.observedShopifyPlanHandle ?? plan?.shopifyPlanHandle ?? null,
-      planNameSnapshot: plan?.name ?? subscription.observedShopifyPlanHandle ?? "Test plan",
+      shopifyPlanHandleSnapshot:
+        subscription.observedShopifyPlanHandle ??
+        plan?.shopifyPlanHandle ??
+        null,
+      planNameSnapshot:
+        plan?.name ?? subscription.observedShopifyPlanHandle ?? "Test plan",
       planKindSnapshot: "PAID_METERED",
-      includedRecoveryCreditsGranted: plan?.includedRecoveryConversationAllowance ?? null,
+      includedRecoveryCreditsGranted:
+        plan?.includedRecoveryConversationAllowance ?? null,
       periodStart,
       periodEnd,
       status: "CLOSED",
@@ -486,20 +645,41 @@ function closedPeriodDefinitions(shop, currentPeriod) {
 /** Do not manufacture a paid current period disconnected from Subscription. */
 async function requireCurrentPaidPeriod(transaction, shop, now) {
   const subscription = shop.subscription;
-  if (!subscription.billingPeriodId || !subscription.currentPeriodStart || !subscription.currentPeriodEnd) {
-    throw new Error("Paid usage fixtures require Subscription.billingPeriodId and currentPeriodStart/currentPeriodEnd. Reconcile the real subscription first.");
+  if (
+    !subscription.billingPeriodId ||
+    !subscription.currentPeriodStart ||
+    !subscription.currentPeriodEnd
+  ) {
+    throw new Error(
+      "Paid usage fixtures require Subscription.billingPeriodId and currentPeriodStart/currentPeriodEnd. Reconcile the real subscription first.",
+    );
   }
   const period = await transaction.billingPeriod.findFirst({
-    where: { id: subscription.billingPeriodId, shopId: shop.id, subscriptionId: subscription.id },
+    where: {
+      id: subscription.billingPeriodId,
+      shopId: shop.id,
+      subscriptionId: subscription.id,
+    },
   });
-  if (!period || period.status !== "OPEN" || period.planKindSnapshot !== "PAID_METERED" ||
-      period.periodStart.getTime() !== subscription.currentPeriodStart.getTime() ||
-      period.periodEnd.getTime() !== subscription.currentPeriodEnd.getTime() ||
-      period.periodStart >= period.periodEnd || period.periodStart > now || period.periodEnd <= now) {
-    throw new Error("Paid current BillingPeriod must be OPEN, PAID_METERED, in-window, and match the existing Subscription. Reconcile billing first.");
+  if (
+    !period ||
+    period.status !== "OPEN" ||
+    period.planKindSnapshot !== "PAID_METERED" ||
+    period.periodStart.getTime() !==
+      subscription.currentPeriodStart.getTime() ||
+    period.periodEnd.getTime() !== subscription.currentPeriodEnd.getTime() ||
+    period.periodStart >= period.periodEnd ||
+    period.periodStart > now ||
+    period.periodEnd <= now
+  ) {
+    throw new Error(
+      "Paid current BillingPeriod must be OPEN, PAID_METERED, in-window, and match the existing Subscription. Reconcile billing first.",
+    );
   }
   if (period.id.startsWith(prefixFor(shop.id))) {
-    throw new Error("Paid current billing period cannot be a synthetic usage-overview fixture period.");
+    throw new Error(
+      "Paid current billing period cannot be a synthetic usage-overview fixture period.",
+    );
   }
   return period;
 }
@@ -513,17 +693,29 @@ function freeUsageFixtures(shopId, count, now, provider) {
     const occurredAt = new Date(now.getTime() - (count - index) * DAY_MS);
     return {
       event: {
-        id: eventId, shopId, billingPeriodId: null,
-        metric: "RECOVERY_CONVERSATION", quantity: 1,
+        id: eventId,
+        shopId,
+        billingPeriodId: null,
+        metric: "RECOVERY_CONVERSATION",
+        quantity: 1,
         idempotencyKey: idFor(shopId, `usage-key-free-${ordinal}`),
-        sourceType: "FREE_RECOVERY_RESERVATION", sourceId: reservationId,
-        occurredAt, shopifyReportState: "NOT_APPLICABLE", provider,
+        sourceType: "FREE_RECOVERY_RESERVATION",
+        sourceId: reservationId,
+        occurredAt,
+        shopifyReportState: "NOT_APPLICABLE",
+        provider,
       },
       reservation: {
-        id: reservationId, shopId,
+        id: reservationId,
+        shopId,
         // Match Background's canonical recovery lineage for test-only debits.
-        sourceKey: createRecoveryIdempotencyKey(shopId, recoveriesFixtureId(shopId, index)),
-        quantity: 1, status: "COMMITTED", committedUsageEventId: eventId,
+        sourceKey: createRecoveryIdempotencyKey(
+          shopId,
+          recoveriesFixtureId(shopId, index),
+        ),
+        quantity: 1,
+        status: "COMMITTED",
+        committedUsageEventId: eventId,
         createdAt: occurredAt,
       },
     };
@@ -534,56 +726,115 @@ async function seedFreeUsage(transaction, shop, now) {
   const subscription = shop.subscription;
   if (shop.platform === "SHOPIFY") {
     await requireCurrentFreePeriod(transaction, shop, now);
-  } else if (subscription.billingPeriodId !== null || subscription.currentPeriodStart !== null ||
-             subscription.currentPeriodEnd !== null) {
-    throw new Error("Free lifetime subscription cannot have a current BillingPeriod or period dates. Reconcile billing first.");
+  } else if (
+    subscription.billingPeriodId !== null ||
+    subscription.currentPeriodStart !== null ||
+    subscription.currentPeriodEnd !== null
+  ) {
+    throw new Error(
+      "Free lifetime subscription cannot have a current BillingPeriod or period dates. Reconcile billing first.",
+    );
   }
   const counter = await transaction.shopEntitlementCounter.findUnique({
     where: { shopId_counter: { shopId: shop.id, counter: FREE_COUNTER } },
   });
-  if (!counter) throw new Error("The shop has no lifetime Free recovery counter. Reconcile Free onboarding first.");
+  if (!counter)
+    throw new Error(
+      "The shop has no lifetime Free recovery counter. Reconcile Free onboarding first.",
+    );
   const { grantedQuantity, committedQuantity, reservedQuantity } = counter;
-  if (![grantedQuantity, committedQuantity, reservedQuantity].every((value) => Number.isSafeInteger(value) && value >= 0) ||
-      grantedQuantity < committedQuantity + reservedQuantity) {
-    throw new Error("Inconsistent lifetime Free counter; refusing fixture mutation.");
+  if (
+    ![grantedQuantity, committedQuantity, reservedQuantity].every(
+      (value) => Number.isSafeInteger(value) && value >= 0,
+    ) ||
+    grantedQuantity < committedQuantity + reservedQuantity
+  ) {
+    throw new Error(
+      "Inconsistent lifetime Free counter; refusing fixture mutation.",
+    );
   }
   const available = grantedQuantity - committedQuantity - reservedQuantity;
   const count = Math.min(FREE_USAGE_EVENTS, available);
   if (count < 1) {
-    throw new Error("No Free lifetime credits remain for fixture usage. Use a disposable shop with available Free credits.");
+    throw new Error(
+      "No Free lifetime credits remain for fixture usage. Use a disposable shop with available Free credits.",
+    );
   }
   const fixtures = freeUsageFixtures(shop.id, count, now, shop.platform);
-  await transaction.usageEvent.createMany({ data: fixtures.map(({ event }) => event) });
+  await transaction.usageEvent.createMany({
+    data: fixtures.map(({ event }) => event),
+  });
   await transaction.usageReservation.createMany({
-    data: fixtures.map(({ reservation }) => ({ ...reservation, counterId: counter.id })),
+    data: fixtures.map(({ reservation }) => ({
+      ...reservation,
+      counterId: counter.id,
+    })),
   });
   const updated = await transaction.shopEntitlementCounter.updateMany({
-    where: { id: counter.id, shopId: shop.id, version: counter.version,
-      grantedQuantity, committedQuantity, reservedQuantity },
-    data: { committedQuantity: { increment: count }, version: { increment: 1 } },
+    where: {
+      id: counter.id,
+      shopId: shop.id,
+      version: counter.version,
+      grantedQuantity,
+      committedQuantity,
+      reservedQuantity,
+    },
+    data: {
+      committedQuantity: { increment: count },
+      version: { increment: 1 },
+    },
   });
-  if (updated.count !== 1) throw new Error("Free counter changed concurrently; transaction aborted.");
-  return { usageEvents: count, currentUsageEvents: count, pastUsageEvents: 0,
-    pastBillingPeriods: 0, currentBillingPeriodId: null, createdCurrentPeriod: false,
-    usageMode: "FREE_LIFETIME", freeCreditsCommitted: count };
+  if (updated.count !== 1)
+    throw new Error("Free counter changed concurrently; transaction aborted.");
+  return {
+    usageEvents: count,
+    currentUsageEvents: count,
+    pastUsageEvents: 0,
+    pastBillingPeriods: 0,
+    currentBillingPeriodId: null,
+    createdCurrentPeriod: false,
+    usageMode: "FREE_LIFETIME",
+    freeCreditsCommitted: count,
+  };
 }
 
 async function requireCurrentFreePeriod(transaction, shop, now) {
   const subscription = shop.subscription;
-  if (!subscription.billingPeriodId || !subscription.currentPeriodStart || !subscription.currentPeriodEnd) {
-    throw new Error("Shopify Free usage fixtures require Subscription.billingPeriodId and current period dates.");
+  if (
+    !subscription.billingPeriodId ||
+    !subscription.currentPeriodStart ||
+    !subscription.currentPeriodEnd
+  ) {
+    throw new Error(
+      "Shopify Free usage fixtures require Subscription.billingPeriodId and current period dates.",
+    );
   }
   const period = await transaction.billingPeriod.findFirst({
-    where: { id: subscription.billingPeriodId, shopId: shop.id, subscriptionId: subscription.id },
+    where: {
+      id: subscription.billingPeriodId,
+      shopId: shop.id,
+      subscriptionId: subscription.id,
+    },
   });
-  if (!period || period.status !== "OPEN" || period.planKindSnapshot !== "FREE" ||
-      period.periodStart.getTime() !== subscription.currentPeriodStart.getTime() ||
-      period.periodEnd.getTime() !== subscription.currentPeriodEnd.getTime() ||
-      period.periodStart >= period.periodEnd || period.periodStart > now || period.periodEnd <= now) {
-    throw new Error("Shopify Free current BillingPeriod must be OPEN, FREE, in-window, and match the existing Subscription. Reconcile billing first.");
+  if (
+    !period ||
+    period.status !== "OPEN" ||
+    period.planKindSnapshot !== "FREE" ||
+    period.periodStart.getTime() !==
+      subscription.currentPeriodStart.getTime() ||
+    period.periodEnd.getTime() !== subscription.currentPeriodEnd.getTime() ||
+    period.periodStart >= period.periodEnd ||
+    period.periodStart > now ||
+    period.periodEnd <= now
+  ) {
+    throw new Error(
+      "Shopify Free current BillingPeriod must be OPEN, FREE, in-window, and match the existing Subscription. Reconcile billing first.",
+    );
   }
   if (period.id.startsWith(prefixFor(shop.id))) {
-    throw new Error("Shopify Free current billing period cannot be a synthetic usage-overview fixture period.");
+    throw new Error(
+      "Shopify Free current billing period cannot be a synthetic usage-overview fixture period.",
+    );
   }
   return period;
 }
@@ -596,7 +847,9 @@ async function requireCurrentFreePeriod(transaction, shop, now) {
  */
 function validatePastPaidHistoryOption(shop, enabled) {
   if (enabled && shop.subscription.plan?.kind !== "FREE") {
-    throw new Error(`${WITH_PAST_PAID_HISTORY_FLAG} is only supported for a currently Free shop. Paid shops already seed past periods.`);
+    throw new Error(
+      `${WITH_PAST_PAID_HISTORY_FLAG} is only supported for a currently Free shop. Paid shops already seed past periods.`,
+    );
   }
 }
 
@@ -606,38 +859,81 @@ async function seedHistoricalPaidUsage(transaction, shop, now, recoveries) {
   // This preserves an unambiguous paid-before-Free test scenario.
   const firstFreeEvent = new Date(now.getTime() - FREE_USAGE_EVENTS * DAY_MS);
   const historicalStart = new Date(firstFreeEvent.getTime() - 2 * DAY_MS);
-  const periods = closedPeriodDefinitions(shop, { periodStart: historicalStart })
-    .map((period, index) => ({
-      ...period,
-      planId: null,
-      shopifyPlanHandleSnapshot: null,
-      planNameSnapshot: "TEST FIXTURE - historical paid plan",
-      planKindSnapshot: "PAID_METERED",
-      includedRecoveryCreditsGranted: null,
-      // The final historical paid period ends before the present Free state.
-      closeReason: index === 0 ? "PLAN_CHANGED" : "RENEWED_SAME_PLAN",
-    }));
-  if (periods.some((period) => period.planKindSnapshot !== "PAID_METERED" ||
-      period.planId !== null || period.periodEnd >= firstFreeEvent ||
-      period.subscriptionId !== shop.subscription.id || period.shopId !== shop.id)) {
-    throw new Error("Historical paid usage fixture crosses the Free lifetime window or subscription scope.");
+  const periods = closedPeriodDefinitions(shop, {
+    periodStart: historicalStart,
+  }).map((period, index) => ({
+    ...period,
+    planId: null,
+    shopifyPlanHandleSnapshot: null,
+    planNameSnapshot: "TEST FIXTURE - historical paid plan",
+    planKindSnapshot: "PAID_METERED",
+    includedRecoveryCreditsGranted: null,
+    // The final historical paid period ends before the present Free state.
+    closeReason: index === 0 ? "PLAN_CHANGED" : "RENEWED_SAME_PLAN",
+  }));
+  if (
+    periods.some(
+      (period) =>
+        period.planKindSnapshot !== "PAID_METERED" ||
+        period.planId !== null ||
+        period.periodEnd >= firstFreeEvent ||
+        period.subscriptionId !== shop.subscription.id ||
+        period.shopId !== shop.id,
+    )
+  ) {
+    throw new Error(
+      "Historical paid usage fixture crosses the Free lifetime window or subscription scope.",
+    );
   }
-  const paid = await seedFixturePaidPeriods(transaction, shop, now, recoveries, periods);
+  const paid = await seedFixturePaidPeriods(
+    transaction,
+    shop,
+    now,
+    recoveries,
+    periods,
+  );
   return { periodCount: periods.length, eventCount: paid.eventCount };
 }
 
 /** Persist the complete synthetic paid allocation ledger in the caller's
  * transaction. No genuine paid counter or provider billing state is touched. */
-async function seedFixturePaidPeriods(transaction, shop, now, recoveries, periods) {
+async function seedFixturePaidPeriods(
+  transaction,
+  shop,
+  now,
+  recoveries,
+  periods,
+) {
   const batches = periods.map((period, index) => {
     const label = `past-${index + 1}`;
     const count = [16, 11, 7][index];
-    const events = usageRows(shop.id, period, label, count, recoveries, now, shop.platform);
-    return { events, allocation: buildPaidAllowanceFixtures(shop.id, period, label, events, idFor) };
+    const events = usageRows(
+      shop.id,
+      period,
+      label,
+      count,
+      recoveries,
+      now,
+      shop.platform,
+    );
+    return {
+      events,
+      allocation: buildPaidAllowanceFixtures(
+        shop.id,
+        period,
+        label,
+        events,
+        idFor,
+      ),
+    };
   });
-  await transaction.billingPeriod.createMany({ data: periods.map((period, index) => ({
-    ...period, includedRecoveryCreditsGranted: batches[index].allocation.counter.grantedQuantity,
-  })) });
+  await transaction.billingPeriod.createMany({
+    data: periods.map((period, index) => ({
+      ...period,
+      includedRecoveryCreditsGranted:
+        batches[index].allocation.counter.grantedQuantity,
+    })),
+  });
   await transaction.billingPeriodEntitlementCounter.createMany({
     data: batches.map((batch) => batch.allocation.counter),
   });
@@ -651,7 +947,10 @@ async function seedFixturePaidPeriods(transaction, shop, now, recoveries, period
 
 function occurredAtWithin(period, index, count, now) {
   const start = period.periodStart.getTime() + HOUR_MS;
-  const endBoundary = Math.min(period.periodEnd.getTime() - HOUR_MS, now.getTime());
+  const endBoundary = Math.min(
+    period.periodEnd.getTime() - HOUR_MS,
+    now.getTime(),
+  );
   const end = Math.max(start, endBoundary);
   const ratio = (index + 1) / (count + 1);
   return new Date(start + Math.floor((end - start) * ratio));
@@ -664,7 +963,10 @@ function usageRows(shopId, period, label, count, recoveries, now, provider) {
     billingPeriodId: period.id,
     metric: "RECOVERY_CONVERSATION",
     quantity: index % 7 === 0 ? 2 : 1,
-    idempotencyKey: idFor(shopId, `usage-key-${label}-${String(index + 1).padStart(3, "0")}`),
+    idempotencyKey: idFor(
+      shopId,
+      `usage-key-${label}-${String(index + 1).padStart(3, "0")}`,
+    ),
     sourceType: "CHECKOUT_RECOVERY",
     sourceId: recoveries[index % recoveries.length].id,
     occurredAt: occurredAtWithin(period, index, count, now),
@@ -673,29 +975,61 @@ function usageRows(shopId, period, label, count, recoveries, now, provider) {
   }));
 }
 
-async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = false } = {}) {
+async function cleanupDatabase(
+  transaction,
+  shopId,
+  { purgeHumanSendAudit = false } = {},
+) {
   const prefix = prefixFor(shopId);
 
   // Both Free and paid fixture reservations must be inspected before any
   // deletion. Fixture cleanup runs atomically in the calling transaction.
   const fixtureReservations = await transaction.usageReservation.findMany({
     where: { shopId, id: { startsWith: prefix } },
-    select: { id: true, shopId: true, sourceKey: true, counterId: true,
-      billingPeriodEntitlementCounterId: true, purchasedCreditPurchaseId: true,
-      promotionalCreditGrantId: true, quantity: true, status: true,
-      committedUsageEventId: true, compensationUsageEventId: true },
+    select: {
+      id: true,
+      shopId: true,
+      sourceKey: true,
+      counterId: true,
+      billingPeriodEntitlementCounterId: true,
+      purchasedCreditPurchaseId: true,
+      promotionalCreditGrantId: true,
+      quantity: true,
+      status: true,
+      committedUsageEventId: true,
+      compensationUsageEventId: true,
+    },
   });
-  const freeReservations = fixtureReservations.filter((row) => row.id.startsWith(`${prefix}reservation-free-`));
-  const paidReservations = fixtureReservations.filter((row) => row.id.startsWith(`${prefix}reservation-paid-`));
-  if (freeReservations.length + paidReservations.length !== fixtureReservations.length) {
+  const freeReservations = fixtureReservations.filter((row) =>
+    row.id.startsWith(`${prefix}reservation-free-`),
+  );
+  const paidReservations = fixtureReservations.filter((row) =>
+    row.id.startsWith(`${prefix}reservation-paid-`),
+  );
+  if (
+    freeReservations.length + paidReservations.length !==
+    fixtureReservations.length
+  ) {
     throw new Error("Unknown fixture reservation type; refusing cleanup.");
   }
-  const eventIds = fixtureReservations.map(({ committedUsageEventId }) => committedUsageEventId).filter(Boolean);
-  const events = eventIds.length ? await transaction.usageEvent.findMany({
-    where: { shopId, id: { in: eventIds } },
-    select: { id: true, shopId: true, billingPeriodId: true, quantity: true, metric: true,
-      sourceType: true, sourceId: true, correctionOfUsageEventId: true },
-  }) : [];
+  const eventIds = fixtureReservations
+    .map(({ committedUsageEventId }) => committedUsageEventId)
+    .filter(Boolean);
+  const events = eventIds.length
+    ? await transaction.usageEvent.findMany({
+        where: { shopId, id: { in: eventIds } },
+        select: {
+          id: true,
+          shopId: true,
+          billingPeriodId: true,
+          quantity: true,
+          metric: true,
+          sourceType: true,
+          sourceId: true,
+          correctionOfUsageEventId: true,
+        },
+      })
+    : [];
   const byId = new Map(events.map((event) => [event.id, event]));
 
   // Synthetic historical counters are fixture owned, unlike the real Free
@@ -705,95 +1039,168 @@ async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = fals
     select: { id: true, shopId: true, status: true, planKindSnapshot: true },
   });
   const periodIds = fixturePeriods.map((period) => period.id);
-  const paidCounters = periodIds.length ? await transaction.billingPeriodEntitlementCounter.findMany({
-    where: { shopId, billingPeriodId: { in: periodIds } },
-    select: { id: true, shopId: true, billingPeriodId: true, counter: true,
-      grantedQuantity: true, committedQuantity: true, reservedQuantity: true,
-      forfeitedQuantity: true, currentAllowanceQuantity: true },
-  }) : [];
+  const paidCounters = periodIds.length
+    ? await transaction.billingPeriodEntitlementCounter.findMany({
+        where: { shopId, billingPeriodId: { in: periodIds } },
+        select: {
+          id: true,
+          shopId: true,
+          billingPeriodId: true,
+          counter: true,
+          grantedQuantity: true,
+          committedQuantity: true,
+          reservedQuantity: true,
+          forfeitedQuantity: true,
+          currentAllowanceQuantity: true,
+        },
+      })
+    : [];
   const paidCounterIds = verifyPaidFixtureCleanup(
-    shopId, paidReservations, events, paidCounters, fixturePeriods, idFor);
+    shopId,
+    paidReservations,
+    events,
+    paidCounters,
+    fixturePeriods,
+    idFor,
+  );
   if (paidCounterIds.length) {
     const unexpectedReservations = await transaction.usageReservation.count({
-      where: { billingPeriodEntitlementCounterId: { in: paidCounterIds },
-        id: { not: { startsWith: prefix } } },
+      where: {
+        billingPeriodEntitlementCounterId: { in: paidCounterIds },
+        id: { not: { startsWith: prefix } },
+      },
     });
-    if (unexpectedReservations) throw new Error("Non-fixture reservation uses a fixture paid counter.");
+    if (unexpectedReservations)
+      throw new Error("Non-fixture reservation uses a fixture paid counter.");
   }
   if (periodIds.length) {
     const unexpectedEvents = await transaction.usageEvent.count({
-      where: { billingPeriodId: { in: periodIds }, id: { not: { startsWith: prefix } } },
+      where: {
+        billingPeriodId: { in: periodIds },
+        id: { not: { startsWith: prefix } },
+      },
     });
-    if (unexpectedEvents) throw new Error("Non-fixture usage uses a fixture paid period.");
+    if (unexpectedEvents)
+      throw new Error("Non-fixture usage uses a fixture paid period.");
   }
 
   if (freeReservations.length) {
     const counter = await transaction.shopEntitlementCounter.findUnique({
       where: { shopId_counter: { shopId, counter: FREE_COUNTER } },
     });
-    if (!counter) throw new Error("Cannot reverse fixture usage: lifetime Free counter is missing.");
+    if (!counter)
+      throw new Error(
+        "Cannot reverse fixture usage: lifetime Free counter is missing.",
+      );
     for (const reservation of freeReservations) {
       const event = byId.get(reservation.committedUsageEventId);
       const ordinal = reservation.id.slice(`${prefix}reservation-free-`.length);
-      const canonicalSource = /^\d{3}$/.test(ordinal) && Number(ordinal) > 0 && Number(ordinal) <= FREE_USAGE_EVENTS
-        ? createRecoveryIdempotencyKey(shopId, recoveriesFixtureId(shopId, Number(ordinal) - 1))
-        : null;
+      const canonicalSource =
+        /^\d{3}$/.test(ordinal) &&
+        Number(ordinal) > 0 &&
+        Number(ordinal) <= FREE_USAGE_EVENTS
+          ? createRecoveryIdempotencyKey(
+              shopId,
+              recoveriesFixtureId(shopId, Number(ordinal) - 1),
+            )
+          : null;
       const legacySource = idFor(shopId, `free-source-${ordinal}`);
-      if (reservation.status !== "COMMITTED" || reservation.compensationUsageEventId !== null ||
-          (reservation.sourceKey !== canonicalSource && reservation.sourceKey !== legacySource) ||
-          reservation.counterId !== counter.id || reservation.billingPeriodEntitlementCounterId !== null ||
-          reservation.purchasedCreditPurchaseId !== null || reservation.promotionalCreditGrantId !== null ||
-          !Number.isSafeInteger(reservation.quantity) || reservation.quantity <= 0 ||
-          typeof reservation.committedUsageEventId !== "string" ||
-          !reservation.committedUsageEventId.startsWith(prefix) || !event ||
-          event.shopId !== shopId || event.billingPeriodId !== null ||
-          event.metric !== "RECOVERY_CONVERSATION" || event.sourceType !== "FREE_RECOVERY_RESERVATION" ||
-          event.sourceId !== reservation.id || Number(event.quantity) !== reservation.quantity) {
-        throw new Error("Fixture Free reservation has changed; refusing to rewrite billing history.");
+      if (
+        reservation.status !== "COMMITTED" ||
+        reservation.compensationUsageEventId !== null ||
+        (reservation.sourceKey !== canonicalSource &&
+          reservation.sourceKey !== legacySource) ||
+        reservation.counterId !== counter.id ||
+        reservation.billingPeriodEntitlementCounterId !== null ||
+        reservation.purchasedCreditPurchaseId !== null ||
+        reservation.promotionalCreditGrantId !== null ||
+        !Number.isSafeInteger(reservation.quantity) ||
+        reservation.quantity <= 0 ||
+        typeof reservation.committedUsageEventId !== "string" ||
+        !reservation.committedUsageEventId.startsWith(prefix) ||
+        !event ||
+        event.shopId !== shopId ||
+        event.billingPeriodId !== null ||
+        event.metric !== "RECOVERY_CONVERSATION" ||
+        event.sourceType !== "FREE_RECOVERY_RESERVATION" ||
+        event.sourceId !== reservation.id ||
+        Number(event.quantity) !== reservation.quantity
+      ) {
+        throw new Error(
+          "Fixture Free reservation has changed; refusing to rewrite billing history.",
+        );
       }
     }
-    const committed = freeReservations.reduce((sum, reservation) => sum + reservation.quantity, 0);
+    const committed = freeReservations.reduce(
+      (sum, reservation) => sum + reservation.quantity,
+      0,
+    );
     const adjusted = await transaction.shopEntitlementCounter.updateMany({
-      where: { id: counter.id, shopId, version: counter.version, committedQuantity: { gte: committed } },
-      data: { committedQuantity: { decrement: committed }, version: { increment: 1 } },
+      where: {
+        id: counter.id,
+        shopId,
+        version: counter.version,
+        committedQuantity: { gte: committed },
+      },
+      data: {
+        committedQuantity: { decrement: committed },
+        version: { increment: 1 },
+      },
     });
-    if (adjusted.count !== 1) throw new Error("Free counter changed concurrently; cleanup aborted.");
+    if (adjusted.count !== 1)
+      throw new Error("Free counter changed concurrently; cleanup aborted.");
   }
   if (fixtureReservations.length) {
     const removed = await transaction.usageReservation.deleteMany({
       where: { shopId, id: { in: fixtureReservations.map((row) => row.id) } },
     });
     if (removed.count !== fixtureReservations.length) {
-      throw new Error("Fixture reservations changed during cleanup; transaction aborted.");
+      throw new Error(
+        "Fixture reservations changed during cleanup; transaction aborted.",
+      );
     }
   }
   // A genuine subscription may never depend on a fixture period we are deleting.
   const subscription = await transaction.subscription.findUnique({
-    where: { shopId }, select: { billingPeriodId: true },
+    where: { shopId },
+    select: { billingPeriodId: true },
   });
   if (subscription?.billingPeriodId?.startsWith(prefix)) {
-    throw new Error("Subscription refers to a fixture billing period; refusing cleanup.");
+    throw new Error(
+      "Subscription refers to a fixture billing period; refusing cleanup.",
+    );
   }
-  const fixtureEventIds = (await transaction.usageEvent.findMany({
-    where: { shopId, id: { startsWith: prefix } }, select: { id: true },
-  })).map((row) => row.id);
+  const fixtureEventIds = (
+    await transaction.usageEvent.findMany({
+      where: { shopId, id: { startsWith: prefix } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
   if (fixtureEventIds.length) {
     const externalCorrections = await transaction.usageEvent.count({
-      where: { correctionOfUsageEventId: { in: fixtureEventIds }, id: { not: { startsWith: prefix } } },
+      where: {
+        correctionOfUsageEventId: { in: fixtureEventIds },
+        id: { not: { startsWith: prefix } },
+      },
     });
     if (externalCorrections) {
-      throw new Error("Non-fixture corrections reference seeded usage; refusing destructive cleanup.");
+      throw new Error(
+        "Non-fixture corrections reference seeded usage; refusing destructive cleanup.",
+      );
     }
   }
   const usage = await transaction.usageEvent.deleteMany({
     where: { shopId, id: { startsWith: prefix } },
   });
   if (paidCounterIds.length) {
-    const removed = await transaction.billingPeriodEntitlementCounter.deleteMany({
-      where: { shopId, id: { in: paidCounterIds } },
-    });
+    const removed =
+      await transaction.billingPeriodEntitlementCounter.deleteMany({
+        where: { shopId, id: { in: paidCounterIds } },
+      });
     if (removed.count !== paidCounterIds.length) {
-      throw new Error("Fixture paid counters changed during cleanup; transaction aborted.");
+      throw new Error(
+        "Fixture paid counters changed during cleanup; transaction aborted.",
+      );
     }
   }
 
@@ -804,27 +1211,41 @@ async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = fals
   const conversationIds = conversations.map((row) => row.id);
   if (conversationIds.length) {
     const commandWhere = { shopId, conversationId: { in: conversationIds } };
-    const commands = await transaction.merchantConversationSendCommand.count({ where: commandWhere });
+    const commands = await transaction.merchantConversationSendCommand.count({
+      where: commandWhere,
+    });
     if (commands && !purgeHumanSendAudit) {
-      throw new Error(`Refusing to erase ${commands} durable HUMAN send command(s). ` +
-        `Re-run with ${PURGE_HUMAN_AUDIT_FLAG} only to purge commands attached to these deterministic test fixtures.`);
+      throw new Error(
+        `Refusing to erase ${commands} durable HUMAN send command(s). ` +
+          `Re-run with ${PURGE_HUMAN_AUDIT_FLAG} only to purge commands attached to these deterministic test fixtures.`,
+      );
     }
     if (commands) {
-      const removedCommands = await transaction.merchantConversationSendCommand.deleteMany({ where: commandWhere });
+      const removedCommands =
+        await transaction.merchantConversationSendCommand.deleteMany({
+          where: commandWhere,
+        });
       if (removedCommands.count !== commands) {
-        throw new Error("HUMAN send-command rows changed during fixture cleanup; transaction aborted.");
+        throw new Error(
+          "HUMAN send-command rows changed during fixture cleanup; transaction aborted.",
+        );
       }
     }
   }
 
   // Delete fixture outreach before fixture messages. The ARCH-040 immutable
   // outboundMessageId guard rejects ON DELETE SET NULL on a used attempt.
-  const recoveryIds = (await transaction.checkoutRecovery.findMany({
-    where: { id: { startsWith: prefix } }, select: { id: true },
-  })).map((row) => row.id);
-  const outreach = recoveryIds.length ? await transaction.recoveryOutreachAttempt.deleteMany({
-    where: { checkoutRecoveryId: { in: recoveryIds } },
-  }) : { count: 0 };
+  const recoveryIds = (
+    await transaction.checkoutRecovery.findMany({
+      where: { id: { startsWith: prefix } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
+  const outreach = recoveryIds.length
+    ? await transaction.recoveryOutreachAttempt.deleteMany({
+        where: { checkoutRecoveryId: { in: recoveryIds } },
+      })
+    : { count: 0 };
 
   const messages = conversationIds.length
     ? await transaction.conversationMessage.deleteMany({
@@ -846,7 +1267,6 @@ async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = fals
   const conversationDelete = await transaction.conversation.deleteMany({
     where: { id: { startsWith: prefix } },
   });
-
 
   const recoveries = await transaction.checkoutRecovery.deleteMany({
     where: { id: { startsWith: prefix } },
@@ -871,7 +1291,11 @@ async function cleanupDatabase(transaction, shopId, { purgeHumanSendAudit = fals
   };
 }
 
-async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = false) {
+async function seedDatabase(
+  shop,
+  humanOptions = null,
+  withPastPaidHistory = false,
+) {
   const now = new Date();
 
   return prisma.$transaction(async (transaction) => {
@@ -887,7 +1311,9 @@ async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = fal
     const recoveries = recoveryFixtures(shop.id, now).map((row, index) => ({
       ...row,
       shopId: shop.id,
-      ...(humanOptions && humanCase(index) ? { lineItems: basketFixture(row) } : {}),
+      ...(humanOptions && humanCase(index)
+        ? { lineItems: basketFixture(row) }
+        : {}),
     }));
     await transaction.checkoutRecovery.createMany({ data: recoveries });
 
@@ -904,54 +1330,87 @@ async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = fal
     });
     const linkedRecovery = recoveries[2];
     await transaction.merchantSupportMessage.createMany({
-      data: [{
-        id: idFor(shop.id, "support-recovery-message"),
-        threadId: supportThread.id,
-        kind: "SYSTEM",
-        state: "AVAILABLE",
-        originalBody: "Your initial recovery message was sent.",
-        sourceLanguageTag: "en",
-        displayLanguageTag: "en",
-        systemCode: "RECOVERY_INITIAL_OUTREACH_SENT",
-        systemVersion: "1",
-        sourceKey: idFor(shop.id, "support-recovery-notice"),
-        checkoutRecoveryId: linkedRecovery.id,
-        availableAt: now,
-        createdAt: now,
-        updatedAt: now,
-      }],
+      data: [
+        {
+          id: idFor(shop.id, "support-recovery-message"),
+          threadId: supportThread.id,
+          kind: "SYSTEM",
+          state: "AVAILABLE",
+          originalBody: "Your initial recovery message was sent.",
+          sourceLanguageTag: "en",
+          displayLanguageTag: "en",
+          systemCode: "RECOVERY_INITIAL_OUTREACH_SENT",
+          systemVersion: "1",
+          sourceKey: idFor(shop.id, "support-recovery-notice"),
+          checkoutRecoveryId: linkedRecovery.id,
+          availableAt: now,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
     });
 
-    const conversations = conversationFixtures(shop.id, recoveries, now, Boolean(humanOptions));
+    const conversations = conversationFixtures(
+      shop.id,
+      recoveries,
+      now,
+      Boolean(humanOptions),
+    );
     await transaction.conversation.createMany({ data: conversations });
 
-    const messages = messageFixtures(shop.id, conversations, Boolean(humanOptions));
+    const messages = messageFixtures(
+      shop.id,
+      conversations,
+      Boolean(humanOptions),
+    );
     await transaction.conversationMessage.createMany({ data: messages });
 
     if (humanOptions) {
-      const handovers = conversations.filter((_, index) => [2, 7, 8].includes(index));
+      const handovers = conversations.filter((_, index) =>
+        [2, 7, 8].includes(index),
+      );
       await transaction.conversationControlEvent.createMany({
         data: handovers.map((conversation) => ({
-          conversationId: conversation.id, fromMode: "AI", toMode: "HUMAN",
-          fromRevision: 0, toRevision: 1, occurredAt: now,
+          conversationId: conversation.id,
+          fromMode: "AI",
+          toMode: "HUMAN",
+          fromRevision: 0,
+          toRevision: 1,
+          occurredAt: now,
         })),
       });
       // Never change subscription/plan entitlements or fabricate provider approvals.
       // A real initial outreach with a controlled recipient is needed by Send.
       const initial = [1, 2, 7, 8].map((index) => {
-        const messageId = idFor(shop.id, `message-${String(index + 1).padStart(2, "0")}-01`);
+        const messageId = idFor(
+          shop.id,
+          `message-${String(index + 1).padStart(2, "0")}-01`,
+        );
         const outbound = messages.find((message) => message.id === messageId);
-        if (!outbound || outbound.conversationId !== conversations[index].id ||
-            outbound.direction !== "OUTBOUND" || !(outbound.sentAt instanceof Date)) {
-          throw new Error(`Initial outreach fixture is missing its sent outbound message for recovery ${index + 1}.`);
+        if (
+          !outbound ||
+          outbound.conversationId !== conversations[index].id ||
+          outbound.direction !== "OUTBOUND" ||
+          !(outbound.sentAt instanceof Date)
+        ) {
+          throw new Error(
+            `Initial outreach fixture is missing its sent outbound message for recovery ${index + 1}.`,
+          );
         }
         return {
-          id: idFor(shop.id, `outreach-${String(index + 1).padStart(2, "0")}-01`),
+          id: idFor(
+            shop.id,
+            `outreach-${String(index + 1).padStart(2, "0")}-01`,
+          ),
           checkoutRecoveryId: recoveries[index].id,
-          sequence: 1, trigger: "INITIAL", status: index === 8 || index === 2 ? "WAITING_FOR_RESPONSE" : "ENGAGED",
+          sequence: 1,
+          trigger: "INITIAL",
+          status:
+            index === 8 || index === 2 ? "WAITING_FOR_RESPONSE" : "ENGAGED",
           // ARCH-016: WAITING_FOR_RESPONSE requires sentAt and outboundMessageId.
           // Link the genuine saved fixture message rather than inventing dispatch evidence.
-          outboundMessageId: outbound.id, sentAt: outbound.sentAt,
+          outboundMessageId: outbound.id,
+          sentAt: outbound.sentAt,
           // Initial attempts cannot have a partial claim tuple under ARCH-040.
           recipient: humanOptions.recipient,
           configuredOfferMode: "NONE",
@@ -961,42 +1420,83 @@ async function seedDatabase(shop, humanOptions = null, withPastPaidHistory = fal
 
       // An explicitly synthetic already-used follow-up, with a persisted outbound
       // fixture message: no provider call or new credit is made by this script.
-      const usedAt = new Date(recoveries[8].detectedAt.getTime() + 27 * HOUR_MS);
-      await transaction.recoveryOutreachAttempt.create({ data: {
-        id: idFor(shop.id, "outreach-09-02"),
-        checkoutRecoveryId: recoveries[8].id,
-        recipient: humanOptions.recipient, sequence: 2,
-        trigger: "POST_WINDOW_FOLLOW_UP", status: "NO_RESPONSE",
-        initiatedBy: "AUTOMATION", initiationKey: idFor(shop.id, "used-follow-up-09"),
-        claimedAt: usedAt, sentAt: usedAt, closedAt: usedAt,
-        configuredOfferMode: "NONE",
-        outboundMessageId: idFor(shop.id, "message-09-follow-up"),
-      } });
+      const usedAt = new Date(
+        recoveries[8].detectedAt.getTime() + 27 * HOUR_MS,
+      );
+      await transaction.recoveryOutreachAttempt.create({
+        data: {
+          id: idFor(shop.id, "outreach-09-02"),
+          checkoutRecoveryId: recoveries[8].id,
+          recipient: humanOptions.recipient,
+          sequence: 2,
+          trigger: "POST_WINDOW_FOLLOW_UP",
+          status: "NO_RESPONSE",
+          initiatedBy: "AUTOMATION",
+          initiationKey: idFor(shop.id, "used-follow-up-09"),
+          claimedAt: usedAt,
+          sentAt: usedAt,
+          closedAt: usedAt,
+          configuredOfferMode: "NONE",
+          outboundMessageId: idFor(shop.id, "message-09-follow-up"),
+        },
+      });
     }
 
     let billingFixture;
     if (shop.subscription.plan.kind === "FREE") {
       billingFixture = await seedFreeUsage(transaction, shop, now);
       if (withPastPaidHistory) {
-        const past = await seedHistoricalPaidUsage(transaction, shop, now, recoveries);
-        billingFixture = { ...billingFixture,
+        const past = await seedHistoricalPaidUsage(
+          transaction,
+          shop,
+          now,
+          recoveries,
+        );
+        billingFixture = {
+          ...billingFixture,
           usageEvents: billingFixture.usageEvents + past.eventCount,
-          pastUsageEvents: past.eventCount, pastBillingPeriods: past.periodCount,
-          usageMode: "FREE_NOW_PREVIOUSLY_PAID" };
+          pastUsageEvents: past.eventCount,
+          pastBillingPeriods: past.periodCount,
+          usageMode: "FREE_NOW_PREVIOUSLY_PAID",
+        };
       }
     } else {
       validatePastPaidHistoryOption(shop, withPastPaidHistory);
-      const currentPeriod = await requireCurrentPaidPeriod(transaction, shop, now);
+      const currentPeriod = await requireCurrentPaidPeriod(
+        transaction,
+        shop,
+        now,
+      );
       const pastPeriods = closedPeriodDefinitions(shop, currentPeriod);
-      const currentEvents = usageRows(shop.id, currentPeriod, "current", 27, recoveries, now, shop.platform);
-      const past = await seedFixturePaidPeriods(transaction, shop, now, recoveries, pastPeriods);
+      const currentEvents = usageRows(
+        shop.id,
+        currentPeriod,
+        "current",
+        27,
+        recoveries,
+        now,
+        shop.platform,
+      );
+      const past = await seedFixturePaidPeriods(
+        transaction,
+        shop,
+        now,
+        recoveries,
+        pastPeriods,
+      );
       // Current paid usage is deliberately not allocated against real live
       // subscription credits by this UI fixture. Its source remains UNATTRIBUTED.
       await transaction.usageEvent.createMany({ data: currentEvents });
-      billingFixture = { usageEvents: currentEvents.length + past.eventCount, currentUsageEvents: 27,
-        pastUsageEvents: past.eventCount, pastBillingPeriods: pastPeriods.length,
-        currentBillingPeriodId: currentPeriod.id, createdCurrentPeriod: false,
-        usageMode: "PAID_METERED", freeCreditsCommitted: 0 };
+      billingFixture = {
+        usageEvents: currentEvents.length + past.eventCount,
+        currentUsageEvents: 27,
+        pastUsageEvents: past.eventCount,
+        pastBillingPeriods: pastPeriods.length,
+        currentBillingPeriodId: currentPeriod.id,
+        createdCurrentPeriod: false,
+        usageMode: "PAID_METERED",
+        freeCreditsCommitted: 0,
+      };
     }
 
     return {
@@ -1026,7 +1526,8 @@ function redisConnection(redisUrl) {
 
 async function cleanupPending(shop) {
   const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) return { skipped: true, reason: "REDIS_URL is not configured" };
+  if (!redisUrl)
+    return { skipped: true, reason: "REDIS_URL is not configured" };
 
   const redis = new Redis(redisUrl, {
     lazyConnect: true,
@@ -1034,7 +1535,9 @@ async function cleanupPending(shop) {
     maxRetriesPerRequest: 1,
     retryStrategy: () => null,
   });
-  const queue = new Queue(PENDING_QUEUE, { connection: redisConnection(redisUrl) });
+  const queue = new Queue(PENDING_QUEUE, {
+    connection: redisConnection(redisUrl),
+  });
 
   let removed = 0;
   try {
@@ -1047,7 +1550,9 @@ async function cleanupPending(shop) {
       if (job) {
         const state = await job.getState();
         if (state === "active") {
-          throw new Error(`Refusing to remove active fixture pending job ${jobId}.`);
+          throw new Error(
+            `Refusing to remove active fixture pending job ${jobId}.`,
+          );
         }
         await job.remove();
         removed += 1;
@@ -1080,7 +1585,9 @@ async function seedPending(shop) {
     maxRetriesPerRequest: 1,
     retryStrategy: () => null,
   });
-  const queue = new Queue(PENDING_QUEUE, { connection: redisConnection(redisUrl) });
+  const queue = new Queue(PENDING_QUEUE, {
+    connection: redisConnection(redisUrl),
+  });
 
   try {
     await redis.connect();
@@ -1097,7 +1604,9 @@ async function seedPending(shop) {
       const delayMs = 7 * DAY_MS + index * 10 * 60 * 1000;
       const dueAt = now + delayMs;
       const checkoutCreatedAt = new Date(now - index * HOUR_MS).toISOString();
-      const lastActivityAt = new Date(now - index * 30 * 60 * 1000).toISOString();
+      const lastActivityAt = new Date(
+        now - index * 30 * 60 * 1000,
+      ).toISOString();
       const data = {
         shopId: shop.id,
         shopDomain: shop.domain,
@@ -1140,29 +1649,52 @@ async function seedPending(shop) {
 
 async function databaseStatus(shop) {
   const prefix = prefixFor(shop.id);
-  const [customers, recoveries, conversations, messages, usageEvents, billingPeriods, fixtureReservations, fixturePaidCounters] = await Promise.all([
+  const [
+    customers,
+    recoveries,
+    conversations,
+    messages,
+    usageEvents,
+    billingPeriods,
+    fixtureReservations,
+    fixturePaidCounters,
+  ] = await Promise.all([
     prisma.customer.count({ where: { id: { startsWith: prefix } } }),
     prisma.checkoutRecovery.count({ where: { id: { startsWith: prefix } } }),
     prisma.conversation.count({ where: { id: { startsWith: prefix } } }),
     prisma.conversationMessage.count({ where: { id: { startsWith: prefix } } }),
-    prisma.usageEvent.count({ where: { shopId: shop.id, id: { startsWith: prefix } } }),
+    prisma.usageEvent.count({
+      where: { shopId: shop.id, id: { startsWith: prefix } },
+    }),
     prisma.billingPeriod.findMany({
       where: { id: { startsWith: prefix } },
       orderBy: { periodStart: "desc" },
       select: { id: true, status: true, periodStart: true, periodEnd: true },
     }),
-    prisma.usageReservation.count({ where: { shopId: shop.id, id: { startsWith: prefix } } }),
-    prisma.billingPeriodEntitlementCounter.count({ where: { shopId: shop.id,
-      id: { startsWith: `${prefix}counter-paid-` } } }),
+    prisma.usageReservation.count({
+      where: { shopId: shop.id, id: { startsWith: prefix } },
+    }),
+    prisma.billingPeriodEntitlementCounter.count({
+      where: { shopId: shop.id, id: { startsWith: `${prefix}counter-paid-` } },
+    }),
   ]);
 
-  return { customers, recoveries, conversations, messages, usageEvents, billingPeriods,
-    fixtureReservations, fixturePaidCounters };
+  return {
+    customers,
+    recoveries,
+    conversations,
+    messages,
+    usageEvents,
+    billingPeriods,
+    fixtureReservations,
+    fixturePaidCounters,
+  };
 }
 
 async function pendingStatus(shop) {
   const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) return { available: false, reason: "REDIS_URL is not configured" };
+  if (!redisUrl)
+    return { available: false, reason: "REDIS_URL is not configured" };
 
   const redis = new Redis(redisUrl, {
     lazyConnect: true,
@@ -1170,7 +1702,9 @@ async function pendingStatus(shop) {
     maxRetriesPerRequest: 1,
     retryStrategy: () => null,
   });
-  const queue = new Queue(PENDING_QUEUE, { connection: redisConnection(redisUrl) });
+  const queue = new Queue(PENDING_QUEUE, {
+    connection: redisConnection(redisUrl),
+  });
   try {
     await redis.connect();
     const rows = [];
@@ -1178,7 +1712,11 @@ async function pendingStatus(shop) {
       const jobId = pendingJobId(shop.id, index);
       const job = await queue.getJob(jobId);
       if (!job) continue;
-      rows.push({ jobId, state: await job.getState(), delay: job.opts.delay ?? 0 });
+      rows.push({
+        jobId,
+        state: await job.getState(),
+        delay: job.opts.delay ?? 0,
+      });
     }
     return { available: true, jobs: rows };
   } finally {
@@ -1198,28 +1736,34 @@ async function printStatus(shop) {
   console.log(`Shop ID: ${shop.id}`);
   console.log(`Usage provider: ${shop.platform}`);
   console.log(`Subscription: ${shop.subscription.status}`);
-  console.log(`Plan: ${shop.subscription.plan?.name ?? shop.subscription.observedShopifyPlanHandle ?? "(unmapped)"}`);
+  console.log(
+    `Plan: ${shop.subscription.plan?.name ?? shop.subscription.observedShopifyPlanHandle ?? "(unmapped)"}`,
+  );
   console.log("");
-  console.table([{
-    customers: db.customers,
-    recoveries: db.recoveries,
-    conversations: db.conversations,
-    messages: db.messages,
-    usageEvents: db.usageEvents,
-    fixtureBillingPeriods: db.billingPeriods.length,
-    fixtureReservations: db.fixtureReservations,
-    fixturePaidCounters: db.fixturePaidCounters,
-    pendingJobs: pending.available ? pending.jobs.length : "unavailable",
-  }]);
+  console.table([
+    {
+      customers: db.customers,
+      recoveries: db.recoveries,
+      conversations: db.conversations,
+      messages: db.messages,
+      usageEvents: db.usageEvents,
+      fixtureBillingPeriods: db.billingPeriods.length,
+      fixtureReservations: db.fixtureReservations,
+      fixturePaidCounters: db.fixturePaidCounters,
+      pendingJobs: pending.available ? pending.jobs.length : "unavailable",
+    },
+  ]);
 
   if (db.billingPeriods.length) {
     console.log("\nFixture billing periods:");
-    console.table(db.billingPeriods.map((period) => ({
-      id: period.id,
-      status: period.status,
-      start: period.periodStart.toISOString(),
-      end: period.periodEnd.toISOString(),
-    })));
+    console.table(
+      db.billingPeriods.map((period) => ({
+        id: period.id,
+        status: period.status,
+        start: period.periodStart.toISOString(),
+        end: period.periodEnd.toISOString(),
+      })),
+    );
   }
 
   if (pending.available && pending.jobs.length) {
@@ -1249,20 +1793,35 @@ async function main() {
     const humanOptions = validateHumanScenarioOptions();
     // Fail explicitly for the old flag rather than silently ignoring a paid-plan
     // identifier. Materialised BillingPlan rows are not required for snapshots.
-    if (hasFlag(LEGACY_HISTORICAL_PAID_PLAN_FLAG) ||
-        argument(LEGACY_HISTORICAL_PAID_PLAN_FLAG) !== undefined) {
-      throw new Error(`${LEGACY_HISTORICAL_PAID_PLAN_FLAG} is obsolete; use ${WITH_PAST_PAID_HISTORY_FLAG} instead.`);
+    if (
+      hasFlag(LEGACY_HISTORICAL_PAID_PLAN_FLAG) ||
+      argument(LEGACY_HISTORICAL_PAID_PLAN_FLAG) !== undefined
+    ) {
+      throw new Error(
+        `${LEGACY_HISTORICAL_PAID_PLAN_FLAG} is obsolete; use ${WITH_PAST_PAID_HISTORY_FLAG} instead.`,
+      );
     }
     const withPastPaidHistory = hasFlag(WITH_PAST_PAID_HISTORY_FLAG);
     // Validate before pending-job cleanup to keep rejected options side-effect free.
     validatePastPaidHistoryOption(shop, withPastPaidHistory);
-    const humanReadiness = await checkHumanScenarioReadiness(shop, humanOptions);
+    const humanReadiness = await checkHumanScenarioReadiness(
+      shop,
+      humanOptions,
+    );
     // Clean any older fixture queue state first. This prevents a previous
     // --with-pending run from surviving a later database-only re-seed.
     let pendingResult = await cleanupPending(shop);
-    const dbResult = await seedDatabase(shop, humanOptions, withPastPaidHistory);
+    const dbResult = await seedDatabase(
+      shop,
+      humanOptions,
+      withPastPaidHistory,
+    );
     if (hasFlag(WITH_PENDING_FLAG)) pendingResult = await seedPending(shop);
-    else if (!pendingResult.skipped) pendingResult = { skipped: true, reason: `${WITH_PENDING_FLAG} not supplied; previous fixture pending jobs were removed` };
+    else if (!pendingResult.skipped)
+      pendingResult = {
+        skipped: true,
+        reason: `${WITH_PENDING_FLAG} not supplied; previous fixture pending jobs were removed`,
+      };
 
     console.log("");
     console.log("Usage Overview test data seeded");
@@ -1272,36 +1831,74 @@ async function main() {
     console.table([dbResult]);
     console.log("Pending recoveries:", pendingResult);
     if (humanOptions) {
-      console.log("\nHUMAN handover scenarios (test data only; do not send to uncontrolled recipients):");
-      console.table(handoverCases.map(({ index, name, scenario }) => ({
-        recoveryId: recoveriesFixtureId(shop.id, index), customer: name, expected: scenario,
-      })));
-      console.log(`Approved checkout-recovery templates already in this shop: ${humanReadiness.approvedTemplates}`);
-      console.log("No Meta template approvals were created or modified by this script.");
-      console.log("To test shop-wide suspension, use the dedicated UI fixture; this script never suspends a real shop.");
+      console.log(
+        "\nHUMAN handover scenarios (test data only; do not send to uncontrolled recipients):",
+      );
+      console.table(
+        handoverCases.map(({ index, name, scenario }) => ({
+          recoveryId: recoveriesFixtureId(shop.id, index),
+          customer: name,
+          expected: scenario,
+        })),
+      );
+      console.log(
+        `Approved checkout-recovery templates already in this shop: ${humanReadiness.approvedTemplates}`,
+      );
+      console.log(
+        "No Meta template approvals were created or modified by this script.",
+      );
+      console.log(
+        "To test shop-wide suspension, use the dedicated UI fixture; this script never suspends a real shop.",
+      );
     }
     console.log("");
     console.log("Manual checks:");
     if (shop.subscription.plan.kind === "FREE") {
-      console.log("1. WooCommerce: Current usage shows lifetime Free records without a BillingPeriod.");
-      console.log("2. Verify Free credits remaining decreased by the fixture amount.");
-      console.log("3. Run delete and verify the original Free credit balance is restored.");
+      console.log(
+        "1. WooCommerce: Current usage shows lifetime Free records without a BillingPeriod.",
+      );
+      console.log(
+        "2. Verify Free credits remaining decreased by the fixture amount.",
+      );
+      console.log(
+        "3. Run delete and verify the original Free credit balance is restored.",
+      );
       if (withPastPaidHistory) {
-        console.log("4. Past periods contains 3 CLOSED, synthetically historical PAID_METERED periods (no paid BillingPlan required).");
-        console.log("5. Historical rows should show Included plan allowance, not Unattributed.");
-        console.log("6. Check period selection and event pagination without changing current Free subscription.");
+        console.log(
+          "4. Past periods contains 3 CLOSED, synthetically historical PAID_METERED periods (no paid BillingPlan required).",
+        );
+        console.log(
+          "5. Historical rows should show Included plan allowance, not Unattributed.",
+        );
+        console.log(
+          "6. Check period selection and event pagination without changing current Free subscription.",
+        );
       } else {
-        console.log("4. Past periods is correctly empty for a never-paid Free merchant.");
-        console.log(`   To simulate past PAID history, pass ${WITH_PAST_PAID_HISTORY_FLAG}.`);
+        console.log(
+          "4. Past periods is correctly empty for a never-paid Free merchant.",
+        );
+        console.log(
+          `   To simulate past PAID history, pass ${WITH_PAST_PAID_HISTORY_FLAG}.`,
+        );
       }
-      console.log("6. Shopify's existing period-based Usage History does not display Free lifetime events.");
+      console.log(
+        "6. Shopify's existing period-based Usage History does not display Free lifetime events.",
+      );
     } else {
-      console.log("1. Current usage shows 27 events linked to the existing OPEN paid BillingPeriod.");
-      console.log("2. Verify 3 closed fixture periods with Included plan allowance attribution.");
-      console.log("3. Exercise paid usage pagination and rows-per-page (10/25/50/100).");
+      console.log(
+        "1. Current usage shows 27 events linked to the existing OPEN paid BillingPeriod.",
+      );
+      console.log(
+        "2. Verify 3 closed fixture periods with Included plan allowance attribution.",
+      );
+      console.log(
+        "3. Exercise paid usage pagination and rows-per-page (10/25/50/100).",
+      );
     }
     if (hasFlag(WITH_PENDING_FLAG)) {
-      console.log("6. Verify Pending recoveries shows 12 Scheduled rows across two pages and Refresh works.");
+      console.log(
+        "6. Verify Pending recoveries shows 12 Scheduled rows across two pages and Refresh works.",
+      );
     }
     return;
   }
@@ -1312,9 +1909,10 @@ async function main() {
     // cannot leave us with a half-cleaned database/Redis test state.
     const pendingResult = await cleanupPending(shop);
     const dbResult = await prisma.$transaction(
-      (transaction) => cleanupDatabase(transaction, shop.id, {
-        purgeHumanSendAudit: hasFlag(PURGE_HUMAN_AUDIT_FLAG),
-      }),
+      (transaction) =>
+        cleanupDatabase(transaction, shop.id, {
+          purgeHumanSendAudit: hasFlag(PURGE_HUMAN_AUDIT_FLAG),
+        }),
       TRANSACTION_OPTIONS,
     );
     console.log("");
@@ -1331,7 +1929,9 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error(`seed-usage-overview-test-data: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `seed-usage-overview-test-data: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   })
   .finally(async () => {

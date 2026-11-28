@@ -1,10 +1,10 @@
-import { createLogger } from '@modainteract/moda-interact-shared/logging';
+import { createLogger } from "@modainteract/moda-interact-shared/logging";
 
-import { resolveDeploymentEnvironmentName } from './environment.ts';
+import { resolveDeploymentEnvironmentName } from "./environment.ts";
 
 const logger = createLogger({
-  serviceNamespace: 'moda-interact',
-  serviceName: 'moda-interact-admin',
+  serviceNamespace: "moda-interact",
+  serviceName: "moda-interact-admin",
   environment: resolveDeploymentEnvironmentName(),
 });
 
@@ -14,7 +14,7 @@ export type AdminSecurityAudit = {
   action?: string;
   resourceType?: string;
   resourceId?: string;
-  outcome: 'allowed' | 'denied' | 'succeeded' | 'failed';
+  outcome: "allowed" | "denied" | "succeeded" | "failed";
   reasonCode?: string;
   developmentBypass?: boolean;
 };

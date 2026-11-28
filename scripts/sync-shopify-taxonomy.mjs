@@ -59,7 +59,10 @@ async function downloadTaxonomy() {
     if (!response.ok) fail(`download returned HTTP ${response.status}`);
 
     const declaredLength = Number(response.headers.get("content-length"));
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_COMPRESSED_BYTES) {
+    if (
+      Number.isFinite(declaredLength) &&
+      declaredLength > MAX_COMPRESSED_BYTES
+    ) {
       fail("compressed taxonomy asset exceeds the size limit");
     }
 
@@ -145,7 +148,10 @@ async function cleanupStaleTaxonomyIndexes(redis, current) {
   } catch {
     return 0;
   }
-  const stale = staleTaxonomyIndexNames(Array.isArray(indexNames) ? indexNames : [], current);
+  const stale = staleTaxonomyIndexNames(
+    Array.isArray(indexNames) ? indexNames : [],
+    current,
+  );
   for (const indexName of stale) {
     await dropIndex(redis, indexName);
   }
@@ -255,7 +261,8 @@ async function smokeVectorSearch(redis, indexName, vector) {
     "DIALECT",
     2,
   );
-  if (parseSearchTotal(reply) < 1) fail(`${indexName} vector smoke search returned no results`);
+  if (parseSearchTotal(reply) < 1)
+    fail(`${indexName} vector smoke search returned no results`);
 }
 
 async function dropIndex(redis, indexName) {
@@ -286,7 +293,11 @@ async function replaceAliases(redis, previous, next) {
   let topUpdated = false;
   let subcategoryUpdated = false;
   try {
-    await redis.call("FT.ALIASUPDATE", SHOPIFY_TAXONOMY_TOP_ALIAS, next.topIndex);
+    await redis.call(
+      "FT.ALIASUPDATE",
+      SHOPIFY_TAXONOMY_TOP_ALIAS,
+      next.topIndex,
+    );
     topUpdated = true;
     await redis.call(
       "FT.ALIASUPDATE",
@@ -303,9 +314,11 @@ async function replaceAliases(redis, previous, next) {
       ).catch(() => {});
     }
     if (topUpdated) {
-      await restoreAlias(redis, SHOPIFY_TAXONOMY_TOP_ALIAS, previous.topIndex).catch(
-        () => {},
-      );
+      await restoreAlias(
+        redis,
+        SHOPIFY_TAXONOMY_TOP_ALIAS,
+        previous.topIndex,
+      ).catch(() => {});
     }
     throw error;
   }
@@ -369,7 +382,9 @@ let previousMetadata = {};
 try {
   await redis.connect();
   await ensureRedisSearch(redis);
-  process.stdout.write("Connected to Redis and verified Redis Search support.\n");
+  process.stdout.write(
+    "Connected to Redis and verified Redis Search support.\n",
+  );
   previousMetadata = await redis.hgetall(SHOPIFY_TAXONOMY_METADATA_KEY);
   const previous = oldIndexMetadata(previousMetadata);
   const staleIndexCount = await cleanupStaleTaxonomyIndexes(redis, previous);
@@ -381,12 +396,17 @@ try {
     `Downloading Shopify taxonomy ${manifest.version} from the pinned release...\n`,
   );
   const { snapshot, sourceSha256 } = await downloadTaxonomy();
-  const { topLevel, subcategories } = buildTaxonomyIndexDocuments(snapshot.categories);
+  const { topLevel, subcategories } = buildTaxonomyIndexDocuments(
+    snapshot.categories,
+  );
   const documentCount = topLevel.length + subcategories.length;
   process.stdout.write(
     `Downloaded and parsed Shopify taxonomy ${snapshot.version}: ${topLevel.length} top-level categories, ${subcategories.length} subcategories.\n`,
   );
-  const rawVectorBytes = estimateRawVectorBytes(documentCount, config.dimensions);
+  const rawVectorBytes = estimateRawVectorBytes(
+    documentCount,
+    config.dimensions,
+  );
   const estimatedRedisBytes = estimateTaxonomyRedisBytes(
     documentCount,
     config.dimensions,
@@ -446,7 +466,13 @@ try {
     `Created replacement indexes ${names.topIndex} and ${names.subcategoryIndex}.\n`,
   );
 
-  await writeDocuments(redis, topLevel, topVectors, names.topPrefix, "top-level");
+  await writeDocuments(
+    redis,
+    topLevel,
+    topVectors,
+    names.topPrefix,
+    "top-level",
+  );
   await writeDocuments(
     redis,
     subcategories,
@@ -456,19 +482,27 @@ try {
   );
   process.stdout.write("Redis taxonomy document writes complete.\n");
 
-  process.stdout.write("Waiting for Redis Search to index replacement documents.\n");
+  process.stdout.write(
+    "Waiting for Redis Search to index replacement documents.\n",
+  );
   await waitForIndex(redis, names.topIndex, topLevel.length);
   await waitForIndex(redis, names.subcategoryIndex, subcategories.length);
-  process.stdout.write("Redis Search replacement indexes reached expected document counts.\n");
+  process.stdout.write(
+    "Redis Search replacement indexes reached expected document counts.\n",
+  );
 
-  process.stdout.write("Running vector smoke searches against replacement indexes.\n");
+  process.stdout.write(
+    "Running vector smoke searches against replacement indexes.\n",
+  );
   await smokeVectorSearch(redis, names.topIndex, topVectors[0]);
   await smokeVectorSearch(redis, names.subcategoryIndex, subcategoryVectors[0]);
   process.stdout.write("Replacement index vector smoke searches passed.\n");
 
   await replaceAliases(redis, previous, names);
   aliasesReplaced = true;
-  process.stdout.write("Switched stable taxonomy aliases to the replacement indexes.\n");
+  process.stdout.write(
+    "Switched stable taxonomy aliases to the replacement indexes.\n",
+  );
   try {
     await persistMetadata(redis, {
       taxonomyVersion: snapshot.version,
@@ -486,9 +520,11 @@ try {
     });
     process.stdout.write("Persisted active taxonomy index metadata.\n");
   } catch (error) {
-    await restoreAlias(redis, SHOPIFY_TAXONOMY_TOP_ALIAS, previous.topIndex).catch(
-      () => {},
-    );
+    await restoreAlias(
+      redis,
+      SHOPIFY_TAXONOMY_TOP_ALIAS,
+      previous.topIndex,
+    ).catch(() => {});
     await restoreAlias(
       redis,
       SHOPIFY_TAXONOMY_SUBCATEGORY_ALIAS,

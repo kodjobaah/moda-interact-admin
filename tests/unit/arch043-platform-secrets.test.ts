@@ -1,14 +1,48 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PLATFORM_SECRET_CONTRACTS, SECRET_PURPOSES } from "../../src/lib/admin/platform-configuration/secrets-contracts.ts";
+import {
+  PLATFORM_SECRET_CONTRACTS,
+  SECRET_PURPOSES,
+} from "../../src/lib/admin/platform-configuration/secrets-contracts.ts";
 import { validateSecretPayload } from "../../src/lib/admin/platform-configuration/secret-validation.ts";
-import { createConfigUnsealKeyring, sealSecret, secretAAD, unsealSecret } from "../../src/lib/admin/platform-configuration/seal.ts";
+import {
+  createConfigUnsealKeyring,
+  sealSecret,
+  secretAAD,
+  unsealSecret,
+} from "../../src/lib/admin/platform-configuration/seal.ts";
 
-const pair = { consumerKey: `ck_${"a".repeat(40)}`, consumerSecret: `cs_${"b".repeat(40)}` };
-const r2 = { endpoint: `https://${"a".repeat(32)}.r2.cloudflarestorage.com`, bucket: "merchant-knowledge", accessKeyId: "r2-access", secretAccessKey: "r2-secret", maxUploadBytes: 10485760, maxXlsxUncompressedBytes: 52428800 };
+const pair = {
+  consumerKey: `ck_${"a".repeat(40)}`,
+  consumerSecret: `cs_${"b".repeat(40)}`,
+};
+const r2 = {
+  endpoint: `https://${"a".repeat(32)}.r2.cloudflarestorage.com`,
+  bucket: "merchant-knowledge",
+  accessKeyId: "r2-access",
+  secretAccessKey: "r2-secret",
+  maxUploadBytes: 10485760,
+  maxXlsxUncompressedBytes: 52428800,
+};
 
 test("twelve closed secret purposes are registered once", () => {
-  assert.deepEqual([...SECRET_PURPOSES], ["auth.admin", "auth.commerce", "commerce.bootstrap", "merchant.knowledge.r2", "woocommerce.auth", "shopify.oauth", "messaging.meta", "woocommerce.billing", "shopify.partner", "shopify.appEvents", "messaging.sender", "ai.providers"]);
+  assert.deepEqual(
+    [...SECRET_PURPOSES],
+    [
+      "auth.admin",
+      "auth.commerce",
+      "commerce.bootstrap",
+      "merchant.knowledge.r2",
+      "woocommerce.auth",
+      "shopify.oauth",
+      "messaging.meta",
+      "woocommerce.billing",
+      "shopify.partner",
+      "shopify.appEvents",
+      "messaging.sender",
+      "ai.providers",
+    ],
+  );
   assert.equal(PLATFORM_SECRET_CONTRACTS.length, 12);
   for (const contract of PLATFORM_SECRET_CONTRACTS) {
     assert.equal(contract.kind, "secret");
@@ -17,35 +51,95 @@ test("twelve closed secret purposes are registered once", () => {
   }
 });
 test("auth requires three fields and adequate signing key", () => {
-  const auth = { authSecret: "x".repeat(48), googleClientId: "google-id", googleClientSecret: "google-secret" };
+  const auth = {
+    authSecret: "x".repeat(48),
+    googleClientId: "google-id",
+    googleClientSecret: "google-secret",
+  };
   for (const key of ["auth.admin", "auth.commerce"]) {
     assert.deepEqual(validateSecretPayload(key, auth), auth);
-    assert.throws(() => validateSecretPayload(key, { ...auth, authSecret: "short" }));
+    assert.throws(() =>
+      validateSecretPayload(key, { ...auth, authSecret: "short" }),
+    );
     assert.throws(() => validateSecretPayload(key, { ...auth, extra: "leak" }));
   }
 });
 test("bootstrap email selector is normalized, required, never a source default", () => {
-  assert.deepEqual(validateSecretPayload("commerce.bootstrap", { adminEmail: "Admin@Example.com" }), { adminEmail: "admin@example.com" });
-  assert.throws(() => validateSecretPayload("commerce.bootstrap", { adminEmail: "missing-at-sign" }));
-  assert.throws(() => validateSecretPayload("commerce.bootstrap", { adminEmail: " " }));
+  assert.deepEqual(
+    validateSecretPayload("commerce.bootstrap", {
+      adminEmail: "Admin@Example.com",
+    }),
+    { adminEmail: "admin@example.com" },
+  );
+  assert.throws(() =>
+    validateSecretPayload("commerce.bootstrap", {
+      adminEmail: "missing-at-sign",
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("commerce.bootstrap", { adminEmail: " " }),
+  );
 });
 test("R2 JSON remains atomic and requires numeric limits with cloudflare origin", () => {
   assert.deepEqual(validateSecretPayload("merchant.knowledge.r2", r2), r2);
-  assert.throws(() => validateSecretPayload("merchant.knowledge.r2", { ...r2, accessKeyId: undefined }));
-  assert.throws(() => validateSecretPayload("merchant.knowledge.r2", { ...r2, maxUploadBytes: "10485760" }));
-  assert.throws(() => validateSecretPayload("merchant.knowledge.r2", { ...r2, maxUploadBytes: 52428801 }));
-  assert.throws(() => validateSecretPayload("merchant.knowledge.r2", { ...r2, endpoint: "http://127.0.0.1" }));
-  assert.throws(() => validateSecretPayload("merchant.knowledge.r2", { ...r2, secretAccessKey: "" }));
-  assert.throws(() => validateSecretPayload("merchant.knowledge.r2", { ...r2, extra: "bad" }));
+  assert.throws(() =>
+    validateSecretPayload("merchant.knowledge.r2", {
+      ...r2,
+      accessKeyId: undefined,
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("merchant.knowledge.r2", {
+      ...r2,
+      maxUploadBytes: "10485760",
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("merchant.knowledge.r2", {
+      ...r2,
+      maxUploadBytes: 52428801,
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("merchant.knowledge.r2", {
+      ...r2,
+      endpoint: "http://127.0.0.1",
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("merchant.knowledge.r2", {
+      ...r2,
+      secretAccessKey: "",
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("merchant.knowledge.r2", { ...r2, extra: "bad" }),
+  );
 });
 test("WooCommerce platform pair has exact consumer key shape", () => {
   assert.deepEqual(validateSecretPayload("woocommerce.auth", pair), pair);
-  assert.throws(() => validateSecretPayload("woocommerce.auth", { ...pair, consumerKey: "ck_short" }));
-  assert.throws(() => validateSecretPayload("woocommerce.auth", { ...pair, consumerSecret: "" }));
+  assert.throws(() =>
+    validateSecretPayload("woocommerce.auth", {
+      ...pair,
+      consumerKey: "ck_short",
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("woocommerce.auth", { ...pair, consumerSecret: "" }),
+  );
 });
 test("AAD is bound to environment, key and resulting revision", () => {
   const aad = secretAAD("production", "merchant.knowledge.r2", 3);
-  assert.equal(aad, JSON.stringify(["moda-platform-config-v1", "production", "merchant.knowledge.r2", 3, 1]));
+  assert.equal(
+    aad,
+    JSON.stringify([
+      "moda-platform-config-v1",
+      "production",
+      "merchant.knowledge.r2",
+      3,
+      1,
+    ]),
+  );
   assert.notEqual(secretAAD("production", "merchant.knowledge.r2", 4), aad);
   assert.notEqual(secretAAD("staging", "merchant.knowledge.r2", 3), aad);
   assert.throws(() => secretAAD("production", "other.secret", 3));
@@ -53,60 +147,145 @@ test("AAD is bound to environment, key and resulting revision", () => {
 
 test("Admin's keyring factory seals and unseals actual Shared ciphertext in both target environments", () => {
   const activeKeyId = "disposable-test-root";
-  const raw = JSON.stringify({ [activeKeyId]: Buffer.alloc(32, 0x35).toString("base64") });
+  const raw = JSON.stringify({
+    [activeKeyId]: Buffer.alloc(32, 0x35).toString("base64"),
+  });
   const wrapping = createConfigUnsealKeyring(raw, activeKeyId);
-  const plaintext = JSON.stringify({ apiKey: "fixture-id", apiSecret: "fixture-secret" });
+  const plaintext = JSON.stringify({
+    apiKey: "fixture-id",
+    apiSecret: "fixture-secret",
+  });
   const rows = ["development", "test"].map((environment) => ({
     environment,
-    sealed: sealSecret({ environment, key: "shopify.oauth", version: 1, plaintext, wrapping }),
+    sealed: sealSecret({
+      environment,
+      key: "shopify.oauth",
+      version: 1,
+      plaintext,
+      wrapping,
+    }),
   }));
   for (const { environment, sealed } of rows) {
     assert.equal(sealed.wrappingKeyId, activeKeyId);
-    assert.equal(unsealSecret({ environment, key: "shopify.oauth", version: 1, value: sealed, wrapping }), plaintext);
+    assert.equal(
+      unsealSecret({
+        environment,
+        key: "shopify.oauth",
+        version: 1,
+        value: sealed,
+        wrapping,
+      }),
+      plaintext,
+    );
   }
-  assert.throws(() => unsealSecret({ environment: "test", key: "shopify.oauth", version: 1,
-    value: rows[0].sealed, wrapping }), /Invalid sealed secret/);
-  assert.throws(() => createConfigUnsealKeyring(raw, "wrong-id"), /Configuration encryption is unavailable/);
+  assert.throws(
+    () =>
+      unsealSecret({
+        environment: "test",
+        key: "shopify.oauth",
+        version: 1,
+        value: rows[0].sealed,
+        wrapping,
+      }),
+    /Invalid sealed secret/,
+  );
+  assert.throws(
+    () => createConfigUnsealKeyring(raw, "wrong-id"),
+    /Configuration encryption is unavailable/,
+  );
 });
 
 test("sealed secret storage rejects malformed, tampered, and oversized values", () => {
   const activeKeyId = "disposable-test-root";
-  const raw = JSON.stringify({ [activeKeyId]: Buffer.alloc(32, 0x35).toString("base64") });
+  const raw = JSON.stringify({
+    [activeKeyId]: Buffer.alloc(32, 0x35).toString("base64"),
+  });
   const wrapping = createConfigUnsealKeyring(raw, activeKeyId);
   const sealed = sealSecret({
-    environment: "test", key: "shopify.oauth", version: 1,
-    plaintext: "secret-value", wrapping,
+    environment: "test",
+    key: "shopify.oauth",
+    version: 1,
+    plaintext: "secret-value",
+    wrapping,
   });
 
-  assert.throws(() => unsealSecret({
-    environment: "test", key: "shopify.oauth", version: 1,
-    value: { ...sealed, unexpected: true }, wrapping,
-  }), /Invalid sealed secret/);
+  assert.throws(
+    () =>
+      unsealSecret({
+        environment: "test",
+        key: "shopify.oauth",
+        version: 1,
+        value: { ...sealed, unexpected: true },
+        wrapping,
+      }),
+    /Invalid sealed secret/,
+  );
 
   const authTag = Buffer.from(sealed.authTag, "base64");
   authTag[0] ^= 1;
-  assert.throws(() => unsealSecret({
-    environment: "test", key: "shopify.oauth", version: 1,
-    value: { ...sealed, authTag: authTag.toString("base64") }, wrapping,
-  }), /Invalid sealed secret/);
+  assert.throws(
+    () =>
+      unsealSecret({
+        environment: "test",
+        key: "shopify.oauth",
+        version: 1,
+        value: { ...sealed, authTag: authTag.toString("base64") },
+        wrapping,
+      }),
+    /Invalid sealed secret/,
+  );
 
-  assert.throws(() => sealSecret({
-    environment: "test", key: "shopify.oauth", version: 1,
-    plaintext: "x".repeat(8193), wrapping,
-  }), /Secret payload exceeds the supported size/);
+  assert.throws(
+    () =>
+      sealSecret({
+        environment: "test",
+        key: "shopify.oauth",
+        version: 1,
+        plaintext: "x".repeat(8193),
+        wrapping,
+      }),
+    /Secret payload exceeds the supported size/,
+  );
 });
 
 test("five reconciled groups use exact closed schemas", () => {
-  const billing = { apiKey: "woo-billing-key", apiSecret: "woo-billing-secret" };
-  assert.deepEqual(validateSecretPayload("woocommerce.billing", billing), billing);
-  assert.throws(() => validateSecretPayload("woocommerce.billing", { ...billing, environment: "production" }));
-  const partner = { accessToken: "shp-token", organizationId: "12345", appId: "54321", apiVersion: "2026-10" };
+  const billing = {
+    apiKey: "woo-billing-key",
+    apiSecret: "woo-billing-secret",
+  };
+  assert.deepEqual(
+    validateSecretPayload("woocommerce.billing", billing),
+    billing,
+  );
+  assert.throws(() =>
+    validateSecretPayload("woocommerce.billing", {
+      ...billing,
+      environment: "production",
+    }),
+  );
+  const partner = {
+    accessToken: "shp-token",
+    organizationId: "12345",
+    appId: "54321",
+    apiVersion: "2026-10",
+  };
   assert.deepEqual(validateSecretPayload("shopify.partner", partner), partner);
-  assert.deepEqual(validateSecretPayload("shopify.partner", { accessToken: "shp-token", organizationId: "12345", appId: "54321" }),
-    { accessToken: "shp-token", organizationId: "12345", appId: "54321" });
+  assert.deepEqual(
+    validateSecretPayload("shopify.partner", {
+      accessToken: "shp-token",
+      organizationId: "12345",
+      appId: "54321",
+    }),
+    { accessToken: "shp-token", organizationId: "12345", appId: "54321" },
+  );
   const shopifyAppGid = "gid://shopify/App/413747675137";
-  assert.deepEqual(validateSecretPayload("shopify.partner", { ...partner, appId: shopifyAppGid }),
-    { ...partner, appId: shopifyAppGid });
+  assert.deepEqual(
+    validateSecretPayload("shopify.partner", {
+      ...partner,
+      appId: shopifyAppGid,
+    }),
+    { ...partner, appId: shopifyAppGid },
+  );
   for (const invalidAppId of [
     "gid://shopify/Shop/413747675137",
     "gid://partners/App/413747675137",
@@ -116,54 +295,170 @@ test("five reconciled groups use exact closed schemas", () => {
     "gid://shopify/App/413747675137/other",
     "gid://shopify/App/413747675137?different=true",
   ]) {
-    assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, appId: invalidAppId }),
-      /Invalid Shopify application ID\./);
+    assert.throws(
+      () =>
+        validateSecretPayload("shopify.partner", {
+          ...partner,
+          appId: invalidAppId,
+        }),
+      /Invalid Shopify application ID\./,
+    );
   }
-  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, apiVersion: "latest" }));
-  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, organizationId: "" }));
-  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, organizationId: "org/123" }),
-    /Invalid Shopify Partner organisation ID\./);
-  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, appId: "gid:\/\/partners\/App\/123" }),
-    /Invalid Shopify application ID\./);
-  assert.throws(() => validateSecretPayload("shopify.partner", { ...partner, apiVersion: "2026-11" }),
-    /Invalid Shopify Partner API version\./);
+  assert.throws(() =>
+    validateSecretPayload("shopify.partner", {
+      ...partner,
+      apiVersion: "latest",
+    }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("shopify.partner", {
+      ...partner,
+      organizationId: "",
+    }),
+  );
+  assert.throws(
+    () =>
+      validateSecretPayload("shopify.partner", {
+        ...partner,
+        organizationId: "org/123",
+      }),
+    /Invalid Shopify Partner organisation ID\./,
+  );
+  assert.throws(
+    () =>
+      validateSecretPayload("shopify.partner", {
+        ...partner,
+        appId: "gid:\/\/partners\/App\/123",
+      }),
+    /Invalid Shopify application ID\./,
+  );
+  assert.throws(
+    () =>
+      validateSecretPayload("shopify.partner", {
+        ...partner,
+        apiVersion: "2026-11",
+      }),
+    /Invalid Shopify Partner API version\./,
+  );
   const events = { clientId: "events-client", clientSecret: "events-secret" };
   assert.deepEqual(validateSecretPayload("shopify.appEvents", events), events);
-  assert.throws(() => validateSecretPayload("shopify.appEvents", { ...events, extra: "unexpected" }));
-  const sender = { accessToken: "meta-token", phoneNumberId: "1234567890", businessAccountId: "9876543210" };
+  assert.throws(() =>
+    validateSecretPayload("shopify.appEvents", {
+      ...events,
+      extra: "unexpected",
+    }),
+  );
+  const sender = {
+    accessToken: "meta-token",
+    phoneNumberId: "1234567890",
+    businessAccountId: "9876543210",
+  };
   assert.deepEqual(validateSecretPayload("messaging.sender", sender), sender);
-  assert.throws(() => validateSecretPayload("messaging.sender", { ...sender, phoneNumberId: "invalid/identity" }));
-  assert.deepEqual(validateSecretPayload("ai.providers", { openAiApiKey: "provider-key" }), { openAiApiKey: "provider-key" });
-  assert.throws(() => validateSecretPayload("ai.providers", { openAiSpeechApiKey: "legacy-key" }));
-  assert.throws(() => validateSecretPayload("ai.providers", { groqSpeechApiKey: "legacy-key" }));
+  assert.throws(() =>
+    validateSecretPayload("messaging.sender", {
+      ...sender,
+      phoneNumberId: "invalid/identity",
+    }),
+  );
+  assert.deepEqual(
+    validateSecretPayload("ai.providers", { openAiApiKey: "provider-key" }),
+    { openAiApiKey: "provider-key" },
+  );
+  assert.throws(() =>
+    validateSecretPayload("ai.providers", { openAiSpeechApiKey: "legacy-key" }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("ai.providers", { groqSpeechApiKey: "legacy-key" }),
+  );
   assert.throws(() => validateSecretPayload("ai.providers", {}));
-  assert.throws(() => validateSecretPayload("ai.providers", { openAiTranslationApiKey: "" }));
-  assert.throws(() => validateSecretPayload("ai.providers", { OPENAI_API_KEY: "legacy" }));
+  assert.throws(() =>
+    validateSecretPayload("ai.providers", { openAiTranslationApiKey: "" }),
+  );
+  assert.throws(() =>
+    validateSecretPayload("ai.providers", { OPENAI_API_KEY: "legacy" }),
+  );
 });
 test("reconciled secrets keep canonical AAD binding", () => {
-  for (const purpose of ["woocommerce.billing", "shopify.partner", "shopify.appEvents", "messaging.sender", "ai.providers"]) {
-    assert.equal(secretAAD("production", purpose, 2), JSON.stringify(["moda-platform-config-v1", "production", purpose, 2, 1]));
-    assert.notEqual(secretAAD("production", purpose, 2), secretAAD("staging", purpose, 2));
+  for (const purpose of [
+    "woocommerce.billing",
+    "shopify.partner",
+    "shopify.appEvents",
+    "messaging.sender",
+    "ai.providers",
+  ]) {
+    assert.equal(
+      secretAAD("production", purpose, 2),
+      JSON.stringify(["moda-platform-config-v1", "production", purpose, 2, 1]),
+    );
+    assert.notEqual(
+      secretAAD("production", purpose, 2),
+      secretAAD("staging", purpose, 2),
+    );
   }
 });
-
 
 test("deployment encryption keys are not editable platform secrets", () => {
   assert.equal(SECRET_PURPOSES.has("commerce.connectionKeys"), false);
-  assert.throws(() => validateSecretPayload("commerce.connectionKeys", {
-    connectionKeysJson: JSON.stringify({ old: Buffer.alloc(32, 1).toString("base64") }), activeKeyId: "old",
-  }), /Unsupported/);
+  assert.throws(
+    () =>
+      validateSecretPayload("commerce.connectionKeys", {
+        connectionKeysJson: JSON.stringify({
+          old: Buffer.alloc(32, 1).toString("base64"),
+        }),
+        activeKeyId: "old",
+      }),
+    /Unsupported/,
+  );
 });
 
 test("unified map decrypts historical platform secrets after selecting a different writer key", () => {
   const historical = Buffer.alloc(32, 0x41).toString("base64");
   const credential = Buffer.alloc(32, 0x42).toString("base64");
-  const original = createConfigUnsealKeyring(JSON.stringify({ historical }), "historical");
-  const combined = createConfigUnsealKeyring(JSON.stringify({ historical, credential }), "credential");
-  const plaintext = JSON.stringify({ apiKey: "fixture-id", apiSecret: "fixture-secret" });
-  const saved = sealSecret({ environment: "production", key: "shopify.oauth", version: 7, plaintext, wrapping: original });
-  assert.equal(unsealSecret({ environment: "production", key: "shopify.oauth", version: 7, value: saved, wrapping: combined }), plaintext);
-  const next = sealSecret({ environment: "production", key: "shopify.oauth", version: 8, plaintext, wrapping: combined });
+  const original = createConfigUnsealKeyring(
+    JSON.stringify({ historical }),
+    "historical",
+  );
+  const combined = createConfigUnsealKeyring(
+    JSON.stringify({ historical, credential }),
+    "credential",
+  );
+  const plaintext = JSON.stringify({
+    apiKey: "fixture-id",
+    apiSecret: "fixture-secret",
+  });
+  const saved = sealSecret({
+    environment: "production",
+    key: "shopify.oauth",
+    version: 7,
+    plaintext,
+    wrapping: original,
+  });
+  assert.equal(
+    unsealSecret({
+      environment: "production",
+      key: "shopify.oauth",
+      version: 7,
+      value: saved,
+      wrapping: combined,
+    }),
+    plaintext,
+  );
+  const next = sealSecret({
+    environment: "production",
+    key: "shopify.oauth",
+    version: 8,
+    plaintext,
+    wrapping: combined,
+  });
   assert.equal(next.wrappingKeyId, "credential");
-  assert.equal(unsealSecret({ environment: "production", key: "shopify.oauth", version: 8, value: next, wrapping: combined }), plaintext);
+  assert.equal(
+    unsealSecret({
+      environment: "production",
+      key: "shopify.oauth",
+      version: 8,
+      value: next,
+      wrapping: combined,
+    }),
+    plaintext,
+  );
 });

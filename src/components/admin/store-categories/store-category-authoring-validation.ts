@@ -48,7 +48,9 @@ export function validateStoreCategoryAuthoringSession(
   const seenConditionKeys = new Set<string>();
   for (const mapping of session.shopifyMappings) {
     if (!isStoreCategoryTaxonomyReference(mapping.taxonomy)) {
-      mappingIssues.push("Every category mapping needs a complete taxonomy selection.");
+      mappingIssues.push(
+        "Every category mapping needs a complete taxonomy selection.",
+      );
       continue;
     }
     const taxonomyId = mapping.taxonomy.categoryId.trim();
@@ -66,12 +68,16 @@ export function validateStoreCategoryAuthoringSession(
       );
     }
     const conditionKey = mapping.conditionKey.trim();
-    if (!StoreCategoryPromptConditionKeySchema.safeParse(conditionKey).success) {
+    if (
+      !StoreCategoryPromptConditionKeySchema.safeParse(conditionKey).success
+    ) {
       mappingIssues.push(
         `Mapping ${mapping.taxonomy.fullName} needs a valid condition key such as shoes or formal_shoes.`,
       );
     } else if (seenConditionKeys.has(conditionKey)) {
-      mappingIssues.push(`Mapping condition key ${conditionKey} is used more than once.`);
+      mappingIssues.push(
+        `Mapping condition key ${conditionKey} is used more than once.`,
+      );
     }
     seenConditionKeys.add(conditionKey);
 
@@ -101,7 +107,9 @@ export function validateStoreCategoryAuthoringSession(
     );
   }
   if (session.defaultTemplate.description.trim().length > 2000) {
-    templateIssues.push("Template description must be at most 2,000 characters.");
+    templateIssues.push(
+      "Template description must be at most 2,000 characters.",
+    );
   }
   if (promptText.length < 1 || promptText.length > 100_000) {
     templateIssues.push(

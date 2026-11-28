@@ -164,13 +164,7 @@ function firstProduct(cart) {
   return cart.items[0]?.title ?? "your items";
 }
 
-function shortConversation({
-  customer,
-  cart,
-  checkoutUrl,
-  outcome,
-  status,
-}) {
+function shortConversation({ customer, cart, checkoutUrl, outcome, status }) {
   const first = firstProduct(cart);
   const total = `£${cart.total.toFixed(2)}`;
 
@@ -373,10 +367,7 @@ function longConversation({ customer, cart, checkoutUrl }) {
       "Does the checkout link expire soon?",
       "The basket is still active right now. If the store changes stock or the checkout expires, the saved state may no longer be available.",
     ],
-    [
-      "Could you send the link again?",
-      `Absolutely: ${checkoutUrl}`,
-    ],
+    ["Could you send the link again?", `Absolutely: ${checkoutUrl}`],
     [
       "Thanks. I am opening it now.",
       "No problem. I can stay here while you check it.",
@@ -451,11 +442,7 @@ function longConversation({ customer, cart, checkoutUrl }) {
   return messages; // 47 messages: 1 initial + 23 customer/agent pairs.
 }
 
-function messageRows({
-  recoveryIndex,
-  detectedAt,
-  messages,
-}) {
+function messageRows({ recoveryIndex, detectedAt, messages }) {
   const firstMessageAt = at(detectedAt, 25 * 60 * 1000);
 
   return messages.map((message, index) => {
@@ -549,14 +536,12 @@ function lifecycleFor({ status, detectedAt }) {
 function recoveryTimestamps(status, detectedAt, messages) {
   const messageSentAt =
     status === "DETECTED" ? null : at(detectedAt, 25 * 60 * 1000);
-  const engagedAt =
-    ["ENGAGED", "COMPLETED", "CANCELLED"].includes(status)
-      ? at(detectedAt, 34 * 60 * 1000)
-      : null;
+  const engagedAt = ["ENGAGED", "COMPLETED", "CANCELLED"].includes(status)
+    ? at(detectedAt, 34 * 60 * 1000)
+    : null;
   const completedAt =
     status === "COMPLETED" ? at(detectedAt, 2 * HOUR_MS) : null;
-  const expiredAt =
-    status === "EXPIRED" ? at(detectedAt, 48 * HOUR_MS) : null;
+  const expiredAt = status === "EXPIRED" ? at(detectedAt, 48 * HOUR_MS) : null;
 
   const lastMessageAt = messages.length
     ? messages[messages.length - 1].createdAt
@@ -565,9 +550,7 @@ function recoveryTimestamps(status, detectedAt, messages) {
   const finalAt =
     completedAt ??
     expiredAt ??
-    (status === "CANCELLED"
-      ? at(detectedAt, 70 * 60 * 1000)
-      : lastMessageAt);
+    (status === "CANCELLED" ? at(detectedAt, 70 * 60 * 1000) : lastMessageAt);
 
   return {
     messageSentAt,
@@ -664,7 +647,11 @@ async function main() {
   let globalRecoveryIndex = 0;
   let longConversationLink = null;
 
-  for (let customerIndex = 0; customerIndex < CUSTOMERS.length; customerIndex += 1) {
+  for (
+    let customerIndex = 0;
+    customerIndex < CUSTOMERS.length;
+    customerIndex += 1
+  ) {
     const customer = CUSTOMERS[customerIndex];
     const customerId = customerIds.get(customerIndex);
 
@@ -683,8 +670,7 @@ async function main() {
             RECOVERY_PROFILES.length
         ];
 
-      const checkoutToken =
-        `${CHECKOUT_PREFIX}${String(globalRecoveryIndex + 1).padStart(3, "0")}`;
+      const checkoutToken = `${CHECKOUT_PREFIX}${String(globalRecoveryIndex + 1).padStart(3, "0")}`;
 
       // Spread recoveries over roughly the last 3 months, keeping the first
       // customer's examples newest so they are convenient to inspect.
@@ -770,10 +756,9 @@ async function main() {
                     timeZone: "Europe/London",
                     inboundVersion: inboundCount,
                     lastProcessedVersion: inboundCount,
-                    summary:
-                      profile.longConversation
-                        ? `Ongoing recovery conversation with ${customer.firstName}; customer asked detailed sizing, delivery and checkout questions.`
-                        : `Seeded ${profile.outcome ?? "IN_PROGRESS"} recovery conversation for admin UI testing.`,
+                    summary: profile.longConversation
+                      ? `Ongoing recovery conversation with ${customer.firstName}; customer asked detailed sizing, delivery and checkout questions.`
+                      : `Seeded ${profile.outcome ?? "IN_PROGRESS"} recovery conversation for admin UI testing.`,
                     lastInboundAt: lastInbound?.createdAt ?? null,
                     lastMessageAt:
                       messages[messages.length - 1]?.createdAt ?? null,

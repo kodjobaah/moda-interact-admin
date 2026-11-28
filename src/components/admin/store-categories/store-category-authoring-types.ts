@@ -1,17 +1,10 @@
 import type { StoreCategoryTaxonomyReference } from "../../../lib/admin/store-category-taxonomy-reference.ts";
 
 export type StoreCategoryAuthoringStep =
-  | "category"
-  | "mappings"
-  | "template"
-  | "review";
+  "category" | "mappings" | "template" | "review";
 
 export type StoreCategoryAuthoringStatus =
-  | "DRAFT"
-  | "READY"
-  | "SAVING"
-  | "FAILED"
-  | "COMPLETE";
+  "DRAFT" | "READY" | "SAVING" | "FAILED" | "COMPLETE";
 
 export type StoreCategoryAuthoringMapping = {
   clientId: string;

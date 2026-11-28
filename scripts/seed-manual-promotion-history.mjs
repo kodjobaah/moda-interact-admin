@@ -186,10 +186,7 @@ async function resolveShop(shopArgument) {
   const normalized = String(shopArgument).trim().toLowerCase();
   const shop = await prisma.shop.findFirst({
     where: {
-      OR: [
-        { id: shopArgument },
-        { domain: normalized },
-      ],
+      OR: [{ id: shopArgument }, { domain: normalized }],
     },
     select: {
       id: true,
@@ -252,11 +249,7 @@ async function findAlternatePlan(transaction, currentPlanId) {
     where: {
       id: { not: currentPlanId },
     },
-    orderBy: [
-      { active: "desc" },
-      { name: "asc" },
-      { id: "asc" },
-    ],
+    orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
     select: {
       id: true,
       name: true,
@@ -442,9 +435,12 @@ function translationData(campaignId, scenario, copyIndex, now) {
       id: `${campaignId}-translation-${locale}`,
       promotionCampaignId: campaignId,
       locale,
-      merchantTitle: locale === "en" ? merchantTitle : `${prefix} · ${merchantTitle}`,
+      merchantTitle:
+        locale === "en" ? merchantTitle : `${prefix} · ${merchantTitle}`,
       merchantDescription:
-        locale === "en" ? merchantDescription : `${prefix} · ${merchantDescription}`,
+        locale === "en"
+          ? merchantDescription
+          : `${prefix} · ${merchantDescription}`,
       createdAt: now,
       updatedAt: now,
     };
@@ -455,14 +451,14 @@ async function existingFixtureCampaigns(transaction, shopId, scenarios = null) {
   const prefix = shopFixturePrefix(shopId);
   const ids = scenarios
     ? scenarios.flatMap((scenario) =>
-        Array.from({ length: 10 }, (_, index) => fixtureId(shopId, scenario, index + 1)),
+        Array.from({ length: 10 }, (_, index) =>
+          fixtureId(shopId, scenario, index + 1),
+        ),
       )
     : null;
 
   return transaction.promotionCampaign.findMany({
-    where: ids
-      ? { id: { in: ids } }
-      : { id: { startsWith: prefix } },
+    where: ids ? { id: { in: ids } } : { id: { startsWith: prefix } },
     select: {
       id: true,
       name: true,
@@ -492,8 +488,17 @@ async function existingFixtureCampaigns(transaction, shopId, scenarios = null) {
   });
 }
 
-async function deleteFixtureCampaigns(transaction, shopId, scenarios, forceUsedTestData) {
-  const campaigns = await existingFixtureCampaigns(transaction, shopId, scenarios);
+async function deleteFixtureCampaigns(
+  transaction,
+  shopId,
+  scenarios,
+  forceUsedTestData,
+) {
+  const campaigns = await existingFixtureCampaigns(
+    transaction,
+    shopId,
+    scenarios,
+  );
   if (campaigns.length === 0) {
     return { campaigns: 0, grants: 0, reservations: 0, selections: 0 };
   }
@@ -595,7 +600,8 @@ async function seedScenario({
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-  const targetPlanId = scenario === "no-longer-eligible" ? alternatePlan.id : null;
+  const targetPlanId =
+    scenario === "no-longer-eligible" ? alternatePlan.id : null;
 
   const campaign = await transaction.promotionCampaign.create({
     data: {
@@ -623,7 +629,12 @@ async function seedScenario({
   });
 
   await transaction.promotionCampaignTranslation.createMany({
-    data: translationData(id, scenario, copyIndex, eventTime("CREATED", definition)),
+    data: translationData(
+      id,
+      scenario,
+      copyIndex,
+      eventTime("CREATED", definition),
+    ),
   });
 
   for (const kind of definition.events) {
@@ -661,10 +672,11 @@ async function seedScenario({
 
   let currentlySelected = false;
   if (createCurrentSelection) {
-    const existingSelection = await transaction.merchantPromotionSelection.findUnique({
-      where: { shopId: shop.id },
-      select: { id: true, promotionalCreditGrantId: true },
-    });
+    const existingSelection =
+      await transaction.merchantPromotionSelection.findUnique({
+        where: { shopId: shop.id },
+        select: { id: true, promotionalCreditGrantId: true },
+      });
 
     if (!existingSelection) {
       await transaction.merchantPromotionSelection.create({
@@ -718,67 +730,60 @@ async function seedHistory(shop, requestedScenario, copies) {
 
   const now = new Date();
 
-  return prisma.$transaction(
-    async (transaction) => {
-      const admin = await ensureDevelopmentAdmin(transaction);
-      const alternatePlan = await findAlternatePlan(
-        transaction,
-        shop.subscription?.planId ?? null,
-      );
+  return prisma.$transaction(async (transaction) => {
+    const admin = await ensureDevelopmentAdmin(transaction);
+    const alternatePlan = await findAlternatePlan(
+      transaction,
+      shop.subscription?.planId ?? null,
+    );
 
-      // Reseeding is deterministic. Remove only this shop's requested manual fixtures.
-      await deleteFixtureCampaigns(
-        transaction,
-        shop.id,
-        scenarios,
-        hasFlag("force-used-test-data"),
-      );
+    // Reseeding is deterministic. Remove only this shop's requested manual fixtures.
+    await deleteFixtureCampaigns(
+      transaction,
+      shop.id,
+      scenarios,
+      hasFlag("force-used-test-data"),
+    );
 
-      const results = [];
-      let currentSelectionCreated = false;
+    const results = [];
+    let currentSelectionCreated = false;
 
-      for (const scenario of scenarios) {
-        for (let copyIndex = 1; copyIndex <= copies; copyIndex += 1) {
-          const result = await seedScenario({
-            transaction,
-            shop,
-            admin,
-            scenario,
-            copyIndex,
-            now,
-            alternatePlan,
-            // Only the first SELECTED fixture may become current, and only when the
-            // shop does not already have an existing current selection.
-            createCurrentSelection:
-              !currentSelectionCreated &&
-              scenario === "selected" &&
-              copyIndex === 1,
-          });
+    for (const scenario of scenarios) {
+      for (let copyIndex = 1; copyIndex <= copies; copyIndex += 1) {
+        const result = await seedScenario({
+          transaction,
+          shop,
+          admin,
+          scenario,
+          copyIndex,
+          now,
+          alternatePlan,
+          // Only the first SELECTED fixture may become current, and only when the
+          // shop does not already have an existing current selection.
+          createCurrentSelection:
+            !currentSelectionCreated &&
+            scenario === "selected" &&
+            copyIndex === 1,
+        });
 
-          if (!result.skipped && result.currentlySelected) {
-            currentSelectionCreated = true;
-          }
-
-          results.push(result);
+        if (!result.skipped && result.currentlySelected) {
+          currentSelectionCreated = true;
         }
-      }
 
-      return results;
-    },
-    TRANSACTION_OPTIONS,
-  );
+        results.push(result);
+      }
+    }
+
+    return results;
+  }, TRANSACTION_OPTIONS);
 }
 
 async function deleteHistory(shop, requestedScenario) {
   requireConfirmation();
 
-  const scenarios =
-    requestedScenario === "all" ? null : [requestedScenario];
+  const scenarios = requestedScenario === "all" ? null : [requestedScenario];
 
-  if (
-    requestedScenario !== "all" &&
-    !SCENARIOS.includes(requestedScenario)
-  ) {
+  if (requestedScenario !== "all" && !SCENARIOS.includes(requestedScenario)) {
     throw new Error(
       `Unknown scenario "${requestedScenario}". Expected one of: ${SCENARIOS.join(", ")}, all.`,
     );
@@ -825,9 +830,7 @@ async function status(shop) {
   console.log(`Shop ID: ${shop.id}`);
   console.log(
     `Current billing plan: ${
-      shop.subscription?.plan?.name ??
-      shop.subscription?.planId ??
-      "(none)"
+      shop.subscription?.plan?.name ?? shop.subscription?.planId ?? "(none)"
     }`,
   );
   console.log("");

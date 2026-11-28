@@ -89,7 +89,11 @@ export function TranslationModelAutomaticDefaultForm({
           </button>
         ) : null}
       </div>
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-gray-700">
+      <p
+        role="status"
+        aria-live="polite"
+        className="min-h-5 text-sm text-gray-700"
+      >
         {pending ? "Updating the automatic translation default…" : message}
       </p>
     </form>

@@ -18,23 +18,18 @@ function canonicalPlan(plan: MerchantPricingEconomicsPlan) {
     usageEvents: plan.usageEvents.map((event) => ({
       eventHandle: event.eventHandle.trim(),
       creditsGrantedPerUnit: event.creditsGrantedPerUnit,
-      maximumUnitsPerBillingPeriod:
-        event.maximumUnitsPerBillingPeriod,
+      maximumUnitsPerBillingPeriod: event.maximumUnitsPerBillingPeriod,
 
       pricing:
         event.pricing.mode === "FIXED"
           ? {
               mode: "FIXED" as const,
-              currency: event.pricing.currency
-                .trim()
-                .toUpperCase(),
+              currency: event.pricing.currency.trim().toUpperCase(),
               unitAmountMinor: event.pricing.unitAmountMinor,
             }
           : {
               mode: event.pricing.mode,
-              currency: event.pricing.currency
-                .trim()
-                .toUpperCase(),
+              currency: event.pricing.currency.trim().toUpperCase(),
               tiers: event.pricing.tiers.map((tier) => ({
                 upTo: tier.upTo,
                 amountPerUnitMinor: tier.amountPerUnitMinor,
@@ -70,7 +65,5 @@ export function createMerchantPricingEconomicsOverrideFingerprint({
     plans,
   };
 
-  return createHash("sha256")
-    .update(JSON.stringify(document))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(document)).digest("hex");
 }

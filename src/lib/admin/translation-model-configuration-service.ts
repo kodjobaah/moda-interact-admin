@@ -58,33 +58,35 @@ export async function createTranslationModelConfiguration(
     const result = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const credential = await transaction.commerceTranslationProviderCredential.findUnique({
-          where: {
-            environment_provider: {
-              environment,
-              provider: TRANSLATION_PROVIDER,
+        const credential =
+          await transaction.commerceTranslationProviderCredential.findUnique({
+            where: {
+              environment_provider: {
+                environment,
+                provider: TRANSLATION_PROVIDER,
+              },
             },
-          },
-          select: { id: true },
-        });
+            select: { id: true },
+          });
         if (!credential) {
           throw new Error(
             TRANSLATION_CONFIGURATION_ERRORS.credentialNotConfigured,
           );
         }
-        const created = await transaction.commerceTranslationModelConfiguration.create({
-          data: {
-            environment,
-            provider: TRANSLATION_PROVIDER,
-            providerModelId: validated.providerModelId,
-            displayName: validated.displayName,
-            enabled: true,
-            editVersion: 1,
-            createdByAdminId: principal.id,
-            updatedByAdminId: principal.id,
-          },
-          select: translationModelSelect,
-        });
+        const created =
+          await transaction.commerceTranslationModelConfiguration.create({
+            data: {
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              providerModelId: validated.providerModelId,
+              displayName: validated.displayName,
+              enabled: true,
+              editVersion: 1,
+              createdByAdminId: principal.id,
+              updatedByAdminId: principal.id,
+            },
+            select: translationModelSelect,
+          });
         await transaction.commerceAuditEvent.create({
           data: {
             actorType: CommerceAuditActorType.PLATFORM_ADMIN,
@@ -124,9 +126,7 @@ export async function createTranslationModelConfiguration(
       throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelDuplicate);
     }
     if (databaseCode(cause) === "P2003") {
-      throw new Error(
-        TRANSLATION_CONFIGURATION_ERRORS.credentialNotConfigured,
-      );
+      throw new Error(TRANSLATION_CONFIGURATION_ERRORS.credentialNotConfigured);
     }
     if (databaseCode(cause) === "P2034") {
       throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
@@ -158,41 +158,46 @@ export async function updateTranslationModelConfiguration(
     const result = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const existing = await transaction.commerceTranslationModelConfiguration.findFirst({
-          where: {
-            id: validated.id,
-            environment,
-            provider: TRANSLATION_PROVIDER,
-          },
-          select: { id: true, editVersion: true },
-        });
+        const existing =
+          await transaction.commerceTranslationModelConfiguration.findFirst({
+            where: {
+              id: validated.id,
+              environment,
+              provider: TRANSLATION_PROVIDER,
+            },
+            select: { id: true, editVersion: true },
+          });
         if (!existing) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelNotFound);
         }
         if (existing.editVersion !== validated.expectedEditVersion) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
         }
-        const updated = await transaction.commerceTranslationModelConfiguration.updateMany({
-          where: {
-            id: existing.id,
-            environment,
-            provider: TRANSLATION_PROVIDER,
-            editVersion: validated.expectedEditVersion,
-          },
-          data: {
-            displayName: validated.displayName,
-            providerModelId: validated.providerModelId,
-            updatedByAdminId: principal.id,
-            editVersion: { increment: 1 },
-          },
-        });
+        const updated =
+          await transaction.commerceTranslationModelConfiguration.updateMany({
+            where: {
+              id: existing.id,
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              editVersion: validated.expectedEditVersion,
+            },
+            data: {
+              displayName: validated.displayName,
+              providerModelId: validated.providerModelId,
+              updatedByAdminId: principal.id,
+              editVersion: { increment: 1 },
+            },
+          });
         if (updated.count !== 1) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
         }
-        const row = await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow({
-          where: { id: existing.id },
-          select: translationModelSelect,
-        });
+        const row =
+          await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow(
+            {
+              where: { id: existing.id },
+              select: translationModelSelect,
+            },
+          );
         await transaction.commerceAuditEvent.create({
           data: {
             actorType: CommerceAuditActorType.PLATFORM_ADMIN,
@@ -258,19 +263,20 @@ export async function setTranslationModelConfigurationAutomaticDefault(
     const result = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const existing = await transaction.commerceTranslationModelConfiguration.findFirst({
-          where: {
-            id: validated.id,
-            environment,
-            provider: TRANSLATION_PROVIDER,
-          },
-          select: {
-            id: true,
-            enabled: true,
-            automaticDefault: true,
-            editVersion: true,
-          },
-        });
+        const existing =
+          await transaction.commerceTranslationModelConfiguration.findFirst({
+            where: {
+              id: validated.id,
+              environment,
+              provider: TRANSLATION_PROVIDER,
+            },
+            select: {
+              id: true,
+              enabled: true,
+              automaticDefault: true,
+              editVersion: true,
+            },
+          });
         if (!existing) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelNotFound);
         }
@@ -283,10 +289,13 @@ export async function setTranslationModelConfigurationAutomaticDefault(
           );
         }
         if (existing.automaticDefault) {
-          const current = await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow({
-            where: { id: existing.id },
-            select: translationModelSelect,
-          });
+          const current =
+            await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow(
+              {
+                where: { id: existing.id },
+                select: translationModelSelect,
+              },
+            );
           return translationModelView(current);
         }
 
@@ -346,10 +355,13 @@ export async function setTranslationModelConfigurationAutomaticDefault(
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
         }
 
-        const row = await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow({
-          where: { id: existing.id },
-          select: translationModelSelect,
-        });
+        const row =
+          await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow(
+            {
+              where: { id: existing.id },
+              select: translationModelSelect,
+            },
+          );
         await transaction.commerceAuditEvent.create({
           data: {
             actorType: CommerceAuditActorType.PLATFORM_ADMIN,
@@ -389,12 +401,15 @@ export async function setTranslationModelConfigurationAutomaticDefault(
     });
     return result;
   } catch (cause) {
-    logger.error("admin.translation_model_configuration.automatic_default_failed", {
-      environment,
-      provider: TRANSLATION_PROVIDER,
-      modelConfigurationId: validated.id,
-      databaseCode: databaseCode(cause) ?? null,
-    });
+    logger.error(
+      "admin.translation_model_configuration.automatic_default_failed",
+      {
+        environment,
+        provider: TRANSLATION_PROVIDER,
+        modelConfigurationId: validated.id,
+        databaseCode: databaseCode(cause) ?? null,
+      },
+    );
     if (databaseCode(cause) === "P2002" || databaseCode(cause) === "P2034") {
       throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
     }
@@ -421,19 +436,20 @@ export async function setTranslationModelConfigurationEnabled(
     const result = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const existing = await transaction.commerceTranslationModelConfiguration.findFirst({
-          where: {
-            id: validated.id,
-            environment,
-            provider: TRANSLATION_PROVIDER,
-          },
-          select: {
-            id: true,
-            enabled: true,
-            automaticDefault: true,
-            editVersion: true,
-          },
-        });
+        const existing =
+          await transaction.commerceTranslationModelConfiguration.findFirst({
+            where: {
+              id: validated.id,
+              environment,
+              provider: TRANSLATION_PROVIDER,
+            },
+            select: {
+              id: true,
+              enabled: true,
+              automaticDefault: true,
+              editVersion: true,
+            },
+          });
         if (!existing) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelNotFound);
         }
@@ -445,27 +461,31 @@ export async function setTranslationModelConfigurationEnabled(
             TRANSLATION_CONFIGURATION_ERRORS.modelAutomaticDefaultDisableBlocked,
           );
         }
-        const updated = await transaction.commerceTranslationModelConfiguration.updateMany({
-          where: {
-            id: existing.id,
-            environment,
-            provider: TRANSLATION_PROVIDER,
-            editVersion: validated.expectedEditVersion,
-            ...(validated.enabled ? {} : { automaticDefault: false }),
-          },
-          data: {
-            enabled: validated.enabled,
-            updatedByAdminId: principal.id,
-            editVersion: { increment: 1 },
-          },
-        });
+        const updated =
+          await transaction.commerceTranslationModelConfiguration.updateMany({
+            where: {
+              id: existing.id,
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              editVersion: validated.expectedEditVersion,
+              ...(validated.enabled ? {} : { automaticDefault: false }),
+            },
+            data: {
+              enabled: validated.enabled,
+              updatedByAdminId: principal.id,
+              editVersion: { increment: 1 },
+            },
+          });
         if (updated.count !== 1) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.modelChanged);
         }
-        const row = await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow({
-          where: { id: existing.id },
-          select: translationModelSelect,
-        });
+        const row =
+          await transaction.commerceTranslationModelConfiguration.findUniqueOrThrow(
+            {
+              where: { id: existing.id },
+              select: translationModelSelect,
+            },
+          );
         await transaction.commerceAuditEvent.create({
           data: {
             actorType: CommerceAuditActorType.PLATFORM_ADMIN,

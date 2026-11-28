@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
-import {
-  TRANSLATION_CONFIGURATION_ERRORS,
-} from "@/lib/admin/translation-configuration";
+import { TRANSLATION_CONFIGURATION_ERRORS } from "@/lib/admin/translation-configuration";
 import {
   removeTranslationProviderCredential,
   replaceTranslationProviderCredential,
@@ -19,8 +17,7 @@ import {
 import { TRANSLATION_CREDENTIAL_ENCRYPTION_UNAVAILABLE } from "@/lib/admin/translation-credential-crypto";
 
 type ActionResult =
-  | { ok: true }
-  | { ok: false; message: string; refreshRequired: boolean };
+  { ok: true } | { ok: false; message: string; refreshRequired: boolean };
 
 function formText(formData: FormData, name: string): string {
   const values = formData.getAll(name);
@@ -97,7 +94,9 @@ async function requireSuperAdmin() {
   return principal;
 }
 
-async function finish(operation: () => Promise<unknown>): Promise<ActionResult> {
+async function finish(
+  operation: () => Promise<unknown>,
+): Promise<ActionResult> {
   try {
     await operation();
     revalidatePath("/system-controls/translations");

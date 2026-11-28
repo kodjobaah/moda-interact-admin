@@ -19,7 +19,6 @@ const categoryBase = {
   },
 };
 
-
 const topLevelTaxonomy = {
   source: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
   version: "2026-08",
@@ -47,20 +46,28 @@ const templateBase = {
   editVersion: 3,
 };
 
-function transactionFor(options: {
-  category?: Record<string, unknown>;
-  template?: Record<string, unknown>;
-  categoryUpdateCount?: number;
-  templateUpdateCount?: number;
-  enabledDefaultCategory?: { id: string } | null;
-  categoryCreateError?: Error;
-  taxonomyCreateError?: Error;
-  taxonomyMapping?: Record<string, unknown>;
-} = {}) {
+function transactionFor(
+  options: {
+    category?: Record<string, unknown>;
+    template?: Record<string, unknown>;
+    categoryUpdateCount?: number;
+    templateUpdateCount?: number;
+    enabledDefaultCategory?: { id: string } | null;
+    categoryCreateError?: Error;
+    taxonomyCreateError?: Error;
+    taxonomyMapping?: Record<string, unknown>;
+  } = {},
+) {
   const calls: Array<{ model: string; method: string; args?: unknown }> = [];
   const audits: Array<Record<string, unknown>> = [];
-  const category = { ...categoryBase, ...options.category } as typeof categoryBase;
-  const template = { ...templateBase, ...options.template } as typeof templateBase;
+  const category = {
+    ...categoryBase,
+    ...options.category,
+  } as typeof categoryBase;
+  const template = {
+    ...templateBase,
+    ...options.template,
+  } as typeof templateBase;
   const mapping = {
     id: "mapping-1",
     categoryId: "category-1",
@@ -72,7 +79,11 @@ function transactionFor(options: {
     category: { enabled: false },
     ...options.taxonomyMapping,
   };
-  const updates: Array<{ model: string; where: Record<string, unknown>; data: Record<string, unknown> }> = [];
+  const updates: Array<{
+    model: string;
+    where: Record<string, unknown>;
+    data: Record<string, unknown>;
+  }> = [];
   const trap = async () => {
     throw new Error("unexpected database operation");
   };
@@ -102,11 +113,22 @@ function transactionFor(options: {
         calls.push({ model: "category", method: "findFirst" });
         return options.enabledDefaultCategory ?? null;
       },
-      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-        calls.push({ model: "category", method: "updateMany", args: { where, data } });
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        calls.push({
+          model: "category",
+          method: "updateMany",
+          args: { where, data },
+        });
         updates.push({ model: "category", where, data });
         if (options.categoryUpdateCount === 0) return { count: 0 };
-        if (where.id === "category-created" && where.editVersion === 1) return { count: 1 };
+        if (where.id === "category-created" && where.editVersion === 1)
+          return { count: 1 };
         if (where.editVersion !== category.editVersion) return { count: 0 };
         Object.assign(category, data);
         if (typeof data.editVersion === "object") category.editVersion += 1;
@@ -129,10 +151,24 @@ function transactionFor(options: {
           },
         };
       },
-      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-        calls.push({ model: "template", method: "updateMany", args: { where, data } });
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        calls.push({
+          model: "template",
+          method: "updateMany",
+          args: { where, data },
+        });
         updates.push({ model: "template", where, data });
-        if (options.templateUpdateCount === 0 || where.editVersion !== template.editVersion) return { count: 0 };
+        if (
+          options.templateUpdateCount === 0 ||
+          where.editVersion !== template.editVersion
+        )
+          return { count: 0 };
         Object.assign(template, data);
         if (typeof data.editVersion === "object") template.editVersion += 1;
         return { count: 1 };
@@ -148,8 +184,18 @@ function transactionFor(options: {
         calls.push({ model: "mapping", method: "findUnique" });
         return mapping;
       },
-      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-        calls.push({ model: "mapping", method: "updateMany", args: { where, data } });
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        calls.push({
+          model: "mapping",
+          method: "updateMany",
+          args: { where, data },
+        });
         updates.push({ model: "mapping", where, data });
         return { count: 1 };
       },
@@ -184,7 +230,17 @@ test("category create initializes version one and records the created entity", a
     },
     "admin-1",
   );
-  assert.equal(fake.calls.find((call) => call.model === "category" && call.method === "create")?.args && (fake.calls.find((call) => call.model === "category" && call.method === "create")?.args as Record<string, unknown>).editVersion, 1);
+  assert.equal(
+    fake.calls.find(
+      (call) => call.model === "category" && call.method === "create",
+    )?.args &&
+      (
+        fake.calls.find(
+          (call) => call.model === "category" && call.method === "create",
+        )?.args as Record<string, unknown>
+      ).editVersion,
+    1,
+  );
   assert.deepEqual(fake.audits[0], {
     action: "CREATE_PROMPT_TEMPLATE_CATEGORY",
     actorAdminId: "admin-1",
@@ -241,7 +297,11 @@ test("duplicate category slug is rejected by the database unique constraint", as
       },
       "admin-1",
     ),
-    (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "P2002",
+    (error: unknown) =>
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002",
   );
   assert.equal(fake.audits.length, 0);
 });
@@ -348,7 +408,10 @@ test("disabling a category audits the change without touching shop profiles", as
     "admin-1",
   );
   assert.equal(fake.audits[0]?.action, "DISABLE_PROMPT_TEMPLATE_CATEGORY");
-  assert.equal(fake.calls.some((call) => call.model.includes("ShopProfile")), false);
+  assert.equal(
+    fake.calls.some((call) => call.model.includes("ShopProfile")),
+    false,
+  );
 });
 
 test("default selection locks category, validates template ownership, and records exact audit metadata", async () => {
@@ -422,7 +485,10 @@ test("template update uses CAS and one content audit with changed-field names", 
     },
     "admin-1",
   );
-  assert.deepEqual(fake.updates[0]?.where, { id: "template-1", editVersion: 3 });
+  assert.deepEqual(fake.updates[0]?.where, {
+    id: "template-1",
+    editVersion: 3,
+  });
   assert.deepEqual(fake.audits[0], {
     action: "UPDATE_PROMPT_TEMPLATE_CONTENT",
     actorAdminId: "admin-1",
@@ -485,7 +551,9 @@ test("stale template CAS writes no audit event", async () => {
 
 test("duplicate taxonomy IDs remain rejected by the database unique constraint", async () => {
   const fake = transactionFor({
-    taxonomyCreateError: Object.assign(new Error("duplicate"), { code: "P2002" }),
+    taxonomyCreateError: Object.assign(new Error("duplicate"), {
+      code: "P2002",
+    }),
   });
   await assert.rejects(
     mutateStoreCategoryCatalogue(
@@ -503,7 +571,11 @@ test("duplicate taxonomy IDs remain rejected by the database unique constraint",
       },
       "admin-1",
     ),
-    (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "P2002",
+    (error: unknown) =>
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002",
   );
   assert.equal(fake.audits.length, 0);
 });
@@ -575,18 +647,26 @@ test("taxonomy mapping create, weight update, and remove use category audit meta
     remove.transaction,
     {
       kind: "remove-taxonomy-mapping",
-      input: { id: "mapping-1", expectedEditVersion: 2, reason: "Remove mapping" },
+      input: {
+        id: "mapping-1",
+        expectedEditVersion: 2,
+        reason: "Remove mapping",
+      },
     },
     "admin-1",
   );
-  assert.equal(remove.calls.some((call) => call.method === "deleteMany"), true);
+  assert.equal(
+    remove.calls.some((call) => call.method === "deleteMany"),
+    true,
+  );
   assert.equal(remove.audits[0]?.promptTemplateCategoryId, "category-1");
-  assert.deepEqual(remove.audits[0]?.metadata, { changeKind: "TAXONOMY_MAPPING" });
+  assert.deepEqual(remove.audits[0]?.metadata, {
+    changeKind: "TAXONOMY_MAPPING",
+  });
 });
 test("atomic category bundle creates disabled category, enabled default template, mappings, and audit evidence", async () => {
-  const { createStoreCategoryBundle } = await import(
-    "../../src/lib/admin/store-categories.ts"
-  );
+  const { createStoreCategoryBundle } =
+    await import("../../src/lib/admin/store-categories.ts");
   const fake = transactionFor();
   const categoryId = await createStoreCategoryBundle(
     fake.transaction,
@@ -621,7 +701,10 @@ test("atomic category bundle creates disabled category, enabled default template
   const categoryCreate = fake.calls.find(
     (call) => call.model === "category" && call.method === "create",
   );
-  assert.equal((categoryCreate?.args as Record<string, unknown>).enabled, false);
+  assert.equal(
+    (categoryCreate?.args as Record<string, unknown>).enabled,
+    false,
+  );
   const templateCreate = fake.calls.find(
     (call) => call.model === "template" && call.method === "create",
   );

@@ -11,7 +11,9 @@ import {
 import type { RecoveryPolicySnapshot } from "../../src/lib/admin/recovery-policy";
 
 if (process.env.ARCH036_DISPOSABLE_POSTGRES !== "1") {
-  throw new Error("Refusing ARCH-036 PostgreSQL tests without a disposable database.");
+  throw new Error(
+    "Refusing ARCH-036 PostgreSQL tests without a disposable database.",
+  );
 }
 
 const database = new PrismaClient();
@@ -171,10 +173,22 @@ test("catalogue read scopes rows to one shop and separates Shopify selection fro
   assert.equal(current.knownDiscountCount, 4);
   assert.equal(current.runningDiscountCount, 1);
   assert.equal(current.fixedSelectableCount, 1);
-  assert.equal(current.discounts.find((row) => row.id === validUnchecked.id)?.isAvailable, false);
-  assert.equal(current.discounts.find((row) => row.id === validUnchecked.id)?.assignable, true);
-  assert.equal(current.discounts.some((row) => row.title === "Foreign discount"), false);
-  assert.equal(current.discounts.find((row) => row.title === "Wrong provider")?.assignable, false);
+  assert.equal(
+    current.discounts.find((row) => row.id === validUnchecked.id)?.isAvailable,
+    false,
+  );
+  assert.equal(
+    current.discounts.find((row) => row.id === validUnchecked.id)?.assignable,
+    true,
+  );
+  assert.equal(
+    current.discounts.some((row) => row.title === "Foreign discount"),
+    false,
+  );
+  assert.equal(
+    current.discounts.find((row) => row.title === "Wrong provider")?.assignable,
+    false,
+  );
 
   const stale = await readAdminDiscountCatalogue(database, {
     shopId,
@@ -245,10 +259,15 @@ test("database-backed authorization denies non-SUPER_ADMIN and inactive admins b
     );
   }
   assert.equal(
-    await database.shopRecoveryPolicyOverrideAuditEvent.count({ where: { shopId } }),
+    await database.shopRecoveryPolicyOverrideAuditEvent.count({
+      where: { shopId },
+    }),
     0,
   );
-  assert.equal(await database.shopRecoveryPolicyOverride.count({ where: { shopId } }), 0);
+  assert.equal(
+    await database.shopRecoveryPolicyOverride.count({ where: { shopId } }),
+    0,
+  );
 });
 
 test("PostgreSQL rolls back the inserted audit when the override upsert fails", async () => {
@@ -292,10 +311,15 @@ test("PostgreSQL rolls back the inserted audit when the override upsert fails", 
       /ARCH-036 forced override write failure/,
     );
     assert.equal(
-      await database.shopRecoveryPolicyOverrideAuditEvent.count({ where: { shopId } }),
+      await database.shopRecoveryPolicyOverrideAuditEvent.count({
+        where: { shopId },
+      }),
       0,
     );
-    assert.equal(await database.shopRecoveryPolicyOverride.count({ where: { shopId } }), 0);
+    assert.equal(
+      await database.shopRecoveryPolicyOverride.count({ where: { shopId } }),
+      0,
+    );
   } finally {
     await database.$executeRawUnsafe(
       `DROP TRIGGER IF EXISTS "${triggerName}" ON shopify."ShopRecoveryPolicyOverride"`,

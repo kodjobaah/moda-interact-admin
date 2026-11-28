@@ -16,7 +16,6 @@ function form(values: Record<string, string>): FormData {
   return result;
 }
 
-
 const taxonomyFields = {
   taxonomySource: "SHOPIFY_STANDARD_PRODUCT_TAXONOMY",
   taxonomyVersion: "2026-08",
@@ -80,9 +79,13 @@ test("category update contract rejects slug input even for an unused category", 
     expectedEditVersion: "2",
     reason: "Metadata update",
   };
-  assert.equal(parseUpdateStoreCategoryForm(form(values)).id, "category-unused");
+  assert.equal(
+    parseUpdateStoreCategoryForm(form(values)).id,
+    "category-unused",
+  );
   assert.throws(
-    () => parseUpdateStoreCategoryForm(form({ ...values, slug: "new-identity" })),
+    () =>
+      parseUpdateStoreCategoryForm(form({ ...values, slug: "new-identity" })),
     /slug is immutable after creation/,
   );
 });
@@ -97,9 +100,15 @@ test("category metadata bounds and edit versions are validated", () => {
     expectedEditVersion: "1",
     reason: "Update",
   };
-  assert.throws(() => parseUpdateStoreCategoryForm(form(values)), /displayOrder/);
   assert.throws(
-    () => parseUpdateStoreCategoryForm(form({ ...values, displayOrder: "0", expectedEditVersion: "0" })),
+    () => parseUpdateStoreCategoryForm(form(values)),
+    /displayOrder/,
+  );
+  assert.throws(
+    () =>
+      parseUpdateStoreCategoryForm(
+        form({ ...values, displayOrder: "0", expectedEditVersion: "0" }),
+      ),
     /expectedEditVersion/,
   );
 });
@@ -114,9 +123,15 @@ test("template create/update require immutable identity and nonblank bounded pro
     enabled: "true",
     reason: "Create template",
   };
-  assert.equal(parseCreatePromptTemplateForm(form(createValues)).promptText, "Canonical instructions");
+  assert.equal(
+    parseCreatePromptTemplateForm(form(createValues)).promptText,
+    "Canonical instructions",
+  );
   assert.throws(
-    () => parseCreatePromptTemplateForm(form({ ...createValues, key: "home-goods.default" })),
+    () =>
+      parseCreatePromptTemplateForm(
+        form({ ...createValues, key: "home-goods.default" }),
+      ),
     /key has an invalid format/,
   );
   const updateValues = {
@@ -128,13 +143,22 @@ test("template create/update require immutable identity and nonblank bounded pro
     expectedEditVersion: "3",
     reason: "Update template",
   };
-  assert.equal(parseUpdatePromptTemplateForm(form(updateValues)).expectedEditVersion, 3);
+  assert.equal(
+    parseUpdatePromptTemplateForm(form(updateValues)).expectedEditVersion,
+    3,
+  );
   assert.throws(
-    () => parseUpdatePromptTemplateForm(form({ ...updateValues, categoryId: "category-2" })),
+    () =>
+      parseUpdatePromptTemplateForm(
+        form({ ...updateValues, categoryId: "category-2" }),
+      ),
     /key and category are immutable/,
   );
   assert.throws(
-    () => parseUpdatePromptTemplateForm(form({ ...updateValues, promptText: "   " })),
+    () =>
+      parseUpdatePromptTemplateForm(
+        form({ ...updateValues, promptText: "   " }),
+      ),
     /promptText must be between 1 and 100000/,
   );
 });
@@ -183,14 +207,16 @@ test("taxonomy mapping weight must be a positive bounded integer", () => {
     { id: "mapping-1", expectedEditVersion: 3, reason: "Remove" },
   );
   assert.throws(
-    () => parseCreateTaxonomyMappingForm(form({ ...values, conditionKey: "Bad-Key" })),
+    () =>
+      parseCreateTaxonomyMappingForm(
+        form({ ...values, conditionKey: "Bad-Key" }),
+      ),
     /conditionKey/,
   );
 });
 test("atomic category bundle validates category, required default template, mappings, and audit reason", async () => {
-  const { parseCreateStoreCategoryBundleInput } = await import(
-    "../../src/lib/admin/store-category-validation.ts"
-  );
+  const { parseCreateStoreCategoryBundleInput } =
+    await import("../../src/lib/admin/store-category-validation.ts");
   const payload = {
     category: {
       referenceTaxonomy: topLevelTaxonomy,
@@ -253,7 +279,10 @@ test("atomic category bundle validates category, required default template, mapp
     () =>
       parseCreateStoreCategoryBundleInput({
         ...payload,
-        shopifyMappings: [payload.shopifyMappings[0], payload.shopifyMappings[0]],
+        shopifyMappings: [
+          payload.shopifyMappings[0],
+          payload.shopifyMappings[0],
+        ],
       }),
     /mapped only once/,
   );

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { adminI18n } from '@/i18n';
+import { adminI18n } from "@/i18n";
 
 export default function ErrorPage({
   reset,
@@ -12,16 +12,16 @@ export default function ErrorPage({
     <main className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
       <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <h1 className="text-xl font-bold text-gray-900">
-          {adminI18n.t('app.errorTitle')}
+          {adminI18n.t("app.errorTitle")}
         </h1>
         <p className="mt-2 text-sm text-gray-500">
-          {adminI18n.t('app.errorDescription')}
+          {adminI18n.t("app.errorDescription")}
         </p>
         <button
           onClick={reset}
           className="mt-5 rounded-md bg-[var(--brand-700)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-800)]"
         >
-          {adminI18n.t('app.tryAgain')}
+          {adminI18n.t("app.tryAgain")}
         </button>
       </div>
     </main>

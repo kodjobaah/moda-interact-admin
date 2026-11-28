@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-import process from 'node:process';
-import { PrismaClient } from '@prisma/client';
+import process from "node:process";
+import { PrismaClient } from "@prisma/client";
 import {
   deleteMerchantDatabaseRows,
   merchantInventory,
   parseOptions,
   validateDeletion,
-} from './merchant-data-deletion-core.mjs';
+} from "./merchant-data-deletion-core.mjs";
 
 const HELP = `
 Delete ONE merchant's DEVELOPMENT/TEST database data (including its Shop row).
@@ -40,13 +40,15 @@ Stop worker processes before running; use only a disposable/test tenant.
 `;
 
 async function main() {
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(HELP.trim());
     return;
   }
   const options = parseOptions(process.argv.slice(2));
   if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL must be set to the correct development/test database.');
+    throw new Error(
+      "DATABASE_URL must be set to the correct development/test database.",
+    );
   }
   const prisma = new PrismaClient();
   try {
@@ -57,14 +59,21 @@ async function main() {
     });
     if (!shop) throw new Error(`Merchant not found: ${identifier}`);
     const inventory = await merchantInventory(prisma, shop);
-    console.log(JSON.stringify({
-      action: options.command,
-      shop,
-      inventory,
-      note: 'Counts cover major direct-shop tables; cascade children are additional.',
-      externalData: 'R2 assets, Redis/BullMQ jobs and external services are not removed.',
-    }, null, 2));
-    if (options.command === 'status') return;
+    console.log(
+      JSON.stringify(
+        {
+          action: options.command,
+          shop,
+          inventory,
+          note: "Counts cover major direct-shop tables; cascade children are additional.",
+          externalData:
+            "R2 assets, Redis/BullMQ jobs and external services are not removed.",
+        },
+        null,
+        2,
+      ),
+    );
+    if (options.command === "status") return;
 
     validateDeletion(options, shop, inventory, process.env);
     if (options.prelaunchProductionReset) {
@@ -72,30 +81,49 @@ async function main() {
       // must identify itself as the exact, pre-reviewed prelaunch database.
       const actual = await prisma.$queryRaw`SELECT current_database() AS name`;
       if (actual.length !== 1 || actual[0].name !== options.confirmDatabase) {
-        throw new Error('Prelaunch database identity changed; deletion refused.');
+        throw new Error(
+          "Prelaunch database identity changed; deletion refused.",
+        );
       }
     }
-    const deletion = await prisma.$transaction(async (tx) => {
-      // Re-read in the transaction; do not delete a different shop if the
-      // identity changed between preview and execution.
-      const current = await tx.shop.findUnique({
-        where: { id: shop.id },
-        select: { id: true, domain: true, platform: true },
-      });
-      if (!current || current.domain !== shop.domain || current.platform !== shop.platform) {
-        throw new Error('Merchant identity changed during deletion; transaction aborted.');
-      }
-      return deleteMerchantDatabaseRows(tx, current, {
-        confirmImmutablePromptPurge: options.confirmImmutablePromptPurge,
-        confirmImmutableAuditPurge: options.confirmImmutableAuditPurge,
-        confirmImmutableConsentPurge: options.confirmImmutableConsentPurge,
-      });
-    }, { maxWait: 15_000, timeout: 120_000 });
-    console.log(JSON.stringify({
-      result: 'deleted', shopId: shop.id, domain: shop.domain,
-      explicitDeletes: deletion,
-      note: 'Database cascades remove additional child rows. Check external data separately.',
-    }, null, 2));
+    const deletion = await prisma.$transaction(
+      async (tx) => {
+        // Re-read in the transaction; do not delete a different shop if the
+        // identity changed between preview and execution.
+        const current = await tx.shop.findUnique({
+          where: { id: shop.id },
+          select: { id: true, domain: true, platform: true },
+        });
+        if (
+          !current ||
+          current.domain !== shop.domain ||
+          current.platform !== shop.platform
+        ) {
+          throw new Error(
+            "Merchant identity changed during deletion; transaction aborted.",
+          );
+        }
+        return deleteMerchantDatabaseRows(tx, current, {
+          confirmImmutablePromptPurge: options.confirmImmutablePromptPurge,
+          confirmImmutableAuditPurge: options.confirmImmutableAuditPurge,
+          confirmImmutableConsentPurge: options.confirmImmutableConsentPurge,
+        });
+      },
+      { maxWait: 15_000, timeout: 120_000 },
+    );
+    console.log(
+      JSON.stringify(
+        {
+          result: "deleted",
+          shopId: shop.id,
+          domain: shop.domain,
+          explicitDeletes: deletion,
+          note: "Database cascades remove additional child rows. Check external data separately.",
+        },
+        null,
+        2,
+      ),
+    );
   } finally {
     await prisma.$disconnect();
   }
@@ -104,6 +132,6 @@ async function main() {
 main().catch((error) => {
   // Print the complete error and stack for local development diagnostics.
   // This may contain database details: do not post the output unredacted.
-  console.error('Merchant deletion failed:', error);
+  console.error("Merchant deletion failed:", error);
   process.exitCode = 1;
 });

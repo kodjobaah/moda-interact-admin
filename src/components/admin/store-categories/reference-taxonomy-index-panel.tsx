@@ -140,7 +140,8 @@ export function ReferenceTaxonomyIndexPanel({
           </p>
           <p className="mt-1 text-xs text-gray-500">
             This Redis index is temporary authoring infrastructure. Clearing it
-            does not remove Store Categories or Category Mappings from PostgreSQL.
+            does not remove Store Categories or Category Mappings from
+            PostgreSQL.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -180,10 +181,14 @@ export function ReferenceTaxonomyIndexPanel({
       <dl className="mt-5 grid gap-4 border-t border-gray-200 pt-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <dt className="text-xs font-semibold text-gray-500">Environment</dt>
-          <dd className="mt-1 font-medium text-gray-900">{status.environment}</dd>
+          <dd className="mt-1 font-medium text-gray-900">
+            {status.environment}
+          </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold text-gray-500">Embedding model</dt>
+          <dt className="text-xs font-semibold text-gray-500">
+            Embedding model
+          </dt>
           <dd className="mt-1 text-gray-900">
             {status.embedding?.model ?? "Not configured"}
           </dd>
@@ -201,31 +206,48 @@ export function ReferenceTaxonomyIndexPanel({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold text-gray-500">Taxonomy version</dt>
+          <dt className="text-xs font-semibold text-gray-500">
+            Taxonomy version
+          </dt>
           <dd className="mt-1 text-gray-900">
             {status.index?.taxonomyVersion ?? "Not loaded"}
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold text-gray-500">Top-level categories</dt>
-          <dd className="mt-1 text-gray-900">{status.index?.topLevelCount ?? "—"}</dd>
+          <dt className="text-xs font-semibold text-gray-500">
+            Top-level categories
+          </dt>
+          <dd className="mt-1 text-gray-900">
+            {status.index?.topLevelCount ?? "—"}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-semibold text-gray-500">Subcategories</dt>
-          <dd className="mt-1 text-gray-900">{status.index?.subcategoryCount ?? "—"}</dd>
+          <dd className="mt-1 text-gray-900">
+            {status.index?.subcategoryCount ?? "—"}
+          </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold text-gray-500">Last synchronized</dt>
-          <dd className="mt-1 text-gray-900">{status.index?.syncedAt ?? "—"}</dd>
+          <dt className="text-xs font-semibold text-gray-500">
+            Last synchronized
+          </dt>
+          <dd className="mt-1 text-gray-900">
+            {status.index?.syncedAt ?? "—"}
+          </dd>
         </div>
       </dl>
 
       {!canManage ? (
         <p className="mt-4 text-xs text-gray-500">
-          SUPER_ADMIN access is required to synchronize or clear the taxonomy search index.
+          SUPER_ADMIN access is required to synchronize or clear the taxonomy
+          search index.
         </p>
       ) : null}
-      <p role="status" aria-live="polite" className="mt-3 min-h-5 text-sm text-gray-700">
+      <p
+        role="status"
+        aria-live="polite"
+        className="mt-3 min-h-5 text-sm text-gray-700"
+      >
         {message}
       </p>
     </section>

@@ -194,7 +194,6 @@ Google authentication is restricted to active, pre-provisioned `PlatformAdmin`
 records. Full page and privileged mutation coverage remains part of the
 follow-up `ADMIN-005` and `ADMIN-006` tasks.
 
-
 ## Optional conversation product image (ARCH-068)
 
 The conversation wrapper editor offers **Optional product image** for AI response
@@ -315,7 +314,6 @@ The CLI uses the existing esbuild tool to load the server core as native ESM,
 leaving installed npm dependencies external through their public exports. It
 removes its temporary local-code artifact on exit; no package-wide module-mode
 change or global Node import-condition override is required.
-
 
 ### Deployment encryption
 

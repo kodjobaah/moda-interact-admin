@@ -40,23 +40,20 @@ export function merchantPricingAutomaticTranslationReady(
 ): boolean {
   return Boolean(
     run &&
-      run.status === "READY_TO_APPLY" &&
-      run.localeCount > 0 &&
-      run.completeLocaleCount === run.localeCount &&
-      run.pendingItemCount === 0 &&
-      run.failedItemCount === 0,
+    run.status === "READY_TO_APPLY" &&
+    run.localeCount > 0 &&
+    run.completeLocaleCount === run.localeCount &&
+    run.pendingItemCount === 0 &&
+    run.failedItemCount === 0,
   );
 }
-
 
 export function merchantPricingAutomaticTranslationCanPersistDraft(
   run: MerchantPricingAutomaticTranslationRunView | null,
 ): boolean {
   return Boolean(
     run &&
-      ["PENDING", "PROCESSING", "READY_TO_APPLY", "FAILED"].includes(
-        run.status,
-      ),
+    ["PENDING", "PROCESSING", "READY_TO_APPLY", "FAILED"].includes(run.status),
   );
 }
 
@@ -64,6 +61,7 @@ export function merchantPricingAutomaticTranslationTerminal(
   run: MerchantPricingAutomaticTranslationRunView | null,
 ): boolean {
   return Boolean(
-    run && ["READY_TO_APPLY", "APPLIED", "FAILED", "STALE"].includes(run.status),
+    run &&
+    ["READY_TO_APPLY", "APPLIED", "FAILED", "STALE"].includes(run.status),
   );
 }

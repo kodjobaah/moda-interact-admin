@@ -55,7 +55,12 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function QueueJobDetail({ state, showAllJobs, canRemoveFailedJobs, onRemoved }: QueueJobDetailProps) {
+export function QueueJobDetail({
+  state,
+  showAllJobs,
+  canRemoveFailedJobs,
+  onRemoved,
+}: QueueJobDetailProps) {
   const {
     selectedJobId,
     jobDetail,
@@ -120,7 +125,11 @@ export function QueueJobDetail({ state, showAllJobs, canRemoveFailedJobs, onRemo
               [adminI18n.t("queue.status"), adminStatusLabel(jobDetail.status)],
               [
                 adminI18n.t("queue.shop"),
-                formatQueueJobShop(jobDetail.shop, jobDetail.attribution, jobDetail.shopDomain),
+                formatQueueJobShop(
+                  jobDetail.shop,
+                  jobDetail.attribution,
+                  jobDetail.shopDomain,
+                ),
               ],
               [
                 adminI18n.t("queue.attemptsMade"),
@@ -201,7 +210,11 @@ export function QueueJobDetail({ state, showAllJobs, canRemoveFailedJobs, onRemo
             </pre>
           </div>
           {canRemoveFailedJobs && jobDetail.status === "failed" ? (
-            <RemoveFailedJob key={jobDetail.id} job={jobDetail} onRemoved={onRemoved} />
+            <RemoveFailedJob
+              key={jobDetail.id}
+              job={jobDetail}
+              onRemoved={onRemoved}
+            />
           ) : null}
         </>
       ) : null}

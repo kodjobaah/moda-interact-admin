@@ -74,15 +74,16 @@ async function statusInTransaction(
   transaction: Tx,
   environment: CommerceEnvironment,
 ): Promise<TranslationProviderCredentialStatus> {
-  const row = await transaction.commerceTranslationProviderCredential.findUnique({
-    where: {
-      environment_provider: {
-        environment,
-        provider: TRANSLATION_PROVIDER,
+  const row =
+    await transaction.commerceTranslationProviderCredential.findUnique({
+      where: {
+        environment_provider: {
+          environment,
+          provider: TRANSLATION_PROVIDER,
+        },
       },
-    },
-    select: translationCredentialStatusSelect,
-  });
+      select: translationCredentialStatusSelect,
+    });
   return translationCredentialStatus(environment, row);
 }
 
@@ -103,15 +104,16 @@ export async function setTranslationProviderCredential(
     const result = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const existing = await transaction.commerceTranslationProviderCredential.findUnique({
-          where: {
-            environment_provider: {
-              environment,
-              provider: TRANSLATION_PROVIDER,
+        const existing =
+          await transaction.commerceTranslationProviderCredential.findUnique({
+            where: {
+              environment_provider: {
+                environment,
+                provider: TRANSLATION_PROVIDER,
+              },
             },
-          },
-          select: { id: true },
-        });
+            select: { id: true },
+          });
         if (existing) {
           throw new Error(
             TRANSLATION_CONFIGURATION_ERRORS.credentialAlreadyConfigured,
@@ -197,31 +199,33 @@ export async function replaceTranslationProviderCredential(
     const result = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const updated = await transaction.commerceTranslationProviderCredential.updateMany({
-          where: {
-            environment,
-            provider: TRANSLATION_PROVIDER,
-            editVersion: expectedEditVersion,
-          },
-          data: {
-            ciphertext: Buffer.from(sealed.ciphertext),
-            nonce: Buffer.from(sealed.nonce),
-            authTag: Buffer.from(sealed.authTag),
-            keyId: sealed.keyId,
-            editVersion: { increment: 1 },
-            updatedByAdminId: principal.id,
-          },
-        });
-        if (updated.count !== 1) {
-          const exists = await transaction.commerceTranslationProviderCredential.findUnique({
+        const updated =
+          await transaction.commerceTranslationProviderCredential.updateMany({
             where: {
-              environment_provider: {
-                environment,
-                provider: TRANSLATION_PROVIDER,
-              },
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              editVersion: expectedEditVersion,
             },
-            select: { id: true },
+            data: {
+              ciphertext: Buffer.from(sealed.ciphertext),
+              nonce: Buffer.from(sealed.nonce),
+              authTag: Buffer.from(sealed.authTag),
+              keyId: sealed.keyId,
+              editVersion: { increment: 1 },
+              updatedByAdminId: principal.id,
+            },
           });
+        if (updated.count !== 1) {
+          const exists =
+            await transaction.commerceTranslationProviderCredential.findUnique({
+              where: {
+                environment_provider: {
+                  environment,
+                  provider: TRANSLATION_PROVIDER,
+                },
+              },
+              select: { id: true },
+            });
           throw new Error(
             exists
               ? TRANSLATION_CONFIGURATION_ERRORS.credentialChanged
@@ -288,15 +292,16 @@ export async function removeTranslationProviderCredential(
     const result = await prisma.$transaction(
       async (transaction) => {
         await ensureDevelopmentPlatformAdmin(transaction, principal);
-        const existing = await transaction.commerceTranslationProviderCredential.findUnique({
-          where: {
-            environment_provider: {
-              environment,
-              provider: TRANSLATION_PROVIDER,
+        const existing =
+          await transaction.commerceTranslationProviderCredential.findUnique({
+            where: {
+              environment_provider: {
+                environment,
+                provider: TRANSLATION_PROVIDER,
+              },
             },
-          },
-          select: translationCredentialStatusSelect,
-        });
+            select: translationCredentialStatusSelect,
+          });
         if (!existing) {
           throw new Error(
             TRANSLATION_CONFIGURATION_ERRORS.credentialNotConfigured,
@@ -308,13 +313,14 @@ export async function removeTranslationProviderCredential(
         if (existing._count.models > 0) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.credentialInUse);
         }
-        const deleted = await transaction.commerceTranslationProviderCredential.deleteMany({
-          where: {
-            environment,
-            provider: TRANSLATION_PROVIDER,
-            editVersion: validated.expectedEditVersion,
-          },
-        });
+        const deleted =
+          await transaction.commerceTranslationProviderCredential.deleteMany({
+            where: {
+              environment,
+              provider: TRANSLATION_PROVIDER,
+              editVersion: validated.expectedEditVersion,
+            },
+          });
         if (deleted.count !== 1) {
           throw new Error(TRANSLATION_CONFIGURATION_ERRORS.credentialChanged);
         }

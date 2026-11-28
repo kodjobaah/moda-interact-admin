@@ -5,7 +5,14 @@ import type { MediaRoleView } from "@/lib/admin/whatsapp-templates/media/readine
 import { ShopBrandMediaPreview } from "../media/shop-brand-media-preview";
 
 /** Presentation-only example data. No network requests, real customer information or live links. */
-export function TemplateReadOnlyPreview({ preview, title = "Example preview", draftInvalid = false, localeLanguageTag = "English", verifiedMedia, mediaDomain }: {
+export function TemplateReadOnlyPreview({
+  preview,
+  title = "Example preview",
+  draftInvalid = false,
+  localeLanguageTag = "English",
+  verifiedMedia,
+  mediaDomain,
+}: {
   preview: TemplatePreviewDTO | null;
   title?: string;
   draftInvalid?: boolean;
@@ -13,42 +20,133 @@ export function TemplateReadOnlyPreview({ preview, title = "Example preview", dr
   verifiedMedia?: MediaRoleView;
   mediaDomain?: string;
 }) {
-  return <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5" aria-label="Example template preview">
-    <div><h2 className="font-semibold text-slate-900">{title}</h2>
-      <p className="mt-1 text-xs text-slate-500">Illustrative values only — no customer or checkout data is loaded.</p></div>
-    {preview?.commonLayout && <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm">
-      <div><h3 className="font-semibold">Common shop header</h3><p className="whitespace-pre-wrap">{preview.commonLayout.header}</p></div>
-      <div><h3 className="font-semibold">Common checkout footer</h3><p className="whitespace-pre-wrap">{preview.commonLayout.footer}</p></div>
-      <details><summary>Compare AI and human messages</summary>
-        <h4 className="mt-2 font-semibold">AI answer</h4><p className="whitespace-pre-wrap">{preview.commonLayout.ai}</p>
-        <p className="my-2 text-xs">Product media stays below the shop header in the composite image when a saved composite profile is selected; otherwise normal message rendering applies.</p>
-        <h4 className="font-semibold">Human reply</h4><p className="whitespace-pre-wrap">{preview.commonLayout.human}</p>
-      </details>
-    </div>}
-    {preview?.compositeProfile ? <TemplateCompositeProfilePreview values={preview.compositeProfile} headerText={preview.header} caption={[preview.body, preview.footer, preview.conditional].filter(Boolean).join("\n\n")} /> : <div className="rounded-xl border border-slate-200 bg-[#e7f0e8] p-3 sm:p-5" aria-label="WhatsApp-style preview">
-      <div className="mx-auto max-w-sm rounded-xl bg-white p-4 shadow-sm" role="region" aria-label="Example message">
-        {!preview ? <p className="text-sm text-slate-600">No preview available.</p> : <>
-          {preview.family === "MODA_CONVERSATION_WRAPPER" && preview.productImage && <ConversationProductImageExample />}
-          {preview.headerMediaRole && <div className="mb-3" aria-label="IMAGE header preview">
-            {verifiedMedia?.status === "READY" && verifiedMedia.role === preview.headerMediaRole && mediaDomain
-              ? <ShopBrandMediaPreview media={verifiedMedia} domain={mediaDomain}/>
-              : <p className="rounded border border-dashed border-slate-300 p-3 text-xs text-slate-600">
-                  {preview.headerMediaRole.replaceAll("_", " ")} IMAGE header — no seeded example. The image role is still saved, not an example URL.
-                </p>}
-          </div>}
-          {!!preview.header && <p className="mb-2 whitespace-pre-wrap break-words font-semibold text-slate-900">{preview.header}</p>}
-          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{preview.body || "Your message will appear here…"}</p>
-          {!!preview.conditional && <p className="mt-2 whitespace-pre-wrap break-words border-l-2 border-blue-200 pl-3 text-sm text-slate-700">{preview.conditional}</p>}
-          {!!preview.footer && <p className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-500">{preview.footer}</p>}
-          {preview.buttons.map((button, index) => <div key={index} className="mt-3 border-t border-slate-100 pt-3 text-center">
-            <span className="text-sm font-semibold text-blue-700">↗ {button.label || "Button label"}</span>
-            <p className="mt-1 break-all text-[11px] text-slate-500">{button.url}</p>
-          </div>)}
-        </>}
+  return (
+    <section
+      className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+      aria-label="Example template preview"
+    >
+      <div>
+        <h2 className="font-semibold text-slate-900">{title}</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Illustrative values only — no customer or checkout data is loaded.
+        </p>
       </div>
-    </div>}
-    {!preview ? <p className="text-xs text-slate-600" role="status">A validated example preview is not available.</p>
-      : draftInvalid ? <p className="text-xs text-amber-800" role="status">Draft preview only. Correct validation issues before saving; the displayed message is not a validated Meta projection.</p>
-      : <p className="text-xs text-emerald-800" role="status">Example based on the validated {localeLanguageTag} template.</p>}
-  </section>;
+      {preview?.commonLayout && (
+        <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm">
+          <div>
+            <h3 className="font-semibold">Common shop header</h3>
+            <p className="whitespace-pre-wrap">{preview.commonLayout.header}</p>
+          </div>
+          <div>
+            <h3 className="font-semibold">Common checkout footer</h3>
+            <p className="whitespace-pre-wrap">{preview.commonLayout.footer}</p>
+          </div>
+          <details>
+            <summary>Compare AI and human messages</summary>
+            <h4 className="mt-2 font-semibold">AI answer</h4>
+            <p className="whitespace-pre-wrap">{preview.commonLayout.ai}</p>
+            <p className="my-2 text-xs">
+              Product media stays below the shop header in the composite image
+              when a saved composite profile is selected; otherwise normal
+              message rendering applies.
+            </p>
+            <h4 className="font-semibold">Human reply</h4>
+            <p className="whitespace-pre-wrap">{preview.commonLayout.human}</p>
+          </details>
+        </div>
+      )}
+      {preview?.compositeProfile ? (
+        <TemplateCompositeProfilePreview
+          values={preview.compositeProfile}
+          headerText={preview.header}
+          caption={[preview.body, preview.footer, preview.conditional]
+            .filter(Boolean)
+            .join("\n\n")}
+        />
+      ) : (
+        <div
+          className="rounded-xl border border-slate-200 bg-[#e7f0e8] p-3 sm:p-5"
+          aria-label="WhatsApp-style preview"
+        >
+          <div
+            className="mx-auto max-w-sm rounded-xl bg-white p-4 shadow-sm"
+            role="region"
+            aria-label="Example message"
+          >
+            {!preview ? (
+              <p className="text-sm text-slate-600">No preview available.</p>
+            ) : (
+              <>
+                {preview.family === "MODA_CONVERSATION_WRAPPER" &&
+                  preview.productImage && <ConversationProductImageExample />}
+                {preview.headerMediaRole && (
+                  <div className="mb-3" aria-label="IMAGE header preview">
+                    {verifiedMedia?.status === "READY" &&
+                    verifiedMedia.role === preview.headerMediaRole &&
+                    mediaDomain ? (
+                      <ShopBrandMediaPreview
+                        media={verifiedMedia}
+                        domain={mediaDomain}
+                      />
+                    ) : (
+                      <p className="rounded border border-dashed border-slate-300 p-3 text-xs text-slate-600">
+                        {preview.headerMediaRole.replaceAll("_", " ")} IMAGE
+                        header — no seeded example. The image role is still
+                        saved, not an example URL.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {!!preview.header && (
+                  <p className="mb-2 whitespace-pre-wrap break-words font-semibold text-slate-900">
+                    {preview.header}
+                  </p>
+                )}
+                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+                  {preview.body || "Your message will appear here…"}
+                </p>
+                {!!preview.conditional && (
+                  <p className="mt-2 whitespace-pre-wrap break-words border-l-2 border-blue-200 pl-3 text-sm text-slate-700">
+                    {preview.conditional}
+                  </p>
+                )}
+                {!!preview.footer && (
+                  <p className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-500">
+                    {preview.footer}
+                  </p>
+                )}
+                {preview.buttons.map((button, index) => (
+                  <div
+                    key={index}
+                    className="mt-3 border-t border-slate-100 pt-3 text-center"
+                  >
+                    <span className="text-sm font-semibold text-blue-700">
+                      ↗ {button.label || "Button label"}
+                    </span>
+                    <p className="mt-1 break-all text-[11px] text-slate-500">
+                      {button.url}
+                    </p>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {!preview ? (
+        <p className="text-xs text-slate-600" role="status">
+          A validated example preview is not available.
+        </p>
+      ) : draftInvalid ? (
+        <p className="text-xs text-amber-800" role="status">
+          Draft preview only. Correct validation issues before saving; the
+          displayed message is not a validated Meta projection.
+        </p>
+      ) : (
+        <p className="text-xs text-emerald-800" role="status">
+          Example based on the validated {localeLanguageTag} template.
+        </p>
+      )}
+    </section>
+  );
 }

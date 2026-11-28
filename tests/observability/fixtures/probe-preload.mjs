@@ -13,7 +13,7 @@
 //
 //   node --import ./observability.mjs ./node_modules/next/dist/bin/next start
 
-import '../../../observability.mjs';
+import "../../../observability.mjs";
 
 const probeTarget = process.env.TELEMETRY_PROBE_TARGET;
 

@@ -1,4 +1,4 @@
-'use server';
+"use server";
 
 import {
   composeAdministrativeMessage,
@@ -9,7 +9,7 @@ import {
   requestFailedTranslationReconciliation,
   requestFailedTranslationsReconciliation,
   takeMerchantSupportThreadOwnership,
-} from '@/lib/admin/merchant-support';
+} from "@/lib/admin/merchant-support";
 
 export async function getMerchantSupportShopSuggestionsAction(input: {
   query: string;

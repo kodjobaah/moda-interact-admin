@@ -1,16 +1,20 @@
-import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** Execute the actual TS/TSX module with explicitly controlled framework adapters. */
-export function loadPolicyModule(path, mocks, {
-  FormData: FormDataImpl = FormData,
-  workspaceRoot = fileURLToPath(new URL('../../../', import.meta.url)),
-} = {}) {
-  const projectRequire = createRequire(resolve(workspaceRoot, 'package.json'));
-  const ts = projectRequire('typescript');
-  const source = readFileSync(resolve(workspaceRoot, path), 'utf8');
+export function loadPolicyModule(
+  path,
+  mocks,
+  {
+    FormData: FormDataImpl = FormData,
+    workspaceRoot = fileURLToPath(new URL("../../../", import.meta.url)),
+  } = {},
+) {
+  const projectRequire = createRequire(resolve(workspaceRoot, "package.json"));
+  const ts = projectRequire("typescript");
+  const source = readFileSync(resolve(workspaceRoot, path), "utf8");
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
@@ -22,11 +26,15 @@ export function loadPolicyModule(path, mocks, {
   });
   const moduleRecord = { exports: {} };
   const requireMock = (name) => {
-    if (!Object.hasOwn(mocks, name)) throw Error(`Unexpected dependency in ${path}: ${name}`);
+    if (!Object.hasOwn(mocks, name))
+      throw Error(`Unexpected dependency in ${path}: ${name}`);
     return mocks[name];
   };
-  new Function('require', 'module', 'exports', 'FormData', outputText)(
-    requireMock, moduleRecord, moduleRecord.exports, FormDataImpl,
+  new Function("require", "module", "exports", "FormData", outputText)(
+    requireMock,
+    moduleRecord,
+    moduleRecord.exports,
+    FormDataImpl,
   );
   return moduleRecord.exports;
 }
@@ -43,10 +51,14 @@ export function createComponentHarness() {
     },
     useState(initial) {
       const index = cursor++;
-      if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
-      return [slots[index], (next) => {
-        slots[index] = typeof next === 'function' ? next(slots[index]) : next;
-      }];
+      if (!(index in slots))
+        slots[index] = typeof initial === "function" ? initial() : initial;
+      return [
+        slots[index],
+        (next) => {
+          slots[index] = typeof next === "function" ? next(slots[index]) : next;
+        },
+      ];
     },
   };
   const jsxRuntime = {
@@ -55,26 +67,35 @@ export function createComponentHarness() {
   };
   function expand(node) {
     if (Array.isArray(node)) return node.map(expand);
-    if (!node || typeof node !== 'object' || !('type' in node)) return node;
-    if (typeof node.type === 'function') return expand(node.type(node.props));
-    return { ...node, props: { ...node.props, children: expand(node.props.children) } };
+    if (!node || typeof node !== "object" || !("type" in node)) return node;
+    if (typeof node.type === "function") return expand(node.type(node.props));
+    return {
+      ...node,
+      props: { ...node.props, children: expand(node.props.children) },
+    };
   }
   return {
-    react, jsxRuntime,
-    render(Component, props) { cursor = 0; return expand(Component(props)); },
+    react,
+    jsxRuntime,
+    render(Component, props) {
+      cursor = 0;
+      return expand(Component(props));
+    },
   };
 }
 
 export function findElement(root, predicate) {
-  if (Array.isArray(root)) return root.map(node => findElement(node, predicate)).find(Boolean);
-  if (!root || typeof root !== 'object' || !('type' in root)) return undefined;
+  if (Array.isArray(root))
+    return root.map((node) => findElement(node, predicate)).find(Boolean);
+  if (!root || typeof root !== "object" || !("type" in root)) return undefined;
   if (predicate(root)) return root;
   return findElement(root.props.children, predicate);
 }
 
 export function elementText(root) {
-  if (Array.isArray(root)) return root.map(elementText).join(' ');
-  if (root === null || root === undefined || typeof root === 'boolean') return '';
-  if (typeof root !== 'object' || !('type' in root)) return String(root);
+  if (Array.isArray(root)) return root.map(elementText).join(" ");
+  if (root === null || root === undefined || typeof root === "boolean")
+    return "";
+  if (typeof root !== "object" || !("type" in root)) return String(root);
   return elementText(root.props.children);
 }

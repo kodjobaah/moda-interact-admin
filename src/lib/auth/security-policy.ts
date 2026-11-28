@@ -33,12 +33,12 @@ type GoogleProfile = {
 };
 
 function stringValue(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function normaliseEmail(value: unknown): string | null {
   const email = stringValue(value)?.toLowerCase();
-  return email?.includes('@') ? email : null;
+  return email?.includes("@") ? email : null;
 }
 
 export function isAuthorizedPlatformAdmin(
@@ -47,9 +47,9 @@ export function isAuthorizedPlatformAdmin(
 ): boolean {
   return Boolean(
     admin?.active &&
-      admin.provider === 'google' &&
-      providerSubject &&
-      admin.providerSubject === providerSubject,
+    admin.provider === "google" &&
+    providerSubject &&
+    admin.providerSubject === providerSubject,
   );
 }
 
@@ -59,9 +59,9 @@ export function canBindPlatformAdmin(
 ): boolean {
   return Boolean(
     admin?.active &&
-      admin.provider === 'google' &&
-      !admin.providerSubject &&
-      providerSubject,
+    admin.provider === "google" &&
+    !admin.providerSubject &&
+    providerSubject,
   );
 }
 
@@ -81,8 +81,8 @@ export async function bindPlatformAdminSubject(
   const current = await persistence.findById(admin.id);
   return Boolean(
     current?.active &&
-      current.provider === 'google' &&
-      current.providerSubject === providerSubject,
+    current.provider === "google" &&
+    current.providerSubject === providerSubject,
   );
 }
 
@@ -98,7 +98,7 @@ export async function authorizeGoogleProfile(
   if (!email || !subject || profile.email_verified !== true) return false;
 
   const admin = await persistence.findByEmail(email);
-  if (!admin || !admin.active || admin.provider !== 'google') return false;
+  if (!admin || !admin.active || admin.provider !== "google") return false;
   if (admin.providerSubject && admin.providerSubject !== subject) return false;
 
   if (!admin.providerSubject) {

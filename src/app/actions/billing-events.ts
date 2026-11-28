@@ -1,26 +1,15 @@
 "use server";
 
-import {
-  BillingAuditAction,
-  Prisma,
-  ShopifyReportState,
-} from "@prisma/client";
+import { BillingAuditAction, Prisma, ShopifyReportState } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdminMutation } from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 
-export type RetryBillingEventActionState =
-  | {
-      ok: boolean;
-      code:
-        | "QUEUED"
-        | "ALREADY_DUE"
-        | "STALE"
-        | "NOT_ELIGIBLE"
-        | "MISSING"
-        | "ERROR";
-    }
-  | null;
+export type RetryBillingEventActionState = {
+  ok: boolean;
+  code:
+    "QUEUED" | "ALREADY_DUE" | "STALE" | "NOT_ELIGIBLE" | "MISSING" | "ERROR";
+} | null;
 
 const RETRYABLE_STATES = new Set<ShopifyReportState>([
   ShopifyReportState.RETRYABLE,
@@ -36,7 +25,9 @@ function parseRequiredString(formData: FormData, key: string): string {
 }
 
 function parseExpectedState(value: string): ShopifyReportState {
-  if (!Object.values(ShopifyReportState).includes(value as ShopifyReportState)) {
+  if (
+    !Object.values(ShopifyReportState).includes(value as ShopifyReportState)
+  ) {
     throw new Error("The expected App Event state is invalid.");
   }
   return value as ShopifyReportState;

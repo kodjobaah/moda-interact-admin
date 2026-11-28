@@ -27,8 +27,8 @@ It also reports the number of matching retained `BillingPlan` records.
 
 ## Delete (verified disposable development/test database only)
 
-Back up the selected database, verify the connection, and stop *all services and
-workers that can register/reconcile pricing plans* before resetting the catalogue.
+Back up the selected database, verify the connection, and stop _all services and
+workers that can register/reconcile pricing plans_ before resetting the catalogue.
 Use the exact database name displayed by the status command:
 
 ```bash
@@ -42,7 +42,7 @@ npm run admin:clear-merchant-pricing -- delete \
 For a **verified remote development/test** database, additionally pass
 `--allow-remote-development-db`. If the preview shows previously materialized
 plans, inspect what will remain in `BillingPlan` and provider subscriptions,
-then explicitly pass `--confirm-materialized-plans` for *disposable* data.
+then explicitly pass `--confirm-materialized-plans` for _disposable_ data.
 
 Any `BillingOperation` referencing a MerchantPricing plan or a pricing usage
 entry **blocks the entire reset**. Those operations are protected financial

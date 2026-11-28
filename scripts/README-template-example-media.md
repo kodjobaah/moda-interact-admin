@@ -34,7 +34,7 @@ is implemented.
   `MODA_ENCRYPTION_ACTIVE_KEY_ID` in the CLI process environment. The script
   reads existing sealed `merchant.knowledge.r2` credentials in the **selected**
   environment, using the canonical Shared unsealer. These credentials must be
-  authorized by R2 to upload/HEAD objects in the *separate* bucket configured by
+  authorized by R2 to upload/HEAD objects in the _separate_ bucket configured by
   `shopBrand.publicMedia`; do not assume read/write access across buckets.
 - `shopBrand.publicMedia` must specify the correct bucket name and HTTPS public
   origin, and the public R2 domain must serve files from that bucket.

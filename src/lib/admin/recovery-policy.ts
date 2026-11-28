@@ -4,7 +4,9 @@ import {
 } from "@modainteract/moda-interact-shared/recovery-policy";
 
 export type RecoveryPolicySnapshot = Omit<EffectiveRecoveryPolicy, "source">;
-export type RecoveryPolicyAuditSnapshot = RecoveryPolicySnapshot & { expiresAt: string | null };
+export type RecoveryPolicyAuditSnapshot = RecoveryPolicySnapshot & {
+  expiresAt: string | null;
+};
 
 export function parseRecoveryPolicySnapshot(
   value: RecoveryPolicySnapshot,

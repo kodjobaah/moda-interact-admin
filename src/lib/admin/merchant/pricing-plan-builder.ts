@@ -418,7 +418,11 @@ export function merchantPricingBuilderTranslationsRetained(
 ): boolean {
   return Boolean(
     plan?.publicationStatus === "READY" &&
-      merchantPricingBuilderEnglishContentUnchanged(plan, description, highlights),
+    merchantPricingBuilderEnglishContentUnchanged(
+      plan,
+      description,
+      highlights,
+    ),
   );
 }
 

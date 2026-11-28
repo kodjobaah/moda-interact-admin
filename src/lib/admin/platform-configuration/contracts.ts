@@ -1,17 +1,59 @@
 /** ARCH-043 Admin-owned, closed policy authoring contracts. No browser-supplied contract is trusted. */
 export type FieldContract =
-  | { name: string; kind: "integer"; label: string; description: string; min: number; max: number; unit?: string; section?: string }
+  | {
+      name: string;
+      kind: "integer";
+      label: string;
+      description: string;
+      min: number;
+      max: number;
+      unit?: string;
+      section?: string;
+    }
   | { name: string; kind: "boolean"; label: string; description: string }
-  | { name: string; kind: "string"; label: string; description: string; maxLength: number; optional?: boolean; pattern?: "model-id" | "bucket" }
-  | { name: string; kind: "enum"; label: string; description: string; options: readonly string[] }
-  | { name: string; kind: "nullable-https-url"; label: string; description: string; maxLength: number; purpose?: "r2" }
-  | { name: string; kind: "secret"; label: string; description: string; revealable: true; optional?: boolean };
+  | {
+      name: string;
+      kind: "string";
+      label: string;
+      description: string;
+      maxLength: number;
+      optional?: boolean;
+      pattern?: "model-id" | "bucket";
+    }
+  | {
+      name: string;
+      kind: "enum";
+      label: string;
+      description: string;
+      options: readonly string[];
+    }
+  | {
+      name: string;
+      kind: "nullable-https-url";
+      label: string;
+      description: string;
+      maxLength: number;
+      purpose?: "r2";
+    }
+  | {
+      name: string;
+      kind: "secret";
+      label: string;
+      description: string;
+      revealable: true;
+      optional?: boolean;
+    };
 
 export type ConfigurationContract = Readonly<{
-  key: string; title: string; description: string; kind: "policy" | "secret";
-  fields: readonly FieldContract[]; defaults?: Readonly<Record<string, unknown>>;
+  key: string;
+  title: string;
+  description: string;
+  kind: "policy" | "secret";
+  fields: readonly FieldContract[];
+  defaults?: Readonly<Record<string, unknown>>;
   defaultsOnRead?: boolean;
-  canReset: boolean; requiredRole: "SUPER_ADMIN";
+  canReset: boolean;
+  requiredRole: "SUPER_ADMIN";
   editor?: "routing-agent";
   /** Server-owned validation for a structured policy; never sent to the browser. */
   validate?: (input: unknown) => ValidationResult;
@@ -20,22 +62,61 @@ export type ConfigurationContract = Readonly<{
 }>;
 export type PublicContract = Omit<ConfigurationContract, "refine" | "validate">;
 export type Registry = ReadonlyMap<string, ConfigurationContract>;
-export type ValidationResult = { ok: true; values: Record<string, unknown> } |
-  { ok: false; fieldErrors: Record<string, string>; message: string };
+export type ValidationResult =
+  | { ok: true; values: Record<string, unknown> }
+  | { ok: false; fieldErrors: Record<string, string>; message: string };
 
 /** Environment names are documentation hints only; PostgreSQL is the configuration store. */
-const withEnvironmentReference = (field: FieldContract, name: string): FieldContract => ({
-  ...field, description: `${field.description} Environment variable: ${name}.`,
+const withEnvironmentReference = (
+  field: FieldContract,
+  name: string,
+): FieldContract => ({
+  ...field,
+  description: `${field.description} Environment variable: ${name}.`,
 });
 
-const integer = (name: string, label: string, min: number, max: number, unit?: string): Extract<FieldContract, { kind: "integer" }> =>
-  ({ name, label, kind: "integer", min, max, unit, description: `Whole number from ${min} to ${max}${unit ? ` ${unit}` : ""}.` });
-const model = (name: string, label: string): FieldContract =>
-  ({ name, label, kind: "string", maxLength: 128, pattern: "model-id", description: "Required model identifier (up to 128 characters)." });
-const grafana = (name: string, label: string): FieldContract =>
-  ({ name, label, kind: "nullable-https-url", maxLength: 2048, description: "Optional HTTPS URL without credentials, query parameters or fragments." });
-const httpsUrl = (name: string, label: string, description: string): FieldContract =>
-  ({ name, label, kind: "nullable-https-url", maxLength: 2048, description });
+const integer = (
+  name: string,
+  label: string,
+  min: number,
+  max: number,
+  unit?: string,
+): Extract<FieldContract, { kind: "integer" }> => ({
+  name,
+  label,
+  kind: "integer",
+  min,
+  max,
+  unit,
+  description: `Whole number from ${min} to ${max}${unit ? ` ${unit}` : ""}.`,
+});
+const model = (name: string, label: string): FieldContract => ({
+  name,
+  label,
+  kind: "string",
+  maxLength: 128,
+  pattern: "model-id",
+  description: "Required model identifier (up to 128 characters).",
+});
+const grafana = (name: string, label: string): FieldContract => ({
+  name,
+  label,
+  kind: "nullable-https-url",
+  maxLength: 2048,
+  description:
+    "Optional HTTPS URL without credentials, query parameters or fragments.",
+});
+const httpsUrl = (
+  name: string,
+  label: string,
+  description: string,
+): FieldContract => ({
+  name,
+  label,
+  kind: "nullable-https-url",
+  maxLength: 2048,
+  description,
+});
 
 /** The 120-second preview reservation is defined by Commerce src/commerce/preview/store.ts.
  * Commerce's run-budgets.ts preserves a 30-second terminal-commit margin. */
@@ -43,230 +124,696 @@ export const APPROVED_PREVIEW_SLOT_MS = 120_000;
 
 import { ROUTING_AGENT_CONTRACT } from "./routing-agent-contract";
 
-export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] = Object.freeze([
-  {
-    key: "commerce.recoveryExecution", title: "Recovery execution", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Shared production recovery limits and Studio test defaults. Studio can override the preview defaults for isolated tests; hard safety ceilings remain enforced.",
-    canReset: true, defaultsOnRead: true,
-    fields: [
-      { ...integer("initialOutreachModelSteps", "Initial outreach model steps", 1, 64), section: "Initial outreach" },
-      { ...integer("initialOutreachToolCalls", "Initial outreach tool calls", 1, 64), section: "Initial outreach" },
-      { ...integer("initialOutreachDeadlineMs", "Initial outreach deadline", 1000, 90000, "ms"), section: "Initial outreach" },
-      { ...integer("initialOutreachOutputTokens", "Initial outreach output tokens", 1, 32768), section: "Initial outreach" },
-      { ...integer("initialOutreachMaxProductDetailReads", "Maximum product detail reads", 1, 50), section: "Initial outreach" },
-      { ...integer("initialOutreachMaxToolResultBytes", "Maximum tool result size", 1024, 1048576, "bytes"), section: "Initial outreach" },
-      { ...integer("initialOutreachMaxModelRequestBytes", "Maximum model request size", 1024, 4194304, "bytes"), section: "Initial outreach" },
-      { ...integer("offerMaxCandidates", "Recovery offer candidates", 1, 100), section: "Offer verification" },
-      { ...integer("offerVerificationTimeoutMs", "Offer verification timeout", 100, 30000, "ms"), section: "Offer verification" },
-      { ...integer("offerAiTimeoutMs", "Offer AI timeout", 100, 30000, "ms"), section: "Offer verification" },
-      { ...integer("offerEvidenceMaxAgeMs", "Maximum offer evidence age", 1000, 600000, "ms"), section: "Offer verification" },
-      { ...integer("offerEvidenceMaxLifetimeMs", "Maximum offer evidence lifetime", 1000, 600000, "ms"), section: "Offer verification" },
-      { ...integer("outreachRevalidationTimeoutMs", "Outreach revalidation timeout", 100, 60000, "ms"), section: "Offer verification" },
-      { ...integer("discountSourceReadTimeoutMs", "Discount source read timeout", 100, 60000, "ms"), section: "Offer verification" },
-      { ...integer("recoveryDelayMinutes", "Default recovery delay", 1, 1440, "minutes"), section: "Recovery timing" },
-      { ...integer("recoveryCandidateTtlBufferMs", "Recovery candidate retention buffer", 60000, 86400000, "ms"), section: "Recovery timing" },
-      { ...integer("abandonedCheckoutMaxCandidates", "Abandoned checkout lookup limit", 1, 100), section: "Recovery timing" },
-      { ...integer("abandonedCheckoutLookupWindowMs", "Abandoned checkout lookup window", 60000, 3600000, "ms"), section: "Recovery timing" },
-      { ...integer("studioPreviewModelSteps", "Studio preview model steps", 1, 64), section: "Studio test defaults" },
-      { ...integer("studioPreviewRemoteCalls", "Studio preview remote calls", 1, 64), section: "Studio test defaults" },
-      { ...integer("studioPreviewDeadlineMs", "Studio preview deadline", 1000, APPROVED_PREVIEW_SLOT_MS - 30000, "ms"), section: "Studio test defaults" },
-      { ...integer("studioPreviewOutputTokens", "Studio preview output tokens", 1, 32768), section: "Studio test defaults" },
-    ],
-    defaults: {
-      initialOutreachModelSteps: 8, initialOutreachToolCalls: 16, initialOutreachDeadlineMs: 45000,
-      initialOutreachOutputTokens: 512, initialOutreachMaxProductDetailReads: 5,
-      initialOutreachMaxToolResultBytes: 32768, initialOutreachMaxModelRequestBytes: 131072,
-      offerMaxCandidates: 8, offerVerificationTimeoutMs: 2000, offerAiTimeoutMs: 1500,
-      offerEvidenceMaxAgeMs: 60000, offerEvidenceMaxLifetimeMs: 60000,
-      outreachRevalidationTimeoutMs: 15000, discountSourceReadTimeoutMs: 10000,
-      recoveryDelayMinutes: 30, recoveryCandidateTtlBufferMs: 3600000,
-      abandonedCheckoutMaxCandidates: 20, abandonedCheckoutLookupWindowMs: 600000,
-      studioPreviewModelSteps: 4, studioPreviewRemoteCalls: 4,
-      studioPreviewDeadlineMs: 60000, studioPreviewOutputTokens: 1200,
+export const PLATFORM_POLICY_CONTRACTS: readonly ConfigurationContract[] =
+  Object.freeze([
+    {
+      key: "commerce.recoveryExecution",
+      title: "Recovery execution",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description:
+        "Shared production recovery limits and Studio test defaults. Studio can override the preview defaults for isolated tests; hard safety ceilings remain enforced.",
+      canReset: true,
+      defaultsOnRead: true,
+      fields: [
+        {
+          ...integer(
+            "initialOutreachModelSteps",
+            "Initial outreach model steps",
+            1,
+            64,
+          ),
+          section: "Initial outreach",
+        },
+        {
+          ...integer(
+            "initialOutreachToolCalls",
+            "Initial outreach tool calls",
+            1,
+            64,
+          ),
+          section: "Initial outreach",
+        },
+        {
+          ...integer(
+            "initialOutreachDeadlineMs",
+            "Initial outreach deadline",
+            1000,
+            90000,
+            "ms",
+          ),
+          section: "Initial outreach",
+        },
+        {
+          ...integer(
+            "initialOutreachOutputTokens",
+            "Initial outreach output tokens",
+            1,
+            32768,
+          ),
+          section: "Initial outreach",
+        },
+        {
+          ...integer(
+            "initialOutreachMaxProductDetailReads",
+            "Maximum product detail reads",
+            1,
+            50,
+          ),
+          section: "Initial outreach",
+        },
+        {
+          ...integer(
+            "initialOutreachMaxToolResultBytes",
+            "Maximum tool result size",
+            1024,
+            1048576,
+            "bytes",
+          ),
+          section: "Initial outreach",
+        },
+        {
+          ...integer(
+            "initialOutreachMaxModelRequestBytes",
+            "Maximum model request size",
+            1024,
+            4194304,
+            "bytes",
+          ),
+          section: "Initial outreach",
+        },
+        {
+          ...integer("offerMaxCandidates", "Recovery offer candidates", 1, 100),
+          section: "Offer verification",
+        },
+        {
+          ...integer(
+            "offerVerificationTimeoutMs",
+            "Offer verification timeout",
+            100,
+            30000,
+            "ms",
+          ),
+          section: "Offer verification",
+        },
+        {
+          ...integer("offerAiTimeoutMs", "Offer AI timeout", 100, 30000, "ms"),
+          section: "Offer verification",
+        },
+        {
+          ...integer(
+            "offerEvidenceMaxAgeMs",
+            "Maximum offer evidence age",
+            1000,
+            600000,
+            "ms",
+          ),
+          section: "Offer verification",
+        },
+        {
+          ...integer(
+            "offerEvidenceMaxLifetimeMs",
+            "Maximum offer evidence lifetime",
+            1000,
+            600000,
+            "ms",
+          ),
+          section: "Offer verification",
+        },
+        {
+          ...integer(
+            "outreachRevalidationTimeoutMs",
+            "Outreach revalidation timeout",
+            100,
+            60000,
+            "ms",
+          ),
+          section: "Offer verification",
+        },
+        {
+          ...integer(
+            "discountSourceReadTimeoutMs",
+            "Discount source read timeout",
+            100,
+            60000,
+            "ms",
+          ),
+          section: "Offer verification",
+        },
+        {
+          ...integer(
+            "recoveryDelayMinutes",
+            "Default recovery delay",
+            1,
+            1440,
+            "minutes",
+          ),
+          section: "Recovery timing",
+        },
+        {
+          ...integer(
+            "recoveryCandidateTtlBufferMs",
+            "Recovery candidate retention buffer",
+            60000,
+            86400000,
+            "ms",
+          ),
+          section: "Recovery timing",
+        },
+        {
+          ...integer(
+            "abandonedCheckoutMaxCandidates",
+            "Abandoned checkout lookup limit",
+            1,
+            100,
+          ),
+          section: "Recovery timing",
+        },
+        {
+          ...integer(
+            "abandonedCheckoutLookupWindowMs",
+            "Abandoned checkout lookup window",
+            60000,
+            3600000,
+            "ms",
+          ),
+          section: "Recovery timing",
+        },
+        {
+          ...integer(
+            "studioPreviewModelSteps",
+            "Studio preview model steps",
+            1,
+            64,
+          ),
+          section: "Studio test defaults",
+        },
+        {
+          ...integer(
+            "studioPreviewRemoteCalls",
+            "Studio preview remote calls",
+            1,
+            64,
+          ),
+          section: "Studio test defaults",
+        },
+        {
+          ...integer(
+            "studioPreviewDeadlineMs",
+            "Studio preview deadline",
+            1000,
+            APPROVED_PREVIEW_SLOT_MS - 30000,
+            "ms",
+          ),
+          section: "Studio test defaults",
+        },
+        {
+          ...integer(
+            "studioPreviewOutputTokens",
+            "Studio preview output tokens",
+            1,
+            32768,
+          ),
+          section: "Studio test defaults",
+        },
+      ],
+      defaults: {
+        initialOutreachModelSteps: 8,
+        initialOutreachToolCalls: 16,
+        initialOutreachDeadlineMs: 45000,
+        initialOutreachOutputTokens: 512,
+        initialOutreachMaxProductDetailReads: 5,
+        initialOutreachMaxToolResultBytes: 32768,
+        initialOutreachMaxModelRequestBytes: 131072,
+        offerMaxCandidates: 8,
+        offerVerificationTimeoutMs: 2000,
+        offerAiTimeoutMs: 1500,
+        offerEvidenceMaxAgeMs: 60000,
+        offerEvidenceMaxLifetimeMs: 60000,
+        outreachRevalidationTimeoutMs: 15000,
+        discountSourceReadTimeoutMs: 10000,
+        recoveryDelayMinutes: 30,
+        recoveryCandidateTtlBufferMs: 3600000,
+        abandonedCheckoutMaxCandidates: 20,
+        abandonedCheckoutLookupWindowMs: 600000,
+        studioPreviewModelSteps: 4,
+        studioPreviewRemoteCalls: 4,
+        studioPreviewDeadlineMs: 60000,
+        studioPreviewOutputTokens: 1200,
+      },
     },
-  },
-  {
-    key: "woo.couponSync", title: "WooCommerce coupon sync", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Background coupon polling and dispatch policy. Worker concurrency changes require worker recreation/restart.",
-    canReset: true,
-    fields: [
-      integer("dispatchBatchSize", "Dispatch batch size", 1, 500),
-      integer("refreshIntervalMinutes", "Refresh interval", 1, 1440, "minutes"),
-      integer("dispatchCooldownMinutes", "Dispatch cooldown", 1, 120, "minutes"),
-      integer("unavailableRecheckMinutes", "Unavailable recheck", 1, 1440, "minutes"),
-      integer("staleScanMinutes", "Stale scan", 1, 120, "minutes"),
-      integer("maxPages", "Maximum pages", 1, 200),
-      integer("requestTimeoutMs", "Request timeout", 1000, 30000, "ms"),
-      integer("maxResponseBytes", "Response size limit", 16384, 4194304, "bytes"),
-      integer("maxScanDurationMs", "Maximum scan duration", 30000, 600000, "ms"),
-      withEnvironmentReference(integer("workerConcurrency", "Worker concurrency", 1, 32), "WOO_COUPON_SYNC_WORKER_CONCURRENCY"),
-    ],
-    defaults: {
-      dispatchBatchSize: 500, refreshIntervalMinutes: 30, dispatchCooldownMinutes: 5,
-      unavailableRecheckMinutes: 30, staleScanMinutes: 15, maxPages: 50,
-      requestTimeoutMs: 8000, maxResponseBytes: 1048576, maxScanDurationMs: 120000, workerConcurrency: 4,
+    {
+      key: "woo.couponSync",
+      title: "WooCommerce coupon sync",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description:
+        "Background coupon polling and dispatch policy. Worker concurrency changes require worker recreation/restart.",
+      canReset: true,
+      fields: [
+        integer("dispatchBatchSize", "Dispatch batch size", 1, 500),
+        integer(
+          "refreshIntervalMinutes",
+          "Refresh interval",
+          1,
+          1440,
+          "minutes",
+        ),
+        integer(
+          "dispatchCooldownMinutes",
+          "Dispatch cooldown",
+          1,
+          120,
+          "minutes",
+        ),
+        integer(
+          "unavailableRecheckMinutes",
+          "Unavailable recheck",
+          1,
+          1440,
+          "minutes",
+        ),
+        integer("staleScanMinutes", "Stale scan", 1, 120, "minutes"),
+        integer("maxPages", "Maximum pages", 1, 200),
+        integer("requestTimeoutMs", "Request timeout", 1000, 30000, "ms"),
+        integer(
+          "maxResponseBytes",
+          "Response size limit",
+          16384,
+          4194304,
+          "bytes",
+        ),
+        integer(
+          "maxScanDurationMs",
+          "Maximum scan duration",
+          30000,
+          600000,
+          "ms",
+        ),
+        withEnvironmentReference(
+          integer("workerConcurrency", "Worker concurrency", 1, 32),
+          "WOO_COUPON_SYNC_WORKER_CONCURRENCY",
+        ),
+      ],
+      defaults: {
+        dispatchBatchSize: 500,
+        refreshIntervalMinutes: 30,
+        dispatchCooldownMinutes: 5,
+        unavailableRecheckMinutes: 30,
+        staleScanMinutes: 15,
+        maxPages: 50,
+        requestTimeoutMs: 8000,
+        maxResponseBytes: 1048576,
+        maxScanDurationMs: 120000,
+        workerConcurrency: 4,
+      },
     },
-  },
-  {
-    key: "speech.transcription", title: "Speech transcription", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Background speech provider and model selection; API keys are managed separately.",
-    canReset: true,
-    fields: [
-      withEnvironmentReference({ name: "provider", label: "Provider", description: "Speech-to-text provider.", kind: "enum", options: ["groq", "openai"] }, "WHATSAPP_TRANSCRIPTION_PROVIDER"),
-      withEnvironmentReference(model("groqModelId", "Groq model ID"), "GROQ_TRANSCRIPTION_MODEL"), withEnvironmentReference(model("openaiModelId", "OpenAI model ID"), "OPENAI_TRANSCRIPTION_MODEL"),
-    ],
-    defaults: { provider: "groq", groqModelId: "whisper-large-v3-turbo", openaiModelId: "gpt-4o-mini-transcribe" },
-  },
-  {
-    key: "commerce.previewStorage", title: "Commerce Studio preview storage", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Storage and retention for Studio previews in this deployment. Each conversation and run has its own record. Changes apply on the next storage operation; expiry is measured from creation.",
-    canReset: true,
-    fields: [
-      integer("retentionHours", "Preview retention", 1, 168, "hours"),
-      integer("maxRecordBytes", "Maximum bytes per preview record", 262144, 4194304, "bytes"),
-      integer("maxConversations", "Maximum retained conversations", 1, 512),
-      integer("maxRuns", "Maximum retained runs and tool tests", 1, 4096),
-    ],
-    defaults: { retentionHours: 24, maxRecordBytes: 1048576, maxConversations: 128, maxRuns: 1024 },
-  },
-  {
-    key: "commerce.preview", title: "Commerce Studio preview", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Studio-only execution budget; does not change production conversations.",
-    canReset: true,
-    fields: [
-      integer("deadlineMs", "Deadline", 1, APPROVED_PREVIEW_SLOT_MS - 30_000, "ms"),
-      integer("outputTokens", "Output tokens", 1, 32768),
-    ],
-    defaults: { deadlineMs: 60_000, outputTokens: 1200 },
-  },
-  {
-    key: "admin.grafana", title: "Grafana navigation", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Optional Admin navigation links only; telemetry exporters and credentials remain unchanged.",
-    canReset: true,
-    fields: [
-      withEnvironmentReference(grafana("baseUrl", "Grafana base URL"), "GRAFANA_BASE_URL"), withEnvironmentReference(grafana("logsUrl", "Logs URL"), "GRAFANA_LOGS_URL"),
-      withEnvironmentReference(grafana("metricsUrl", "Metrics URL"), "GRAFANA_METRICS_URL"), withEnvironmentReference(grafana("tracesUrl", "Traces URL"), "GRAFANA_TRACES_URL"),
-      withEnvironmentReference(grafana("platformDashboardUrl", "Platform dashboard URL"), "GRAFANA_PLATFORM_DASHBOARD_URL"),
-    ],
-    defaults: { baseUrl: null, logsUrl: null, metricsUrl: null, tracesUrl: null, platformDashboardUrl: null },
-  },
-  {
-    key: "omini.moderation", title: "OpenAI SDK moderation", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "OpenAI SDK moderation settings",
-    canReset: true,
-    fields: [
-      withEnvironmentReference(httpsUrl("baseUrl", "OpenAI moderation base URL", "Optional HTTPS base URL without credentials, query parameters or fragments."), "OPENAI_MODERATION_BASE_URL"),
-      withEnvironmentReference(model("modelId", "OpenAI SDK OpenAI Moderation model ID"), "OPENAI_MODERATION_MODEL_ID"),
-    ],
-    defaults: { baseUrl: 'https://api.openai.com/v1/moderations', modelId: 'omni-moderation-latest' },
-  },
-  {
-    key: "shopBrand.publicMedia", title: "ShopBrand public media", kind: "policy", requiredRole: "SUPER_ADMIN",
-    description: "Public media origin and bucket configuration. These values do not enable or verify media delivery.",
-    canReset: false, defaultsOnRead: true,
-    fields: [
-      { name: "publicOrigin", label: "Public origin", kind: "nullable-https-url", maxLength: 2048,
-        description: "HTTPS origin only; paths, credentials, queries and fragments are not allowed." },
-      { name: "bucketName", label: "Bucket name", kind: "string", maxLength: 63, pattern: "bucket",
-        description: "Lowercase bucket name (3 to 63 characters)." },
-    ],
-    defaults: { publicOrigin: "https://shop-brands.modainteract.com", bucketName: "moda-interact-shop-brands" },
-    refine: (values) => {
-      const origin = values.publicOrigin;
-      if (typeof origin !== "string") return "Public origin is required.";
-      return new URL(origin).pathname === "/" ? null : "Public origin must not include a path.";
+    {
+      key: "speech.transcription",
+      title: "Speech transcription",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description:
+        "Background speech provider and model selection; API keys are managed separately.",
+      canReset: true,
+      fields: [
+        withEnvironmentReference(
+          {
+            name: "provider",
+            label: "Provider",
+            description: "Speech-to-text provider.",
+            kind: "enum",
+            options: ["groq", "openai"],
+          },
+          "WHATSAPP_TRANSCRIPTION_PROVIDER",
+        ),
+        withEnvironmentReference(
+          model("groqModelId", "Groq model ID"),
+          "GROQ_TRANSCRIPTION_MODEL",
+        ),
+        withEnvironmentReference(
+          model("openaiModelId", "OpenAI model ID"),
+          "OPENAI_TRANSCRIPTION_MODEL",
+        ),
+      ],
+      defaults: {
+        provider: "groq",
+        groqModelId: "whisper-large-v3-turbo",
+        openaiModelId: "gpt-4o-mini-transcribe",
+      },
     },
-  },
-  ROUTING_AGENT_CONTRACT,
-]);
+    {
+      key: "commerce.previewStorage",
+      title: "Commerce Studio preview storage",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description:
+        "Storage and retention for Studio previews in this deployment. Each conversation and run has its own record. Changes apply on the next storage operation; expiry is measured from creation.",
+      canReset: true,
+      fields: [
+        integer("retentionHours", "Preview retention", 1, 168, "hours"),
+        integer(
+          "maxRecordBytes",
+          "Maximum bytes per preview record",
+          262144,
+          4194304,
+          "bytes",
+        ),
+        integer("maxConversations", "Maximum retained conversations", 1, 512),
+        integer("maxRuns", "Maximum retained runs and tool tests", 1, 4096),
+      ],
+      defaults: {
+        retentionHours: 24,
+        maxRecordBytes: 1048576,
+        maxConversations: 128,
+        maxRuns: 1024,
+      },
+    },
+    {
+      key: "commerce.preview",
+      title: "Commerce Studio preview",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description:
+        "Studio-only execution budget; does not change production conversations.",
+      canReset: true,
+      fields: [
+        integer(
+          "deadlineMs",
+          "Deadline",
+          1,
+          APPROVED_PREVIEW_SLOT_MS - 30_000,
+          "ms",
+        ),
+        integer("outputTokens", "Output tokens", 1, 32768),
+      ],
+      defaults: { deadlineMs: 60_000, outputTokens: 1200 },
+    },
+    {
+      key: "admin.grafana",
+      title: "Grafana navigation",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description:
+        "Optional Admin navigation links only; telemetry exporters and credentials remain unchanged.",
+      canReset: true,
+      fields: [
+        withEnvironmentReference(
+          grafana("baseUrl", "Grafana base URL"),
+          "GRAFANA_BASE_URL",
+        ),
+        withEnvironmentReference(
+          grafana("logsUrl", "Logs URL"),
+          "GRAFANA_LOGS_URL",
+        ),
+        withEnvironmentReference(
+          grafana("metricsUrl", "Metrics URL"),
+          "GRAFANA_METRICS_URL",
+        ),
+        withEnvironmentReference(
+          grafana("tracesUrl", "Traces URL"),
+          "GRAFANA_TRACES_URL",
+        ),
+        withEnvironmentReference(
+          grafana("platformDashboardUrl", "Platform dashboard URL"),
+          "GRAFANA_PLATFORM_DASHBOARD_URL",
+        ),
+      ],
+      defaults: {
+        baseUrl: null,
+        logsUrl: null,
+        metricsUrl: null,
+        tracesUrl: null,
+        platformDashboardUrl: null,
+      },
+    },
+    {
+      key: "omini.moderation",
+      title: "OpenAI SDK moderation",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description: "OpenAI SDK moderation settings",
+      canReset: true,
+      fields: [
+        withEnvironmentReference(
+          httpsUrl(
+            "baseUrl",
+            "OpenAI moderation base URL",
+            "Optional HTTPS base URL without credentials, query parameters or fragments.",
+          ),
+          "OPENAI_MODERATION_BASE_URL",
+        ),
+        withEnvironmentReference(
+          model("modelId", "OpenAI SDK OpenAI Moderation model ID"),
+          "OPENAI_MODERATION_MODEL_ID",
+        ),
+      ],
+      defaults: {
+        baseUrl: "https://api.openai.com/v1/moderations",
+        modelId: "omni-moderation-latest",
+      },
+    },
+    {
+      key: "shopBrand.publicMedia",
+      title: "ShopBrand public media",
+      kind: "policy",
+      requiredRole: "SUPER_ADMIN",
+      description:
+        "Public media origin and bucket configuration. These values do not enable or verify media delivery.",
+      canReset: false,
+      defaultsOnRead: true,
+      fields: [
+        {
+          name: "publicOrigin",
+          label: "Public origin",
+          kind: "nullable-https-url",
+          maxLength: 2048,
+          description:
+            "HTTPS origin only; paths, credentials, queries and fragments are not allowed.",
+        },
+        {
+          name: "bucketName",
+          label: "Bucket name",
+          kind: "string",
+          maxLength: 63,
+          pattern: "bucket",
+          description: "Lowercase bucket name (3 to 63 characters).",
+        },
+      ],
+      defaults: {
+        publicOrigin: "https://shop-brands.modainteract.com",
+        bucketName: "moda-interact-shop-brands",
+      },
+      refine: (values) => {
+        const origin = values.publicOrigin;
+        if (typeof origin !== "string") return "Public origin is required.";
+        return new URL(origin).pathname === "/"
+          ? null
+          : "Public origin must not include a path.";
+      },
+    },
+    ROUTING_AGENT_CONTRACT,
+  ]);
 
 /** Dependency injection here is for isolated tests only; production callers use the closed registry. */
-export function createConfigurationRegistry(definitions: readonly ConfigurationContract[]): Registry {
+export function createConfigurationRegistry(
+  definitions: readonly ConfigurationContract[],
+): Registry {
   const registry = new Map<string, ConfigurationContract>();
   for (const definition of definitions) {
-    if (!/^[a-z][a-zA-Z0-9]*(\.[a-zA-Z][a-zA-Z0-9]*)+$/.test(definition.key) || registry.has(definition.key)) {
+    if (
+      !/^[a-z][a-zA-Z0-9]*(\.[a-zA-Z][a-zA-Z0-9]*)+$/.test(definition.key) ||
+      registry.has(definition.key)
+    ) {
       throw new Error("Invalid or duplicate server-owned configuration key");
     }
-    if (definition.canReset && !definition.defaults) throw new Error("Reset requires reviewed defaults");
-    if (definition.defaultsOnRead && !definition.defaults) throw new Error("Read defaults require reviewed defaults");
-    if (definition.kind === "secret" && definition.defaults) throw new Error("Secret defaults are forbidden");
-    if (new Set(definition.fields.map((field) => field.name)).size !== definition.fields.length) {
+    if (definition.canReset && !definition.defaults)
+      throw new Error("Reset requires reviewed defaults");
+    if (definition.defaultsOnRead && !definition.defaults)
+      throw new Error("Read defaults require reviewed defaults");
+    if (definition.kind === "secret" && definition.defaults)
+      throw new Error("Secret defaults are forbidden");
+    if (
+      new Set(definition.fields.map((field) => field.name)).size !==
+      definition.fields.length
+    ) {
       throw new Error("Duplicate configuration field");
     }
     registry.set(definition.key, definition);
   }
   return registry;
 }
-export const PLATFORM_POLICY_REGISTRY = createConfigurationRegistry(PLATFORM_POLICY_CONTRACTS);
+export const PLATFORM_POLICY_REGISTRY = createConfigurationRegistry(
+  PLATFORM_POLICY_CONTRACTS,
+);
 // ADMIN-002 reuses the same registry architecture; the non-secret entrypoint remains policy-only.
 import { PLATFORM_SECRET_CONTRACTS } from "./secrets-contracts";
-export const PLATFORM_CONFIGURATION_REGISTRY = createConfigurationRegistry([...PLATFORM_POLICY_CONTRACTS, ...PLATFORM_SECRET_CONTRACTS]);
+export const PLATFORM_CONFIGURATION_REGISTRY = createConfigurationRegistry([
+  ...PLATFORM_POLICY_CONTRACTS,
+  ...PLATFORM_SECRET_CONTRACTS,
+]);
 
-export function publicContracts(registry: Registry = PLATFORM_POLICY_REGISTRY, includeSecrets = false): PublicContract[] {
-  return [...registry.values()].filter((contract) => includeSecrets || contract.kind === "policy").map((contract) => ({
-    key: contract.key,
-    title: contract.title,
-    description: contract.description,
-    kind: contract.kind,
-    fields: contract.fields.map((field) => ({ ...field })),
-    defaults: contract.defaults ? { ...contract.defaults } : undefined,
-    canReset: contract.canReset,
-    requiredRole: contract.requiredRole,
-    ...(contract.editor ? { editor: contract.editor } : {}),
-  }));
+export function publicContracts(
+  registry: Registry = PLATFORM_POLICY_REGISTRY,
+  includeSecrets = false,
+): PublicContract[] {
+  return [...registry.values()]
+    .filter((contract) => includeSecrets || contract.kind === "policy")
+    .map((contract) => ({
+      key: contract.key,
+      title: contract.title,
+      description: contract.description,
+      kind: contract.kind,
+      fields: contract.fields.map((field) => ({ ...field })),
+      defaults: contract.defaults ? { ...contract.defaults } : undefined,
+      canReset: contract.canReset,
+      requiredRole: contract.requiredRole,
+      ...(contract.editor ? { editor: contract.editor } : {}),
+    }));
 }
 
 /** Only fully qualified, public HTTPS destinations without embedded secrets. */
 export function isSafeHttpsUrl(input: string, purpose?: "r2"): boolean {
   try {
-    if (input.length > 2048 || input.trim() !== input || /[\s\x00-\x1f]/.test(input)) return false;
+    if (
+      input.length > 2048 ||
+      input.trim() !== input ||
+      /[\s\x00-\x1f]/.test(input)
+    )
+      return false;
     const url = new URL(input);
-    if (url.protocol !== "https:" || url.username || url.password || url.hash || url.search || url.port && url.port !== "443") return false;
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      url.search ||
+      (url.port && url.port !== "443")
+    )
+      return false;
     const host = url.hostname.toLowerCase();
-    if (!host.includes(".") || host === "localhost" || /\.(?:local|localhost|test|invalid|example|internal)$/.test(host)) return false;
-    if (/^(?:127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)/.test(host)) return false;
+    if (
+      !host.includes(".") ||
+      host === "localhost" ||
+      /\.(?:local|localhost|test|invalid|example|internal)$/.test(host)
+    )
+      return false;
+    if (
+      /^(?:127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)/.test(
+        host,
+      )
+    )
+      return false;
     if (host.startsWith("[") || /^\d+(?:\.\d+){3}$/.test(host)) return false;
-    if (purpose === "r2" && (url.pathname !== "/" || /(?:^|\.)example\.(?:com|net|org)$/.test(host))) return false;
+    if (
+      purpose === "r2" &&
+      (url.pathname !== "/" || /(?:^|\.)example\.(?:com|net|org)$/.test(host))
+    )
+      return false;
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
-export function validateConfiguration(contract: ConfigurationContract, input: unknown): ValidationResult {
+export function validateConfiguration(
+  contract: ConfigurationContract,
+  input: unknown,
+): ValidationResult {
   const errors: Record<string, string> = {};
-  if (contract.kind !== "policy" || !input || typeof input !== "object" || Array.isArray(input)) {
-    return { ok: false, fieldErrors: {}, message: "A supported non-secret policy object is required." };
+  if (
+    contract.kind !== "policy" ||
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input)
+  ) {
+    return {
+      ok: false,
+      fieldErrors: {},
+      message: "A supported non-secret policy object is required.",
+    };
   }
   if (contract.validate) return contract.validate(input);
   const record = input as Record<string, unknown>;
   const fields = new Map(contract.fields.map((field) => [field.name, field]));
-  for (const key of Object.keys(record)) if (!fields.has(key)) errors[key] = "Unrecognised field.";
+  for (const key of Object.keys(record))
+    if (!fields.has(key)) errors[key] = "Unrecognised field.";
   const values: Record<string, unknown> = {};
   for (const field of contract.fields) {
     const value = record[field.name];
-    if (field.kind === "secret") { errors[field.name] = "Secrets cannot be written with the policy editor."; continue; }
+    if (field.kind === "secret") {
+      errors[field.name] = "Secrets cannot be written with the policy editor.";
+      continue;
+    }
     switch (field.kind) {
       case "integer":
-        if (typeof value !== "number" || !Number.isSafeInteger(value) || value < field.min || value > field.max) errors[field.name] = `Enter a whole number from ${field.min} to ${field.max}.`;
+        if (
+          typeof value !== "number" ||
+          !Number.isSafeInteger(value) ||
+          value < field.min ||
+          value > field.max
+        )
+          errors[field.name] =
+            `Enter a whole number from ${field.min} to ${field.max}.`;
         else values[field.name] = value;
         break;
       case "boolean":
-        if (typeof value !== "boolean") errors[field.name] = "Choose true or false.";
+        if (typeof value !== "boolean")
+          errors[field.name] = "Choose true or false.";
         else values[field.name] = value;
         break;
       case "enum":
-        if (typeof value !== "string" || !field.options.includes(value)) errors[field.name] = "Select an approved value.";
+        if (typeof value !== "string" || !field.options.includes(value))
+          errors[field.name] = "Select an approved value.";
         else values[field.name] = value;
         break;
       case "string":
-        if (typeof value !== "string" || !value.trim() || value.length > field.maxLength || value.trim() !== value || /[\x00-\x1f]/.test(value)) errors[field.name] = `Enter text up to ${field.maxLength} characters.`;
-        else if (field.pattern === "model-id" && !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)) errors[field.name] = "Invalid model identifier.";
-        else if (field.pattern === "bucket" && (!/^(?!.*\.\.)(?!.*\.-|.*-\.)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(value) || /^\d+\.\d+\.\d+\.\d+$/.test(value) || ["configured-bucket", "example-bucket", "your-bucket", "bucket-name"].includes(value))) errors[field.name] = "Invalid or placeholder bucket name.";
+        if (
+          typeof value !== "string" ||
+          !value.trim() ||
+          value.length > field.maxLength ||
+          value.trim() !== value ||
+          /[\x00-\x1f]/.test(value)
+        )
+          errors[field.name] =
+            `Enter text up to ${field.maxLength} characters.`;
+        else if (
+          field.pattern === "model-id" &&
+          !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)
+        )
+          errors[field.name] = "Invalid model identifier.";
+        else if (
+          field.pattern === "bucket" &&
+          (!/^(?!.*\.\.)(?!.*\.-|.*-\.)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(
+            value,
+          ) ||
+            /^\d+\.\d+\.\d+\.\d+$/.test(value) ||
+            [
+              "configured-bucket",
+              "example-bucket",
+              "your-bucket",
+              "bucket-name",
+            ].includes(value))
+        )
+          errors[field.name] = "Invalid or placeholder bucket name.";
         else values[field.name] = value;
         break;
       case "nullable-https-url":
-        if (field.purpose === "r2" && (typeof value !== "string" || !isSafeHttpsUrl(value, "r2"))) errors[field.name] = "A valid, non-placeholder public HTTPS R2 endpoint is required.";
-        else if (field.purpose !== "r2" && value !== null && (typeof value !== "string" || !isSafeHttpsUrl(value))) errors[field.name] = "Use an HTTPS URL without credentials, query parameters or fragments, or leave blank.";
-        else if (typeof value === "string" && value.length > field.maxLength) errors[field.name] = `Maximum ${field.maxLength} characters.`;
+        if (
+          field.purpose === "r2" &&
+          (typeof value !== "string" || !isSafeHttpsUrl(value, "r2"))
+        )
+          errors[field.name] =
+            "A valid, non-placeholder public HTTPS R2 endpoint is required.";
+        else if (
+          field.purpose !== "r2" &&
+          value !== null &&
+          (typeof value !== "string" || !isSafeHttpsUrl(value))
+        )
+          errors[field.name] =
+            "Use an HTTPS URL without credentials, query parameters or fragments, or leave blank.";
+        else if (typeof value === "string" && value.length > field.maxLength)
+          errors[field.name] = `Maximum ${field.maxLength} characters.`;
         else values[field.name] = value;
         break;
     }
@@ -275,5 +822,11 @@ export function validateConfiguration(contract: ConfigurationContract, input: un
     const message = contract.refine(values);
     if (message) errors._form = message;
   }
-  return Object.keys(errors).length ? { ok: false, fieldErrors: errors, message: "Correct the highlighted fields." } : { ok: true, values };
+  return Object.keys(errors).length
+    ? {
+        ok: false,
+        fieldErrors: errors,
+        message: "Correct the highlighted fields.",
+      }
+    : { ok: true, values };
 }

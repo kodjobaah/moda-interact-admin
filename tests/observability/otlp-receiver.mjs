@@ -10,33 +10,33 @@
 // The server deliberately answers 200 with an empty body for every request so
 // the OpenTelemetry exporters never treat the test as a failure or a retry.
 
-import { createServer } from 'node:http';
+import { createServer } from "node:http";
 
 function listen(server, port) {
   return new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => resolve(server.address().port));
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", () => resolve(server.address().port));
   });
 }
 
 function readBody(request) {
   return new Promise((resolve) => {
     const chunks = [];
-    request.on('data', (chunk) => chunks.push(chunk));
-    request.on('end', () => resolve(Buffer.concat(chunks)));
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => resolve(Buffer.concat(chunks)));
   });
 }
 
 function scalarFromValue(value) {
-  if (value !== null && typeof value === 'object') {
-    for (const key of ['stringValue', 'boolValue', 'intValue', 'doubleValue']) {
+  if (value !== null && typeof value === "object") {
+    for (const key of ["stringValue", "boolValue", "intValue", "doubleValue"]) {
       if (key in value) {
         return value[key];
       }
     }
     return JSON.stringify(value);
   }
-  return String(value ?? '');
+  return String(value ?? "");
 }
 
 function attributesToRecord(attributes = []) {
@@ -80,24 +80,24 @@ export async function startOtlpReceiver() {
 
   const server = createServer(async (req, res) => {
     const body = await readBody(req);
-    if (req.method === 'POST' && req.url.endsWith('/v1/traces')) {
-      if (req.headers['content-type'] !== 'application/json') {
+    if (req.method === "POST" && req.url.endsWith("/v1/traces")) {
+      if (req.headers["content-type"] !== "application/json") {
         state.errors.push({
           url: req.url,
-          contentType: req.headers['content-type'],
+          contentType: req.headers["content-type"],
           bodyLength: body.length,
           error:
-            'unexpected trace content type (shared runtime exports OTLP/HTTP JSON)',
+            "unexpected trace content type (shared runtime exports OTLP/HTTP JSON)",
         });
       } else if (body.length > 0) {
         try {
-          const decoded = decodeTracePayload(JSON.parse(body.toString('utf8')));
+          const decoded = decodeTracePayload(JSON.parse(body.toString("utf8")));
           state.resource ??= decoded.resource;
           state.spans.push(...decoded.spans);
         } catch (error) {
           state.errors.push({
             url: req.url,
-            contentType: req.headers['content-type'],
+            contentType: req.headers["content-type"],
             bodyLength: body.length,
             error: String(error && error.stack ? error.stack : error),
           });
@@ -106,20 +106,20 @@ export async function startOtlpReceiver() {
       state.requests.push({
         method: req.method,
         url: req.url,
-        contentType: req.headers['content-type'],
-        contentEncoding: req.headers['content-encoding'],
+        contentType: req.headers["content-type"],
+        contentEncoding: req.headers["content-encoding"],
         bodyLength: body.length,
       });
     } else {
       state.requests.push({ method: req.method, url: req.url });
     }
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end('{}');
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end("{}");
   });
 
-  server.on('connection', (socket) => {
+  server.on("connection", (socket) => {
     sockets.add(socket);
-    socket.on('close', () => sockets.delete(socket));
+    socket.on("close", () => sockets.delete(socket));
   });
 
   const port = await listen(server, 0);
@@ -135,9 +135,9 @@ export async function startOtlpReceiver() {
         }
         await new Promise((resolveWait) => setTimeout(resolveWait, 100));
       }
-      const names = state.spans.map((span) => span.name).join(', ');
+      const names = state.spans.map((span) => span.name).join(", ");
       throw new Error(
-        `Timed out waiting for ${message}. Captured span names: ${names || '(none)'}`,
+        `Timed out waiting for ${message}. Captured span names: ${names || "(none)"}`,
       );
     },
 

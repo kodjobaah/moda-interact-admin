@@ -1,123 +1,538 @@
 import assert from "node:assert/strict";
-import {test,after} from "node:test";
-import {randomUUID} from "node:crypto";
-import {PrismaClient,type Prisma} from "@prisma/client";
-import {layoutAst} from "../fixtures/arch075-common-layout.ts";
-import {saveEnglishTemplate} from "../../src/lib/admin/whatsapp-templates/authoring/service.ts";
-import {splitInitialReplyBody,standaloneInitialReplyText} from "../../src/lib/admin/whatsapp-templates/authoring/initial-reply-instructions.ts";
-import {RECOVERY_SCENARIOS} from "../../src/lib/admin/whatsapp-templates/authoring/scenarios.ts";
-import {readSavedCommonLayout} from "../../src/lib/admin/whatsapp-templates/authoring/common-layout-repository.ts";
-import {compileTemplateAst} from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
-import {templateHash} from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
-import {REVIEW_LANGUAGES} from "../../src/lib/admin/whatsapp-templates/compilation/language-codes.ts";
-if(process.env.ARCH047_DISPOSABLE_POSTGRES!=="1"||new URL(process.env.DATABASE_URL!).hostname!=="127.0.0.1")throw Error("Disposable localhost fixture required");
-const db=new PrismaClient();after(()=>db.$disconnect());
-test("real immutable common revision is frozen into new clone; stale caller fails atomically and original source remains identical",async()=>{
- const id="common-test-"+randomUUID();const principal={id,role:"SUPER_ADMIN" as const,developmentBypass:false};
- await db.platformAdmin.create({data:{id,provider:"fixture",providerSubject:id,email:id+"@example.invalid",displayName:"Test admin",role:"SUPER_ADMIN",active:true}});
- const original=await saveEnglishTemplate({submissionId:randomUUID(),draft:RECOVERY_SCENARIOS[0].draft},{db,principal});
- const before=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:original.id},include:{locales:true}});
- const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft:layoutAst()},{db,principal});
- await assert.rejects(readSavedCommonLayout(db,saved.id,"en"),/20/);
- for(const languageTag of REVIEW_LANGUAGES.filter(t=>t!=="en")){
-  const ast=layoutAst();if(languageTag==="fr")ast.header[0]={type:"text",value:"Bienvenue chez "};const prepared=compileTemplateAst(ast);
-  await db.whatsAppTemplateLocale.create({data:{definitionId:saved.id,languageTag,providerLanguageCode:null,localeAst:{schemaVersion:1,authoring:ast,prepared} as unknown as Prisma.InputJsonValue,contentHash:templateHash(prepared),status:"REVIEWED",reviewedAt:new Date(),reviewedByAdminId:id}});
- }
- const ref=await readSavedCommonLayout(db,saved.id,"en");
- const draft={...structuredClone(RECOVERY_SCENARIOS[0].draft),commonLayout:ref,shopBrandMediaRole:"LOGO",footer:[{type:"text",value:"Reply STOP to opt out."}]};
- const submissionId=randomUUID();const clone=await saveEnglishTemplate({submissionId,draft,cloneFromDefinitionId:original.id},{db,principal});
- assert.equal((await saveEnglishTemplate({submissionId,draft,cloneFromDefinitionId:original.id},{db,principal})).replay,true);
- const stored=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:clone.id},include:{locales:true}});
- assert.equal(stored.clonedFromDefinitionId,original.id);assert.equal(stored.sourceHash,templateHash(draft));
- assert.deepEqual((stored.locales[0].localeAst as unknown as {authoring:{commonLayout:unknown}}).authoring.commonLayout,ref);
- assert.equal(await db.commerceAuditEvent.count({where:{operationId:clone.id}}),1);
- // Exercise the actual save gate with headerless TEXT and a standalone Reply.
- const parts=splitInitialReplyBody(draft.body,draft.promotionTarget,"en",false);assert.ok(parts);
- const textDraft={...draft,shopBrandMediaRole:undefined,body:[...parts.body,{type:"text" as const,value:standaloneInitialReplyText("en",draft.promotionTarget)}]};
- const textClone=await saveEnglishTemplate({submissionId:randomUUID(),draft:textDraft,cloneFromDefinitionId:clone.id},{db,principal});
- const textStored=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:textClone.id},include:{locales:true}});
- const textRecord=textStored.locales[0].localeAst as unknown as import("../../src/lib/admin/whatsapp-templates/authoring/types").ImmutableAuthoringRecord;
- assert.equal(textRecord.prepared.family,"META_RECOVERY");if(textRecord.prepared.family!=="META_RECOVERY")throw Error("Expected Meta recovery");
- assert.equal(textRecord.prepared.parameterBindings.body.filter(b=>b.variable==="shop.name").length,1);
- assert.equal(textRecord.prepared.components.some(c=>c.type==="HEADER"),false);
- assert.equal(textStored.sourceHash,templateHash(textDraft));
- const count=await db.whatsAppTemplateDefinition.count();
- await assert.rejects(saveEnglishTemplate({submissionId:randomUUID(),draft:{...textDraft,commonLayout:{...ref,localeId:"forged"}}},{db,principal}),/differs/);
- await assert.rejects(saveEnglishTemplate({submissionId:randomUUID(),draft:{...draft,commonLayout:{...ref,localeId:"forged"}}},{db,principal}),/differs/);
- assert.equal(await db.whatsAppTemplateDefinition.count(),count);
- const french=await readSavedCommonLayout(db,saved.id,"fr",ref.sourceHash);assert.notEqual(french.contentHash,ref.contentHash);
- await db.whatsAppTemplateDefinition.update({where:{id:saved.id},data:{status:"RETIRED",retiredAt:new Date()}});
- await assert.rejects(saveEnglishTemplate({submissionId:randomUUID(),draft},{db,principal}),/not ready/);
- assert.equal(await db.whatsAppTemplateDefinition.count(),count);
- assert.deepEqual(await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:original.id},include:{locales:true}}),before);
- assert.equal(await db.whatsAppTemplateMetaRegistration.count(),0);assert.equal(await db.whatsAppConversationWrapperActiveSlot.count(),0);
+import { test, after } from "node:test";
+import { randomUUID } from "node:crypto";
+import { PrismaClient, type Prisma } from "@prisma/client";
+import { layoutAst } from "../fixtures/arch075-common-layout.ts";
+import { saveEnglishTemplate } from "../../src/lib/admin/whatsapp-templates/authoring/service.ts";
+import {
+  splitInitialReplyBody,
+  standaloneInitialReplyText,
+} from "../../src/lib/admin/whatsapp-templates/authoring/initial-reply-instructions.ts";
+import { RECOVERY_SCENARIOS } from "../../src/lib/admin/whatsapp-templates/authoring/scenarios.ts";
+import { readSavedCommonLayout } from "../../src/lib/admin/whatsapp-templates/authoring/common-layout-repository.ts";
+import { compileTemplateAst } from "../../src/lib/admin/whatsapp-templates/authoring/compiler.ts";
+import { templateHash } from "../../src/lib/admin/whatsapp-templates/authoring/identifiers.ts";
+import { REVIEW_LANGUAGES } from "../../src/lib/admin/whatsapp-templates/compilation/language-codes.ts";
+if (
+  process.env.ARCH047_DISPOSABLE_POSTGRES !== "1" ||
+  new URL(process.env.DATABASE_URL!).hostname !== "127.0.0.1"
+)
+  throw Error("Disposable localhost fixture required");
+const db = new PrismaClient();
+after(() => db.$disconnect());
+test("real immutable common revision is frozen into new clone; stale caller fails atomically and original source remains identical", async () => {
+  const id = "common-test-" + randomUUID();
+  const principal = {
+    id,
+    role: "SUPER_ADMIN" as const,
+    developmentBypass: false,
+  };
+  await db.platformAdmin.create({
+    data: {
+      id,
+      provider: "fixture",
+      providerSubject: id,
+      email: id + "@example.invalid",
+      displayName: "Test admin",
+      role: "SUPER_ADMIN",
+      active: true,
+    },
+  });
+  const original = await saveEnglishTemplate(
+    { submissionId: randomUUID(), draft: RECOVERY_SCENARIOS[0].draft },
+    { db, principal },
+  );
+  const before = await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+    where: { id: original.id },
+    include: { locales: true },
+  });
+  const saved = await saveEnglishTemplate(
+    { submissionId: randomUUID(), draft: layoutAst() },
+    { db, principal },
+  );
+  await assert.rejects(readSavedCommonLayout(db, saved.id, "en"), /20/);
+  for (const languageTag of REVIEW_LANGUAGES.filter((t) => t !== "en")) {
+    const ast = layoutAst();
+    if (languageTag === "fr")
+      ast.header[0] = { type: "text", value: "Bienvenue chez " };
+    const prepared = compileTemplateAst(ast);
+    await db.whatsAppTemplateLocale.create({
+      data: {
+        definitionId: saved.id,
+        languageTag,
+        providerLanguageCode: null,
+        localeAst: {
+          schemaVersion: 1,
+          authoring: ast,
+          prepared,
+        } as unknown as Prisma.InputJsonValue,
+        contentHash: templateHash(prepared),
+        status: "REVIEWED",
+        reviewedAt: new Date(),
+        reviewedByAdminId: id,
+      },
+    });
+  }
+  const ref = await readSavedCommonLayout(db, saved.id, "en");
+  const draft = {
+    ...structuredClone(RECOVERY_SCENARIOS[0].draft),
+    commonLayout: ref,
+    shopBrandMediaRole: "LOGO",
+    footer: [{ type: "text", value: "Reply STOP to opt out." }],
+  };
+  const submissionId = randomUUID();
+  const clone = await saveEnglishTemplate(
+    { submissionId, draft, cloneFromDefinitionId: original.id },
+    { db, principal },
+  );
+  assert.equal(
+    (
+      await saveEnglishTemplate(
+        { submissionId, draft, cloneFromDefinitionId: original.id },
+        { db, principal },
+      )
+    ).replay,
+    true,
+  );
+  const stored = await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+    where: { id: clone.id },
+    include: { locales: true },
+  });
+  assert.equal(stored.clonedFromDefinitionId, original.id);
+  assert.equal(stored.sourceHash, templateHash(draft));
+  assert.deepEqual(
+    (
+      stored.locales[0].localeAst as unknown as {
+        authoring: { commonLayout: unknown };
+      }
+    ).authoring.commonLayout,
+    ref,
+  );
+  assert.equal(
+    await db.commerceAuditEvent.count({ where: { operationId: clone.id } }),
+    1,
+  );
+  // Exercise the actual save gate with headerless TEXT and a standalone Reply.
+  const parts = splitInitialReplyBody(
+    draft.body,
+    draft.promotionTarget,
+    "en",
+    false,
+  );
+  assert.ok(parts);
+  const textDraft = {
+    ...draft,
+    shopBrandMediaRole: undefined,
+    body: [
+      ...parts.body,
+      {
+        type: "text" as const,
+        value: standaloneInitialReplyText("en", draft.promotionTarget),
+      },
+    ],
+  };
+  const textClone = await saveEnglishTemplate(
+    {
+      submissionId: randomUUID(),
+      draft: textDraft,
+      cloneFromDefinitionId: clone.id,
+    },
+    { db, principal },
+  );
+  const textStored = await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+    where: { id: textClone.id },
+    include: { locales: true },
+  });
+  const textRecord = textStored.locales[0]
+    .localeAst as unknown as import("../../src/lib/admin/whatsapp-templates/authoring/types").ImmutableAuthoringRecord;
+  assert.equal(textRecord.prepared.family, "META_RECOVERY");
+  if (textRecord.prepared.family !== "META_RECOVERY")
+    throw Error("Expected Meta recovery");
+  assert.equal(
+    textRecord.prepared.parameterBindings.body.filter(
+      (b) => b.variable === "shop.name",
+    ).length,
+    1,
+  );
+  assert.equal(
+    textRecord.prepared.components.some((c) => c.type === "HEADER"),
+    false,
+  );
+  assert.equal(textStored.sourceHash, templateHash(textDraft));
+  const count = await db.whatsAppTemplateDefinition.count();
+  await assert.rejects(
+    saveEnglishTemplate(
+      {
+        submissionId: randomUUID(),
+        draft: { ...textDraft, commonLayout: { ...ref, localeId: "forged" } },
+      },
+      { db, principal },
+    ),
+    /differs/,
+  );
+  await assert.rejects(
+    saveEnglishTemplate(
+      {
+        submissionId: randomUUID(),
+        draft: { ...draft, commonLayout: { ...ref, localeId: "forged" } },
+      },
+      { db, principal },
+    ),
+    /differs/,
+  );
+  assert.equal(await db.whatsAppTemplateDefinition.count(), count);
+  const french = await readSavedCommonLayout(
+    db,
+    saved.id,
+    "fr",
+    ref.sourceHash,
+  );
+  assert.notEqual(french.contentHash, ref.contentHash);
+  await db.whatsAppTemplateDefinition.update({
+    where: { id: saved.id },
+    data: { status: "RETIRED", retiredAt: new Date() },
+  });
+  await assert.rejects(
+    saveEnglishTemplate(
+      { submissionId: randomUUID(), draft },
+      { db, principal },
+    ),
+    /not ready/,
+  );
+  assert.equal(await db.whatsAppTemplateDefinition.count(), count);
+  assert.deepEqual(
+    await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+      where: { id: original.id },
+      include: { locales: true },
+    }),
+    before,
+  );
+  assert.equal(await db.whatsAppTemplateMetaRegistration.count(), 0);
+  assert.equal(await db.whatsAppConversationWrapperActiveSlot.count(), 0);
 });
 
-import {newWrapperDraft,cloneDraft,parseEditorNodes} from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
-import {listReviewedCommonLayouts} from "../../src/lib/admin/whatsapp-templates/authoring/common-layout-repository.ts";
-import {insertTranslationRun} from "../../src/lib/admin/whatsapp-templates/translations/repository.ts";
-import {reviewTranslation} from "../../src/lib/admin/whatsapp-templates/compilation/service.ts";
-import {previewCommonActivation} from "../../src/lib/admin/whatsapp-templates/common-activation/preview.ts";
-import {activateCommonRecoveryLayout} from "../../src/lib/admin/whatsapp-templates/common-activation/service.ts";
-import {activateConversationWrapper} from "../../src/lib/admin/whatsapp-templates/wrappers/service.ts";
-import type {TemplateTranslationSourceSnapshot} from "../../src/lib/admin/whatsapp-templates/translations/source-snapshot.ts";
+import {
+  newWrapperDraft,
+  cloneDraft,
+  parseEditorNodes,
+} from "../../src/lib/admin/whatsapp-templates/authoring/draft-operations.ts";
+import { listReviewedCommonLayouts } from "../../src/lib/admin/whatsapp-templates/authoring/common-layout-repository.ts";
+import { insertTranslationRun } from "../../src/lib/admin/whatsapp-templates/translations/repository.ts";
+import { reviewTranslation } from "../../src/lib/admin/whatsapp-templates/compilation/service.ts";
+import { previewCommonActivation } from "../../src/lib/admin/whatsapp-templates/common-activation/preview.ts";
+import { activateCommonRecoveryLayout } from "../../src/lib/admin/whatsapp-templates/common-activation/service.ts";
+import { activateConversationWrapper } from "../../src/lib/admin/whatsapp-templates/wrappers/service.ts";
+import type { TemplateTranslationSourceSnapshot } from "../../src/lib/admin/whatsapp-templates/translations/source-snapshot.ts";
 
-test("real editable draft, immutable save, queued translation review, selector and coordinated activation preserve history",async()=>{
- process.env.DEPLOYMENT_ENVIRONMENT_NAME="test";process.env.WHATSAPP_BUSINESS_ACCOUNT_ID="1234567890";
- const id="workflow-"+randomUUID();const principal={id,role:"SUPER_ADMIN" as const,developmentBypass:false};
- await db.platformAdmin.create({data:{id,provider:"fixture",providerSubject:id,email:id+"@example.invalid",role:"SUPER_ADMIN",active:true}});
- const draft=newWrapperDraft();
- draft.header=parseEditorNodes("{{shop.name}}\n{{shop.websiteUrl}}\n──────────",{variables:["shop.name","shop.websiteUrl"]}) as typeof draft.header;
- draft.conditionals=[{when:"checkout.available",nodes:parseEditorNodes("──────────\nReturn to your checkout:\n{{checkout.url}}",{variables:["checkout.url"]}) as typeof draft.header}];
- assert.deepEqual(draft.footer,[]);
- const legacy={...draft,footer:[{type:"text" as const,value:""}]};
- const old=await saveEnglishTemplate({submissionId:randomUUID(),draft:legacy},{db,principal});
- const oldBefore=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:old.id},include:{locales:true}});
- const editable=cloneDraft(legacy);assert.deepEqual(editable.footer,[]);if(editable.family!=="MODA_CONVERSATION_WRAPPER")throw new Error("Wrong clone family");
- editable.header=parseEditorNodes("Shop: {{shop.name}}\n──────────",{variables:["shop.name"]}) as typeof editable.header;
- editable.conditionals=[{when:"checkout.available",nodes:parseEditorNodes("──────────\nWebsite: {{shop.websiteUrl}}\nReturn to your checkout:\n{{checkout.url}}",{variables:["shop.websiteUrl","checkout.url"]}) as typeof editable.header}];
- const {leftCompositeProfile,topCompositeProfile}=await import("../fixtures/arch075-composite-profile.ts");
- editable.compositeProfile=leftCompositeProfile;
- const saved=await saveEnglishTemplate({submissionId:randomUUID(),draft:editable,cloneFromDefinitionId:old.id},{db,principal});assert.notEqual(saved.id,old.id);
- await db.commerceTranslationProviderCredential.create({data:{environment:"TEST",provider:"openai",ciphertext:Buffer.alloc(32,1),nonce:Buffer.alloc(12,2),authTag:Buffer.alloc(16,3),keyId:"fixture",updatedByAdminId:id}});
- await db.commerceTranslationModelConfiguration.create({data:{environment:"TEST",provider:"openai",providerModelId:"fixture-no-network",displayName:"Fixture",enabled:true,automaticDefault:true,createdByAdminId:id,updatedByAdminId:id}});
- const requested=await insertTranslationRun(db,{definitionId:saved.id,actorId:id});
- const run=await db.whatsAppTemplateTranslationRun.findUniqueOrThrow({where:{id:requested.runId}});
- const snapshot=run.sourceSnapshot as unknown as TemplateTranslationSourceSnapshot;
- assert.equal((await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id}})).status,"TRANSLATION_QUEUED");
- assert.equal((await listReviewedCommonLayouts(db)).some(r=>r.definitionId===saved.id),false);
- // Provider boundary fixture only: preserve protected markers; real Admin review reconstructs/finalizes every locale.
- const translated={schemaVersion:1,segments:snapshot.segments.map(s=>({key:s.key,text:s.text}))};
- await db.whatsAppTemplateTranslationItem.updateMany({where:{runId:run.id},data:{status:"AVAILABLE",translatedAst:translated,outputContentHash:templateHash(translated),completedAt:new Date()}});
- await db.whatsAppTemplateTranslationRun.update({where:{id:run.id},data:{status:"COMPLETED",completedAt:new Date()}});
- const tags=REVIEW_LANGUAGES.filter(tag=>tag!=="en");
- for(const languageTag of tags.slice(0,-1))await reviewTranslation({definitionId:saved.id,runId:run.id,languageTag,decision:"APPROVE"},{db,principal});
- assert.equal((await listReviewedCommonLayouts(db)).some(r=>r.definitionId===saved.id),false);
- await reviewTranslation({definitionId:saved.id,runId:run.id,languageTag:tags.at(-1)!,decision:"APPROVE"},{db,principal});
- const reviewed=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id},include:{locales:true}});
- assert.equal(reviewed.status,"READY_FOR_REVIEW");
- assert.equal(reviewed.publishedAt,null);assert.equal(reviewed.locales.length,20);
- for(const locale of reviewed.locales){const record=locale.localeAst as unknown as {authoring:{compositeProfile:unknown},prepared:{compositeProfile:unknown,compositeProfileSha256:string}};assert.deepEqual(record.authoring.compositeProfile,leftCompositeProfile);assert.deepEqual(record.prepared.compositeProfile,leftCompositeProfile);assert.equal(typeof record.prepared.compositeProfileSha256,"string");}
- const selected=(await listReviewedCommonLayouts(db)).find(r=>r.definitionId===saved.id);assert.ok(selected);assert.deepEqual(selected.prepared.footer,[]);assert.deepEqual(selected.prepared.compositeProfile,leftCompositeProfile);
- assert.equal(selected.prepared.header.some(t=>t.kind==="variable"&&t.name==="shop.websiteUrl"),false);
- assert.deepEqual(selected.prepared.conditionals[0].tokens.filter(t=>t.kind==="variable").map(t=>t.name),["shop.websiteUrl","checkout.url"]);
- assert.equal(await db.commerceAuditEvent.count({where:{action:"REVIEW_WHATSAPP_TEMPLATE_LOCALE",operationId:{startsWith:saved.id+":"}}}),19);
- const selection={commonDefinitionId:saved.id,replacements:[]};const preview=await previewCommonActivation(db,selection);
- const request={selection,issuedAt:preview.issuedAt,fingerprint:preview.fingerprint,operationKey:randomUUID(),reason:"Reviewed new editor common layout through all nineteen translations",acknowledgeOverrides:true as const,consumerDeploymentConfirmed:true as const,englishContentReviewed:true as const};
- await assert.rejects(activateConversationWrapper({audience:"SHARED",definitionId:saved.id,expectedDefinitionId:null,expectedVersion:null,reason:request.reason},{db,principal}),/coordinated/);
- const result=await activateCommonRecoveryLayout(request,{db,principal});assert.equal(result.targetCount,0);assert.equal(result.editVersion,1);
- assert.equal((await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id}})).status,"PUBLISHED");
- assert.equal((await db.whatsAppConversationWrapperActiveSlot.findUniqueOrThrow({where:{audience:"SHARED"}})).definitionId,saved.id);
- assert.deepEqual((await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id},include:{locales:true}})).locales,reviewed.locales);
- assert.deepEqual(await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:old.id},include:{locales:true}}),oldBefore);
- assert.equal((await activateCommonRecoveryLayout(request,{db,principal})).replay,true);
- assert.equal(await db.whatsAppTemplateVariant.count(),0);assert.equal(await db.whatsAppTemplateMetaRegistration.count(),0);
- const topDraft=cloneDraft(editable);if(topDraft.family!=="MODA_CONVERSATION_WRAPPER")throw new Error("Wrong clone family");topDraft.compositeProfile=topCompositeProfile;
- const topSaved=await saveEnglishTemplate({submissionId:randomUUID(),draft:topDraft,cloneFromDefinitionId:saved.id},{db,principal});
- const topRecord=await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:topSaved.id},include:{locales:true}});
- assert.notEqual(topRecord.sourceHash,reviewed.sourceHash);
- assert.deepEqual((topRecord.locales[0].localeAst as unknown as {prepared:{compositeProfile:unknown}}).prepared.compositeProfile,topCompositeProfile);
- assert.deepEqual((await db.whatsAppTemplateDefinition.findUniqueOrThrow({where:{id:saved.id},include:{locales:true}})).locales,reviewed.locales);
- assert.equal(await db.platformConfiguration.count({where:{key:"messaging.recoveryCompositeLayout"}}),0);
-
+test("real editable draft, immutable save, queued translation review, selector and coordinated activation preserve history", async () => {
+  process.env.DEPLOYMENT_ENVIRONMENT_NAME = "test";
+  process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = "1234567890";
+  const id = "workflow-" + randomUUID();
+  const principal = {
+    id,
+    role: "SUPER_ADMIN" as const,
+    developmentBypass: false,
+  };
+  await db.platformAdmin.create({
+    data: {
+      id,
+      provider: "fixture",
+      providerSubject: id,
+      email: id + "@example.invalid",
+      role: "SUPER_ADMIN",
+      active: true,
+    },
+  });
+  const draft = newWrapperDraft();
+  draft.header = parseEditorNodes(
+    "{{shop.name}}\n{{shop.websiteUrl}}\n──────────",
+    { variables: ["shop.name", "shop.websiteUrl"] },
+  ) as typeof draft.header;
+  draft.conditionals = [
+    {
+      when: "checkout.available",
+      nodes: parseEditorNodes(
+        "──────────\nReturn to your checkout:\n{{checkout.url}}",
+        { variables: ["checkout.url"] },
+      ) as typeof draft.header,
+    },
+  ];
+  assert.deepEqual(draft.footer, []);
+  const legacy = { ...draft, footer: [{ type: "text" as const, value: "" }] };
+  const old = await saveEnglishTemplate(
+    { submissionId: randomUUID(), draft: legacy },
+    { db, principal },
+  );
+  const oldBefore = await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+    where: { id: old.id },
+    include: { locales: true },
+  });
+  const editable = cloneDraft(legacy);
+  assert.deepEqual(editable.footer, []);
+  if (editable.family !== "MODA_CONVERSATION_WRAPPER")
+    throw new Error("Wrong clone family");
+  editable.header = parseEditorNodes("Shop: {{shop.name}}\n──────────", {
+    variables: ["shop.name"],
+  }) as typeof editable.header;
+  editable.conditionals = [
+    {
+      when: "checkout.available",
+      nodes: parseEditorNodes(
+        "──────────\nWebsite: {{shop.websiteUrl}}\nReturn to your checkout:\n{{checkout.url}}",
+        { variables: ["shop.websiteUrl", "checkout.url"] },
+      ) as typeof editable.header,
+    },
+  ];
+  const { leftCompositeProfile, topCompositeProfile } =
+    await import("../fixtures/arch075-composite-profile.ts");
+  editable.compositeProfile = leftCompositeProfile;
+  const saved = await saveEnglishTemplate(
+    {
+      submissionId: randomUUID(),
+      draft: editable,
+      cloneFromDefinitionId: old.id,
+    },
+    { db, principal },
+  );
+  assert.notEqual(saved.id, old.id);
+  await db.commerceTranslationProviderCredential.create({
+    data: {
+      environment: "TEST",
+      provider: "openai",
+      ciphertext: Buffer.alloc(32, 1),
+      nonce: Buffer.alloc(12, 2),
+      authTag: Buffer.alloc(16, 3),
+      keyId: "fixture",
+      updatedByAdminId: id,
+    },
+  });
+  await db.commerceTranslationModelConfiguration.create({
+    data: {
+      environment: "TEST",
+      provider: "openai",
+      providerModelId: "fixture-no-network",
+      displayName: "Fixture",
+      enabled: true,
+      automaticDefault: true,
+      createdByAdminId: id,
+      updatedByAdminId: id,
+    },
+  });
+  const requested = await insertTranslationRun(db, {
+    definitionId: saved.id,
+    actorId: id,
+  });
+  const run = await db.whatsAppTemplateTranslationRun.findUniqueOrThrow({
+    where: { id: requested.runId },
+  });
+  const snapshot =
+    run.sourceSnapshot as unknown as TemplateTranslationSourceSnapshot;
+  assert.equal(
+    (
+      await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+        where: { id: saved.id },
+      })
+    ).status,
+    "TRANSLATION_QUEUED",
+  );
+  assert.equal(
+    (await listReviewedCommonLayouts(db)).some(
+      (r) => r.definitionId === saved.id,
+    ),
+    false,
+  );
+  // Provider boundary fixture only: preserve protected markers; real Admin review reconstructs/finalizes every locale.
+  const translated = {
+    schemaVersion: 1,
+    segments: snapshot.segments.map((s) => ({ key: s.key, text: s.text })),
+  };
+  await db.whatsAppTemplateTranslationItem.updateMany({
+    where: { runId: run.id },
+    data: {
+      status: "AVAILABLE",
+      translatedAst: translated,
+      outputContentHash: templateHash(translated),
+      completedAt: new Date(),
+    },
+  });
+  await db.whatsAppTemplateTranslationRun.update({
+    where: { id: run.id },
+    data: { status: "COMPLETED", completedAt: new Date() },
+  });
+  const tags = REVIEW_LANGUAGES.filter((tag) => tag !== "en");
+  for (const languageTag of tags.slice(0, -1))
+    await reviewTranslation(
+      {
+        definitionId: saved.id,
+        runId: run.id,
+        languageTag,
+        decision: "APPROVE",
+      },
+      { db, principal },
+    );
+  assert.equal(
+    (await listReviewedCommonLayouts(db)).some(
+      (r) => r.definitionId === saved.id,
+    ),
+    false,
+  );
+  await reviewTranslation(
+    {
+      definitionId: saved.id,
+      runId: run.id,
+      languageTag: tags.at(-1)!,
+      decision: "APPROVE",
+    },
+    { db, principal },
+  );
+  const reviewed = await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+    where: { id: saved.id },
+    include: { locales: true },
+  });
+  assert.equal(reviewed.status, "READY_FOR_REVIEW");
+  assert.equal(reviewed.publishedAt, null);
+  assert.equal(reviewed.locales.length, 20);
+  for (const locale of reviewed.locales) {
+    const record = locale.localeAst as unknown as {
+      authoring: { compositeProfile: unknown };
+      prepared: { compositeProfile: unknown; compositeProfileSha256: string };
+    };
+    assert.deepEqual(record.authoring.compositeProfile, leftCompositeProfile);
+    assert.deepEqual(record.prepared.compositeProfile, leftCompositeProfile);
+    assert.equal(typeof record.prepared.compositeProfileSha256, "string");
+  }
+  const selected = (await listReviewedCommonLayouts(db)).find(
+    (r) => r.definitionId === saved.id,
+  );
+  assert.ok(selected);
+  assert.deepEqual(selected.prepared.footer, []);
+  assert.deepEqual(selected.prepared.compositeProfile, leftCompositeProfile);
+  assert.equal(
+    selected.prepared.header.some(
+      (t) => t.kind === "variable" && t.name === "shop.websiteUrl",
+    ),
+    false,
+  );
+  assert.deepEqual(
+    selected.prepared.conditionals[0].tokens
+      .filter((t) => t.kind === "variable")
+      .map((t) => t.name),
+    ["shop.websiteUrl", "checkout.url"],
+  );
+  assert.equal(
+    await db.commerceAuditEvent.count({
+      where: {
+        action: "REVIEW_WHATSAPP_TEMPLATE_LOCALE",
+        operationId: { startsWith: saved.id + ":" },
+      },
+    }),
+    19,
+  );
+  const selection = { commonDefinitionId: saved.id, replacements: [] };
+  const preview = await previewCommonActivation(db, selection);
+  const request = {
+    selection,
+    issuedAt: preview.issuedAt,
+    fingerprint: preview.fingerprint,
+    operationKey: randomUUID(),
+    reason:
+      "Reviewed new editor common layout through all nineteen translations",
+    acknowledgeOverrides: true as const,
+    consumerDeploymentConfirmed: true as const,
+    englishContentReviewed: true as const,
+  };
+  await assert.rejects(
+    activateConversationWrapper(
+      {
+        audience: "SHARED",
+        definitionId: saved.id,
+        expectedDefinitionId: null,
+        expectedVersion: null,
+        reason: request.reason,
+      },
+      { db, principal },
+    ),
+    /coordinated/,
+  );
+  const result = await activateCommonRecoveryLayout(request, { db, principal });
+  assert.equal(result.targetCount, 0);
+  assert.equal(result.editVersion, 1);
+  assert.equal(
+    (
+      await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+        where: { id: saved.id },
+      })
+    ).status,
+    "PUBLISHED",
+  );
+  assert.equal(
+    (
+      await db.whatsAppConversationWrapperActiveSlot.findUniqueOrThrow({
+        where: { audience: "SHARED" },
+      })
+    ).definitionId,
+    saved.id,
+  );
+  assert.deepEqual(
+    (
+      await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+        where: { id: saved.id },
+        include: { locales: true },
+      })
+    ).locales,
+    reviewed.locales,
+  );
+  assert.deepEqual(
+    await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+      where: { id: old.id },
+      include: { locales: true },
+    }),
+    oldBefore,
+  );
+  assert.equal(
+    (await activateCommonRecoveryLayout(request, { db, principal })).replay,
+    true,
+  );
+  assert.equal(await db.whatsAppTemplateVariant.count(), 0);
+  assert.equal(await db.whatsAppTemplateMetaRegistration.count(), 0);
+  const topDraft = cloneDraft(editable);
+  if (topDraft.family !== "MODA_CONVERSATION_WRAPPER")
+    throw new Error("Wrong clone family");
+  topDraft.compositeProfile = topCompositeProfile;
+  const topSaved = await saveEnglishTemplate(
+    {
+      submissionId: randomUUID(),
+      draft: topDraft,
+      cloneFromDefinitionId: saved.id,
+    },
+    { db, principal },
+  );
+  const topRecord = await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+    where: { id: topSaved.id },
+    include: { locales: true },
+  });
+  assert.notEqual(topRecord.sourceHash, reviewed.sourceHash);
+  assert.deepEqual(
+    (
+      topRecord.locales[0].localeAst as unknown as {
+        prepared: { compositeProfile: unknown };
+      }
+    ).prepared.compositeProfile,
+    topCompositeProfile,
+  );
+  assert.deepEqual(
+    (
+      await db.whatsAppTemplateDefinition.findUniqueOrThrow({
+        where: { id: saved.id },
+        include: { locales: true },
+      })
+    ).locales,
+    reviewed.locales,
+  );
+  assert.equal(
+    await db.platformConfiguration.count({
+      where: { key: "messaging.recoveryCompositeLayout" },
+    }),
+    0,
+  );
 });

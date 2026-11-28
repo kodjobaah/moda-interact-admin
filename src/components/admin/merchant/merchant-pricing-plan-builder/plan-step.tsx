@@ -95,8 +95,8 @@ export function PlanStep({
             ) : null}
             {commerceModelOptions.map((option) => (
               <option key={option.id} value={option.id}>
-                {option.displayName} ({option.provider}/
-                {option.providerModelId})
+                {option.displayName} ({option.provider}/{option.providerModelId}
+                )
               </option>
             ))}
           </select>
@@ -109,9 +109,9 @@ export function PlanStep({
           <span className="mt-1 block text-xs font-normal text-gray-500">
             When a Shop has no explicit model override, a current subscription
             to this plan uses this model. Use Platform default leaves the plan
-            without its own model override. The current billing plan is used
-            on the next CommerceAgent turn; pending plan changes do not take
-            effect early.
+            without its own model override. The current billing plan is used on
+            the next CommerceAgent turn; pending plan changes do not take effect
+            early.
           </span>
         </label>
         <label className="text-sm font-medium text-gray-700">

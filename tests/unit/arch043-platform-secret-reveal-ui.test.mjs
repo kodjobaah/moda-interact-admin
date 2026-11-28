@@ -3,8 +3,12 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 const load = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const [editor, field, service, action, contracts] = await Promise.all([
-  load("../../src/components/admin/platform-configuration/secret-configuration-editor.tsx"),
-  load("../../src/components/admin/platform-configuration/configuration-field.tsx"),
+  load(
+    "../../src/components/admin/platform-configuration/secret-configuration-editor.tsx",
+  ),
+  load(
+    "../../src/components/admin/platform-configuration/configuration-field.tsx",
+  ),
   load("../../src/lib/admin/platform-configuration/secret-service.ts"),
   load("../../src/app/actions/platform-secret.ts"),
   load("../../src/lib/admin/platform-configuration/secrets-contracts.ts"),

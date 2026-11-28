@@ -4,11 +4,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 
 test("Admin exposes only the guarded manual settlement mutation", async () => {
-  const source = await readFile(path.join(root, "src/lib/admin/recovery-credit-refund-settlement.ts"), "utf8");
-  const actions = await readFile(path.join(root, "src/app/actions/recovery-credit-refunds.ts"), "utf8");
+  const source = await readFile(
+    path.join(root, "src/lib/admin/recovery-credit-refund-settlement.ts"),
+    "utf8",
+  );
+  const actions = await readFile(
+    path.join(root, "src/app/actions/recovery-credit-refunds.ts"),
+    "utf8",
+  );
   const legacyLock = ["lockRecoveryCredit", "Refund"].join("");
   const legacyReject = ["rejectRecoveryCredit", "Refund"].join("");
   assert.equal(source.includes(legacyLock), false);
@@ -16,7 +25,10 @@ test("Admin exposes only the guarded manual settlement mutation", async () => {
   assert.match(source, /requirePlatformAdminMutation\(\)/);
   assert.match(source, /principal\.role !== "SUPER_ADMIN"/);
   assert.match(source, /Prisma\.TransactionIsolationLevel\.Serializable/);
-  assert.match(source, /status !== RecoveryCreditRefundStatus\.PROVIDER_ACTION_REQUIRED/);
+  assert.match(
+    source,
+    /status !== RecoveryCreditRefundStatus\.PROVIDER_ACTION_REQUIRED/,
+  );
   assert.match(source, /automaticCorrectionUsageEventId !== null/);
   assert.match(source, /RecoveryCreditPurchaseStatus\.WITHDRAWN/);
   assert.match(source, /purchase\.reservedAmount !== 0/);
@@ -25,7 +37,10 @@ test("Admin exposes only the guarded manual settlement mutation", async () => {
   assert.match(source, /status: RecoveryCreditRefundStatus\.NEEDS_ATTENTION/);
   assert.match(source, /status: RecoveryCreditRefundStatus\.COMPLETED/);
   assert.doesNotMatch(source, /UsageEvent\.create|refundCreate|shopify\.admin/);
-  assert.equal(source.toLowerCase().includes(["mark", " complete"].join("")), false);
+  assert.equal(
+    source.toLowerCase().includes(["mark", " complete"].join("")),
+    false,
+  );
   const legacyLockAction = [legacyLock, "Action"].join("");
   const legacyRejectAction = [legacyReject, "Action"].join("");
   assert.equal(actions.includes(legacyLockAction), false);
@@ -33,7 +48,10 @@ test("Admin exposes only the guarded manual settlement mutation", async () => {
 });
 
 test("manual evidence preserves exact-once entitlement, audit, and system-message completion", async () => {
-  const source = await readFile(path.join(root, "src/lib/admin/recovery-credit-refund-settlement.ts"), "utf8");
+  const source = await readFile(
+    path.join(root, "src/lib/admin/recovery-credit-refund-settlement.ts"),
+    "utf8",
+  );
   assert.match(source, /providerAmount\.eq\(refund\.expectedProviderAmount\)/);
   assert.match(source, /providerCurrency !== refund\.expectedProviderCurrency/);
   assert.match(source, /status: RecoveryCreditPurchaseStatus\.REFUNDED/);

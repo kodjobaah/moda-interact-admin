@@ -1,55 +1,61 @@
-import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { test } from 'node:test';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { test } from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, resolve } from "node:path";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const sourcePath = resolve(root, 'src/lib/admin/merchant-support.ts');
-const source = readFileSync(sourcePath, 'utf8');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const sourcePath = resolve(root, "src/lib/admin/merchant-support.ts");
+const source = readFileSync(sourcePath, "utf8");
 const developmentAdminSource = readFileSync(
-  resolve(root, 'src/lib/auth/development-platform-admin.ts'),
-  'utf8',
+  resolve(root, "src/lib/auth/development-platform-admin.ts"),
+  "utf8",
 );
 const packageJson = JSON.parse(
-  readFileSync(resolve(root, 'package.json'), 'utf8'),
+  readFileSync(resolve(root, "package.json"), "utf8"),
 );
 
 function runBehaviorScript(script) {
   const output = execFileSync(
-      process.execPath,
-      ['--experimental-strip-types', '--input-type=module', '-e', script],
-      {
-        cwd: root,
-        env: {
-          ...process.env,
-          NODE_ENV: 'test',
-          ADMIN_DEVELOPMENT_AUTH_BYPASS: 'true',
-          DEPLOYMENT_ENVIRONMENT_NAME: 'development',
-        },
-        encoding: 'utf8',
+    process.execPath,
+    ["--experimental-strip-types", "--input-type=module", "-e", script],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        NODE_ENV: "test",
+        ADMIN_DEVELOPMENT_AUTH_BYPASS: "true",
+        DEPLOYMENT_ENVIRONMENT_NAME: "development",
       },
-    );
-  return JSON.parse(output.trim().split('\n').at(-1));
+      encoding: "utf8",
+    },
+  );
+  return JSON.parse(output.trim().split("\n").at(-1));
 }
 
 const moduleUrl = pathToFileURL(sourcePath).href;
 
-test('consumes the published shared release without a local declaration shim', () => {
-  assert.match(packageJson.dependencies['@modainteract/moda-interact-shared'], /^\d+\.\d+\.\d+$/);
+test("consumes the published shared release without a local declaration shim", () => {
+  assert.match(
+    packageJson.dependencies["@modainteract/moda-interact-shared"],
+    /^\d+\.\d+\.\d+$/,
+  );
   assert.equal(
-    existsSync(resolve(root, 'src/types/shared-merchant-communications.d.ts')),
+    existsSync(resolve(root, "src/types/shared-merchant-communications.d.ts")),
     false,
   );
   assert.match(
     source,
     /from '@modainteract\/moda-interact-shared\/merchant-communications\/node'/,
   );
-  assert.doesNotMatch(source, /await import\(\s*['"]@modainteract\/moda-interact-shared\/merchant-communications\/node/);
+  assert.doesNotMatch(
+    source,
+    /await import\(\s*['"]@modainteract\/moda-interact-shared\/merchant-communications\/node/,
+  );
 });
 
-test('bounds protected shop suggestions and aligns search with brand/domain matching', () => {
+test("bounds protected shop suggestions and aligns search with brand/domain matching", () => {
   const result = runBehaviorScript(`
     import { getMerchantSupportShopSuggestions } from ${JSON.stringify(moduleUrl)};
     let queryCalls = 0;
@@ -79,13 +85,15 @@ test('bounds protected shop suggestions and aligns search with brand/domain matc
   `);
 
   assert.deepEqual(result.short, []);
-  assert.deepEqual(result.suggestions, [{
-    threadId: 'thread-1',
-    shopId: 'shop-1',
-    domain: 'north.example.com',
-    brandName: 'North',
-    needsAdminResponse: true,
-  }]);
+  assert.deepEqual(result.suggestions, [
+    {
+      threadId: "thread-1",
+      shopId: "shop-1",
+      domain: "north.example.com",
+      brandName: "North",
+      needsAdminResponse: true,
+    },
+  ]);
   assert.equal(result.queryCalls, 1);
   assert.match(result.sql, /FROM "support"\."MerchantSupportThread"/);
   assert.match(result.sql, /LEFT JOIN "commerce"\."ShopBrand"/);
@@ -94,7 +102,7 @@ test('bounds protected shop suggestions and aligns search with brand/domain matc
   assert.ok(result.values.includes(8));
 });
 
-test('enforces the Unicode body limit and owner recheck', () => {
+test("enforces the Unicode body limit and owner recheck", () => {
   const result = runBehaviorScript(`
     import {
       adminCanSend,
@@ -157,7 +165,7 @@ test('enforces the Unicode body limit and owner recheck', () => {
   });
 });
 
-test('uses shared Shop language context for compose, including Shops without ShopSettings', () => {
+test("uses shared Shop language context for compose, including Shops without ShopSettings", () => {
   const result = runBehaviorScript(`
     import { composeAdministrativeMessage } from ${JSON.stringify(moduleUrl)};
     const run = async (defaultLanguageTag) => {
@@ -258,22 +266,32 @@ test('uses shared Shop language context for compose, including Shops without Sho
     queueCalls: 0,
     responseBoundaryConditions: [true, true],
   });
-  assert.ok(fallbackMessageInsertValues.includes('en-GB'));
-  for (const threadReadSql of [englishThreadReadSql, frenchThreadReadSql, fallbackThreadReadSql]) {
-    const normalizedSql = threadReadSql.replace(/\s+/g, ' ').trim();
-    assert.match(normalizedSql, /INNER JOIN "commerce"\."Shop" s ON s\."id" = t\."shopId"/);
+  assert.ok(fallbackMessageInsertValues.includes("en-GB"));
+  for (const threadReadSql of [
+    englishThreadReadSql,
+    frenchThreadReadSql,
+    fallbackThreadReadSql,
+  ]) {
+    const normalizedSql = threadReadSql.replace(/\s+/g, " ").trim();
+    assert.match(
+      normalizedSql,
+      /INNER JOIN "commerce"\."Shop" s ON s\."id" = t\."shopId"/,
+    );
     assert.match(normalizedSql, /s\."defaultLanguageTag"/);
     assert.doesNotMatch(normalizedSql, /"shopify"\."ShopSettings"/);
     assert.match(normalizedSql, /FOR UPDATE OF t/);
     assert.doesNotMatch(normalizedSql, /FOR UPDATE(?!\s+OF\s+t)/);
   }
   for (const [messageInsertSql, messageInsertValues, state] of [
-    [englishMessageInsertSql, englishMessageInsertValues, 'AVAILABLE'],
-    [frenchMessageInsertSql, frenchMessageInsertValues, 'PROCESSING'],
-    [fallbackMessageInsertSql, fallbackMessageInsertValues, 'AVAILABLE'],
+    [englishMessageInsertSql, englishMessageInsertValues, "AVAILABLE"],
+    [frenchMessageInsertSql, frenchMessageInsertValues, "PROCESSING"],
+    [fallbackMessageInsertSql, fallbackMessageInsertValues, "AVAILABLE"],
   ]) {
-    const normalizedSql = messageInsertSql.replace(/\s+/g, ' ').trim();
-    assert.match(normalizedSql, /INSERT INTO "support"\."MerchantSupportMessage"/);
+    const normalizedSql = messageInsertSql.replace(/\s+/g, " ").trim();
+    assert.match(
+      normalizedSql,
+      /INSERT INTO "support"\."MerchantSupportMessage"/,
+    );
     assert.match(
       normalizedSql,
       /CAST\((?:\?|\$\d+) AS "support"\."MerchantSupportMessageState"\)/,
@@ -282,7 +300,7 @@ test('uses shared Shop language context for compose, including Shops without Sho
   }
 });
 
-test('maps persisted message kinds and respects existing translation status', () => {
+test("maps persisted message kinds and respects existing translation status", () => {
   const result = runBehaviorScript(`
     import { requestAdditionalTranslation } from ${JSON.stringify(moduleUrl)};
     const run = async (kind, status) => {
@@ -337,25 +355,35 @@ test('maps persisted message kinds and respects existing translation status', ()
 
   assert.equal(result.invalid, true);
   assert.equal(result.merchant.queueCalls, 1);
-  assert.ok(result.merchant.values.flat().includes('en-GB'));
+  assert.ok(result.merchant.values.flat().includes("en-GB"));
   assert.equal(result.administrative.queueCalls, 0);
   assert.equal(result.system.queueCalls, 0);
-  assert.ok(result.merchant.values.flat().includes('MERCHANT_TO_ADMIN'));
-  assert.ok(result.administrative.values.flat().includes('ADMIN_TO_MERCHANT'));
-  assert.ok(result.system.values.flat().includes('SYSTEM_TO_MERCHANT'));
-  assert.equal(result.merchant.id, 'translation-1');
-  const normalizedDirectionSql = result.merchant.directionInsertSql.replace(/\s+/g, ' ').trim();
-  assert.match(normalizedDirectionSql, /INSERT INTO "support"\."MerchantMessageTranslation"/);
+  assert.ok(result.merchant.values.flat().includes("MERCHANT_TO_ADMIN"));
+  assert.ok(result.administrative.values.flat().includes("ADMIN_TO_MERCHANT"));
+  assert.ok(result.system.values.flat().includes("SYSTEM_TO_MERCHANT"));
+  assert.equal(result.merchant.id, "translation-1");
+  const normalizedDirectionSql = result.merchant.directionInsertSql
+    .replace(/\s+/g, " ")
+    .trim();
+  assert.match(
+    normalizedDirectionSql,
+    /INSERT INTO "support"\."MerchantMessageTranslation"/,
+  );
   assert.match(
     normalizedDirectionSql,
     /CAST\((?:\?|\$\d+) AS "support"\."MerchantTranslationDirection"\)/,
   );
-  assert.ok(result.merchant.directionInsertValues.includes('MERCHANT_TO_ADMIN'));
+  assert.ok(
+    result.merchant.directionInsertValues.includes("MERCHANT_TO_ADMIN"),
+  );
 });
 
-test('keeps reconciliation durable when queue enqueue fails and caches producers', () => {
+test("keeps reconciliation durable when queue enqueue fails and caches producers", () => {
   assert.match(source, /let redisQueue: Queue \| null = null/);
-  assert.match(source, /if \(redisQueue && redisQueueUrl === redisUrl\) return redisQueue/);
+  assert.match(
+    source,
+    /if \(redisQueue && redisQueueUrl === redisUrl\) return redisQueue/,
+  );
   assert.match(source, /await redisQueue\.close\(\)/);
   assert.match(source, /getMerchantCommunicationsQueue/);
   assert.match(source, /requestFailedTranslationReconciliation/);
@@ -365,9 +393,9 @@ test('keeps reconciliation durable when queue enqueue fails and caches producers
   assert.doesNotMatch(source, /shared_job_id_runtime_unavailable/);
 });
 
-test('returns post-read state and bounded translation-safe arrays', () => {
+test("returns post-read state and bounded translation-safe arrays", () => {
   const readUpdate = source.indexOf('SET "readAt" = NOW()');
-  const messageSelect = source.indexOf('WITH bounded_messages');
+  const messageSelect = source.indexOf("WITH bounded_messages");
   assert.ok(readUpdate >= 0 && readUpdate < messageSelect);
   assert.match(source, /translations: TranslationView\[\]/);
   assert.match(source, /ROW_NUMBER\(\) OVER \(PARTITION BY "messageId"/);
@@ -380,18 +408,31 @@ test('returns post-read state and bounded translation-safe arrays', () => {
   assert.doesNotMatch(source, /latestTranslation/);
 });
 
-test('materializes development attribution for every FK-backed support mutation', () => {
+test("materializes development attribution for every FK-backed support mutation", () => {
   assert.match(developmentAdminSource, /ON CONFLICT \("id"\) DO NOTHING/);
   assert.match(
     developmentAdminSource,
     /reserved development platform administrator identity conflicts/,
   );
-  assert.equal((source.match(/ensureDevelopmentPlatformAdmin\(transaction, principal\)/g) ?? []).length, 4);
-  assert.match(source, /requestFailedTranslationsReconciliation[\s\S]*?database\.\$transaction/);
-  assert.match(developmentAdminSource, /if \(!principal\.developmentBypass\) return;/);
+  assert.equal(
+    (
+      source.match(
+        /ensureDevelopmentPlatformAdmin\(transaction, principal\)/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+  assert.match(
+    source,
+    /requestFailedTranslationsReconciliation[\s\S]*?database\.\$transaction/,
+  );
+  assert.match(
+    developmentAdminSource,
+    /if \(!principal\.developmentBypass\) return;/,
+  );
 });
 
-test('casts the development principal role as the PostgreSQL enum while binding its value', () => {
+test("casts the development principal role as the PostgreSQL enum while binding its value", () => {
   const result = runBehaviorScript(`
     import { composeAdministrativeMessage } from ${JSON.stringify(moduleUrl)};
     let identityInsert;
@@ -420,13 +461,16 @@ test('casts the development principal role as the PostgreSQL enum while binding 
     console.log(JSON.stringify({ sql: identityInsert.sql, values: identityInsert.values }));
   `);
 
-  assert.match(result.sql, /CAST\((?:\?|\$\d+) AS "public"\."PlatformAdminRole"\)/);
+  assert.match(
+    result.sql,
+    /CAST\((?:\?|\$\d+) AS "public"\."PlatformAdminRole"\)/,
+  );
   assert.match(result.sql, /"updatedAt"/);
   assert.match(result.sql, /CURRENT_TIMESTAMP/);
-  assert.ok(result.values.includes('SUPER_ADMIN'));
+  assert.ok(result.values.includes("SUPER_ADMIN"));
 });
 
-test('reuses production queues, closes replaced queues, and leaves injected queues open', () => {
+test("reuses production queues, closes replaced queues, and leaves injected queues open", () => {
   const result = runBehaviorScript(`
     import {
       composeAdministrativeMessage,
@@ -483,7 +527,7 @@ test('reuses production queues, closes replaced queues, and leaves injected queu
   });
 });
 
-test('persists targeted reconciliation before a failed queue hint', () => {
+test("persists targeted reconciliation before a failed queue hint", () => {
   const result = runBehaviorScript(`
     import {
       requestFailedTranslationReconciliation,
@@ -511,7 +555,7 @@ test('persists targeted reconciliation before a failed queue hint', () => {
   assert.equal(result.writes, 2);
 });
 
-test('enforces global reconciliation authorization and durability', () => {
+test("enforces global reconciliation authorization and durability", () => {
   const result = runBehaviorScript(`
     import {
       adminCanRequestGlobalReconciliation,
@@ -550,7 +594,7 @@ test('enforces global reconciliation authorization and durability', () => {
   assert.equal(result.platformAdminAllowed, false);
 });
 
-test('lists only pending threads with bounded filters and safe owner summaries', () => {
+test("lists only pending threads with bounded filters and safe owner summaries", () => {
   const result = runBehaviorScript(`
     import { getPendingMerchantSupportThreads } from ${JSON.stringify(moduleUrl)};
     const queries = [];
@@ -588,15 +632,15 @@ test('lists only pending threads with bounded filters and safe owner summaries',
   assert.equal(result.pageSize, 50);
   assert.equal(result.totalItems, 2);
   assert.deepEqual(result.item.owner, {
-    id: 'admin-2',
-    displayName: 'Other Admin',
-    email: 'other@example.com',
+    id: "admin-2",
+    displayName: "Other Admin",
+    email: "other@example.com",
   });
-  assert.equal('originalBody' in result.item, false);
-  assert.ok(result.queryValues.includes('development-platform-admin'));
+  assert.equal("originalBody" in result.item, false);
+  assert.ok(result.queryValues.includes("development-platform-admin"));
 });
 
-test('compare-and-set ownership has one winner and reloads the losing owner', () => {
+test("compare-and-set ownership has one winner and reloads the losing owner", () => {
   const result = runBehaviorScript(`
     import {
       adminCanRelease,
@@ -665,14 +709,14 @@ test('compare-and-set ownership has one winner and reloads the losing owner', ()
 
   assert.deepEqual(result.claims.sort(), [false, true]);
   assert.deepEqual(result.loserOwner, {
-    id: 'development-platform-admin',
-    displayName: 'Current Admin',
-    email: 'current@example.com',
+    id: "development-platform-admin",
+    displayName: "Current Admin",
+    email: "current@example.com",
   });
   assert.deepEqual(result.reassigned, {
-    id: 'admin-2',
-    displayName: 'Admin Two',
-    email: 'two@example.com',
+    id: "admin-2",
+    displayName: "Admin Two",
+    email: "two@example.com",
   });
   assert.equal(result.ordinaryReleaseOther, false);
   assert.equal(result.superReleaseOther, true);

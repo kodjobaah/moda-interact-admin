@@ -21,10 +21,10 @@ test("effective policy uses an active complete override", () => {
     followUpEnabled: true,
     followUpDelayMinutes: 120,
   });
-  assert.deepEqual(
-    effectiveRecoveryPolicy(merchant, override, null),
-    { ...override, source: "ADMIN_OVERRIDE" },
-  );
+  assert.deepEqual(effectiveRecoveryPolicy(merchant, override, null), {
+    ...override,
+    source: "ADMIN_OVERRIDE",
+  });
 });
 
 test("expired override restores merchant policy without deleting history", () => {
@@ -47,12 +47,16 @@ test("expired override restores merchant policy without deleting history", () =>
 });
 
 test("Shared cross-field validation remains authoritative", () => {
-  assert.throws(() => parseRecoveryPolicySnapshot({
-    ...merchant,
-    recoveryOfferMode: "FIXED",
-  }));
-  assert.throws(() => parseRecoveryPolicySnapshot({
-    ...merchant,
-    followUpEnabled: true,
-  }));
+  assert.throws(() =>
+    parseRecoveryPolicySnapshot({
+      ...merchant,
+      recoveryOfferMode: "FIXED",
+    }),
+  );
+  assert.throws(() =>
+    parseRecoveryPolicySnapshot({
+      ...merchant,
+      followUpEnabled: true,
+    }),
+  );
 });

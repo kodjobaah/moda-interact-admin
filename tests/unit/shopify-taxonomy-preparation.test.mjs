@@ -38,7 +38,10 @@ test("preparation parser builds hierarchy from Shopify's compact text distributi
     parentId: "gid://shopify/TaxonomyCategory/aa-1",
     hasChildren: false,
     ancestors: [
-      { id: "gid://shopify/TaxonomyCategory/aa", name: "Apparel & Accessories" },
+      {
+        id: "gid://shopify/TaxonomyCategory/aa",
+        name: "Apparel & Accessories",
+      },
       { id: "gid://shopify/TaxonomyCategory/aa-1", name: "Clothing" },
     ],
   });

@@ -32,9 +32,7 @@ export function ShopifyPricingStep({
           value={recoveryUsageEventHandle}
           required={planKind === "PAID_METERED"}
           disabled={planKind === "FREE"}
-          onChange={(event) =>
-            setRecoveryUsageEventHandle(event.target.value)
-          }
+          onChange={(event) => setRecoveryUsageEventHandle(event.target.value)}
         />
         <span className="mt-1 block text-xs font-normal text-gray-500">
           Normal paid recovery meter copied to

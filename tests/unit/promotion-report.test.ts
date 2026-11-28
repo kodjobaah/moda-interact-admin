@@ -10,7 +10,9 @@ const selectedAt = new Date("2026-01-01T00:00:00Z");
 const reselectedAt = new Date("2026-01-03T00:00:00Z");
 const usedAt = new Date("2026-01-02T00:00:00Z");
 
-function grant(overrides: Partial<Parameters<typeof projectPromotionMerchantRow>[0]> = {}) {
+function grant(
+  overrides: Partial<Parameters<typeof projectPromotionMerchantRow>[0]> = {},
+) {
   return projectPromotionMerchantRow({
     shopId: "shop-1",
     shopLabel: "shop.example",
@@ -47,7 +49,11 @@ test("used grants preserve first and last use timestamps independently", () => {
 
 test("remaining allocation is quantity minus reserved and committed, bounded at zero", () => {
   assert.equal(grant().remainingAllocation, 5);
-  assert.equal(grant({ quantity: 4, reservedQuantity: 3, committedQuantity: 4 }).remainingAllocation, 0);
+  assert.equal(
+    grant({ quantity: 4, reservedQuantity: 3, committedQuantity: 4 })
+      .remainingAllocation,
+    0,
+  );
 });
 
 test("reselection preserves one original allocation and its history", () => {
@@ -66,14 +72,24 @@ test("exhaustion and current-selection projection are preserved", () => {
 });
 
 test("page normalization accepts positive integers only", () => {
-  for (const value of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, undefined]) {
+  for (const value of [
+    0,
+    -1,
+    1.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    undefined,
+  ]) {
     assert.equal(normalizePromotionReportPage(value), 1);
   }
   assert.equal(normalizePromotionReportPage(3), 3);
 });
 
 test("merchant search is trimmed and truncated to 255 characters", () => {
-  assert.equal(normalizePromotionReportSearch("  shop.example  "), "shop.example");
+  assert.equal(
+    normalizePromotionReportSearch("  shop.example  "),
+    "shop.example",
+  );
   assert.equal(normalizePromotionReportSearch("x".repeat(300))?.length, 255);
   assert.equal(normalizePromotionReportSearch("   "), undefined);
 });

@@ -121,13 +121,19 @@ export default async function BillingPage({ searchParams }: PageProps) {
     firstParam(rawParams.planId)
       ? await getMerchantPricingPlanById(firstParam(rawParams.planId) as string)
       : null;
-  const planPolicyHistoryPage = Math.min(1000, positiveInt(rawParams.commercePlanHistoryPage, 1) - 1);
+  const planPolicyHistoryPage = Math.min(
+    1000,
+    positiveInt(rawParams.commercePlanHistoryPage, 1) - 1,
+  );
   const selectedPlanPolicy = selectedPlan
     ? await getLivePlanPolicyDashboard(selectedPlan.id, planPolicyHistoryPage)
     : null;
-  const createPlanPlatformPolicy = view === "plans" && planSection === "pricing" &&
-    params.drawer === "register-plan" && principal.role === "SUPER_ADMIN"
-      ? (await getLivePlatformPolicyDashboard(0)).policy?.budget ?? null
+  const createPlanPlatformPolicy =
+    view === "plans" &&
+    planSection === "pricing" &&
+    params.drawer === "register-plan" &&
+    principal.role === "SUPER_ADMIN"
+      ? ((await getLivePlatformPolicyDashboard(0)).policy?.budget ?? null)
       : null;
   const planDrawerOpen =
     view === "plans" &&
@@ -285,9 +291,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
             params={params}
           />
         ) : null}
-        {view === "sync-errors" && firstParam(rawParams.syncReconcileRequested) ? (
+        {view === "sync-errors" &&
+        firstParam(rawParams.syncReconcileRequested) ? (
           <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-            Billing reconciliation was requested. The billing worker will reconstruct the scheduled subscription reconciliation on its next billing cycle.
+            Billing reconciliation was requested. The billing worker will
+            reconstruct the scheduled subscription reconciliation on its next
+            billing cycle.
           </div>
         ) : null}
         {view === "sync-errors" && syncErrors ? (

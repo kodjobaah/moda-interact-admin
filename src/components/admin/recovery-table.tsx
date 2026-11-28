@@ -37,7 +37,8 @@ export function RecoveryTable({
             href={backHref}
             className="flex items-center text-sm font-medium text-gray-600 hover:text-[var(--brand-600)]"
           >
-            <Icon name="arrow-left" className="mr-2 h-4 w-4" /> {adminI18n.t("recovery.backToCustomers")}
+            <Icon name="arrow-left" className="mr-2 h-4 w-4" />{" "}
+            {adminI18n.t("recovery.backToCustomers")}
           </Link>
           <span className="ml-4 border-l border-gray-300 pl-4 text-sm font-bold text-gray-900">
             {customerName(
@@ -47,7 +48,9 @@ export function RecoveryTable({
             )}
           </span>
         </div>
-        <span className="text-xs text-gray-500">{adminI18n.t("recovery.list")}</span>
+        <span className="text-xs text-gray-500">
+          {adminI18n.t("recovery.list")}
+        </span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-4">
         {recoveries.items.length ? (
@@ -87,10 +90,7 @@ export function RecoveryTable({
                     </td>
                     <td className="py-3 pr-3 text-sm text-gray-500">
                       <Link href={href} className="block">
-                        {formatMoney(
-                          recovery.totalPrice,
-                          recovery.currency,
-                        )}
+                        {formatMoney(recovery.totalPrice, recovery.currency)}
                       </Link>
                     </td>
                     <td className="py-3 pr-3">

@@ -11,10 +11,16 @@ import {
 const firstKey = "11111111-1111-4111-8111-111111111111";
 const secondKey = "22222222-2222-4222-8222-222222222222";
 
-function source(highlights = [
-  { contentKey: firstKey, title: "Fast", description: "Fast recovery" },
-  { contentKey: secondKey, title: "Helpful", description: "Helpful conversations" },
-]) {
+function source(
+  highlights = [
+    { contentKey: firstKey, title: "Fast", description: "Fast recovery" },
+    {
+      contentKey: secondKey,
+      title: "Helpful",
+      description: "Helpful conversations",
+    },
+  ],
+) {
   return canonicalMerchantPricingTranslationSource({
     shopifyPlanHandle: " starter ",
     englishDescription: " Recover baskets ",
@@ -111,7 +117,10 @@ test("edits retain unchanged fields independently and translate only a changed f
     ({ sourceContentKey, sourceField }) =>
       sourceContentKey === firstKey && sourceField === "TITLE",
   );
-  assert.equal(changedTitle.filter(({ status }) => status === "AVAILABLE").length, 1);
+  assert.equal(
+    changedTitle.filter(({ status }) => status === "AVAILABLE").length,
+    1,
+  );
   assert.equal(
     changedTitle.filter(({ status }) => status === "PENDING").length,
     MERCHANT_PRICING_LOCALES.length - 1,
@@ -138,7 +147,9 @@ test("reorder-only edits retain every persisted translation", () => {
 
 test("retention fails closed when persisted locale coverage is incomplete", () => {
   const stored = previous();
-  stored.translations = stored.translations.filter(({ locale }) => locale !== "fr");
+  stored.translations = stored.translations.filter(
+    ({ locale }) => locale !== "fr",
+  );
   assert.throws(
     () =>
       buildMerchantPricingTranslationItemSeeds({

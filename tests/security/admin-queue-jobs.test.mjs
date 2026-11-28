@@ -1,17 +1,19 @@
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { test } from 'node:test';
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { test } from "node:test";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../..',
+  "../..",
 );
 const sourcePath = (relativePath) => path.join(repositoryRoot, relativePath);
 
 function importQueueMonitor() {
-  return import(`${sourcePath('src/lib/admin/queue-monitor.ts')}?jobs-test=${Date.now()}-${Math.random()}`);
+  return import(
+    `${sourcePath("src/lib/admin/queue-monitor.ts")}?jobs-test=${Date.now()}-${Math.random()}`
+  );
 }
 
 function queueFactory(jobsByStatus) {
@@ -21,180 +23,175 @@ function queueFactory(jobsByStatus) {
   });
 }
 
-test('projects only documented Shopify tenant shop domains', async () => {
+test("projects only documented Shopify tenant shop domains", async () => {
   const { extractQueueJobShop } = await importQueueMonitor();
 
   assert.equal(
-    extractQueueJobShop(
-      'checkout-events',
-      'checkout-created',
-      { tenant: { shopDomain: ' Alpha.MyShopify.com ' } },
-    ),
-    'alpha.myshopify.com',
+    extractQueueJobShop("checkout-events", "checkout-created", {
+      tenant: { shopDomain: " Alpha.MyShopify.com " },
+    }),
+    "alpha.myshopify.com",
+  );
+  assert.equal(
+    extractQueueJobShop("checkout-events", "checkout-created", {
+      shop: "alpha.myshopify.com",
+    }),
+    null,
   );
   assert.equal(
     extractQueueJobShop(
-      'checkout-events',
-      'checkout-created',
-      { shop: 'alpha.myshopify.com' },
+      "pending-recovery-candidates",
+      "Pending recovery candidates",
+      { shopId: "shop_1" },
     ),
     null,
   );
   assert.equal(
     extractQueueJobShop(
-      'pending-recovery-candidates',
-      'Pending recovery candidates',
-      { shopId: 'shop_1' },
+      "pending-recovery-candidates",
+      "evaluate-pending-recovery",
+      { shopId: "shop_1", shopDomain: " Alpha.MyShopify.com " },
+    ),
+    "alpha.myshopify.com",
+  );
+  assert.equal(
+    extractQueueJobShop(
+      "pending-recovery-candidates",
+      "evaluate-pending-recovery",
+      { shopId: "shop_1" },
     ),
     null,
   );
   assert.equal(
-    extractQueueJobShop(
-      'pending-recovery-candidates',
-      'evaluate-pending-recovery',
-      { shopId: 'shop_1', shopDomain: ' Alpha.MyShopify.com ' },
-    ),
-    'alpha.myshopify.com',
-  );
-  assert.equal(
-    extractQueueJobShop(
-      'pending-recovery-candidates',
-      'evaluate-pending-recovery',
-      { shopId: 'shop_1' },
-    ),
-    null,
-  );
-  assert.equal(
-    extractQueueJobShop(
-      'checkout-events',
-      'checkout-created',
-      { tenant: { shopDomain: 'not a domain' } },
-    ),
+    extractQueueJobShop("checkout-events", "checkout-created", {
+      tenant: { shopDomain: "not a domain" },
+    }),
     null,
   );
 });
 
-
-test('projects documented internal shop IDs when a queue payload has no shop domain', async () => {
-  const { extractQueueJobShopId, readQueueJobSnapshot } = await importQueueMonitor();
+test("projects documented internal shop IDs when a queue payload has no shop domain", async () => {
+  const { extractQueueJobShopId, readQueueJobSnapshot } =
+    await importQueueMonitor();
 
   assert.equal(
-    extractQueueJobShopId(
-      'merchant-knowledge',
-      'process-source-revision',
-      { shopId: 'cmu8d6ypo0008qr0i5pvwjzux' },
-    ),
-    'cmu8d6ypo0008qr0i5pvwjzux',
+    extractQueueJobShopId("merchant-knowledge", "process-source-revision", {
+      shopId: "cmu8d6ypo0008qr0i5pvwjzux",
+    }),
+    "cmu8d6ypo0008qr0i5pvwjzux",
   );
   assert.equal(
     extractQueueJobShopId(
-      'billing-subscription-reconcile',
-      'reconcile-subscription',
-      { shopId: 'shop-1' },
+      "billing-subscription-reconcile",
+      "reconcile-subscription",
+      { shopId: "shop-1" },
     ),
-    'shop-1',
+    "shop-1",
   );
 
   const snapshot = await readQueueJobSnapshot({
-    redisUrl: 'redis://queue-shop-id.test.invalid',
-    queueName: 'merchant-knowledge',
-    status: 'waiting',
+    redisUrl: "redis://queue-shop-id.test.invalid",
+    queueName: "merchant-knowledge",
+    status: "waiting",
     queueFactory: queueFactory({
       waiting: [
         {
-          id: 'knowledge-1',
-          name: 'process-source-revision',
+          id: "knowledge-1",
+          name: "process-source-revision",
           attemptsMade: 0,
           timestamp: 1710000000000,
           data: {
             schemaVersion: 1,
-            shopId: 'cmu8d6ypo0008qr0i5pvwjzux',
-            sourceRevisionId: 'revision-1',
+            shopId: "cmu8d6ypo0008qr0i5pvwjzux",
+            sourceRevisionId: "revision-1",
             generation: 1,
-            requestedAt: '2026-10-04T11:59:35.230Z',
+            requestedAt: "2026-10-04T11:59:35.230Z",
           },
         },
       ],
     }),
   });
 
-  assert.equal(snapshot.jobs[0].shop, 'cmu8d6ypo0008qr0i5pvwjzux');
+  assert.equal(snapshot.jobs[0].shop, "cmu8d6ypo0008qr0i5pvwjzux");
   assert.equal(snapshot.jobs[0].shopDomain, null);
-  assert.equal(snapshot.jobs[0].attribution, 'identified');
+  assert.equal(snapshot.jobs[0].attribution, "identified");
   assert.deepEqual(snapshot.facets.shops, [
     {
-      value: 'id:cmu8d6ypo0008qr0i5pvwjzux',
-      label: 'Shop ID · cmu8d6ypo0008qr0i5pvwjzux',
+      value: "id:cmu8d6ypo0008qr0i5pvwjzux",
+      label: "Shop ID · cmu8d6ypo0008qr0i5pvwjzux",
     },
   ]);
   assert.equal(snapshot.facets.hasOrphans, false);
 
   const filtered = await readQueueJobSnapshot({
-    redisUrl: 'redis://queue-shop-id-filter.test.invalid',
-    queueName: 'merchant-knowledge',
-    status: 'waiting',
-    shop: 'id:cmu8d6ypo0008qr0i5pvwjzux',
+    redisUrl: "redis://queue-shop-id-filter.test.invalid",
+    queueName: "merchant-knowledge",
+    status: "waiting",
+    shop: "id:cmu8d6ypo0008qr0i5pvwjzux",
     queueFactory: queueFactory({
       waiting: [
         {
-          id: 'knowledge-1',
-          name: 'process-source-revision',
+          id: "knowledge-1",
+          name: "process-source-revision",
           attemptsMade: 0,
           timestamp: 1710000000000,
-          data: { shopId: 'cmu8d6ypo0008qr0i5pvwjzux' },
+          data: { shopId: "cmu8d6ypo0008qr0i5pvwjzux" },
         },
       ],
     }),
   });
-  assert.deepEqual(filtered.jobs.map((job) => job.id), ['knowledge-1']);
+  assert.deepEqual(
+    filtered.jobs.map((job) => job.id),
+    ["knowledge-1"],
+  );
 });
 
-test('reads failed and active jobs with shop facets and redacted list fields', async () => {
+test("reads failed and active jobs with shop facets and redacted list fields", async () => {
   const { readQueueJobSnapshot } = await importQueueMonitor();
   const snapshot = await readQueueJobSnapshot({
-    redisUrl: 'redis://queue-jobs.test.invalid',
-    queueName: 'checkout-events',
+    redisUrl: "redis://queue-jobs.test.invalid",
+    queueName: "checkout-events",
     queueFactory: queueFactory({
       failed: [
         {
-          id: 'failed-1',
-          name: 'checkout-created',
+          id: "failed-1",
+          name: "checkout-created",
           attemptsMade: 2,
           finishedOn: 1710000002000,
-          data: { tenant: { shopDomain: 'alpha.myshopify.com' } },
-          failedReason: 'safe reason',
-          stacktrace: ['secret stack'],
+          data: { tenant: { shopDomain: "alpha.myshopify.com" } },
+          failedReason: "safe reason",
+          stacktrace: ["secret stack"],
         },
         {
-          id: 'failed-2',
-          name: 'checkout-created',
+          id: "failed-2",
+          name: "checkout-created",
           attemptsMade: 1,
           timestamp: 1710000001000,
-          data: { unexpected: 'orphan' },
+          data: { unexpected: "orphan" },
         },
       ],
       active: [
         {
-          id: 'active-1',
-          name: 'checkout-updated',
+          id: "active-1",
+          name: "checkout-updated",
           attemptsMade: 1,
           processedOn: 1710000003000,
-          data: { tenant: { shopDomain: 'beta.myshopify.com' } },
+          data: { tenant: { shopDomain: "beta.myshopify.com" } },
         },
       ],
       waiting: [
         {
-          id: 'waiting-1',
-          name: 'checkout-created',
+          id: "waiting-1",
+          name: "checkout-created",
           attemptsMade: 0,
           timestamp: 1710000004000,
-          data: { tenant: { shopDomain: 'gamma.myshopify.com' } },
+          data: { tenant: { shopDomain: "gamma.myshopify.com" } },
         },
       ],
       delayed: [
         {
-          id: 'delayed-1',
-          name: 'checkout-created',
+          id: "delayed-1",
+          name: "checkout-created",
           attemptsMade: 0,
           timestamp: 1710000005000,
           delay: 3000,
@@ -204,144 +201,245 @@ test('reads failed and active jobs with shop facets and redacted list fields', a
     }),
   });
 
-  assert.equal(snapshot.status, 'failed');
-  assert.equal(snapshot.shop, '*');
-  assert.equal(snapshot.direction, 'desc');
+  assert.equal(snapshot.status, "failed");
+  assert.equal(snapshot.shop, "*");
+  assert.equal(snapshot.direction, "desc");
   assert.equal(snapshot.knownTotal, 2);
   assert.equal(snapshot.scanTruncated, false);
   assert.equal(snapshot.hasNext, false);
-  assert.deepEqual(snapshot.jobs.map((job) => [job.id, job.shop, job.eventAt]), [
-    ['failed-1', 'alpha.myshopify.com', '2024-03-09T16:00:02.000Z'],
-    ['failed-2', null, '2024-03-09T16:00:01.000Z'],
-  ]);
+  assert.deepEqual(
+    snapshot.jobs.map((job) => [job.id, job.shop, job.eventAt]),
+    [
+      ["failed-1", "alpha.myshopify.com", "2024-03-09T16:00:02.000Z"],
+      ["failed-2", null, "2024-03-09T16:00:01.000Z"],
+    ],
+  );
   assert.deepEqual(snapshot.facets.shops, [
-    { value: 'alpha.myshopify.com', label: 'alpha.myshopify.com' },
-    { value: 'beta.myshopify.com', label: 'beta.myshopify.com' },
-    { value: 'gamma.myshopify.com', label: 'gamma.myshopify.com' },
+    { value: "alpha.myshopify.com", label: "alpha.myshopify.com" },
+    { value: "beta.myshopify.com", label: "beta.myshopify.com" },
+    { value: "gamma.myshopify.com", label: "gamma.myshopify.com" },
   ]);
   assert.equal(snapshot.facets.hasOrphans, true);
-  assert.equal(JSON.stringify(snapshot).includes('secret stack'), false);
-  assert.equal(JSON.stringify(snapshot).includes('data'), false);
+  assert.equal(JSON.stringify(snapshot).includes("secret stack"), false);
+  assert.equal(JSON.stringify(snapshot).includes("data"), false);
 });
 
-test('filters orphan and concrete shops before bounded pagination', async () => {
+test("filters orphan and concrete shops before bounded pagination", async () => {
   const { readQueueJobSnapshot } = await importQueueMonitor();
   const options = {
-    redisUrl: 'redis://queue-jobs-filter.test.invalid',
-    queueName: 'order-events',
+    redisUrl: "redis://queue-jobs-filter.test.invalid",
+    queueName: "order-events",
     queueFactory: queueFactory({
       failed: [
-        { id: 'alpha', name: 'order-completed', attemptsMade: 1, finishedOn: 1710000001000, data: { tenant: { shopDomain: 'alpha.myshopify.com' } } },
-        { id: 'orphan', name: 'order-completed', attemptsMade: 1, finishedOn: 1710000002000, data: {} },
+        {
+          id: "alpha",
+          name: "order-completed",
+          attemptsMade: 1,
+          finishedOn: 1710000001000,
+          data: { tenant: { shopDomain: "alpha.myshopify.com" } },
+        },
+        {
+          id: "orphan",
+          name: "order-completed",
+          attemptsMade: 1,
+          finishedOn: 1710000002000,
+          data: {},
+        },
       ],
       active: [
-        { id: 'active-alpha', name: 'order-completed', attemptsMade: 1, processedOn: 1710000003000, data: { tenant: { shopDomain: 'alpha.myshopify.com' } } },
+        {
+          id: "active-alpha",
+          name: "order-completed",
+          attemptsMade: 1,
+          processedOn: 1710000003000,
+          data: { tenant: { shopDomain: "alpha.myshopify.com" } },
+        },
       ],
     }),
   };
 
-  const orphanSnapshot = await readQueueJobSnapshot({ ...options, shop: '__orphan__' });
-  assert.deepEqual(orphanSnapshot.jobs.map((job) => job.id), ['orphan']);
+  const orphanSnapshot = await readQueueJobSnapshot({
+    ...options,
+    shop: "__orphan__",
+  });
+  assert.deepEqual(
+    orphanSnapshot.jobs.map((job) => job.id),
+    ["orphan"],
+  );
 
   const concreteSnapshot = await readQueueJobSnapshot({
     ...options,
-    shop: 'ALPHA.MYSHOPIFY.COM',
-    limit: '1',
-    page: '2',
+    shop: "ALPHA.MYSHOPIFY.COM",
+    limit: "1",
+    page: "2",
   });
   assert.deepEqual(concreteSnapshot.jobs, []);
   assert.equal(concreteSnapshot.knownTotal, 1);
   assert.equal(concreteSnapshot.hasPrevious, true);
   assert.equal(concreteSnapshot.hasNext, false);
 
-  const activeSnapshot = await readQueueJobSnapshot({ ...options, status: 'active' });
-  assert.equal(activeSnapshot.jobs[0].status, 'active');
-  assert.equal(activeSnapshot.jobs[0].eventAt, '2024-03-09T16:00:03.000Z');
+  const activeSnapshot = await readQueueJobSnapshot({
+    ...options,
+    status: "active",
+  });
+  assert.equal(activeSnapshot.jobs[0].status, "active");
+  assert.equal(activeSnapshot.jobs[0].eventAt, "2024-03-09T16:00:03.000Z");
 });
 
-test('rejects unsupported statuses, malformed shops, and unbounded queries', async () => {
-  const { InvalidQueueJobQueryError, readQueueJobSnapshot } = await importQueueMonitor();
+test("rejects unsupported statuses, malformed shops, and unbounded queries", async () => {
+  const { InvalidQueueJobQueryError, readQueueJobSnapshot } =
+    await importQueueMonitor();
   const options = {
-    redisUrl: 'redis://queue-jobs-invalid.test.invalid',
-    queueName: 'checkout-events',
+    redisUrl: "redis://queue-jobs-invalid.test.invalid",
+    queueName: "checkout-events",
     queueFactory: () => {
-      throw new Error('Redis must not be accessed');
+      throw new Error("Redis must not be accessed");
     },
   };
 
-  await assert.rejects(readQueueJobSnapshot({ ...options, status: 'paused' }), InvalidQueueJobQueryError);
-  await assert.rejects(readQueueJobSnapshot({ ...options, shop: 'not a domain' }), InvalidQueueJobQueryError);
-  await assert.rejects(readQueueJobSnapshot({ ...options, limit: '51' }), InvalidQueueJobQueryError);
+  await assert.rejects(
+    readQueueJobSnapshot({ ...options, status: "paused" }),
+    InvalidQueueJobQueryError,
+  );
+  await assert.rejects(
+    readQueueJobSnapshot({ ...options, shop: "not a domain" }),
+    InvalidQueueJobQueryError,
+  );
+  await assert.rejects(
+    readQueueJobSnapshot({ ...options, limit: "51" }),
+    InvalidQueueJobQueryError,
+  );
 });
 
-test('reads waiting and delayed jobs, ordering delayed jobs by scheduled time', async () => {
+test("reads waiting and delayed jobs, ordering delayed jobs by scheduled time", async () => {
   const { readQueueJobSnapshot } = await importQueueMonitor();
   const options = {
-    redisUrl: 'redis://queue-jobs-states.test.invalid',
-    queueName: 'pending-recovery-candidates',
+    redisUrl: "redis://queue-jobs-states.test.invalid",
+    queueName: "pending-recovery-candidates",
     queueFactory: queueFactory({
       waiting: [
-        { id: 'waiting-1', name: 'Pending recovery candidates', attemptsMade: 0, timestamp: 1710000001000, data: {} },
+        {
+          id: "waiting-1",
+          name: "Pending recovery candidates",
+          attemptsMade: 0,
+          timestamp: 1710000001000,
+          data: {},
+        },
       ],
       delayed: [
-        { id: 'delayed-late', name: 'evaluate-pending-recovery', attemptsMade: 0, timestamp: 1710000001000, delay: 9000, data: { shopDomain: 'alpha.myshopify.com' } },
-        { id: 'delayed-soon', name: 'evaluate-pending-recovery', attemptsMade: 0, timestamp: 1710000002000, delay: 1000, data: {} },
+        {
+          id: "delayed-late",
+          name: "evaluate-pending-recovery",
+          attemptsMade: 0,
+          timestamp: 1710000001000,
+          delay: 9000,
+          data: { shopDomain: "alpha.myshopify.com" },
+        },
+        {
+          id: "delayed-soon",
+          name: "evaluate-pending-recovery",
+          attemptsMade: 0,
+          timestamp: 1710000002000,
+          delay: 1000,
+          data: {},
+        },
       ],
     }),
   };
 
-  const waiting = await readQueueJobSnapshot({ ...options, status: 'waiting' });
-  assert.deepEqual(waiting.jobs.map((job) => [job.id, job.eventAt, job.shop]), [
-    ['waiting-1', '2024-03-09T16:00:01.000Z', null],
-  ]);
+  const waiting = await readQueueJobSnapshot({ ...options, status: "waiting" });
+  assert.deepEqual(
+    waiting.jobs.map((job) => [job.id, job.eventAt, job.shop]),
+    [["waiting-1", "2024-03-09T16:00:01.000Z", null]],
+  );
 
-  const delayed = await readQueueJobSnapshot({ ...options, status: 'delayed' });
-  assert.deepEqual(delayed.jobs.map((job) => [job.id, job.eventAt, job.shop]), [
-    ['delayed-late', '2024-03-09T16:00:10.000Z', 'alpha.myshopify.com'],
-    ['delayed-soon', '2024-03-09T16:00:03.000Z', null],
-  ]);
+  const delayed = await readQueueJobSnapshot({ ...options, status: "delayed" });
+  assert.deepEqual(
+    delayed.jobs.map((job) => [job.id, job.eventAt, job.shop]),
+    [
+      ["delayed-late", "2024-03-09T16:00:10.000Z", "alpha.myshopify.com"],
+      ["delayed-soon", "2024-03-09T16:00:03.000Z", null],
+    ],
+  );
   assert.deepEqual(delayed.facets.shops, [
-    { value: 'alpha.myshopify.com', label: 'alpha.myshopify.com' },
+    { value: "alpha.myshopify.com", label: "alpha.myshopify.com" },
   ]);
   assert.equal(delayed.facets.hasOrphans, true);
-  const orphan = await readQueueJobSnapshot({ ...options, status: 'delayed', shop: '__orphan__' });
-  assert.deepEqual(orphan.jobs.map((job) => job.id), ['delayed-soon']);
+  const orphan = await readQueueJobSnapshot({
+    ...options,
+    status: "delayed",
+    shop: "__orphan__",
+  });
+  assert.deepEqual(
+    orphan.jobs.map((job) => job.id),
+    ["delayed-soon"],
+  );
 });
 
-test('keeps unresolved WhatsApp jobs distinct from orphan jobs', async () => {
+test("keeps unresolved WhatsApp jobs distinct from orphan jobs", async () => {
   const { readQueueJobSnapshot } = await importQueueMonitor();
   const options = {
-    redisUrl: 'redis://queue-jobs-unresolved.test.invalid',
-    queueName: 'whatsapp-events',
+    redisUrl: "redis://queue-jobs-unresolved.test.invalid",
+    queueName: "whatsapp-events",
     queueFactory: queueFactory({
       failed: [
-        { id: 'whatsapp-1', name: 'whatsapp-message', attemptsMade: 1, finishedOn: 1710000001000, data: {} },
-        { id: 'whatsapp-2', name: 'whatsapp-message', attemptsMade: 1, finishedOn: 1710000002000, data: { shopDomain: 'must-not-infer.myshopify.com' } },
+        {
+          id: "whatsapp-1",
+          name: "whatsapp-message",
+          attemptsMade: 1,
+          finishedOn: 1710000001000,
+          data: {},
+        },
+        {
+          id: "whatsapp-2",
+          name: "whatsapp-message",
+          attemptsMade: 1,
+          finishedOn: 1710000002000,
+          data: { shopDomain: "must-not-infer.myshopify.com" },
+        },
       ],
     }),
   };
 
   const all = await readQueueJobSnapshot(options);
-  assert.deepEqual(all.jobs.map((job) => [job.id, job.shop, job.attribution]), [
-    ['whatsapp-2', null, 'unresolved'],
-    ['whatsapp-1', null, 'unresolved'],
-  ]);
+  assert.deepEqual(
+    all.jobs.map((job) => [job.id, job.shop, job.attribution]),
+    [
+      ["whatsapp-2", null, "unresolved"],
+      ["whatsapp-1", null, "unresolved"],
+    ],
+  );
   assert.equal(all.facets.hasUnresolved, true);
   assert.equal(all.facets.hasOrphans, false);
 
-  const unresolved = await readQueueJobSnapshot({ ...options, shop: '__unresolved__' });
-  assert.deepEqual(unresolved.jobs.map((job) => job.id), ['whatsapp-2', 'whatsapp-1']);
-  const orphan = await readQueueJobSnapshot({ ...options, shop: '__orphan__' });
+  const unresolved = await readQueueJobSnapshot({
+    ...options,
+    shop: "__unresolved__",
+  });
+  assert.deepEqual(
+    unresolved.jobs.map((job) => job.id),
+    ["whatsapp-2", "whatsapp-1"],
+  );
+  const orphan = await readQueueJobSnapshot({ ...options, shop: "__orphan__" });
   assert.deepEqual(orphan.jobs, []);
 });
 
-test('generic queue-job API authorizes first and exposes safe errors', async () => {
-  const routeSource = await readFile(sourcePath('src/app/api/admin/queues/jobs/route.ts'), 'utf8');
-  assert.ok(routeSource.indexOf('await requirePlatformAdminRead()') < routeSource.indexOf('readQueueJobSnapshot('));
+test("generic queue-job API authorizes first and exposes safe errors", async () => {
+  const routeSource = await readFile(
+    sourcePath("src/app/api/admin/queues/jobs/route.ts"),
+    "utf8",
+  );
+  assert.ok(
+    routeSource.indexOf("await requirePlatformAdminRead()") <
+      routeSource.indexOf("readQueueJobSnapshot("),
+  );
   assert.match(routeSource, /status: 401/);
   assert.match(routeSource, /status: 400/);
   assert.match(routeSource, /status: 503/);
   assert.match(routeSource, /enrichQueueJobSnapshotShopDomains\(snapshot\)/);
   assert.match(routeSource, /Cache-Control.*no-store/);
-  assert.doesNotMatch(routeSource, /REDIS_URL|connectionString|stacktrace|data/);
+  assert.doesNotMatch(
+    routeSource,
+    /REDIS_URL|connectionString|stacktrace|data/,
+  );
 });

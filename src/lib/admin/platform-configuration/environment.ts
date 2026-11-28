@@ -7,14 +7,27 @@
 import { resolveDeploymentEnvironmentName } from "@/lib/auth/environment";
 import { ConfigurationError } from "./errors";
 
-const ENVIRONMENTS = new Set(["local", "test", "development", "staging", "production"]);
+const ENVIRONMENTS = new Set([
+  "local",
+  "test",
+  "development",
+  "staging",
+  "production",
+]);
 
 export function getConfigurationEnvironment(): string {
   const environment = resolveDeploymentEnvironmentName();
-  if (!ENVIRONMENTS.has(environment)) throw new ConfigurationError("INVALID_INPUT", "Unknown deployment environment.");
+  if (!ENVIRONMENTS.has(environment))
+    throw new ConfigurationError(
+      "INVALID_INPUT",
+      "Unknown deployment environment.",
+    );
   // NODE_ENV production always wins over any attempt to impersonate development.
   if (process.env.NODE_ENV === "production" && environment === "development") {
-    throw new ConfigurationError("FORBIDDEN", "Environment identity is inconsistent.");
+    throw new ConfigurationError(
+      "FORBIDDEN",
+      "Environment identity is inconsistent.",
+    );
   }
   return environment;
 }

@@ -20,24 +20,35 @@ function text(formData: FormData, name: string, maxLength: number): string {
   return trimmed;
 }
 
-export async function mutateFeatureCatalogueAction(formData: FormData): Promise<void> {
+export async function mutateFeatureCatalogueAction(
+  formData: FormData,
+): Promise<void> {
   const principal = await requirePlatformAdminMutation();
-  if (principal.role !== "SUPER_ADMIN") actionError("SUPER_ADMIN access is required.");
+  if (principal.role !== "SUPER_ADMIN")
+    actionError("SUPER_ADMIN access is required.");
   const intent = formData.get("intent");
   const id = formData.get("id");
 
   if (intent === "create") {
     const key = text(formData, "key", 128);
-    if (!FEATURE_KEY_PATTERN.test(key)) actionError("Feature key has an invalid format.");
+    if (!FEATURE_KEY_PATTERN.test(key))
+      actionError("Feature key has an invalid format.");
     if (key === "merchant_knowledge") {
-      actionError("Merchant Knowledge is managed by pricing-plan product policy.");
+      actionError(
+        "Merchant Knowledge is managed by pricing-plan product policy.",
+      );
     }
     const displayName = text(formData, "displayName", 255);
     const rawDescription = formData.get("description");
-    const description = typeof rawDescription === "string" ? rawDescription.trim() : "";
-    if (description.length > 2000) actionError("Feature description must be at most 2000 characters.");
+    const description =
+      typeof rawDescription === "string" ? rawDescription.trim() : "";
+    if (description.length > 2000)
+      actionError("Feature description must be at most 2000 characters.");
     const activationMode = formData.get("activationMode");
-    if (activationMode !== FeatureActivationMode.ALWAYS_ENABLED && activationMode !== FeatureActivationMode.MERCHANT_OPT_IN) {
+    if (
+      activationMode !== FeatureActivationMode.ALWAYS_ENABLED &&
+      activationMode !== FeatureActivationMode.MERCHANT_OPT_IN
+    ) {
       actionError("Feature activation mode is invalid.");
     }
     try {
@@ -63,7 +74,10 @@ export async function mutateFeatureCatalogueAction(formData: FormData): Promise<
         });
       });
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Unique constraint")) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Unique constraint")
+      ) {
         actionError("A Feature with this key already exists.");
       }
       throw error;
@@ -72,8 +86,10 @@ export async function mutateFeatureCatalogueAction(formData: FormData): Promise<
     if (typeof id !== "string" || !id) actionError("A Feature id is required.");
     const displayName = text(formData, "displayName", 255);
     const rawDescription = formData.get("description");
-    const description = typeof rawDescription === "string" ? rawDescription.trim() : "";
-    if (description.length > 2000) actionError("Feature description must be at most 2000 characters.");
+    const description =
+      typeof rawDescription === "string" ? rawDescription.trim() : "";
+    if (description.length > 2000)
+      actionError("Feature description must be at most 2000 characters.");
     await prisma.$transaction(async (transaction) => {
       const existing = await transaction.feature.findUnique({ where: { id } });
       if (!existing) actionError("Feature not found.");
@@ -101,7 +117,8 @@ export async function mutateFeatureCatalogueAction(formData: FormData): Promise<
           "Merchant Knowledge is included by pricing-plan product policy and cannot be deactivated here.",
         );
       }
-      if (existing.systemRequired) actionError("System-required Features cannot be deactivated.");
+      if (existing.systemRequired)
+        actionError("System-required Features cannot be deactivated.");
       const feature = await transaction.feature.update({
         where: { id },
         data: { active: !existing.active },

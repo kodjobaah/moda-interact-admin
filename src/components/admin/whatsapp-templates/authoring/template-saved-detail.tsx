@@ -6,35 +6,142 @@ import { makeExamplePreview } from "@/lib/admin/whatsapp-templates/authoring/pre
 import type { TemplateDetail } from "@/lib/admin/whatsapp-templates/authoring/types";
 import { TemplateReadOnlyPreview } from "./template-read-only-preview";
 
-export function TemplateSavedDetail({ detail, integrated = false }: { detail: TemplateDetail; integrated?: boolean }) {
-  const historicalCommon = detail.english?.authoring.family === "MODA_CONVERSATION_WRAPPER" && detail.english.authoring.audience === "SHARED" && !detail.english.authoring.compositeProfile;
+export function TemplateSavedDetail({
+  detail,
+  integrated = false,
+}: {
+  detail: TemplateDetail;
+  integrated?: boolean;
+}) {
+  const historicalCommon =
+    detail.english?.authoring.family === "MODA_CONVERSATION_WRAPPER" &&
+    detail.english.authoring.audience === "SHARED" &&
+    !detail.english.authoring.compositeProfile;
   let preview = null;
   if (detail.english) {
     try {
-      const prepared = verifyFrozenTemplateProjection(detail.english, templateHash(detail.english.prepared));
-      preview = makeExamplePreview(prepared, detail.english.authoring.family === "META_RECOVERY" ? detail.english.authoring.commonLayout : undefined, detail.english.authoring.family === "MODA_CONVERSATION_WRAPPER" ? detail.english.authoring.audience : undefined);
-    } catch { /* Historical invalid/tampered sources remain read-only and are never recompiled for display. */ }
+      const prepared = verifyFrozenTemplateProjection(
+        detail.english,
+        templateHash(detail.english.prepared),
+      );
+      preview = makeExamplePreview(
+        prepared,
+        detail.english.authoring.family === "META_RECOVERY"
+          ? detail.english.authoring.commonLayout
+          : undefined,
+        detail.english.authoring.family === "MODA_CONVERSATION_WRAPPER"
+          ? detail.english.authoring.audience
+          : undefined,
+      );
+    } catch {
+      /* Historical invalid/tampered sources remain read-only and are never recompiled for display. */
+    }
   }
-  return <article className="space-y-4 rounded-lg border bg-white p-4" aria-label="Saved immutable template">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Saved definition (read only)</h2>
-      {detail.english && <div className="flex flex-wrap gap-2">
-        {!integrated && detail.kind === "META_RECOVERY" && <Link className="rounded bg-blue-800 px-3 py-2 text-sm text-white" href={workflowHref(detail.id)}>Resume template workflow</Link>}
-        {!integrated && <Link className="rounded border border-blue-800 px-3 py-2 text-sm text-blue-800" href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/translations`}>Translations</Link>}
-        <Link className="rounded bg-blue-800 px-3 py-2 text-sm text-white" href={`/system-controls/whatsapp-templates?clone=${encodeURIComponent(detail.id)}`}>Clone as New</Link>
-      </div>}
-    </div>
-    <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-      <div><dt className="text-gray-500">Identity</dt><dd className="break-all font-mono text-xs">{detail.id}</dd></div>
-      <div><dt className="text-gray-500">Lifecycle</dt><dd>{detail.status}</dd></div>
-      <div><dt className="text-gray-500">Family</dt><dd>{detail.kind}</dd></div>
-      <div><dt className="text-gray-500">Purpose / audience</dt><dd>{detail.kind === "META_RECOVERY" ? `${detail.purpose}/${detail.offerType}${detail.english?.authoring.family === "META_RECOVERY" && detail.english.authoring.promotionTarget ? `/${detail.english.authoring.promotionTarget}` : ""}` : detail.audience === "ROUTER" ? "Router — before a shop is selected" : detail.audience}</dd></div>
-      <div><dt className="text-gray-500">Source language</dt><dd>{detail.sourceLanguageTag}</dd></div>
-      <div><dt className="text-gray-500">Provider name</dt><dd className="break-all">{detail.providerTemplateName || "Not applicable (internal)"}</dd></div>
-      <div className="sm:col-span-2"><dt className="text-gray-500">Source SHA-256</dt><dd className="break-all font-mono text-xs">{detail.sourceHash}</dd></div>
-    </dl>
-    {historicalCommon && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">Historical common template — available for read-only audit only. It cannot be selected or activated. Use Clone as New and explicitly define the current saved layout before review.</p>}
-    {!integrated && detail.kind === "META_RECOVERY" && detail.english && <Link className="inline-block rounded border border-blue-700 px-3 py-2 text-sm font-medium text-blue-800" href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/publish`}>Publish template</Link>}
-    {!integrated && detail.english && <Link className="inline-block rounded border border-blue-700 px-3 py-2 text-sm font-medium text-blue-800" href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/review`}>Review translations</Link>}
-    {detail.english ? <TemplateReadOnlyPreview preview={preview} /> : <p role="alert" className="text-sm text-red-700">English locale unavailable. No edits are permitted here.</p>}
-  </article>;
+  return (
+    <article
+      className="space-y-4 rounded-lg border bg-white p-4"
+      aria-label="Saved immutable template"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">Saved definition (read only)</h2>
+        {detail.english && (
+          <div className="flex flex-wrap gap-2">
+            {!integrated && detail.kind === "META_RECOVERY" && (
+              <Link
+                className="rounded bg-blue-800 px-3 py-2 text-sm text-white"
+                href={workflowHref(detail.id)}
+              >
+                Resume template workflow
+              </Link>
+            )}
+            {!integrated && (
+              <Link
+                className="rounded border border-blue-800 px-3 py-2 text-sm text-blue-800"
+                href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/translations`}
+              >
+                Translations
+              </Link>
+            )}
+            <Link
+              className="rounded bg-blue-800 px-3 py-2 text-sm text-white"
+              href={`/system-controls/whatsapp-templates?clone=${encodeURIComponent(detail.id)}`}
+            >
+              Clone as New
+            </Link>
+          </div>
+        )}
+      </div>
+      <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-gray-500">Identity</dt>
+          <dd className="break-all font-mono text-xs">{detail.id}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500">Lifecycle</dt>
+          <dd>{detail.status}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500">Family</dt>
+          <dd>{detail.kind}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500">Purpose / audience</dt>
+          <dd>
+            {detail.kind === "META_RECOVERY"
+              ? `${detail.purpose}/${detail.offerType}${detail.english?.authoring.family === "META_RECOVERY" && detail.english.authoring.promotionTarget ? `/${detail.english.authoring.promotionTarget}` : ""}`
+              : detail.audience === "ROUTER"
+                ? "Router — before a shop is selected"
+                : detail.audience}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-gray-500">Source language</dt>
+          <dd>{detail.sourceLanguageTag}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500">Provider name</dt>
+          <dd className="break-all">
+            {detail.providerTemplateName || "Not applicable (internal)"}
+          </dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-gray-500">Source SHA-256</dt>
+          <dd className="break-all font-mono text-xs">{detail.sourceHash}</dd>
+        </div>
+      </dl>
+      {historicalCommon && (
+        <p
+          role="status"
+          className="rounded border border-amber-300 bg-amber-50 p-3 text-sm"
+        >
+          Historical common template — available for read-only audit only. It
+          cannot be selected or activated. Use Clone as New and explicitly
+          define the current saved layout before review.
+        </p>
+      )}
+      {!integrated && detail.kind === "META_RECOVERY" && detail.english && (
+        <Link
+          className="inline-block rounded border border-blue-700 px-3 py-2 text-sm font-medium text-blue-800"
+          href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/publish`}
+        >
+          Publish template
+        </Link>
+      )}
+      {!integrated && detail.english && (
+        <Link
+          className="inline-block rounded border border-blue-700 px-3 py-2 text-sm font-medium text-blue-800"
+          href={`/system-controls/whatsapp-templates/${encodeURIComponent(detail.id)}/review`}
+        >
+          Review translations
+        </Link>
+      )}
+      {detail.english ? (
+        <TemplateReadOnlyPreview preview={preview} />
+      ) : (
+        <p role="alert" className="text-sm text-red-700">
+          English locale unavailable. No edits are permitted here.
+        </p>
+      )}
+    </article>
+  );
 }

@@ -42,12 +42,16 @@ export function StoreCategoryEditor({
         {activeTab === "details" ? (
           <section aria-labelledby="store-category-details-title">
             <div className="mb-5">
-              <h3 id="store-category-details-title" className="text-lg font-semibold text-gray-950">
+              <h3
+                id="store-category-details-title"
+                className="text-lg font-semibold text-gray-950"
+              >
                 Category details
               </h3>
               <p className="mt-1 text-sm text-gray-600">
-                Store Categories are edited while disabled. A disabled draft can only
-                become enabled through the translation/enablement workflow below.
+                Store Categories are edited while disabled. A disabled draft can
+                only become enabled through the translation/enablement workflow
+                below.
               </p>
             </div>
 
@@ -57,9 +61,9 @@ export function StoreCategoryEditor({
                   Disable before editing
                 </h4>
                 <p className="mt-1 text-sm text-amber-800">
-                  Category labels, mappings and prompt templates form the reviewed
-                  configuration used for localization and prompt generation. Disable this
-                  category before changing them.
+                  Category labels, mappings and prompt templates form the
+                  reviewed configuration used for localization and prompt
+                  generation. Disable this category before changing them.
                 </p>
                 <form
                   action={mutateStoreCategoryCatalogueAction}
@@ -67,9 +71,21 @@ export function StoreCategoryEditor({
                 >
                   <input type="hidden" name="intent" value="update-category" />
                   <input type="hidden" name="id" value={category.id} />
-                  <input type="hidden" name="displayName" value={category.displayName} />
-                  <input type="hidden" name="description" value={category.description} />
-                  <input type="hidden" name="displayOrder" value={category.displayOrder} />
+                  <input
+                    type="hidden"
+                    name="displayName"
+                    value={category.displayName}
+                  />
+                  <input
+                    type="hidden"
+                    name="description"
+                    value={category.description}
+                  />
+                  <input
+                    type="hidden"
+                    name="displayOrder"
+                    value={category.displayOrder}
+                  />
                   <input type="hidden" name="enabled" value="false" />
                   <input
                     type="hidden"
@@ -147,7 +163,12 @@ export function StoreCategoryEditor({
                 </label>
                 <label className="text-sm font-medium text-gray-700 sm:col-span-2 xl:col-span-3">
                   Audit reason
-                  <input className={inputClass} name="reason" maxLength={1000} required />
+                  <input
+                    className={inputClass}
+                    name="reason"
+                    maxLength={1000}
+                    required
+                  />
                 </label>
                 <div className="flex items-end">
                   <button
@@ -162,21 +183,29 @@ export function StoreCategoryEditor({
 
             <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div className="mb-3">
-                <h4 className="text-sm font-semibold text-gray-900">Default template</h4>
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Default template
+                </h4>
                 <p className="mt-1 text-sm text-gray-600">
-                  {category.defaultTemplate?.displayName ?? "No default template selected"}
+                  {category.defaultTemplate?.displayName ??
+                    "No default template selected"}
                 </p>
               </div>
               {category.enabled ? (
                 <p className="text-sm text-gray-600">
-                  Disable this Store Category before changing the default template.
+                  Disable this Store Category before changing the default
+                  template.
                 </p>
               ) : (
                 <form
                   action={mutateStoreCategoryCatalogueAction}
                   className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]"
                 >
-                  <input type="hidden" name="intent" value="select-default-template" />
+                  <input
+                    type="hidden"
+                    name="intent"
+                    value="select-default-template"
+                  />
                   <input type="hidden" name="categoryId" value={category.id} />
                   <input
                     type="hidden"
@@ -189,15 +218,21 @@ export function StoreCategoryEditor({
                     required
                     defaultValue={category.defaultTemplateId ?? ""}
                   >
-                    <option value="" disabled>Select an enabled template</option>
+                    <option value="" disabled>
+                      Select an enabled template
+                    </option>
                     {templates.map((template) => (
                       <option
                         key={template.id}
                         value={template.id}
-                        disabled={!template.enabled || !template.promptText.trim()}
+                        disabled={
+                          !template.enabled || !template.promptText.trim()
+                        }
                       >
                         {template.displayName}
-                        {!template.enabled || !template.promptText.trim() ? " (not selectable)" : ""}
+                        {!template.enabled || !template.promptText.trim()
+                          ? " (not selectable)"
+                          : ""}
                       </option>
                     ))}
                   </select>

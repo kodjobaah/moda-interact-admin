@@ -135,8 +135,8 @@ export function TranslationModelConfigurations({
                   <div className="space-y-5">
                     {model.automaticDefault ? (
                       <p className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-                        This profile is the automatic translation default. Choose
-                        another automatic default before disabling it.
+                        This profile is the automatic translation default.
+                        Choose another automatic default before disabling it.
                       </p>
                     ) : model.enabled ? (
                       <TranslationModelAutomaticDefaultForm

@@ -1,5 +1,9 @@
 import { readSavedCommonLayout } from "./common-layout-repository";
-import type { TemplateDetail, TemplateListItem, ImmutableAuthoringRecord } from "./types";
+import type {
+  TemplateDetail,
+  TemplateListItem,
+  ImmutableAuthoringRecord,
+} from "./types";
 import { Prisma } from "@prisma/client";
 import { requirePlatformAdminRead } from "../../../auth/platform-admin";
 import { requireTemplateSuperAdmin } from "./service";
@@ -35,38 +39,113 @@ export async function getScenarioCoverage() {
   return scenarioCoverage(rows);
 }
 function item(row: {
-  id: string; kind: string; purpose: string | null; offerType: string | null;
-  audience: string | null; sourceLanguageTag: string; status: string;
-  providerTemplateName: string | null; createdAt: Date;
+  id: string;
+  kind: string;
+  purpose: string | null;
+  offerType: string | null;
+  audience: string | null;
+  sourceLanguageTag: string;
+  status: string;
+  providerTemplateName: string | null;
+  createdAt: Date;
 }): TemplateListItem {
-  return { id: row.id, kind: row.kind, purpose: row.purpose, offerType: row.offerType,
-    audience: row.audience, sourceLanguageTag: row.sourceLanguageTag, status: row.status,
-    providerTemplateName: row.providerTemplateName, createdAt: row.createdAt.toISOString() };
+  return {
+    id: row.id,
+    kind: row.kind,
+    purpose: row.purpose,
+    offerType: row.offerType,
+    audience: row.audience,
+    sourceLanguageTag: row.sourceLanguageTag,
+    status: row.status,
+    providerTemplateName: row.providerTemplateName,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
-export async function listDefinitions(page = 1, search = "", filters: { kind?: string; status?: string; scenario?: string } = {}): Promise<{ items: TemplateListItem[]; page: number; hasNext: boolean }> {
+export async function listDefinitions(
+  page = 1,
+  search = "",
+  filters: { kind?: string; status?: string; scenario?: string } = {},
+): Promise<{ items: TemplateListItem[]; page: number; hasNext: boolean }> {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
-  const safePage = Math.min(1000, Math.max(1, Number.isInteger(page) ? page : 1));
+  const safePage = Math.min(
+    1000,
+    Math.max(1, Number.isInteger(page) ? page : 1),
+  );
   const query = search.trim().slice(0, 90);
   const where: Prisma.WhatsAppTemplateDefinitionWhereInput = {};
-  if (query) where.OR = [
-    { id: { contains: query, mode: "insensitive" } },
-    { providerTemplateName: { contains: query, mode: "insensitive" } },
-  ];
-  if (filters.kind && ["META_RECOVERY", "MODA_CONVERSATION_WRAPPER"].includes(filters.kind)) where.kind = filters.kind;
-  if (filters.status && ["SAVED", "PUBLISHED", "RETIRED"].includes(filters.status)) where.status = filters.status;
-  const scenario = RECOVERY_SCENARIOS.find(row => row.id === filters.scenario);
-  if (scenario) Object.assign(where, { kind: "META_RECOVERY", purpose: scenario.draft.stage, offerType: scenario.draft.offerType });
+  if (query)
+    where.OR = [
+      { id: { contains: query, mode: "insensitive" } },
+      { providerTemplateName: { contains: query, mode: "insensitive" } },
+    ];
+  if (
+    filters.kind &&
+    ["META_RECOVERY", "MODA_CONVERSATION_WRAPPER"].includes(filters.kind)
+  )
+    where.kind = filters.kind;
+  if (
+    filters.status &&
+    ["SAVED", "PUBLISHED", "RETIRED"].includes(filters.status)
+  )
+    where.status = filters.status;
+  const scenario = RECOVERY_SCENARIOS.find(
+    (row) => row.id === filters.scenario,
+  );
+  if (scenario)
+    Object.assign(where, {
+      kind: "META_RECOVERY",
+      purpose: scenario.draft.stage,
+      offerType: scenario.draft.offerType,
+    });
   const rows = await prisma.whatsAppTemplateDefinition.findMany({
     where,
-    select: { id: true, kind: true, purpose: true, offerType: true, audience: true,
-      sourceLanguageTag: true, status: true, providerTemplateName: true, createdAt: true, sourceHash: true,
-      locales: { where: { languageTag: "en" }, take: 1, select: { localeAst: true } },
-      translationRuns: { orderBy: [{ requestedAt: "desc" }, { id: "desc" }], take: 1, select: { status: true, sourceHash: true, items: { select: { status: true, failureCode: true, resultLocaleId: true }, take: 20 } } } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (safePage - 1) * PAGE_SIZE, take: PAGE_SIZE + 1,
+    select: {
+      id: true,
+      kind: true,
+      purpose: true,
+      offerType: true,
+      audience: true,
+      sourceLanguageTag: true,
+      status: true,
+      providerTemplateName: true,
+      createdAt: true,
+      sourceHash: true,
+      locales: {
+        where: { languageTag: "en" },
+        take: 1,
+        select: { localeAst: true },
+      },
+      translationRuns: {
+        orderBy: [{ requestedAt: "desc" }, { id: "desc" }],
+        take: 1,
+        select: {
+          status: true,
+          sourceHash: true,
+          items: {
+            select: { status: true, failureCode: true, resultLocaleId: true },
+            take: 20,
+          },
+        },
+      },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (safePage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE + 1,
   });
-  const recoveryIds = rows.slice(0, PAGE_SIZE).filter(row => row.kind === "META_RECOVERY").map(row => row.id);
-  const coverage = recoveryIds.length ? await prisma.$queryRaw<Array<{ id: string; active: boolean; localeCount: number; matchingCount: number }>>(Prisma.sql`
+  const recoveryIds = rows
+    .slice(0, PAGE_SIZE)
+    .filter((row) => row.kind === "META_RECOVERY")
+    .map((row) => row.id);
+  const coverage = recoveryIds.length
+    ? await prisma.$queryRaw<
+        Array<{
+          id: string;
+          active: boolean;
+          localeCount: number;
+          matchingCount: number;
+        }>
+      >(Prisma.sql`
     SELECT d.id, (s."definitionId" IS NOT NULL) AS active, count(l.id)::int AS "localeCount",
       count(l.id) FILTER (WHERE l."localeAst"#>>'{authoring,commonLayout,definitionId}' = s."definitionId"
         AND l."localeAst"#>>'{authoring,commonLayout,sourceHash}' = w."sourceHash"
@@ -79,45 +158,117 @@ export async function listDefinitions(page = 1, search = "", filters: { kind?: s
     LEFT JOIN whatsapp."WhatsAppTemplateDefinition" w ON w.id = s."definitionId"
     LEFT JOIN whatsapp."WhatsAppTemplateLocale" wl ON wl."definitionId" = w.id AND wl."languageTag" = l."languageTag"
     WHERE d.id IN (${Prisma.join(recoveryIds)}) GROUP BY d.id, s."definitionId"
-  `) : [];
+  `)
+    : [];
   const coverageById = new Map(coverage.map(({ id, ...facts }) => [id, facts]));
-  return { items: rows.slice(0, PAGE_SIZE).map(row => ({ ...item(row), ...(row.kind === "META_RECOVERY" && row.locales[0]?.localeAst ? { recoveryFormat: ((row.locales[0].localeAst as { authoring?: { shopBrandMediaRole?: string } }).authoring?.shopBrandMediaRole ? "IMAGE" : "TEXT") as "IMAGE" | "TEXT" } : {}), commonLayoutCoverage: coverageById.get(row.id), progress: row.translationRuns[0]?.sourceHash === row.sourceHash ? {
-    runStatus: row.translationRuns[0].status,
-    translated: row.translationRuns[0].items.filter(i => ["COMPLETED", "COMPLETE", "SUCCEEDED", "AVAILABLE"].includes(i.status) && !i.failureCode).length,
-    reviewed: row.translationRuns[0].items.filter(i => i.resultLocaleId).length,
-    total: row.translationRuns[0].items.length,
-  } : undefined })), page: safePage, hasNext: rows.length > PAGE_SIZE };
+  return {
+    items: rows.slice(0, PAGE_SIZE).map((row) => ({
+      ...item(row),
+      ...(row.kind === "META_RECOVERY" && row.locales[0]?.localeAst
+        ? {
+            recoveryFormat: ((
+              row.locales[0].localeAst as {
+                authoring?: { shopBrandMediaRole?: string };
+              }
+            ).authoring?.shopBrandMediaRole
+              ? "IMAGE"
+              : "TEXT") as "IMAGE" | "TEXT",
+          }
+        : {}),
+      commonLayoutCoverage: coverageById.get(row.id),
+      progress:
+        row.translationRuns[0]?.sourceHash === row.sourceHash
+          ? {
+              runStatus: row.translationRuns[0].status,
+              translated: row.translationRuns[0].items.filter(
+                (i) =>
+                  ["COMPLETED", "COMPLETE", "SUCCEEDED", "AVAILABLE"].includes(
+                    i.status,
+                  ) && !i.failureCode,
+              ).length,
+              reviewed: row.translationRuns[0].items.filter(
+                (i) => i.resultLocaleId,
+              ).length,
+              total: row.translationRuns[0].items.length,
+            }
+          : undefined,
+    })),
+    page: safePage,
+    hasNext: rows.length > PAGE_SIZE,
+  };
 }
 
 /** Stable read port for ADMIN-004/005/006/007/008; contents are read-only. */
-export async function getDefinitionDetail(id: string): Promise<TemplateDetail | null> {
+export async function getDefinitionDetail(
+  id: string,
+): Promise<TemplateDetail | null> {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
   if (!/^wtdef_[a-f0-9]{64}$/.test(id)) return null;
-  const row = await prisma.whatsAppTemplateDefinition.findUnique({ where: { id },
-    include: { locales: { where: { languageTag: "en" }, take: 1 } } });
+  const row = await prisma.whatsAppTemplateDefinition.findUnique({
+    where: { id },
+    include: { locales: { where: { languageTag: "en" }, take: 1 } },
+  });
   if (!row) return null;
   const localeAst = row.locales[0]?.localeAst;
   // Never permit a mutable/reconstructed English definition to masquerade as source.
-  const source = localeAst && typeof localeAst === "object" && !Array.isArray(localeAst) &&
-    localeAst.schemaVersion === 1 && "authoring" in localeAst && "prepared" in localeAst
-    ? localeAst as unknown as ImmutableAuthoringRecord : null;
-  const english = source && row.locales[0]?.contentHash &&
+  const source =
+    localeAst &&
+    typeof localeAst === "object" &&
+    !Array.isArray(localeAst) &&
+    localeAst.schemaVersion === 1 &&
+    "authoring" in localeAst &&
+    "prepared" in localeAst
+      ? (localeAst as unknown as ImmutableAuthoringRecord)
+      : null;
+  const english =
+    source &&
+    row.locales[0]?.contentHash &&
     templateHash(source.authoring) === row.sourceHash &&
     templateHash(source.prepared) === row.locales[0].contentHash
-    ? source : null;
-  return { ...item(row), clonedFromDefinitionId: row.clonedFromDefinitionId,
-    sourceHash: row.sourceHash, english };
+      ? source
+      : null;
+  return {
+    ...item(row),
+    clonedFromDefinitionId: row.clonedFromDefinitionId,
+    sourceHash: row.sourceHash,
+    english,
+  };
 }
 
 /** Existing global pointers only; configured is not proof of current provider/locale eligibility. */
 export async function getDynamicLayoutCoverage() {
   requireTemplateSuperAdmin(await requirePlatformAdminRead());
-  const slots = await prisma.whatsAppConversationWrapperActiveSlot.findMany({ where: { audience: { in: ["SHARED", "AI", "HUMAN", "ROUTER"] } }, take: 4, select: { audience: true, definitionId: true } });
-  const shared = slots.find(slot => slot.audience === "SHARED");
+  const slots = await prisma.whatsAppConversationWrapperActiveSlot.findMany({
+    where: { audience: { in: ["SHARED", "AI", "HUMAN", "ROUTER"] } },
+    take: 4,
+    select: { audience: true, definitionId: true },
+  });
+  const shared = slots.find((slot) => slot.audience === "SHARED");
   let commonRecovery = false;
-  if (shared) { try { await readSavedCommonLayout(prisma, shared.definitionId, "en"); commonRecovery = true; } catch { /* Display only verified common-mode precedence. */ } }
-  return (["SHARED", "AI", "HUMAN", "ROUTER"] as const).map(audience => {
-    const own = slots.find(slot => slot.audience === audience);
-    return { audience, selection: audience === "ROUTER" ? (own ? "Independent router pointer configured; review publication eligibility" : "Not configured; no shop-layout fallback") : commonRecovery ? "Uses common SHARED layout for recovery; audience history retained" : own ? "Audience layout selected" : audience !== "SHARED" && shared ? "Uses shared layout" : "No layout selected" };
+  if (shared) {
+    try {
+      await readSavedCommonLayout(prisma, shared.definitionId, "en");
+      commonRecovery = true;
+    } catch {
+      /* Display only verified common-mode precedence. */
+    }
+  }
+  return (["SHARED", "AI", "HUMAN", "ROUTER"] as const).map((audience) => {
+    const own = slots.find((slot) => slot.audience === audience);
+    return {
+      audience,
+      selection:
+        audience === "ROUTER"
+          ? own
+            ? "Independent router pointer configured; review publication eligibility"
+            : "Not configured; no shop-layout fallback"
+          : commonRecovery
+            ? "Uses common SHARED layout for recovery; audience history retained"
+            : own
+              ? "Audience layout selected"
+              : audience !== "SHARED" && shared
+                ? "Uses shared layout"
+                : "No layout selected",
+    };
   });
 }

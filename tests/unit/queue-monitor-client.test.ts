@@ -37,12 +37,15 @@ test("summary request uses the protected endpoint, no-store cache, and signal", 
   const signal = new AbortController().signal;
   const payload = { observedAt: "2026-10-02T00:00:00.000Z", queues: [] };
 
-  await withMockFetch(() => Response.json(payload), async (calls) => {
-    assert.deepEqual(await fetchQueueMonitorSnapshot(signal), payload);
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "/api/admin/queues");
-    assertNoStoreAndSignal(calls[0], signal);
-  });
+  await withMockFetch(
+    () => Response.json(payload),
+    async (calls) => {
+      assert.deepEqual(await fetchQueueMonitorSnapshot(signal), payload);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, "/api/admin/queues");
+      assertNoStoreAndSignal(calls[0], signal);
+    },
+  );
 });
 
 test("jobs requests serialize recent and full filters in the established order", async () => {
@@ -55,7 +58,8 @@ test("jobs requests serialize recent and full filters in the established order",
       page: 2,
       limit: "5",
       direction: "desc" as const,
-      expected: "queue=checkout-events&status=failed&shop=*&page=2&limit=5&direction=desc",
+      expected:
+        "queue=checkout-events&status=failed&shop=*&page=2&limit=5&direction=desc",
     },
     {
       queue: "order-events",
@@ -64,19 +68,23 @@ test("jobs requests serialize recent and full filters in the established order",
       page: 7,
       limit: "10",
       direction: "asc" as const,
-      expected: "queue=order-events&status=active&shop=__unresolved__&page=7&limit=10&direction=asc",
+      expected:
+        "queue=order-events&status=active&shop=__unresolved__&page=7&limit=10&direction=asc",
     },
   ];
 
-  await withMockFetch(() => Response.json({}), async (calls) => {
-    for (const { expected, ...request } of requests) {
-      await fetchQueueJobs(request, signal);
-      const call = calls.at(-1)!;
-      assert.equal(call.url, `/api/admin/queues/jobs?${expected}`);
-      assertNoStoreAndSignal(call, signal);
-    }
-    assert.equal(calls.length, requests.length);
-  });
+  await withMockFetch(
+    () => Response.json({}),
+    async (calls) => {
+      for (const { expected, ...request } of requests) {
+        await fetchQueueJobs(request, signal);
+        const call = calls.at(-1)!;
+        assert.equal(call.url, `/api/admin/queues/jobs?${expected}`);
+        assertNoStoreAndSignal(call, signal);
+      }
+      assert.equal(calls.length, requests.length);
+    },
+  );
 });
 
 test("detail requests serialize selected job filters and preserve HTTP status", async () => {
@@ -99,8 +107,10 @@ test("detail requests serialize selected job filters and preserve HTTP status", 
 
   await withMockFetch(
     (url) => {
-      if (url.includes("jobId=missing")) return new Response(null, { status: 404 });
-      if (url.includes("jobId=unavailable")) return new Response(null, { status: 503 });
+      if (url.includes("jobId=missing"))
+        return new Response(null, { status: 404 });
+      if (url.includes("jobId=unavailable"))
+        return new Response(null, { status: 503 });
       return Response.json(detail);
     },
     async (calls) => {
@@ -111,11 +121,13 @@ test("detail requests serialize selected job filters and preserve HTTP status", 
       );
       await assert.rejects(
         fetchQueueJobDetail({ ...request, jobId: "missing" }, signal),
-        (error) => error instanceof QueueJobDetailHttpError && error.status === 404,
+        (error) =>
+          error instanceof QueueJobDetailHttpError && error.status === 404,
       );
       await assert.rejects(
         fetchQueueJobDetail({ ...request, jobId: "unavailable" }, signal),
-        (error) => error instanceof QueueJobDetailHttpError && error.status === 503,
+        (error) =>
+          error instanceof QueueJobDetailHttpError && error.status === 503,
       );
 
       assert.deepEqual(

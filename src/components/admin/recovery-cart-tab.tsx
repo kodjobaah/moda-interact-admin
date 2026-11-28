@@ -45,10 +45,7 @@ export function RecoveryCartTab({ recovery }: { recovery: RecoveryDetail }) {
                 {adminI18n.t("recovery.quantity", { quantity: item.quantity })}
               </span>
               <span className="text-sm font-bold text-gray-900">
-                {formatMoney(
-                  item.price,
-                  item.currency ?? recovery.currency,
-                )}
+                {formatMoney(item.price, item.currency ?? recovery.currency)}
               </span>
             </div>
           </div>
@@ -61,7 +58,8 @@ export function RecoveryCartTab({ recovery }: { recovery: RecoveryDetail }) {
           rel="noreferrer"
           className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-700)] hover:text-[var(--brand-900)]"
         >
-          {adminI18n.t("recovery.openCheckout")} <Icon name="external" className="h-4 w-4" />
+          {adminI18n.t("recovery.openCheckout")}{" "}
+          <Icon name="external" className="h-4 w-4" />
         </a>
       ) : null}
     </div>

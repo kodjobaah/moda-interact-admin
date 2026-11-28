@@ -100,11 +100,20 @@ test("requires a positive whole-number WhatsApp recipient suppression duration",
 test("billing policy writes use the shared row CAS and preserve MCP JSONB", () => {
   assert.match(actionSource, /version !== values\.expectedVersion/);
   assert.match(actionSource, /platformBillingPolicy\.updateMany/);
-  assert.match(actionSource, /where: \{ id: "default", version: values\.expectedVersion \}/);
+  assert.match(
+    actionSource,
+    /where: \{ id: "default", version: values\.expectedVersion \}/,
+  );
   assert.match(actionSource, /version: \{ increment: 1 \}/);
-  assert.match(actionSource, /isolationLevel: Prisma\.TransactionIsolationLevel\.Serializable/);
+  assert.match(
+    actionSource,
+    /isolationLevel: Prisma\.TransactionIsolationLevel\.Serializable/,
+  );
   assert.doesNotMatch(actionSource, /mcpExecutionPolicy: values\./);
-  assert.match(actionSource, /reason: values\.reason,\n\s+relatedEntityType: "PlatformBillingPolicy"/);
+  assert.match(
+    actionSource,
+    /reason: values\.reason,\n\s+relatedEntityType: "PlatformBillingPolicy"/,
+  );
 });
 
 test("preserves nullable shop override inheritance and validates effective limits", () => {
@@ -148,8 +157,14 @@ test("keeps policy changes protected, audited, and internal-only", () => {
   assert.match(componentSource, /name="lifetimeFreeRecoveryAllowance"/);
   assert.match(componentSource, /policy\?\.lifetimeFreeRecoveryAllowance/);
   assert.match(componentSource, /name="whatsappRecipientSuppressionDays"/);
-  assert.match(componentSource, /policy\?\.whatsappRecipientSuppressionDays \?\? 7/);
-  assert.match(componentSource, /min="1"[\s\S]*?step="1"[\s\S]*?name="whatsappRecipientSuppressionDays"/);
+  assert.match(
+    componentSource,
+    /policy\?\.whatsappRecipientSuppressionDays \?\? 7/,
+  );
+  assert.match(
+    componentSource,
+    /min="1"[\s\S]*?step="1"[\s\S]*?name="whatsappRecipientSuppressionDays"/,
+  );
   const catalogue = JSON.parse(
     readFileSync(resolve(root, "src/i18n/locales/en.json"), "utf8"),
   );
@@ -158,7 +173,10 @@ test("keeps policy changes protected, audited, and internal-only", () => {
     "This value is snapshotted only when a merchant receives its first verified subscription activation. Changing it affects future first activations only; it does not reset or increase existing merchants' lifetime grants.",
   );
   const pageSource = readFileSync(
-    resolve(root, "src/app/(protected)/system-controls/platform-policy/page.tsx"),
+    resolve(
+      root,
+      "src/app/(protected)/system-controls/platform-policy/page.tsx",
+    ),
     "utf8",
   );
   assert.match(pageSource, /requirePlatformAdminPage/);
@@ -196,13 +214,19 @@ test("platform policy explains the controls and reports mutations inline with du
     assert.ok(catalogue[key].length > 20);
   }
 
-  assert.match(componentSource, /billingControls\.platformLimitRulesDescription/);
+  assert.match(
+    componentSource,
+    /billingControls\.platformLimitRulesDescription/,
+  );
   assert.match(formSource, /role=\{result\.ok \? "status" : "alert"\}/);
   assert.match(formSource, /submittingRef\.current/);
   assert.match(formSource, /disabled=\{pending\}/);
   assert.match(formSource, /mutatePlatformBillingPolicyAction/);
   assert.match(actionSource, /Promise<PlatformBillingPolicyActionResult>/);
-  assert.match(actionSource, /return \{ ok: false, message: platformBillingPolicyClientMessage\(cause\) \}/);
+  assert.match(
+    actionSource,
+    /return \{ ok: false, message: platformBillingPolicyClientMessage\(cause\) \}/,
+  );
 });
 
 test("server validation enforces the platform ceiling and soft-below-hard rule", () => {

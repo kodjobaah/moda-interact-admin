@@ -89,7 +89,10 @@ test("Store Category taxonomy search is split between top-level authoring and su
     "src/components/admin/store-categories/store-category-mapping-workspace.tsx",
   );
 
-  assert.match(route, /scopeValue === "top-level" \|\| scopeValue === "subcategories"/);
+  assert.match(
+    route,
+    /scopeValue === "top-level" \|\| scopeValue === "subcategories"/,
+  );
   assert.match(route, /const rootId = params\.get\("root"\)/);
   assert.match(route, /resolveShopifyTaxonomyCategory\(id, scope\)/);
   assert.match(route, /scope === "top-level" && parent/);
@@ -98,7 +101,9 @@ test("Store Category taxonomy search is split between top-level authoring and su
   assert.match(library, /@rootId:/);
   assert.match(categoryStep, /scope="top-level"/);
   assert.match(
-    await source("src/components/admin/store-categories/shopify-taxonomy-picker.tsx"),
+    await source(
+      "src/components/admin/store-categories/shopify-taxonomy-picker.tsx",
+    ),
     /scope !== "top-level" && category\.hasChildren/,
   );
   assert.match(mappingStep, /StoreCategoryMappingWorkspace/);
@@ -124,7 +129,10 @@ test("Store Category mapping UX persists exact IDs plus human-readable reference
   assert.match(picker, /Reference taxonomy hierarchy/);
   assert.match(picker, /name="taxonomyCategoryFullName"/);
   assert.match(mappingWorkspace, /<ShopifyTaxonomyPicker/);
-  assert.match(mappingEditor, /formData\.set\("taxonomyCategoryFullName", taxonomy\.fullName\)/);
+  assert.match(
+    mappingEditor,
+    /formData\.set\("taxonomyCategoryFullName", taxonomy\.fullName\)/,
+  );
   assert.match(reviewStep, /mapping\.taxonomy\?\.fullName/);
 });
 
@@ -148,10 +156,12 @@ test("Admin taxonomy queries use the active Redis embedding metadata rather than
 
   assert.match(library, /loadShopifyTaxonomyQueryEmbeddingConfig/);
   assert.match(library, /embeddingDimensions: metadata\.embeddingDimensions/);
-  assert.doesNotMatch(library, /config\.dimensions !== metadata\.embeddingDimensions/);
+  assert.doesNotMatch(
+    library,
+    /config\.dimensions !== metadata\.embeddingDimensions/,
+  );
   assert.match(embedding, /dimensions: embeddingDimensions/);
 });
-
 
 test("taxonomy semantic-search failures are explicit without exposing credentials", async () => {
   const route = await source("src/app/api/admin/shopify-taxonomy/route.ts");
@@ -166,13 +176,13 @@ test("taxonomy semantic-search failures are explicit without exposing credential
   assert.match(embedding, /"INVALID_INDEX_METADATA"/);
   assert.match(route, /admin\.shopify_taxonomy\.unavailable/);
   assert.match(route, /error: "embedding_configuration"/);
-  assert.match(route, /error\.detail === "MISSING_API_KEY"\s*\? "missing_api_key"/);
+  assert.match(
+    route,
+    /error\.detail === "MISSING_API_KEY"\s*\? "missing_api_key"/,
+  );
   assert.match(route, /"missing_api_key"/);
   assert.match(route, /error: "embedding_request_failed"/);
-  assert.match(
-    picker,
-    /embedding credential is not configured/,
-  );
+  assert.match(picker, /embedding credential is not configured/);
   assert.match(picker, /active index embedding metadata is invalid/);
   assert.match(picker, /could not reach the embedding service/);
   assert.doesNotMatch(route, /EMBEDDING_API_KEY/);

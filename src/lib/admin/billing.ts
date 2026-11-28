@@ -115,7 +115,8 @@ function billingLedgerProjection(
     quantity: decimalValue(row.quantity),
     retryAlreadyDue:
       row.shopifyReportState === ShopifyReportState.RETRYABLE &&
-      (row.nextReportAt === null || row.nextReportAt.getTime() <= now.getTime()),
+      (row.nextReportAt === null ||
+        row.nextReportAt.getTime() <= now.getTime()),
   };
 }
 
@@ -409,9 +410,7 @@ export async function getTenantBilling(
   const overrideState = billingOverrideState(override, now);
   const overrideActive = overrideState === "ACTIVE";
   const configuredHardLimit = overrideActive
-    ? (override?.outboundHardLimit ??
-      policy?.defaultOutboundHardLimit ??
-      null)
+    ? (override?.outboundHardLimit ?? policy?.defaultOutboundHardLimit ?? null)
     : (policy?.defaultOutboundHardLimit ?? null);
   const effectiveHardCap = effectiveOutboundHardCap(
     configuredHardLimit,
@@ -430,8 +429,7 @@ export async function getTenantBilling(
       automatedMessages === null
         ? null
         : decimalValue(automatedMessages._sum.quantity),
-    platformDefaultOutboundHardLimit:
-      policy?.defaultOutboundHardLimit ?? null,
+    platformDefaultOutboundHardLimit: policy?.defaultOutboundHardLimit ?? null,
     platformAbsoluteOutboundHardLimit:
       policy?.absoluteOutboundHardLimit ?? null,
     effectiveOutboundHardCap: effectiveHardCap,

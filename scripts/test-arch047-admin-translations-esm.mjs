@@ -17,19 +17,40 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
-const workspaceRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const workspaceRoot = path.resolve(
+  fileURLToPath(new URL("..", import.meta.url)),
+);
 const testRoot = path.join(workspaceRoot, "tests");
 const selected = process.argv.slice(2);
-assert.ok(selected.length > 0, "Provide one or more ARCH-047 translation test files.");
+assert.ok(
+  selected.length > 0,
+  "Provide one or more ARCH-047 translation test files.",
+);
 const sources = selected.map((entry) => {
   const absolute = path.resolve(workspaceRoot, entry);
-  assert.ok(absolute.startsWith(`${testRoot}${path.sep}`), "Test entry must belong to this workspace's tests directory.");
-  assert.match(absolute, /\.tsx?$/, "Test entry must be a TypeScript test file.");
-  assert.match(path.basename(absolute), /^arch047-template-translation.*\.test\.tsx?$/, "This runner only executes ARCH-047 translation tests.");
+  assert.ok(
+    absolute.startsWith(`${testRoot}${path.sep}`),
+    "Test entry must belong to this workspace's tests directory.",
+  );
+  assert.match(
+    absolute,
+    /\.tsx?$/,
+    "Test entry must be a TypeScript test file.",
+  );
+  assert.match(
+    path.basename(absolute),
+    /^arch047-template-translation.*\.test\.tsx?$/,
+    "This runner only executes ARCH-047 translation tests.",
+  );
   return absolute;
 });
 
-const tempParent = path.join(workspaceRoot, "node_modules", ".cache", "arch047-admin-translations-esm");
+const tempParent = path.join(
+  workspaceRoot,
+  "node_modules",
+  ".cache",
+  "arch047-admin-translations-esm",
+);
 await mkdir(tempParent, { recursive: true });
 const tempDir = await mkdtemp(path.join(tempParent, "run-"));
 try {
@@ -49,8 +70,12 @@ try {
     tsconfig: path.join(workspaceRoot, "tsconfig.json"),
     logLevel: "warning",
   });
-  const outputs = sources.map((source) => path.join(tempDir,
-    path.relative(testRoot, source).replace(/\.tsx?$/, ".mjs")));
+  const outputs = sources.map((source) =>
+    path.join(
+      tempDir,
+      path.relative(testRoot, source).replace(/\.tsx?$/, ".mjs"),
+    ),
+  );
   const child = spawnSync(process.execPath, ["--test", ...outputs], {
     cwd: workspaceRoot,
     // These isolated test processes always resolve the TEST model configuration.

@@ -31,17 +31,27 @@ test("summary failure and abort retain the last snapshot and error convergence",
     { type: "request-succeeded", snapshot },
     { type: "request-finished" },
   );
-  const failed = reduce(loaded, { type: "request-started" }, {
-    type: "request-failed",
-    error: "unavailable",
-  }, { type: "request-finished" });
+  const failed = reduce(
+    loaded,
+    { type: "request-started" },
+    {
+      type: "request-failed",
+      error: "unavailable",
+    },
+    { type: "request-finished" },
+  );
   const abort = new DOMException("Aborted", "AbortError");
   const aborted = isQueueMonitorAbortError(abort)
     ? reduce(failed, { type: "request-started" }, { type: "request-finished" })
-    : reduce(failed, { type: "request-started" }, {
-        type: "request-failed",
-        error: "unavailable",
-      }, { type: "request-finished" });
+    : reduce(
+        failed,
+        { type: "request-started" },
+        {
+          type: "request-failed",
+          error: "unavailable",
+        },
+        { type: "request-finished" },
+      );
 
   assert.equal(isQueueMonitorAbortError(abort), true);
   assert.equal(isQueueMonitorAbortError(new Error("unavailable")), false);

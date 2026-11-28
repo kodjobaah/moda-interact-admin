@@ -31,16 +31,24 @@ export type PromotionGrantProjectionInput = {
   selection: { id: string } | null;
 };
 
-export function normalizePromotionReportPage(value: number | undefined): number {
-  return Number.isInteger(value) && value !== undefined && value > 0 ? value : 1;
+export function normalizePromotionReportPage(
+  value: number | undefined,
+): number {
+  return Number.isInteger(value) && value !== undefined && value > 0
+    ? value
+    : 1;
 }
 
-export function normalizePromotionReportSearch(value: string | undefined): string | undefined {
+export function normalizePromotionReportSearch(
+  value: string | undefined,
+): string | undefined {
   const search = value?.trim().slice(0, 255);
   return search || undefined;
 }
 
-export function projectPromotionMerchantRow(grant: PromotionGrantProjectionInput): PromotionMerchantRow {
+export function projectPromotionMerchantRow(
+  grant: PromotionGrantProjectionInput,
+): PromotionMerchantRow {
   return {
     shopId: grant.shopId,
     shopLabel: grant.shopLabel,
@@ -50,7 +58,10 @@ export function projectPromotionMerchantRow(grant: PromotionGrantProjectionInput
     quantityGranted: grant.quantity,
     reserved: grant.reservedQuantity,
     committed: grant.committedQuantity,
-    remainingAllocation: Math.max(0, grant.quantity - grant.reservedQuantity - grant.committedQuantity),
+    remainingAllocation: Math.max(
+      0,
+      grant.quantity - grant.reservedQuantity - grant.committedQuantity,
+    ),
     firstUsedAt: grant.firstUsedAt,
     lastUsedAt: grant.lastUsedAt,
     exhaustedAt: grant.exhaustedAt,

@@ -205,7 +205,13 @@ test("changing the reference category resets the authored template and mappings 
   })!;
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.added",
-    mapping: { clientId: "m1", taxonomy: SUBCATEGORY, conditionKey: "clothing", displayName: "Clothing", weight: 2 },
+    mapping: {
+      clientId: "m1",
+      taxonomy: SUBCATEGORY,
+      conditionKey: "clothing",
+      displayName: "Clothing",
+      weight: 2,
+    },
     now: T0,
   })!;
   session = storeCategoryAuthoringReducer(session, {
@@ -288,19 +294,35 @@ test("review readiness becomes stale whenever reviewed category configuration ch
 
 test("category mappings are optional but every supplied mapping must be complete and unique", () => {
   let session = completeSession();
-  assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, true);
+  assert.equal(
+    validateStoreCategoryAuthoringSession(session).shopifyMappings.valid,
+    true,
+  );
 
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.added",
-    mapping: { clientId: "m1", taxonomy: null, conditionKey: "", displayName: "", weight: 1 },
+    mapping: {
+      clientId: "m1",
+      taxonomy: null,
+      conditionKey: "",
+      displayName: "",
+      weight: 1,
+    },
     now: T0,
   })!;
-  assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, false);
+  assert.equal(
+    validateStoreCategoryAuthoringSession(session).shopifyMappings.valid,
+    false,
+  );
 
   session = storeCategoryAuthoringReducer(session, {
     type: "mapping.changed",
     clientId: "m1",
-    patch: { taxonomy: SUBCATEGORY, conditionKey: "clothing", displayName: "Clothing" },
+    patch: {
+      taxonomy: SUBCATEGORY,
+      conditionKey: "clothing",
+      displayName: "Clothing",
+    },
     now: T0,
   })!;
   session = storeCategoryAuthoringReducer(session, {
@@ -314,7 +336,10 @@ test("category mappings are optional but every supplied mapping must be complete
     },
     now: T0,
   })!;
-  assert.equal(validateStoreCategoryAuthoringSession(session).shopifyMappings.valid, false);
+  assert.equal(
+    validateStoreCategoryAuthoringSession(session).shopifyMappings.valid,
+    false,
+  );
 });
 
 test("mapping conditions are validated against the conditional prompt contract", () => {
@@ -348,7 +373,10 @@ test("mapping conditions are validated against the conditional prompt contract",
     },
     now: T0,
   })!;
-  assert.equal(validateStoreCategoryAuthoringSession(session).defaultTemplate.valid, true);
+  assert.equal(
+    validateStoreCategoryAuthoringSession(session).defaultTemplate.valid,
+    true,
+  );
 
   session = storeCategoryAuthoringReducer(session, {
     type: "template.changed",
@@ -357,7 +385,10 @@ test("mapping conditions are validated against the conditional prompt contract",
     },
     now: T0,
   })!;
-  assert.equal(validateStoreCategoryAuthoringSession(session).defaultTemplate.valid, false);
+  assert.equal(
+    validateStoreCategoryAuthoringSession(session).defaultTemplate.valid,
+    false,
+  );
 });
 
 test("browser session restoration rejects incompatible state and derives readiness from the reviewed revision", () => {

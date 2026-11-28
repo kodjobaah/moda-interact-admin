@@ -28,8 +28,7 @@ export const STORE_CATEGORY_AUTHORING_SCHEMA_VERSION = 3 as const;
 export const STORE_CATEGORY_AUTHORING_STORAGE_KEY =
   "moda.admin.store-category-authoring.v3";
 
-function createEmptyDefaultTemplate():
-  StoreCategoryAuthoringSession["defaultTemplate"] {
+function createEmptyDefaultTemplate(): StoreCategoryAuthoringSession["defaultTemplate"] {
   return {
     key: "",
     displayName: "",

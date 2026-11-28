@@ -199,8 +199,7 @@ const COPY = {
     description: (name, credits) =>
       `${name} มีเครดิตกู้คืน ${credits} เครดิตสำหรับการสนทนาเกี่ยวกับตะกร้าที่ถูกละทิ้ง และช่วยให้ร้านค้าวางแผนความจุได้อย่างคาดการณ์ได้เมื่อเติบโตขึ้น`,
     includedTitle: "เครดิตกู้คืนที่รวมอยู่",
-    includedDescription: (credits) =>
-      `แผนนี้รวมเครดิตกู้คืน ${credits} เครดิต`,
+    includedDescription: (credits) => `แผนนี้รวมเครดิตกู้คืน ${credits} เครดิต`,
     topupTitle: "เติมเครดิตได้ยืดหยุ่น",
     topupDescription: (credits) =>
       `ซื้อแพ็กเพิ่มครั้งละ ${credits} เครดิตเมื่อคุณต้องการความจุเพิ่ม`,
@@ -219,8 +218,7 @@ const COPY = {
     description: (name, credits) =>
       `${name} 包含 ${credits} 个购物车挽回积分，用于与弃购客户沟通，并随着商店增长提供可预测的容量。`,
     includedTitle: "包含的挽回积分",
-    includedDescription: (credits) =>
-      `此方案包含 ${credits} 个挽回积分。`,
+    includedDescription: (credits) => `此方案包含 ${credits} 个挽回积分。`,
     topupTitle: "灵活加购",
     topupDescription: (credits) =>
       `需要更多容量时，可购买每包 ${credits} 个积分的额外额度。`,
@@ -229,8 +227,7 @@ const COPY = {
     description: (name, credits) =>
       `${name} 包含 ${credits} 個購物車挽回點數，用於與棄購顧客溝通，並隨商店成長提供可預測的容量。`,
     includedTitle: "包含的挽回點數",
-    includedDescription: (credits) =>
-      `此方案包含 ${credits} 個挽回點數。`,
+    includedDescription: (credits) => `此方案包含 ${credits} 個挽回點數。`,
     topupTitle: "彈性加購",
     topupDescription: (credits) =>
       `需要更多容量時，可購買每包 ${credits} 個點數的額外額度。`,
@@ -410,7 +407,9 @@ async function main() {
   const plans = PLAN_DEFINITIONS.map((definition) => ({ ...definition }));
   assertIncreasingPlanCredits(plans);
 
-  console.log(`Creating ${plans.length} MerchantPricing plans from the 2026 investor pricing proposal.`);
+  console.log(
+    `Creating ${plans.length} MerchantPricing plans from the 2026 investor pricing proposal.`,
+  );
 
   for (const [index, plan] of plans.entries()) {
     const planHighlights = highlights(plan);
@@ -488,7 +487,8 @@ async function main() {
         `${created._count.highlights} highlights`,
         `${created._count.usageEvents} usage events`,
         ...plan.topUpBundles.map(
-          (bundle) => `${bundle.name} ${bundle.credits} @ ${money(bundle.price)}`,
+          (bundle) =>
+            `${bundle.name} ${bundle.credits} @ ${money(bundle.price)}`,
         ),
       ].join(" | "),
     );
@@ -499,8 +499,12 @@ async function main() {
   console.log("The FREE plan is at catalogue position 0.");
   console.log("All allowances strictly increase with catalogue order.");
   console.log("Each plan has all 20 supported merchant translations.");
-  console.log("Each plan has translated highlights and fixed Bronze, Silver, and Gold pack events.");
-  console.log("Prices are the proposed investor-report amounts and are not verified production catalogue rates.");
+  console.log(
+    "Each plan has translated highlights and fixed Bronze, Silver, and Gold pack events.",
+  );
+  console.log(
+    "Prices are the proposed investor-report amounts and are not verified production catalogue rates.",
+  );
 }
 
 main()

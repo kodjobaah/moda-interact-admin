@@ -1,10 +1,13 @@
 #!/usr/bin/env node
-import process from 'node:process';
-import { PrismaClient } from '@prisma/client';
+import process from "node:process";
+import { PrismaClient } from "@prisma/client";
 import {
-  parsePricingResetOptions, databaseIdentity, assertPricingResetAllowed,
-  pricingCatalogueInventory, clearPricingCatalogueWithinTransaction,
-} from './clear-merchant-pricing-core.mjs';
+  parsePricingResetOptions,
+  databaseIdentity,
+  assertPricingResetAllowed,
+  pricingCatalogueInventory,
+  clearPricingCatalogueWithinTransaction,
+} from "./clear-merchant-pricing-core.mjs";
 
 const HELP = `
 Reset the entire MerchantPricing catalogue in a verified DEVELOPMENT/TEST database.
@@ -30,7 +33,7 @@ validation triggers stay enabled. Any failure rolls the transaction back.
 `;
 
 async function main() {
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
     console.log(HELP.trim());
     return;
   }
@@ -39,28 +42,47 @@ async function main() {
   const prisma = new PrismaClient();
   try {
     const inventory = await pricingCatalogueInventory(prisma);
-    console.log(JSON.stringify({
-      action: options.command,
-      database: { name: db.database, host: db.host },
-      catalogue: {
-        ...inventory,
-        plans: inventory.plans.slice(0, 50),
-        ...(inventory.plans.length > 50 ? { additionalPlansNotShown: inventory.plans.length - 50 } : {}),
-      },
-      note: 'BillingPlan/subscriptions/charges and all merchant data are retained.',
-    }, null, 2));
-    if (options.command === 'status') return;
+    console.log(
+      JSON.stringify(
+        {
+          action: options.command,
+          database: { name: db.database, host: db.host },
+          catalogue: {
+            ...inventory,
+            plans: inventory.plans.slice(0, 50),
+            ...(inventory.plans.length > 50
+              ? { additionalPlansNotShown: inventory.plans.length - 50 }
+              : {}),
+          },
+          note: "BillingPlan/subscriptions/charges and all merchant data are retained.",
+        },
+        null,
+        2,
+      ),
+    );
+    if (options.command === "status") return;
     assertPricingResetAllowed(options, inventory, process.env);
     const result = await prisma.$transaction(
-      (tx) => clearPricingCatalogueWithinTransaction(
-        tx, inventory.plans.map((plan) => plan.id), options, process.env,
-      ),
-      { maxWait: 15_000, timeout: 120_000, isolationLevel: 'Serializable' },
+      (tx) =>
+        clearPricingCatalogueWithinTransaction(
+          tx,
+          inventory.plans.map((plan) => plan.id),
+          options,
+          process.env,
+        ),
+      { maxWait: 15_000, timeout: 120_000, isolationLevel: "Serializable" },
     );
-    console.log(JSON.stringify({
-      result: 'deleted', ...result,
-      note: 'Plan-scoped CommerceModelPolicy overrides and MerchantPricing catalogue child rows were removed. Audit history and operational billing records remain.',
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          result: "deleted",
+          ...result,
+          note: "Plan-scoped CommerceModelPolicy overrides and MerchantPricing catalogue child rows were removed. Audit history and operational billing records remain.",
+        },
+        null,
+        2,
+      ),
+    );
   } finally {
     await prisma.$disconnect();
   }
@@ -69,6 +91,6 @@ async function main() {
 main().catch((error) => {
   // Local diagnostic only. Prisma messages can contain database details:
   // redact secrets and customer data before sharing this error.
-  console.error('MerchantPricing reset failed:', error);
+  console.error("MerchantPricing reset failed:", error);
   process.exitCode = 1;
 });

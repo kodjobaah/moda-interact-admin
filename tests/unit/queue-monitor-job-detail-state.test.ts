@@ -93,15 +93,29 @@ test("jobs invalidation preserves the established reason-specific status behavio
 
 test("detail request errors preserve the 404, unavailable, and ordinary error mappings", () => {
   assert.equal(
-    getQueueJobDetailError(new QueueJobDetailHttpError(404), "gone", "unavailable"),
+    getQueueJobDetailError(
+      new QueueJobDetailHttpError(404),
+      "gone",
+      "unavailable",
+    ),
     "gone",
   );
   assert.equal(
-    getQueueJobDetailError(new QueueJobDetailHttpError(503), "gone", "unavailable"),
+    getQueueJobDetailError(
+      new QueueJobDetailHttpError(503),
+      "gone",
+      "unavailable",
+    ),
     "unavailable",
   );
-  assert.equal(getQueueJobDetailError(new Error("network"), "gone", "unavailable"), "network");
-  assert.equal(getQueueJobDetailError("unknown", "gone", "unavailable"), "unavailable");
+  assert.equal(
+    getQueueJobDetailError(new Error("network"), "gone", "unavailable"),
+    "network",
+  );
+  assert.equal(
+    getQueueJobDetailError("unknown", "gone", "unavailable"),
+    "unavailable",
+  );
 });
 
 test("abort errors are recognized and never become user-facing errors", () => {

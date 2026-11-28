@@ -131,7 +131,9 @@ function EmbeddingConfigurationCard({
           <h2 className="text-lg font-semibold text-gray-900">
             {purposeLabels[status.purpose]}
           </h2>
-          <p className="mt-1 font-mono text-xs text-gray-500">{status.purpose}</p>
+          <p className="mt-1 font-mono text-xs text-gray-500">
+            {status.purpose}
+          </p>
         </div>
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -152,14 +154,18 @@ function EmbeddingConfigurationCard({
           </div>
           <div>
             <dt className="text-xs font-semibold text-gray-500">Model</dt>
-            <dd className="mt-1 break-all text-gray-900">{status.embeddingModel}</dd>
+            <dd className="mt-1 break-all text-gray-900">
+              {status.embeddingModel}
+            </dd>
           </div>
           <div>
             <dt className="text-xs font-semibold text-gray-500">Dimensions</dt>
             <dd className="mt-1 text-gray-900">{status.embeddingDimensions}</dd>
           </div>
           <div>
-            <dt className="text-xs font-semibold text-gray-500">Index version</dt>
+            <dt className="text-xs font-semibold text-gray-500">
+              Index version
+            </dt>
             <dd className="mt-1 break-all text-gray-900">
               {status.embeddingIndexVersion}
             </dd>
@@ -169,7 +175,9 @@ function EmbeddingConfigurationCard({
             <dd className="mt-1 text-gray-900">Configured</dd>
           </div>
           <div>
-            <dt className="text-xs font-semibold text-gray-500">Edit version</dt>
+            <dt className="text-xs font-semibold text-gray-500">
+              Edit version
+            </dt>
             <dd className="mt-1 text-gray-900">{status.editVersion}</dd>
           </div>
           <div className="sm:col-span-2">
@@ -283,7 +291,9 @@ function EmbeddingConfigurationCard({
                   aria-pressed={showSecret}
                   className="font-medium text-[var(--brand-700)] underline-offset-2 hover:underline disabled:opacity-50"
                 >
-                  {showSecret ? "Hide entered credential" : "Show entered credential"}
+                  {showSecret
+                    ? "Hide entered credential"
+                    : "Show entered credential"}
                 </button>
                 <span className="text-xs text-gray-500">
                   A saved credential cannot be viewed from Admin. Changing the
@@ -338,7 +348,10 @@ function EmbeddingConfigurationCard({
           )}
 
           {status.configured && editing ? (
-            <form onSubmit={remove} className="mt-6 space-y-4 border-t border-gray-200 pt-5">
+            <form
+              onSubmit={remove}
+              className="mt-6 space-y-4 border-t border-gray-200 pt-5"
+            >
               <input type="hidden" name="purpose" value={status.purpose} />
               <label className="block text-sm font-medium text-gray-800">
                 Removal reason
@@ -380,7 +393,11 @@ function EmbeddingConfigurationCard({
         </p>
       )}
 
-      <p role="status" aria-live="polite" className="mt-4 min-h-5 text-sm text-gray-700">
+      <p
+        role="status"
+        aria-live="polite"
+        className="mt-4 min-h-5 text-sm text-gray-700"
+      >
         {pending ? "Updating embedding configuration…" : message}
       </p>
     </article>
@@ -398,15 +415,20 @@ export function EmbeddingConfigurationsPanel({
   return (
     <section className="max-w-6xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--brand-900)]">Embeddings</h1>
+        <h1 className="text-2xl font-bold text-[var(--brand-900)]">
+          Embeddings
+        </h1>
         <p className="mt-2 max-w-3xl text-sm text-gray-600">
           Configure the provider, model, dimensions, index version and encrypted
           provider credential for each embedding purpose. Existing vectors built
-          with a different configuration must be rebuilt before they are queried.
+          with a different configuration must be rebuilt before they are
+          queried.
         </p>
       </div>
       <div className="mb-6 rounded-lg border border-[var(--brand-200)] bg-[var(--brand-50)] px-4 py-3 text-sm">
-        <span className="font-semibold text-[var(--brand-900)]">Commerce environment:</span>{" "}
+        <span className="font-semibold text-[var(--brand-900)]">
+          Commerce environment:
+        </span>{" "}
         <span className="font-mono text-[var(--brand-800)]">{environment}</span>
         <span className="ml-2 text-gray-600">
           This deployment can configure only its current environment.

@@ -69,18 +69,22 @@ export function StoreCategoryPromptConditionEditor({
           Available mapping conditions
         </h4>
         <p className="mt-1 text-xs leading-5 text-gray-600">
-          Mapping conditions are evaluated when a merchant chooses this Store Category.
-          Insert a bounded conditional block to include prompt instructions only when that
-          mapping is selected.
+          Mapping conditions are evaluated when a merchant chooses this Store
+          Category. Insert a bounded conditional block to include prompt
+          instructions only when that mapping is selected.
         </p>
         {conditions.length === 0 ? (
           <p className="mt-4 rounded-md bg-white p-3 text-sm text-gray-600">
-            No mapping conditions are configured. This prompt will be unconditional.
+            No mapping conditions are configured. This prompt will be
+            unconditional.
           </p>
         ) : (
           <ul className="mt-4 space-y-2">
             {conditions.map((condition) => (
-              <li key={condition.id} className="rounded-md border border-gray-200 bg-white p-3">
+              <li
+                key={condition.id}
+                className="rounded-md border border-gray-200 bg-white p-3"
+              >
                 <p className="text-sm font-medium text-gray-900">
                   {condition.displayName}
                 </p>
@@ -122,7 +126,9 @@ export function StoreCategoryPromptConditionEditor({
                 : "bg-amber-100 text-amber-800"
             }`}
           >
-            {validation.valid ? "Conditional prompt valid" : "Prompt needs attention"}
+            {validation.valid
+              ? "Conditional prompt valid"
+              : "Prompt needs attention"}
           </span>
           {validation.referencedConditionKeys.length > 0 ? (
             <span className="text-gray-500">

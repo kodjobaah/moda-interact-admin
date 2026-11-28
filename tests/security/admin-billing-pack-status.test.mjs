@@ -4,11 +4,17 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { test } from "node:test";
 
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const read = (relativePath) => readFile(path.join(repositoryRoot, relativePath), "utf8");
+const repositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+const read = (relativePath) =>
+  readFile(path.join(repositoryRoot, relativePath), "utf8");
 
 function enumValues(schema, enumName) {
-  const match = schema.match(new RegExp(`enum\\s+${enumName}\\s*\\{([\\s\\S]*?)\\}`));
+  const match = schema.match(
+    new RegExp(`enum\\s+${enumName}\\s*\\{([\\s\\S]*?)\\}`),
+  );
   assert.ok(match, `${enumName} must exist in the Prisma schema`);
   return match[1]
     .split("\n")
@@ -25,9 +31,19 @@ test("every RecoveryCreditPurchaseStatus has an ICU label and filter support", a
   const catalogue = JSON.parse(catalogueSource);
   const statuses = enumValues(schema, "RecoveryCreditPurchaseStatus");
 
-  assert.deepEqual(statuses, ["REQUESTED", "ACTIVE", "COMPLETED", "WITHDRAWN", "REFUNDED"]);
+  assert.deepEqual(statuses, [
+    "REQUESTED",
+    "ACTIVE",
+    "COMPLETED",
+    "WITHDRAWN",
+    "REFUNDED",
+  ]);
   for (const status of statuses) {
-    assert.equal(typeof catalogue[`billing.packStatus.${status}`], "string", status);
+    assert.equal(
+      typeof catalogue[`billing.packStatus.${status}`],
+      "string",
+      status,
+    );
   }
   assert.match(packsSource, /Object\.values\(RecoveryCreditPurchaseStatus\)/);
   assert.match(packsSource, /adminBillingPackStatusLabel\(status\)/);
@@ -43,7 +59,13 @@ test("purchase-status rendering uses the bounded presenter rather than dynamic I
 
   assert.match(i18nSource, /export function adminBillingPackStatusLabel/);
   assert.match(i18nSource, /Object\.hasOwn\(catalogue, key\)/);
-  assert.match(drawersSource, /adminBillingPackStatusLabel\(purchase\.status\)/);
+  assert.match(
+    drawersSource,
+    /adminBillingPackStatusLabel\(purchase\.status\)/,
+  );
   assert.match(tenantSource, /adminBillingPackStatusLabel\(purchase\.status\)/);
-  assert.doesNotMatch(`${drawersSource}\n${tenantSource}`, /adminI18n\.t\(`billing\.packStatus\.\$\{/);
+  assert.doesNotMatch(
+    `${drawersSource}\n${tenantSource}`,
+    /adminI18n\.t\(`billing\.packStatus\.\$\{/,
+  );
 });

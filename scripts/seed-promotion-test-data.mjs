@@ -45,13 +45,7 @@ const LOCALES = [
   "zh-Hant",
 ];
 
-const STATE_SEQUENCE = [
-  "DRAFT",
-  "SCHEDULED",
-  "RUNNING",
-  "EXPIRED",
-  "CLOSED",
-];
+const STATE_SEQUENCE = ["DRAFT", "SCHEDULED", "RUNNING", "EXPIRED", "CLOSED"];
 
 const QUANTITIES = [1, 2, 3, 5, 8, 10];
 
@@ -259,17 +253,20 @@ function buildFixtureData({ count, now, adminId, plans, shops, scopes }) {
     const family = OFFER_FAMILIES[(index - 1) % OFFER_FAMILIES.length];
     const lifecycle = windowForState(state, index, now);
     const createdAt = dateAt(now, -(count - index + 1) * 13 * MINUTE_MS);
-    const plan = scope === PromotionTargetScope.PLAN
-      ? plans[(index - 1) % plans.length]
-      : null;
-    const shop = scope === PromotionTargetScope.SHOP
-      ? shops[(index - 1) % shops.length]
-      : null;
+    const plan =
+      scope === PromotionTargetScope.PLAN
+        ? plans[(index - 1) % plans.length]
+        : null;
+    const shop =
+      scope === PromotionTargetScope.SHOP
+        ? shops[(index - 1) % shops.length]
+        : null;
 
     const padded = String(index).padStart(2, "0");
-    const longNameSuffix = index % 10 === 0
-      ? " — deliberately longer campaign name for wrapping/layout verification"
-      : "";
+    const longNameSuffix =
+      index % 10 === 0
+        ? " — deliberately longer campaign name for wrapping/layout verification"
+        : "";
     const name = `${family} ${padded} · ${state} · ${scope}${longNameSuffix}`;
     const creditLabel = quantity === 1 ? "credit" : "credits";
     const merchantTitle = `${quantity} recovery ${creditLabel}: ${family}`;
@@ -387,7 +384,9 @@ async function main() {
   ];
 
   if (!plans.length)
-    console.warn("No active BillingPlan rows exist; PLAN fixtures will be skipped.");
+    console.warn(
+      "No active BillingPlan rows exist; PLAN fixtures will be skipped.",
+    );
   if (!shops.length)
     console.warn("No Shop rows exist; SHOP fixtures will be skipped.");
 
@@ -407,7 +406,9 @@ async function main() {
     await transaction.promotionCampaignTranslation.createMany({
       data: fixture.translations,
     });
-    await transaction.promotionCampaignEvent.createMany({ data: fixture.events });
+    await transaction.promotionCampaignEvent.createMany({
+      data: fixture.events,
+    });
   });
 
   console.log(
@@ -428,13 +429,17 @@ async function main() {
   console.log("  - page sizes 10, 20 and 50");
   console.log("  - State filters: DRAFT, SCHEDULED, RUNNING, EXPIRED, CLOSED");
   console.log("  - Scope filters: GLOBAL, PLAN, SHOP");
-  console.log("  - Target/name search using a fixture name, plan name or shop domain");
+  console.log(
+    "  - Target/name search using a fixture name, plan name or shop domain",
+  );
 }
 
 main()
   .catch((error) => {
     console.error(
-      error instanceof Error ? error.message : "Promotion fixture seeding failed.",
+      error instanceof Error
+        ? error.message
+        : "Promotion fixture seeding failed.",
     );
     process.exitCode = 1;
   })

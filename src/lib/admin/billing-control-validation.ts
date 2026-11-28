@@ -54,7 +54,11 @@ export function parsePlatformBillingPolicyForm(
   formData: FormData,
 ): PlatformBillingPolicyInput {
   const rawVersion = formData.get("expectedVersion");
-  if (typeof rawVersion !== "string" || !/^(0|[1-9][0-9]*|-1)$/.test(rawVersion) || !Number.isSafeInteger(Number(rawVersion))) {
+  if (
+    typeof rawVersion !== "string" ||
+    !/^(0|[1-9][0-9]*|-1)$/.test(rawVersion) ||
+    !Number.isSafeInteger(Number(rawVersion))
+  ) {
     throw new Error("Invalid policy version. Reload the page.");
   }
   const expectedVersion = Number(rawVersion);
@@ -81,11 +85,17 @@ export function parsePlatformBillingPolicyForm(
   if (defaultOutboundHardLimit < 2)
     throw new Error("Default outbound hard limit must be at least 2.");
   if (defaultOutboundSoftLimit > defaultOutboundHardLimit)
-    throw new Error("Default outbound soft limit must not exceed the hard limit.");
+    throw new Error(
+      "Default outbound soft limit must not exceed the hard limit.",
+    );
   if (defaultOutboundHardLimit > absoluteOutboundHardLimit)
-    throw new Error("Default outbound hard limit must not exceed the absolute hard limit.");
+    throw new Error(
+      "Default outbound hard limit must not exceed the absolute hard limit.",
+    );
   if (terminalMessageReservedSlots >= defaultOutboundHardLimit)
-    throw new Error("Terminal message reserved slots must be lower than the default outbound hard limit.");
+    throw new Error(
+      "Terminal message reserved slots must be lower than the default outbound hard limit.",
+    );
   const defaultWarningPercent = requiredInt(
     formData.get("defaultWarningPercent"),
     "Warning threshold",

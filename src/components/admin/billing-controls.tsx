@@ -84,7 +84,11 @@ export function PlatformPolicyControls({
       ) : null}
 
       <PlatformPolicyForm>
-        <input type="hidden" name="expectedVersion" value={policy?.version ?? -1}/>
+        <input
+          type="hidden"
+          name="expectedVersion"
+          value={policy?.version ?? -1}
+        />
         <p className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-700">
           <span className="font-semibold">
             {adminI18n.t("billingControls.platformLimitRulesTitle")}
@@ -128,7 +132,9 @@ export function PlatformPolicyControls({
               id="whatsappRecipientSuppressionDays-help"
               className="mt-1 block text-xs font-normal leading-5 text-gray-500"
             >
-              {adminI18n.t("billingControls.whatsappRecipientSuppressionDaysHelp")}
+              {adminI18n.t(
+                "billingControls.whatsappRecipientSuppressionDaysHelp",
+              )}
             </span>
           </label>
 
@@ -324,8 +330,10 @@ export function TenantBillingControls({
     override?.expiresAt && override.expiresAt < new Date(),
   );
   const activeOverride = override && !expired ? override : null;
-  const effectiveSoftLimit = activeOverride?.outboundSoftLimit ?? defaultSoftLimit;
-  const effectiveHardLimit = activeOverride?.outboundHardLimit ?? defaultHardLimit;
+  const effectiveSoftLimit =
+    activeOverride?.outboundSoftLimit ?? defaultSoftLimit;
+  const effectiveHardLimit =
+    activeOverride?.outboundHardLimit ?? defaultHardLimit;
   const effectiveTerminalMessageReservedSlots =
     activeOverride?.terminalMessageReservedSlots ??
     controls.platform?.terminalMessageReservedSlots ??
@@ -356,8 +364,12 @@ export function TenantBillingControls({
             </p>
           </div>
           <div>
-            <dt className="text-xs font-medium text-gray-500">Terminal message reserve</dt>
-            <dd className="mt-1 text-sm font-semibold text-gray-900">{effectiveTerminalMessageReservedSlots}</dd>
+            <dt className="text-xs font-medium text-gray-500">
+              Terminal message reserve
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-gray-900">
+              {effectiveTerminalMessageReservedSlots}
+            </dd>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -444,7 +456,10 @@ export function TenantBillingControls({
               {adminI18n.t("billingControls.expired")}
             </p>
           ) : null}
-          <form action={mutateShopBillingOverrideAction} className="mt-4 space-y-4">
+          <form
+            action={mutateShopBillingOverrideAction}
+            className="mt-4 space-y-4"
+          >
             <input type="hidden" name="shopId" value={shopId} />
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="text-sm font-medium text-gray-700">
@@ -481,7 +496,14 @@ export function TenantBillingControls({
               </label>
               <label className="text-sm font-medium text-gray-700">
                 Terminal message reserved slots
-                <input className={inputClass} type="number" min="1" name="terminalMessageReservedSlots" defaultValue={override?.terminalMessageReservedSlots ?? ""} placeholder="Inherit platform default" />
+                <input
+                  className={inputClass}
+                  type="number"
+                  min="1"
+                  name="terminalMessageReservedSlots"
+                  defaultValue={override?.terminalMessageReservedSlots ?? ""}
+                  placeholder="Inherit platform default"
+                />
               </label>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -560,7 +582,9 @@ export function TenantBillingControls({
             <dt className="text-xs text-gray-500">
               {adminI18n.t("billingControls.committed")}
             </dt>
-            <dd className="mt-1 text-lg font-semibold">{allowance.committed}</dd>
+            <dd className="mt-1 text-lg font-semibold">
+              {allowance.committed}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-gray-500">

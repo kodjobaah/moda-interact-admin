@@ -17,7 +17,9 @@ function validatePartnerSecret(payload: unknown): ShopifyPartnerSecret {
     accessToken: values.accessToken as string,
     organizationId: values.organizationId as string,
     appId: values.appId as string,
-    ...(values.apiVersion !== undefined ? { apiVersion: values.apiVersion as string } : {}),
+    ...(values.apiVersion !== undefined
+      ? { apiVersion: values.apiVersion as string }
+      : {}),
   };
 }
 
@@ -27,10 +29,11 @@ export async function requireAdminShopifyPartnerCredentials() {
   return resolveShopifyPartnerCredentialsWithDependencies({
     environment,
     isProductionNode: process.env.NODE_ENV === "production",
-    read: () => prisma.platformConfiguration.findUnique({
-      where: { environment_key: { environment, key: "shopify.partner" } },
-      select: { value: true, version: true },
-    }),
+    read: () =>
+      prisma.platformConfiguration.findUnique({
+        where: { environment_key: { environment, key: "shopify.partner" } },
+        select: { value: true, version: true },
+      }),
     decode: (row) => {
       const plaintext = unsealSecret({
         environment,

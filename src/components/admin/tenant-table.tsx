@@ -15,7 +15,10 @@ import { Pagination } from "./pagination";
 import { TenantDetailPanel } from "./tenant-detail-panel";
 import type { HumanMessagingDashboard } from "@/lib/admin/human-messaging-contract";
 import { TenantRow } from "./tenant-row";
-import type { LiveShopPolicyView, LiveShopPolicyHistoryEntry } from "@/lib/admin/commerce-model-shop-policy";
+import type {
+  LiveShopPolicyView,
+  LiveShopPolicyHistoryEntry,
+} from "@/lib/admin/commerce-model-shop-policy";
 
 export function TenantTable({
   tenants,
@@ -46,7 +49,11 @@ export function TenantTable({
   humanMessaging: HumanMessagingDashboard | null;
   tab: "admin" | "recovery" | "logs" | "billing" | "commerce";
   canEditCommercePolicy: boolean;
-  shopPolicyDashboard: { policy: LiveShopPolicyView; history: LiveShopPolicyHistoryEntry[]; hasMore: boolean } | null;
+  shopPolicyDashboard: {
+    policy: LiveShopPolicyView;
+    history: LiveShopPolicyHistoryEntry[];
+    hasMore: boolean;
+  } | null;
   shopPolicyScope: string | null;
   shopPolicyHistoryPage: number;
   customers: PageResult<CustomerListItem> | null;
@@ -59,9 +66,18 @@ export function TenantTable({
   discountSyncRequested?: boolean;
   billing: TenantBilling | null;
   billingView: "overview" | "usage" | "shopify" | "activity";
-  billingPacks: import("@/lib/admin/types").PageResult<import("@/lib/admin/types").RecoveryCreditPurchaseItem> | null;
-  billingEvents: import("@/lib/admin/types").PageResult<import("@/lib/admin/types").BillingLedgerItem> | null;
-  selectedPurchase: import("@/lib/admin/types").RecoveryCreditPurchaseItem | null;
+  billingPacks:
+    | import("@/lib/admin/types").PageResult<
+        import("@/lib/admin/types").RecoveryCreditPurchaseItem
+      >
+    | null;
+  billingEvents:
+    | import("@/lib/admin/types").PageResult<
+        import("@/lib/admin/types").BillingLedgerItem
+      >
+    | null;
+  selectedPurchase:
+    import("@/lib/admin/types").RecoveryCreditPurchaseItem | null;
   selectedEvent: import("@/lib/admin/types").BillingLedgerItem | null;
 }) {
   return (

@@ -1,17 +1,19 @@
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { test } from 'node:test';
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { test } from "node:test";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../..',
+  "../..",
 );
 const sourcePath = (relativePath) => path.join(repositoryRoot, relativePath);
 
 function importQueueMonitor() {
-  return import(`${sourcePath('src/lib/admin/queue-monitor.ts')}?detail-jobs-test=${Date.now()}-${Math.random()}`);
+  return import(
+    `${sourcePath("src/lib/admin/queue-monitor.ts")}?detail-jobs-test=${Date.now()}-${Math.random()}`
+  );
 }
 
 function queueFactory(job, state) {
@@ -22,152 +24,207 @@ function queueFactory(job, state) {
   });
 }
 
-test('normalizes active detail with the same shop projection as list rows', async () => {
+test("normalizes active detail with the same shop projection as list rows", async () => {
   const { readQueueJobDetail } = await importQueueMonitor();
   const detail = await readQueueJobDetail({
-    redisUrl: 'redis://active-detail-jobs.test.invalid',
-    queueName: 'checkout-events',
-    status: 'active',
-    jobId: 'active-123',
-    queueFactory: queueFactory({
-      id: 'active-123',
-      name: 'checkout-created',
-      attemptsMade: 2,
-      timestamp: 1710000000000,
-      processedOn: 1710000001000,
-      finishedOn: 1710000002000,
-      failedReason: 'must not be returned for active',
-      stacktrace: ['must not be returned for active'],
-      data: { tenant: { shopDomain: ' Alpha.MyShopify.com ' }, orderId: 'order-123' },
-    }, 'active'),
+    redisUrl: "redis://active-detail-jobs.test.invalid",
+    queueName: "checkout-events",
+    status: "active",
+    jobId: "active-123",
+    queueFactory: queueFactory(
+      {
+        id: "active-123",
+        name: "checkout-created",
+        attemptsMade: 2,
+        timestamp: 1710000000000,
+        processedOn: 1710000001000,
+        finishedOn: 1710000002000,
+        failedReason: "must not be returned for active",
+        stacktrace: ["must not be returned for active"],
+        data: {
+          tenant: { shopDomain: " Alpha.MyShopify.com " },
+          orderId: "order-123",
+        },
+      },
+      "active",
+    ),
   });
 
   assert.deepEqual(detail, {
-    id: 'active-123',
-    queueName: 'checkout-events',
-    name: 'checkout-created',
-    status: 'active',
-    shop: 'alpha.myshopify.com',
-    shopDomain: 'alpha.myshopify.com',
-    attribution: 'known',
+    id: "active-123",
+    queueName: "checkout-events",
+    name: "checkout-created",
+    status: "active",
+    shop: "alpha.myshopify.com",
+    shopDomain: "alpha.myshopify.com",
+    attribution: "known",
     attemptsMade: 2,
-    timestamp: '2024-03-09T16:00:00.000Z',
-    processedOn: '2024-03-09T16:00:01.000Z',
-    finishedOn: '2024-03-09T16:00:02.000Z',
-    failedReason: '',
-    stacktrace: ['must not be returned for active'],
-    data: { tenant: { shopDomain: ' Alpha.MyShopify.com ' }, orderId: 'order-123' },
+    timestamp: "2024-03-09T16:00:00.000Z",
+    processedOn: "2024-03-09T16:00:01.000Z",
+    finishedOn: "2024-03-09T16:00:02.000Z",
+    failedReason: "",
+    stacktrace: ["must not be returned for active"],
+    data: {
+      tenant: { shopDomain: " Alpha.MyShopify.com " },
+      orderId: "order-123",
+    },
   });
 });
 
-
-test('keeps merchant knowledge shop IDs attributed instead of marking them orphaned', async () => {
+test("keeps merchant knowledge shop IDs attributed instead of marking them orphaned", async () => {
   const { readQueueJobDetail } = await importQueueMonitor();
   const detail = await readQueueJobDetail({
-    redisUrl: 'redis://merchant-knowledge-detail.test.invalid',
-    queueName: 'merchant-knowledge',
-    status: 'waiting',
-    jobId: 'knowledge-123',
-    queueFactory: queueFactory({
-      id: 'knowledge-123',
-      name: 'process-source-revision',
-      attemptsMade: 0,
-      timestamp: 1710000000000,
-      data: {
-        schemaVersion: 1,
-        shopId: 'cmu8d6ypo0008qr0i5pvwjzux',
-        sourceRevisionId: 'revision-1',
-        generation: 1,
-        requestedAt: '2026-10-04T11:59:35.230Z',
+    redisUrl: "redis://merchant-knowledge-detail.test.invalid",
+    queueName: "merchant-knowledge",
+    status: "waiting",
+    jobId: "knowledge-123",
+    queueFactory: queueFactory(
+      {
+        id: "knowledge-123",
+        name: "process-source-revision",
+        attemptsMade: 0,
+        timestamp: 1710000000000,
+        data: {
+          schemaVersion: 1,
+          shopId: "cmu8d6ypo0008qr0i5pvwjzux",
+          sourceRevisionId: "revision-1",
+          generation: 1,
+          requestedAt: "2026-10-04T11:59:35.230Z",
+        },
       },
-    }, 'waiting'),
+      "waiting",
+    ),
   });
 
-  assert.equal(detail.shop, 'cmu8d6ypo0008qr0i5pvwjzux');
+  assert.equal(detail.shop, "cmu8d6ypo0008qr0i5pvwjzux");
   assert.equal(detail.shopDomain, null);
-  assert.equal(detail.attribution, 'identified');
+  assert.equal(detail.attribution, "identified");
 });
 
-test('keeps failed detail inspectable through the generic reader', async () => {
+test("keeps failed detail inspectable through the generic reader", async () => {
   const { readQueueJobDetail } = await importQueueMonitor();
   const detail = await readQueueJobDetail({
-    redisUrl: 'redis://failed-detail-jobs.test.invalid',
-    queueName: 'order-events',
-    status: 'failed',
-    jobId: 'failed-123',
-    queueFactory: queueFactory({
-      id: 'failed-123',
-      name: 'order-completed',
-      attemptsMade: 3,
-      finishedOn: 1710000002000,
-      failedReason: 'order failed',
-      stacktrace: ['Error: order failed'],
-      data: { tenant: { shopDomain: 'beta.myshopify.com' } },
-    }, 'failed'),
+    redisUrl: "redis://failed-detail-jobs.test.invalid",
+    queueName: "order-events",
+    status: "failed",
+    jobId: "failed-123",
+    queueFactory: queueFactory(
+      {
+        id: "failed-123",
+        name: "order-completed",
+        attemptsMade: 3,
+        finishedOn: 1710000002000,
+        failedReason: "order failed",
+        stacktrace: ["Error: order failed"],
+        data: { tenant: { shopDomain: "beta.myshopify.com" } },
+      },
+      "failed",
+    ),
   });
 
-  assert.equal(detail.status, 'failed');
-  assert.equal(detail.shop, 'beta.myshopify.com');
-  assert.equal(detail.failedReason, 'order failed');
-  assert.equal(detail.attribution, 'known');
-  assert.deepEqual(detail.stacktrace, ['Error: order failed']);
+  assert.equal(detail.status, "failed");
+  assert.equal(detail.shop, "beta.myshopify.com");
+  assert.equal(detail.failedReason, "order failed");
+  assert.equal(detail.attribution, "known");
+  assert.deepEqual(detail.stacktrace, ["Error: order failed"]);
 });
 
-test('normalizes waiting and delayed detail only for their current states', async () => {
-  const { QueueJobNotFoundError, readQueueJobDetail } = await importQueueMonitor();
+test("normalizes waiting and delayed detail only for their current states", async () => {
+  const { QueueJobNotFoundError, readQueueJobDetail } =
+    await importQueueMonitor();
   const waitingOptions = {
-    redisUrl: 'redis://waiting-detail-jobs.test.invalid',
-    queueName: 'pending-recovery-candidates',
-    jobId: 'waiting-123',
-    queueFactory: queueFactory({
-      id: 'waiting-123',
-      name: 'Pending recovery candidates',
-      attemptsMade: 0,
-      timestamp: 1710000000000,
-      data: {},
-    }, 'waiting'),
+    redisUrl: "redis://waiting-detail-jobs.test.invalid",
+    queueName: "pending-recovery-candidates",
+    jobId: "waiting-123",
+    queueFactory: queueFactory(
+      {
+        id: "waiting-123",
+        name: "Pending recovery candidates",
+        attemptsMade: 0,
+        timestamp: 1710000000000,
+        data: {},
+      },
+      "waiting",
+    ),
   };
-  const waiting = await readQueueJobDetail({ ...waitingOptions, status: 'waiting' });
-  assert.equal(waiting.status, 'waiting');
-  assert.equal(waiting.failedReason, '');
-  await assert.rejects(readQueueJobDetail({ ...waitingOptions, status: 'delayed' }), QueueJobNotFoundError);
+  const waiting = await readQueueJobDetail({
+    ...waitingOptions,
+    status: "waiting",
+  });
+  assert.equal(waiting.status, "waiting");
+  assert.equal(waiting.failedReason, "");
+  await assert.rejects(
+    readQueueJobDetail({ ...waitingOptions, status: "delayed" }),
+    QueueJobNotFoundError,
+  );
 
   const delayedOptions = {
     ...waitingOptions,
-    redisUrl: 'redis://delayed-detail-jobs.test.invalid',
-    jobId: 'delayed-123',
-    queueFactory: queueFactory({
-      id: 'delayed-123',
-      name: 'Pending recovery candidates',
-      attemptsMade: 0,
-      timestamp: 1710000000000,
-      delay: 5000,
-      data: {},
-    }, 'delayed'),
+    redisUrl: "redis://delayed-detail-jobs.test.invalid",
+    jobId: "delayed-123",
+    queueFactory: queueFactory(
+      {
+        id: "delayed-123",
+        name: "Pending recovery candidates",
+        attemptsMade: 0,
+        timestamp: 1710000000000,
+        delay: 5000,
+        data: {},
+      },
+      "delayed",
+    ),
   };
-  const delayed = await readQueueJobDetail({ ...delayedOptions, status: 'delayed' });
-  assert.equal(delayed.status, 'delayed');
-  assert.equal(delayed.attribution, 'orphan');
-  await assert.rejects(readQueueJobDetail({ ...delayedOptions, status: 'waiting' }), QueueJobNotFoundError);
+  const delayed = await readQueueJobDetail({
+    ...delayedOptions,
+    status: "delayed",
+  });
+  assert.equal(delayed.status, "delayed");
+  assert.equal(delayed.attribution, "orphan");
+  await assert.rejects(
+    readQueueJobDetail({ ...delayedOptions, status: "waiting" }),
+    QueueJobNotFoundError,
+  );
 });
 
-test('returns safe not-found for state races and rejects unsupported status', async () => {
-  const { InvalidQueueJobQueryError, QueueJobNotFoundError, readQueueJobDetail } = await importQueueMonitor();
+test("returns safe not-found for state races and rejects unsupported status", async () => {
+  const {
+    InvalidQueueJobQueryError,
+    QueueJobNotFoundError,
+    readQueueJobDetail,
+  } = await importQueueMonitor();
   const options = {
-    redisUrl: 'redis://race-detail-jobs.test.invalid',
-    queueName: 'checkout-events',
-    jobId: 'job-123',
-    queueFactory: queueFactory({ id: 'job-123', name: 'checkout-created', attemptsMade: 1 }, 'active'),
+    redisUrl: "redis://race-detail-jobs.test.invalid",
+    queueName: "checkout-events",
+    jobId: "job-123",
+    queueFactory: queueFactory(
+      { id: "job-123", name: "checkout-created", attemptsMade: 1 },
+      "active",
+    ),
   };
 
-  await assert.rejects(readQueueJobDetail({ ...options, status: 'failed' }), QueueJobNotFoundError);
-  await assert.rejects(readQueueJobDetail({ ...options, status: 'paused' }), InvalidQueueJobQueryError);
-  await assert.rejects(readQueueJobDetail({ ...options }), InvalidQueueJobQueryError);
+  await assert.rejects(
+    readQueueJobDetail({ ...options, status: "failed" }),
+    QueueJobNotFoundError,
+  );
+  await assert.rejects(
+    readQueueJobDetail({ ...options, status: "paused" }),
+    InvalidQueueJobQueryError,
+  );
+  await assert.rejects(
+    readQueueJobDetail({ ...options }),
+    InvalidQueueJobQueryError,
+  );
 });
 
-test('generic detail API authorizes first and exposes safe errors', async () => {
-  const routeSource = await readFile(sourcePath('src/app/api/admin/queues/jobs/detail/route.ts'), 'utf8');
-  assert.ok(routeSource.indexOf('await requirePlatformAdminRead()') < routeSource.indexOf('readQueueJobDetail('));
+test("generic detail API authorizes first and exposes safe errors", async () => {
+  const routeSource = await readFile(
+    sourcePath("src/app/api/admin/queues/jobs/detail/route.ts"),
+    "utf8",
+  );
+  assert.ok(
+    routeSource.indexOf("await requirePlatformAdminRead()") <
+      routeSource.indexOf("readQueueJobDetail("),
+  );
   assert.match(routeSource, /status: 401/);
   assert.match(routeSource, /status: 400/);
   assert.match(routeSource, /status: 404/);

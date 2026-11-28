@@ -9,7 +9,7 @@ URL, backup, `.sha256` file, or terminal output containing production data.
 ## Scope
 
 - Deletes **all currently listed Shopify merchants** from Moda's database using
-  the existing *per-shop* deletion utility (Shop, installations, sessions,
+  the existing _per-shop_ deletion utility (Shop, installations, sessions,
   customers, billing history, recoveries, conversations, consent evidence,
   merchant settings, and dependent rows). Database foreign keys remain enabled.
 - Preserves WooCommerce shops, global pricing catalogues, Admin configuration,

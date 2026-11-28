@@ -1,18 +1,22 @@
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { test } from 'node:test';
-import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { test } from "node:test";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../..',
+  "../..",
 );
 const sourcePath = (relativePath) => path.join(repositoryRoot, relativePath);
 
-function runEnvironmentCheck(nodeEnvironment, deploymentEnvironment, disableBypass = false) {
-  const environmentPath = sourcePath('src/lib/auth/environment.ts');
+function runEnvironmentCheck(
+  nodeEnvironment,
+  deploymentEnvironment,
+  disableBypass = false,
+) {
+  const environmentPath = sourcePath("src/lib/auth/environment.ts");
   const script = `
     import {
       assertPlatformAdminAuthConfiguration,
@@ -27,19 +31,19 @@ function runEnvironmentCheck(nodeEnvironment, deploymentEnvironment, disableBypa
   `;
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--input-type=module', '--eval', script],
+    ["--experimental-strip-types", "--input-type=module", "--eval", script],
     {
       env: {
         ...process.env,
         NODE_ENV: nodeEnvironment,
         DEPLOYMENT_ENVIRONMENT_NAME: deploymentEnvironment,
-        ADMIN_DEVELOPMENT_AUTH_BYPASS: disableBypass ? 'false' : '',
-        AUTH_SECRET: '',
-        AUTH_GOOGLE_ID: '',
-        AUTH_GOOGLE_SECRET: '',
-        AUTH_URL: '',
+        ADMIN_DEVELOPMENT_AUTH_BYPASS: disableBypass ? "false" : "",
+        AUTH_SECRET: "",
+        AUTH_GOOGLE_ID: "",
+        AUTH_GOOGLE_SECRET: "",
+        AUTH_URL: "",
       },
-      encoding: 'utf8',
+      encoding: "utf8",
     },
   );
   assert.equal(result.status, 0, result.stderr);
@@ -47,7 +51,7 @@ function runEnvironmentCheck(nodeEnvironment, deploymentEnvironment, disableBypa
 }
 
 function runIdentityCheck() {
-  const policyPath = sourcePath('src/lib/auth/security-policy.ts');
+  const policyPath = sourcePath("src/lib/auth/security-policy.ts");
   const script = `
     import {
       canBindPlatformAdmin,
@@ -69,15 +73,15 @@ function runIdentityCheck() {
   `;
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--input-type=module', '--eval', script],
-    { encoding: 'utf8' },
+    ["--experimental-strip-types", "--input-type=module", "--eval", script],
+    { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout.trim());
 }
 
 function runGoogleAuthorizationCheck() {
-  const policyPath = sourcePath('src/lib/auth/security-policy.ts');
+  const policyPath = sourcePath("src/lib/auth/security-policy.ts");
   const script = `
     import { authorizeGoogleProfile } from ${JSON.stringify(policyPath)};
     const profile = { sub: 'google-1', email: 'ADMIN@EXAMPLE.COM', email_verified: true, name: 'Admin' };
@@ -101,15 +105,15 @@ function runGoogleAuthorizationCheck() {
   `;
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--input-type=module', '--eval', script],
-    { encoding: 'utf8' },
+    ["--experimental-strip-types", "--input-type=module", "--eval", script],
+    { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout.trim());
 }
 
 function runSubjectBindingPersistenceCheck() {
-  const policyPath = sourcePath('src/lib/auth/security-policy.ts');
+  const policyPath = sourcePath("src/lib/auth/security-policy.ts");
   const script = `
     import { bindPlatformAdminSubject } from ${JSON.stringify(policyPath)};
     const admin = { id: '1', active: true, provider: 'google', providerSubject: null };
@@ -125,15 +129,15 @@ function runSubjectBindingPersistenceCheck() {
   `;
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--input-type=module', '--eval', script],
-    { encoding: 'utf8' },
+    ["--experimental-strip-types", "--input-type=module", "--eval", script],
+    { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout.trim());
 }
 
 function runPrincipalResolutionCheck() {
-  const resolverPath = sourcePath('src/lib/auth/platform-admin.ts');
+  const resolverPath = sourcePath("src/lib/auth/platform-admin.ts");
   const script = `
     import { resolvePlatformAdminPrincipal } from ${JSON.stringify(resolverPath)};
     let active = true;
@@ -151,18 +155,18 @@ function runPrincipalResolutionCheck() {
   `;
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--input-type=module', '--eval', script],
+    ["--experimental-strip-types", "--input-type=module", "--eval", script],
     {
       env: {
         ...process.env,
-        NODE_ENV: 'test',
-        DEPLOYMENT_ENVIRONMENT_NAME: 'test',
-        AUTH_SECRET: 'test-secret',
-        AUTH_GOOGLE_ID: 'test-google-id',
-        AUTH_GOOGLE_SECRET: 'test-google-secret',
-        AUTH_URL: 'https://admin-test.example.com',
+        NODE_ENV: "test",
+        DEPLOYMENT_ENVIRONMENT_NAME: "test",
+        AUTH_SECRET: "test-secret",
+        AUTH_GOOGLE_ID: "test-google-id",
+        AUTH_GOOGLE_SECRET: "test-google-secret",
+        AUTH_URL: "https://admin-test.example.com",
       },
-      encoding: 'utf8',
+      encoding: "utf8",
     },
   );
   assert.equal(result.status, 0, result.stderr);
@@ -170,7 +174,7 @@ function runPrincipalResolutionCheck() {
 }
 
 function runDevelopmentPrincipalCheck() {
-  const resolverPath = sourcePath('src/lib/auth/platform-admin.ts');
+  const resolverPath = sourcePath("src/lib/auth/platform-admin.ts");
   const script = `
     const auth = await import(${JSON.stringify(resolverPath)});
     const readPrincipal = await auth.requirePlatformAdminRead();
@@ -179,23 +183,23 @@ function runDevelopmentPrincipalCheck() {
   `;
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--input-type=module', '--eval', script],
+    ["--experimental-strip-types", "--input-type=module", "--eval", script],
     {
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        ADMIN_DEVELOPMENT_AUTH_BYPASS: 'true',
-        DEPLOYMENT_ENVIRONMENT_NAME: 'development',
+        NODE_ENV: "development",
+        ADMIN_DEVELOPMENT_AUTH_BYPASS: "true",
+        DEPLOYMENT_ENVIRONMENT_NAME: "development",
       },
-      encoding: 'utf8',
+      encoding: "utf8",
     },
   );
   assert.equal(result.status, 0, result.stderr);
-  return JSON.parse(result.stdout.trim().split('\n').at(-1));
+  return JSON.parse(result.stdout.trim().split("\n").at(-1));
 }
 
 function runMutationBoundaryCheck() {
-  const policyPath = sourcePath('src/lib/auth/tenant-action.ts');
+  const policyPath = sourcePath("src/lib/auth/tenant-action.ts");
   const script = `
     import { runProtectedTenantAction } from ${JSON.stringify(policyPath)};
     let reads = 0;
@@ -209,36 +213,43 @@ function runMutationBoundaryCheck() {
   `;
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--input-type=module', '--eval', script],
-    { encoding: 'utf8' },
+    ["--experimental-strip-types", "--input-type=module", "--eval", script],
+    { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout.trim());
 }
 
-test('environment matrix enforces the development-only bypass invariant', () => {
-  assert.equal(runEnvironmentCheck('development', 'development').bypass, true);
-  assert.equal(runEnvironmentCheck('test', 'development').bypass, true);
-  const verifiedDevelopment = runEnvironmentCheck('development', 'development', true);
+test("environment matrix enforces the development-only bypass invariant", () => {
+  assert.equal(runEnvironmentCheck("development", "development").bypass, true);
+  assert.equal(runEnvironmentCheck("test", "development").bypass, true);
+  const verifiedDevelopment = runEnvironmentCheck(
+    "development",
+    "development",
+    true,
+  );
   assert.equal(verifiedDevelopment.bypass, false);
   assert.match(verifiedDevelopment.configuration, /missing AUTH_SECRET/);
-  assert.equal(runEnvironmentCheck('test', 'test', true).bypass, false);
+  assert.equal(runEnvironmentCheck("test", "test", true).bypass, false);
 
   for (const [nodeEnvironment, deploymentEnvironment] of [
-    ['test', 'test'],
-    ['production', 'production'],
+    ["test", "test"],
+    ["production", "production"],
   ]) {
     const result = runEnvironmentCheck(nodeEnvironment, deploymentEnvironment);
     assert.equal(result.bypass, false);
     assert.match(result.configuration, /missing AUTH_SECRET/);
   }
 
-  const productionDevelopment = runEnvironmentCheck('production', 'development');
+  const productionDevelopment = runEnvironmentCheck(
+    "production",
+    "development",
+  );
   assert.equal(productionDevelopment.bypass, false);
   assert.match(productionDevelopment.bypassError, /Refusing platform-admin/);
 });
 
-test('identity and revocation matrix enforces current PlatformAdmin state', () => {
+test("identity and revocation matrix enforces current PlatformAdmin state", () => {
   assert.deepEqual(runIdentityCheck(), {
     bound: true,
     unbound: true,
@@ -249,7 +260,7 @@ test('identity and revocation matrix enforces current PlatformAdmin state', () =
   });
 });
 
-test('Google authorization executes binding, race, denial, and verification paths', () => {
+test("Google authorization executes binding, race, denial, and verification paths", () => {
   assert.deepEqual(runGoogleAuthorizationCheck(), {
     bound: true,
     unbound: true,
@@ -261,7 +272,7 @@ test('Google authorization executes binding, race, denial, and verification path
   });
 });
 
-test('subject binding persistence executes direct and raced outcomes', () => {
+test("subject binding persistence executes direct and raced outcomes", () => {
   assert.deepEqual(runSubjectBindingPersistenceCheck(), {
     direct: true,
     racedSame: true,
@@ -270,55 +281,61 @@ test('subject binding persistence executes direct and raced outcomes', () => {
   });
 });
 
-test('principal resolver rechecks the current admin record for session revocation', () => {
+test("principal resolver rechecks the current admin record for session revocation", () => {
   const result = runPrincipalResolutionCheck();
-  assert.equal(result.allowed.id, 'admin-1');
+  assert.equal(result.allowed.id, "admin-1");
   assert.equal(result.allowed.developmentBypass, false);
   assert.equal(result.revoked, null);
 });
 
-test('development bypass returns an explicit SUPER_ADMIN principal', () => {
+test("development bypass returns an explicit SUPER_ADMIN principal", () => {
   assert.deepEqual(runDevelopmentPrincipalCheck(), {
     readPrincipal: {
-      id: 'development-platform-admin',
-      role: 'SUPER_ADMIN',
+      id: "development-platform-admin",
+      role: "SUPER_ADMIN",
       developmentBypass: true,
     },
     mutationPrincipal: {
-      id: 'development-platform-admin',
-      role: 'SUPER_ADMIN',
+      id: "development-platform-admin",
+      role: "SUPER_ADMIN",
       developmentBypass: true,
     },
   });
 });
 
-test('direct mutation rejection runs before FormData access or mutation', () => {
+test("direct mutation rejection runs before FormData access or mutation", () => {
   assert.deepEqual(runMutationBoundaryCheck(), {
-    error: 'denied',
+    error: "denied",
     reads: 0,
     mutations: 0,
   });
 });
 
-test('identity, revocation, mutation, session, and route contracts are wired', async () => {
-  const authSource = await readFile(sourcePath('src/auth.ts'), 'utf8');
+test("identity, revocation, mutation, session, and route contracts are wired", async () => {
+  const authSource = await readFile(sourcePath("src/auth.ts"), "utf8");
   const principalSource = await readFile(
-    sourcePath('src/lib/auth/platform-admin.ts'),
-    'utf8',
+    sourcePath("src/lib/auth/platform-admin.ts"),
+    "utf8",
   );
   const policySource = await readFile(
-    sourcePath('src/lib/auth/security-policy.ts'),
-    'utf8',
+    sourcePath("src/lib/auth/security-policy.ts"),
+    "utf8",
   );
   const mutationSource = await readFile(
-    sourcePath('src/app/actions/tenant.ts'),
-    'utf8',
+    sourcePath("src/app/actions/tenant.ts"),
+    "utf8",
   );
-  const dataSource = await readFile(sourcePath('src/lib/admin/data.ts'), 'utf8');
-  const readme = await readFile(sourcePath('README.md'), 'utf8');
+  const dataSource = await readFile(
+    sourcePath("src/lib/admin/data.ts"),
+    "utf8",
+  );
+  const readme = await readFile(sourcePath("README.md"), "utf8");
 
   assert.match(policySource, /profile\.email_verified !== true/);
-  assert.match(policySource, /admin\.providerSubject && admin\.providerSubject !== subject/);
+  assert.match(
+    policySource,
+    /admin\.providerSubject && admin\.providerSubject !== subject/,
+  );
   assert.match(authSource, /providerSubject =\s*account\.providerAccountId/);
   assert.match(policySource, /admin\.providerSubject === providerSubject/);
   assert.match(policySource, /export async function bindPlatformAdminSubject/);
@@ -328,12 +345,21 @@ test('identity, revocation, mutation, session, and route contracts are wired', a
   assert.match(mutationSource, /requirePlatformAdminMutation,/);
   assert.match(mutationSource, /runProtectedTenantAction\(/);
   assert.ok(
-    mutationSource.indexOf('requirePlatformAdminMutation,') <
-      mutationSource.indexOf('formData.get('),
+    mutationSource.indexOf("requirePlatformAdminMutation,") <
+      mutationSource.indexOf("formData.get("),
   );
-  const boundarySource = await readFile(sourcePath('src/lib/auth/tenant-action.ts'), 'utf8');
-  assert.ok(boundarySource.indexOf('await requireAdmin();') < boundarySource.indexOf('return mutate(formData)'));
-  assert.equal((dataSource.match(/await requirePlatformAdminRead\(\);/g) ?? []).length, 5);
+  const boundarySource = await readFile(
+    sourcePath("src/lib/auth/tenant-action.ts"),
+    "utf8",
+  );
+  assert.ok(
+    boundarySource.indexOf("await requireAdmin();") <
+      boundarySource.indexOf("return mutate(formData)"),
+  );
+  assert.equal(
+    (dataSource.match(/await requirePlatformAdminRead\(\);/g) ?? []).length,
+    5,
+  );
   assert.match(authSource, /maxAge: 8 \* 60 \* 60/);
   assert.match(authSource, /httpOnly: true/);
   assert.match(authSource, /sameSite: 'lax'/);
@@ -342,13 +368,22 @@ test('identity, revocation, mutation, session, and route contracts are wired', a
   assert.match(readme, /test callback must use the test Admin host/);
 });
 
-test('public infrastructure routes are bounded and remain outside auth guards', async () => {
-  const healthSource = await readFile(sourcePath('src/app/health/route.ts'), 'utf8');
-  const readySource = await readFile(sourcePath('src/app/ready/route.ts'), 'utf8');
-  const readinessSource = await readFile(sourcePath('src/lib/health/readiness.ts'), 'utf8');
+test("public infrastructure routes are bounded and remain outside auth guards", async () => {
+  const healthSource = await readFile(
+    sourcePath("src/app/health/route.ts"),
+    "utf8",
+  );
+  const readySource = await readFile(
+    sourcePath("src/app/ready/route.ts"),
+    "utf8",
+  );
+  const readinessSource = await readFile(
+    sourcePath("src/lib/health/readiness.ts"),
+    "utf8",
+  );
   const databaseHealthSource = await readFile(
-    sourcePath('src/app/api/health/database/route.ts'),
-    'utf8',
+    sourcePath("src/app/api/health/database/route.ts"),
+    "utf8",
   );
 
   assert.doesNotMatch(healthSource, /requirePlatformAdmin/);
@@ -362,8 +397,11 @@ test('public infrastructure routes are bounded and remain outside auth guards', 
   assert.match(databaseHealthSource, /database: 'ok'/);
 });
 
-test('audit source contains no prohibited credential or session fields', async () => {
-  const auditSource = await readFile(sourcePath('src/lib/auth/audit.ts'), 'utf8');
+test("audit source contains no prohibited credential or session fields", async () => {
+  const auditSource = await readFile(
+    sourcePath("src/lib/auth/audit.ts"),
+    "utf8",
+  );
   assert.doesNotMatch(
     auditSource,
     /password|oauth|authorization|cookie|jwt|session|request|response|profile|secret/i,

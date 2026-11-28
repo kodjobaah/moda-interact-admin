@@ -1,11 +1,11 @@
 "use server";
 
-import {
-  BackgroundRuntimeConfigSection,
-  Prisma,
-} from "@prisma/client";
+import { BackgroundRuntimeConfigSection, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { requirePlatformAdminMutation, requirePlatformAdminRead } from "@/lib/auth/platform-admin";
+import {
+  requirePlatformAdminMutation,
+  requirePlatformAdminRead,
+} from "@/lib/auth/platform-admin";
 import { prisma } from "@/lib/prisma";
 import {
   ALL_RUNTIME_FIELDS,
@@ -31,11 +31,16 @@ async function auditAdminId(
     where: { active: true, role: "SUPER_ADMIN" },
     select: { id: true },
   });
-  if (!admin) throw new Error("A provisioned SUPER_ADMIN is required for runtime controls.");
+  if (!admin)
+    throw new Error(
+      "A provisioned SUPER_ADMIN is required for runtime controls.",
+    );
   return admin.id;
 }
 
-function runtimeSnapshot(config: Record<string, unknown>): Record<string, number> {
+function runtimeSnapshot(
+  config: Record<string, unknown>,
+): Record<string, number> {
   return Object.fromEntries([
     ["version", config.version],
     ...ALL_RUNTIME_FIELDS.map(({ key }) => [key, config[key]]),
@@ -44,7 +49,9 @@ function runtimeSnapshot(config: Record<string, unknown>): Record<string, number
 
 export async function getBackgroundRuntimeConfig(): Promise<BackgroundRuntimeConfigView> {
   const principal = await requirePlatformAdminRead();
-  const config = await prisma.backgroundRuntimeConfig.findUnique({ where: { id: "default" } });
+  const config = await prisma.backgroundRuntimeConfig.findUnique({
+    where: { id: "default" },
+  });
   if (!config) throw new Error(RUNTIME_MISSING_MESSAGE);
   return {
     ...runtimeSnapshot(config as unknown as Record<string, unknown>),
@@ -57,7 +64,8 @@ export async function mutateBackgroundRuntimeControlsAction(
   formData: FormData,
 ): Promise<void> {
   const principal = await requirePlatformAdminMutation();
-  if (principal.role !== "SUPER_ADMIN") throw new Error("SUPER_ADMIN access is required.");
+  if (principal.role !== "SUPER_ADMIN")
+    throw new Error("SUPER_ADMIN access is required.");
 
   const section = parseRuntimeSection(formData.get("section"));
   const expectedVersion = parseExpectedVersion(formData.get("expectedVersion"));
@@ -69,7 +77,8 @@ export async function mutateBackgroundRuntimeControlsAction(
       where: { id: "default" },
     });
     if (!before) throw new Error(RUNTIME_MISSING_MESSAGE);
-    if (before.version !== expectedVersion) throw new Error(RUNTIME_CONFLICT_MESSAGE);
+    if (before.version !== expectedVersion)
+      throw new Error(RUNTIME_CONFLICT_MESSAGE);
 
     const prospective = parseRuntimeControlsForm(
       formData,
@@ -78,7 +87,10 @@ export async function mutateBackgroundRuntimeControlsAction(
     );
     const updateData = Object.fromEntries(
       Object.entries(prospective).filter(([key]) =>
-        ALL_RUNTIME_FIELDS.some((field) => field.key === key && fieldBelongsToSection(field.key, section)),
+        ALL_RUNTIME_FIELDS.some(
+          (field) =>
+            field.key === key && fieldBelongsToSection(field.key, section),
+        ),
       ),
     ) as Prisma.BackgroundRuntimeConfigUpdateManyMutationInput;
     updateData.version = { increment: 1 };
@@ -102,7 +114,9 @@ export async function mutateBackgroundRuntimeControlsAction(
         resultingVersion: after.version,
         platformAdminId: adminId,
         reason,
-        beforeValue: runtimeSnapshot(before) as unknown as Prisma.InputJsonValue,
+        beforeValue: runtimeSnapshot(
+          before,
+        ) as unknown as Prisma.InputJsonValue,
         afterValue: runtimeSnapshot(after) as unknown as Prisma.InputJsonValue,
       },
     });

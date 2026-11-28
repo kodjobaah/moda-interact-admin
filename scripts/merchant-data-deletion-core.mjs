@@ -1,12 +1,12 @@
-import { statSync } from 'node:fs';
-import { isAbsolute } from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { deleteImmutableShopPrompts } from './merchant-prompt-cleanup.mjs';
+import { statSync } from "node:fs";
+import { isAbsolute } from "node:path";
+import { execFileSync } from "node:child_process";
+import { deleteImmutableShopPrompts } from "./merchant-prompt-cleanup.mjs";
 import {
   commerceAuditEventShopWhere,
   commerceExternalAuditShopWhere,
   deleteImmutableShopAudits,
-} from './merchant-audit-cleanup.mjs';
+} from "./merchant-audit-cleanup.mjs";
 
 /**
  * Single-tenant database deletion with an explicit prelaunch-production exception. The database's actual foreign
@@ -15,17 +15,19 @@ import {
  */
 export function parseOptions(argv) {
   const [command, ...rest] = argv;
-  if (!['status', 'delete'].includes(command)) {
-    throw new Error('Expected status or delete. See --help.');
+  if (!["status", "delete"].includes(command)) {
+    throw new Error("Expected status or delete. See --help.");
   }
   const values = new Map();
   const flags = new Set([
-    '--confirm-test-data', '--confirm-workers-stopped',
-    '--external-assets-handled', '--allow-remote-development-db',
-    '--confirm-immutable-prompt-purge',
-    '--confirm-immutable-audit-purge',
-    '--confirm-immutable-consent-purge',
-    '--prelaunch-production-reset',
+    "--confirm-test-data",
+    "--confirm-workers-stopped",
+    "--external-assets-handled",
+    "--allow-remote-development-db",
+    "--confirm-immutable-prompt-purge",
+    "--confirm-immutable-audit-purge",
+    "--confirm-immutable-consent-purge",
+    "--prelaunch-production-reset",
   ]);
   for (let index = 0; index < rest.length; index += 1) {
     const entry = rest[index];
@@ -34,106 +36,187 @@ export function parseOptions(argv) {
       values.set(entry, true);
       continue;
     }
-    const match = /^(--shop|--confirm-shop|--confirm-database|--backup-file)(?:=(.*))?$/.exec(entry);
+    const match =
+      /^(--shop|--confirm-shop|--confirm-database|--backup-file)(?:=(.*))?$/.exec(
+        entry,
+      );
     if (!match) throw new Error(`Unknown argument: ${entry}`);
     const value = match[2] ?? rest[++index];
-    if (!value || value.startsWith('--') || values.has(match[1])) {
+    if (!value || value.startsWith("--") || values.has(match[1])) {
       throw new Error(`${match[1]} requires exactly one value.`);
     }
     values.set(match[1], value);
   }
-  const shop = values.get('--shop');
-  if (!shop) throw new Error('--shop <domain-or-shop-id> is required.');
+  const shop = values.get("--shop");
+  if (!shop) throw new Error("--shop <domain-or-shop-id> is required.");
   const options = {
     command,
     shop,
-    confirmShop: values.get('--confirm-shop'),
-    confirmTestData: Boolean(values.get('--confirm-test-data')),
-    confirmWorkersStopped: Boolean(values.get('--confirm-workers-stopped')),
-    externalAssetsHandled: Boolean(values.get('--external-assets-handled')),
-    allowRemoteDevelopmentDb: Boolean(values.get('--allow-remote-development-db')),
-    confirmImmutablePromptPurge: Boolean(values.get('--confirm-immutable-prompt-purge')),
-    confirmImmutableAuditPurge: Boolean(values.get('--confirm-immutable-audit-purge')),
-    confirmImmutableConsentPurge: Boolean(values.get('--confirm-immutable-consent-purge')),
+    confirmShop: values.get("--confirm-shop"),
+    confirmTestData: Boolean(values.get("--confirm-test-data")),
+    confirmWorkersStopped: Boolean(values.get("--confirm-workers-stopped")),
+    externalAssetsHandled: Boolean(values.get("--external-assets-handled")),
+    allowRemoteDevelopmentDb: Boolean(
+      values.get("--allow-remote-development-db"),
+    ),
+    confirmImmutablePromptPurge: Boolean(
+      values.get("--confirm-immutable-prompt-purge"),
+    ),
+    confirmImmutableAuditPurge: Boolean(
+      values.get("--confirm-immutable-audit-purge"),
+    ),
+    confirmImmutableConsentPurge: Boolean(
+      values.get("--confirm-immutable-consent-purge"),
+    ),
   };
   // Keep ordinary development CLI options backward-compatible.
-  if (values.has('--prelaunch-production-reset')) options.prelaunchProductionReset = true;
-  if (values.has('--confirm-database')) options.confirmDatabase = values.get('--confirm-database');
-  if (values.has('--backup-file')) options.backupFile = values.get('--backup-file');
+  if (values.has("--prelaunch-production-reset"))
+    options.prelaunchProductionReset = true;
+  if (values.has("--confirm-database"))
+    options.confirmDatabase = values.get("--confirm-database");
+  if (values.has("--backup-file"))
+    options.backupFile = values.get("--backup-file");
   return options;
 }
 
 export function validateDeletion(options, shop, inventory, env) {
-  if (options.command !== 'delete') throw new Error('Delete action required.');
+  if (options.command !== "delete") throw new Error("Delete action required.");
   if (!options.confirmTestData) {
-    throw new Error('Mutation refused: --confirm-test-data is required.');
+    throw new Error("Mutation refused: --confirm-test-data is required.");
   }
   if (!options.confirmWorkersStopped) {
-    throw new Error('Mutation refused: stop merchant-related workers and pass --confirm-workers-stopped.');
+    throw new Error(
+      "Mutation refused: stop merchant-related workers and pass --confirm-workers-stopped.",
+    );
   }
   if (options.confirmShop !== shop.domain) {
-    throw new Error(`Mutation refused: --confirm-shop must exactly match ${shop.domain}.`);
+    throw new Error(
+      `Mutation refused: --confirm-shop must exactly match ${shop.domain}.`,
+    );
   }
   const environments = [
-    env.NODE_ENV, env.MODA_ENVIRONMENT, env.DEPLOYMENT_ENVIRONMENT_NAME,
-    env.DEPLOYMENT_ENVIRONMENT, env.RENDER_ENV,
-  ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  const productionEnv = environments.some((value) => value === 'production' || value === 'prod');
-  if (!env.DATABASE_URL) throw new Error('DATABASE_URL must be set to the intended database.');
+    env.NODE_ENV,
+    env.MODA_ENVIRONMENT,
+    env.DEPLOYMENT_ENVIRONMENT_NAME,
+    env.DEPLOYMENT_ENVIRONMENT,
+    env.RENDER_ENV,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toLowerCase());
+  const productionEnv = environments.some(
+    (value) => value === "production" || value === "prod",
+  );
+  if (!env.DATABASE_URL)
+    throw new Error("DATABASE_URL must be set to the intended database.");
   let address;
-  try { address = new URL(env.DATABASE_URL); }
-  catch { throw new Error('DATABASE_URL is not a valid PostgreSQL URL.'); }
-  if (!['postgresql:', 'postgres:'].includes(address.protocol)) {
-    throw new Error('DATABASE_URL must use PostgreSQL.');
+  try {
+    address = new URL(env.DATABASE_URL);
+  } catch {
+    throw new Error("DATABASE_URL is not a valid PostgreSQL URL.");
   }
-  const databaseName = decodeURIComponent(address.pathname.replace(/^\//, ''));
-  const local = ['localhost', '127.0.0.1', '[::1]'].includes(address.hostname);
+  if (!["postgresql:", "postgres:"].includes(address.protocol)) {
+    throw new Error("DATABASE_URL must use PostgreSQL.");
+  }
+  const databaseName = decodeURIComponent(address.pathname.replace(/^\//, ""));
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(address.hostname);
   if (options.prelaunchProductionReset) {
     // This exception is intentionally narrowly pinned to the known pre-launch
     // database. It must be removed before the first live merchant is admitted.
-    if (shop.platform !== 'SHOPIFY' || databaseName !== 'moda_interact_postgres_production' ||
-        options.confirmDatabase !== databaseName ||
-        env.MODA_PRELAUNCH_RESET_AUTHORIZATION !== 'PRELAUNCH_TEST_DATA_ONLY') {
-      throw new Error('Prelaunch production Shopify reset refused: shop, database or authorisation mismatch.');
+    if (
+      shop.platform !== "SHOPIFY" ||
+      databaseName !== "moda_interact_postgres_production" ||
+      options.confirmDatabase !== databaseName ||
+      env.MODA_PRELAUNCH_RESET_AUTHORIZATION !== "PRELAUNCH_TEST_DATA_ONLY"
+    ) {
+      throw new Error(
+        "Prelaunch production Shopify reset refused: shop, database or authorisation mismatch.",
+      );
     }
     if (!options.backupFile || !isAbsolute(options.backupFile)) {
-      throw new Error('Prelaunch reset requires an absolute --backup-file path.');
+      throw new Error(
+        "Prelaunch reset requires an absolute --backup-file path.",
+      );
     }
     let backupSize;
-    try { backupSize = statSync(options.backupFile).size; }
-    catch { throw new Error('Prelaunch reset backup file is unavailable.'); }
-    if (backupSize < 1024) throw new Error('Prelaunch reset backup is empty or incomplete.');
+    try {
+      backupSize = statSync(options.backupFile).size;
+    } catch {
+      throw new Error("Prelaunch reset backup file is unavailable.");
+    }
+    if (backupSize < 1024)
+      throw new Error("Prelaunch reset backup is empty or incomplete.");
     let archiveList;
     try {
-      archiveList = execFileSync('pg_restore', ['--list', options.backupFile], {
-        encoding: 'utf8', timeout: 60_000, maxBuffer: 8 * 1024 * 1024,
+      archiveList = execFileSync("pg_restore", ["--list", options.backupFile], {
+        encoding: "utf8",
+        timeout: 60_000,
+        maxBuffer: 8 * 1024 * 1024,
       });
     } catch {
-      throw new Error('Prelaunch reset backup archive cannot be read by pg_restore.');
+      throw new Error(
+        "Prelaunch reset backup archive cannot be read by pg_restore.",
+      );
     }
-    if (!archiveList.split('\n').some((line) => /^;\s*dbname:\s*/.test(line) &&
-        line.trim().endsWith(`dbname: ${databaseName}`))) {
-      throw new Error('Prelaunch reset backup does not identify the exact target database.');
+    if (
+      !archiveList
+        .split("\n")
+        .some(
+          (line) =>
+            /^;\s*dbname:\s*/.test(line) &&
+            line.trim().endsWith(`dbname: ${databaseName}`),
+        )
+    ) {
+      throw new Error(
+        "Prelaunch reset backup does not identify the exact target database.",
+      );
     }
   } else {
-    if (productionEnv || /(^|[_-])(prod|production)([_-]|$)/i.test(databaseName)) {
-      throw new Error('Production merchant deletion is not supported by this development utility.');
+    if (
+      productionEnv ||
+      /(^|[_-])(prod|production)([_-]|$)/i.test(databaseName)
+    ) {
+      throw new Error(
+        "Production merchant deletion is not supported by this development utility.",
+      );
     }
     if (!local && !options.allowRemoteDevelopmentDb) {
-      throw new Error('Remote database refused. Use --allow-remote-development-db only for a verified non-production database.');
+      throw new Error(
+        "Remote database refused. Use --allow-remote-development-db only for a verified non-production database.",
+      );
     }
   }
-  if (inventory.commerceAgentPrompts > 0 && !options.confirmImmutablePromptPurge) {
-    throw new Error('Merchant has immutable ARCH-021 prompt records. Inspect the preview, then pass --confirm-immutable-prompt-purge to remove them from a disposable development/test database.');
+  if (
+    inventory.commerceAgentPrompts > 0 &&
+    !options.confirmImmutablePromptPurge
+  ) {
+    throw new Error(
+      "Merchant has immutable ARCH-021 prompt records. Inspect the preview, then pass --confirm-immutable-prompt-purge to remove them from a disposable development/test database.",
+    );
   }
-  if ((inventory.commerceAuditEvents > 0 || inventory.commerceExternalConnectionAudits > 0) && !options.confirmImmutableAuditPurge) {
-    throw new Error('Merchant has immutable commerce audit records. Inspect the preview, then pass --confirm-immutable-audit-purge to remove them from a disposable development/test database.');
+  if (
+    (inventory.commerceAuditEvents > 0 ||
+      inventory.commerceExternalConnectionAudits > 0) &&
+    !options.confirmImmutableAuditPurge
+  ) {
+    throw new Error(
+      "Merchant has immutable commerce audit records. Inspect the preview, then pass --confirm-immutable-audit-purge to remove them from a disposable development/test database.",
+    );
   }
-  if (inventory.whatsAppConsentEvidence > 0 && !options.confirmImmutableConsentPurge) {
-    throw new Error('Merchant has immutable Woo WhatsApp consent evidence. Inspect the preview, then pass --confirm-immutable-consent-purge to remove it from a disposable development/test database.');
+  if (
+    inventory.whatsAppConsentEvidence > 0 &&
+    !options.confirmImmutableConsentPurge
+  ) {
+    throw new Error(
+      "Merchant has immutable Woo WhatsApp consent evidence. Inspect the preview, then pass --confirm-immutable-consent-purge to remove it from a disposable development/test database.",
+    );
   }
-  if (inventory.merchantKnowledgeUploadedAssets > 0 && !options.externalAssetsHandled) {
-    throw new Error('Merchant has uploaded knowledge assets. Delete/retain the R2 objects deliberately, then pass --external-assets-handled.');
+  if (
+    inventory.merchantKnowledgeUploadedAssets > 0 &&
+    !options.externalAssetsHandled
+  ) {
+    throw new Error(
+      "Merchant has uploaded knowledge assets. Delete/retain the R2 objects deliberately, then pass --external-assets-handled.",
+    );
   }
 }
 
@@ -142,48 +225,75 @@ export function validateDeletion(options, shop, inventory, env) {
 export async function merchantInventory(db, shop) {
   const scoped = { shopId: shop.id };
   const counters = {
-    sessions: ['session', { shop: shop.domain }],
-    customers: ['customer', scoped],
-    whatsAppConsentEvidence: ['whatsAppConsentEvidence', scoped],
-    checkoutRecoveries: ['checkoutRecovery', scoped],
-    conversations: ['conversation', { OR: [scoped, { checkoutRecovery: { is: scoped } }] }],
-    billingPeriods: ['billingPeriod', scoped],
-    usageEvents: ['usageEvent', scoped],
-    billingOperations: ['billingOperation', scoped],
-    usageReservations: ['usageReservation', scoped],
-    recoveryCreditPurchases: ['recoveryCreditPurchase', scoped],
-    recoveryCreditRefunds: ['recoveryCreditRefund', scoped],
-    promotionalCreditGrants: ['promotionalCreditGrant', scoped],
-    merchantSupportThreads: ['merchantSupportThread', scoped],
-    commerceAuditEvents: ['commerceAuditEvent', commerceAuditEventShopWhere(shop.id)],
-    commerceExternalConnectionAudits: ['commerceExternalConnectionAudit', commerceExternalAuditShopWhere(shop.id)],
-    billingAuditEvents: ['billingAuditEvent', scoped],
-    commerceAgentConfigurations: ['commerceAgentConfiguration', scoped],
-    commerceAgentPrompts: ['commerceAgentPrompt', scoped],
-    commerceAgentPromptRevisions: ['commerceAgentPromptRevision', { prompt: { is: scoped } }],
-    commerceModelAvailability: ['commerceModelAvailability', scoped],
-    commerceModelPolicies: ['commerceModelPolicy', scoped],
-    commerceStudioMerchantAccess: ['commerceStudioMerchantAccess', scoped],
-    merchantKnowledgeSources: ['merchantKnowledgeSource', scoped],
-    merchantKnowledgeUploadedAssets: ['merchantKnowledgeUploadedAsset', scoped],
-    whatsAppTemplatePublicationTargets: ['whatsAppTemplatePublicationTarget', scoped],
+    sessions: ["session", { shop: shop.domain }],
+    customers: ["customer", scoped],
+    whatsAppConsentEvidence: ["whatsAppConsentEvidence", scoped],
+    checkoutRecoveries: ["checkoutRecovery", scoped],
+    conversations: [
+      "conversation",
+      { OR: [scoped, { checkoutRecovery: { is: scoped } }] },
+    ],
+    billingPeriods: ["billingPeriod", scoped],
+    usageEvents: ["usageEvent", scoped],
+    billingOperations: ["billingOperation", scoped],
+    usageReservations: ["usageReservation", scoped],
+    recoveryCreditPurchases: ["recoveryCreditPurchase", scoped],
+    recoveryCreditRefunds: ["recoveryCreditRefund", scoped],
+    promotionalCreditGrants: ["promotionalCreditGrant", scoped],
+    merchantSupportThreads: ["merchantSupportThread", scoped],
+    commerceAuditEvents: [
+      "commerceAuditEvent",
+      commerceAuditEventShopWhere(shop.id),
+    ],
+    commerceExternalConnectionAudits: [
+      "commerceExternalConnectionAudit",
+      commerceExternalAuditShopWhere(shop.id),
+    ],
+    billingAuditEvents: ["billingAuditEvent", scoped],
+    commerceAgentConfigurations: ["commerceAgentConfiguration", scoped],
+    commerceAgentPrompts: ["commerceAgentPrompt", scoped],
+    commerceAgentPromptRevisions: [
+      "commerceAgentPromptRevision",
+      { prompt: { is: scoped } },
+    ],
+    commerceModelAvailability: ["commerceModelAvailability", scoped],
+    commerceModelPolicies: ["commerceModelPolicy", scoped],
+    commerceStudioMerchantAccess: ["commerceStudioMerchantAccess", scoped],
+    merchantKnowledgeSources: ["merchantKnowledgeSource", scoped],
+    merchantKnowledgeUploadedAssets: ["merchantKnowledgeUploadedAsset", scoped],
+    whatsAppTemplatePublicationTargets: [
+      "whatsAppTemplatePublicationTarget",
+      scoped,
+    ],
   };
-  const entries = await Promise.all(Object.entries(counters).map(async ([key, [delegate, where]]) => [
-    key, await db[delegate].count({ where }),
-  ]));
+  const entries = await Promise.all(
+    Object.entries(counters).map(async ([key, [delegate, where]]) => [
+      key,
+      await db[delegate].count({ where }),
+    ]),
+  );
   return Object.fromEntries(entries);
 }
 
 const byShop = (shopId) => ({ where: { shopId } });
 
-const WOO_CONSENT_GUARD = 'ALTER TABLE commerce."WhatsAppConsentEvidence" DISABLE TRIGGER arch045_woo_evidence_guard';
-const RESTORE_WOO_CONSENT_GUARD = 'ALTER TABLE commerce."WhatsAppConsentEvidence" ENABLE TRIGGER arch045_woo_evidence_guard';
+const WOO_CONSENT_GUARD =
+  'ALTER TABLE commerce."WhatsAppConsentEvidence" DISABLE TRIGGER arch045_woo_evidence_guard';
+const RESTORE_WOO_CONSENT_GUARD =
+  'ALTER TABLE commerce."WhatsAppConsentEvidence" ENABLE TRIGGER arch045_woo_evidence_guard';
 
-export async function deleteImmutableWooConsentEvidence(tx, shopId, erase, confirmed) {
+export async function deleteImmutableWooConsentEvidence(
+  tx,
+  shopId,
+  erase,
+  confirmed,
+) {
   const where = byShop(shopId);
   const count = await tx.whatsAppConsentEvidence.count(where);
   if (count > 0 && !confirmed) {
-    throw new Error('Woo WhatsApp consent evidence purge not confirmed: pass --confirm-immutable-consent-purge.');
+    throw new Error(
+      "Woo WhatsApp consent evidence purge not confirmed: pass --confirm-immutable-consent-purge.",
+    );
   }
 
   if (count > 0) {
@@ -196,16 +306,22 @@ export async function deleteImmutableWooConsentEvidence(tx, shopId, erase, confi
       WHERE n.nspname = 'commerce' AND c.relname = 'WhatsAppConsentEvidence'
         AND t.tgname = 'arch045_woo_evidence_guard'
     `;
-    if (!Array.isArray(guards) || guards.length !== 1 ||
-        guards[0].enabledState !== 'O' || guards[0].internal !== false) {
-      throw new Error('Woo consent evidence trigger differs from its expected enabled state; merchant deletion refused.');
+    if (
+      !Array.isArray(guards) ||
+      guards.length !== 1 ||
+      guards[0].enabledState !== "O" ||
+      guards[0].internal !== false
+    ) {
+      throw new Error(
+        "Woo consent evidence trigger differs from its expected enabled state; merchant deletion refused.",
+      );
     }
 
     await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
     await tx.$executeRawUnsafe(WOO_CONSENT_GUARD);
   }
 
-  await erase('whatsAppConsentEvidence', where);
+  await erase("whatsAppConsentEvidence", where);
 
   if (count > 0) {
     await tx.$executeRawUnsafe(RESTORE_WOO_CONSENT_GUARD);
@@ -213,11 +329,15 @@ export async function deleteImmutableWooConsentEvidence(tx, shopId, erase, confi
 }
 
 /** Only shop-owned rows are explicitly removed. Global catalogue rows survive. */
-export async function deleteMerchantDatabaseRows(tx, shop, {
-  confirmImmutablePromptPurge = false,
-  confirmImmutableAuditPurge = false,
-  confirmImmutableConsentPurge = false,
-} = {}) {
+export async function deleteMerchantDatabaseRows(
+  tx,
+  shop,
+  {
+    confirmImmutablePromptPurge = false,
+    confirmImmutableAuditPurge = false,
+    confirmImmutableConsentPurge = false,
+  } = {},
+) {
   const shopId = shop.id;
   const removed = {};
   const erase = async (name, args) => {
@@ -227,28 +347,43 @@ export async function deleteMerchantDatabaseRows(tx, shop, {
 
   // Unlinked receipts can retain provider payloads; linked receipts must be
   // deleted before the BillingOperation FK would be set null by a cascade.
-  await erase('wooCommerceBillingWebhookReceipt', {
+  await erase("wooCommerceBillingWebhookReceipt", {
     where: { billingOperation: { is: { shopId } } },
   });
-  await deleteImmutableWooConsentEvidence(tx, shopId, erase, confirmImmutableConsentPurge);
-  await erase('billingAuditEvent', byShop(shopId));
+  await deleteImmutableWooConsentEvidence(
+    tx,
+    shopId,
+    erase,
+    confirmImmutableConsentPurge,
+  );
+  await erase("billingAuditEvent", byShop(shopId));
 
-  await deleteImmutableShopAudits(tx, shopId, erase, confirmImmutableAuditPurge);
-  await erase('commerceExternalCredential', byShop(shopId));
-  await erase('commerceStudioMerchantAccess', byShop(shopId));
-  await erase('commerceShopProfile', byShop(shopId));
-  await erase('commerceAgentConfiguration', byShop(shopId));
-  await deleteImmutableShopPrompts(tx, shopId, erase, confirmImmutablePromptPurge);
-  await erase('commerceModelCatalogueEntry', {
+  await deleteImmutableShopAudits(
+    tx,
+    shopId,
+    erase,
+    confirmImmutableAuditPurge,
+  );
+  await erase("commerceExternalCredential", byShop(shopId));
+  await erase("commerceStudioMerchantAccess", byShop(shopId));
+  await erase("commerceShopProfile", byShop(shopId));
+  await erase("commerceAgentConfiguration", byShop(shopId));
+  await deleteImmutableShopPrompts(
+    tx,
+    shopId,
+    erase,
+    confirmImmutablePromptPurge,
+  );
+  await erase("commerceModelCatalogueEntry", {
     where: { availability: { is: { shopId } } },
   });
-  await erase('commerceModelAvailability', byShop(shopId));
-  await erase('commerceModelPolicy', byShop(shopId));
+  await erase("commerceModelAvailability", byShop(shopId));
+  await erase("commerceModelPolicy", byShop(shopId));
 
   // Source revisions reference uploaded assets with RESTRICT, so sources and
   // their cascading revisions/chunks must be removed before uploaded assets.
-  await erase('merchantKnowledgeSource', byShop(shopId));
-  await erase('merchantKnowledgeUploadedAsset', byShop(shopId));
+  await erase("merchantKnowledgeSource", byShop(shopId));
+  await erase("merchantKnowledgeUploadedAsset", byShop(shopId));
 
   // These are not linked by an FK. Remove only requests for translations tied
   // to this merchant's support messages, before support messages cascade away.
@@ -265,23 +400,23 @@ export async function deleteMerchantDatabaseRows(tx, shop, {
 
   // FK restrictions between grants/reservations, purchases/refunds, and
   // subscriptions/billing periods require explicit ordering.
-  await erase('merchantPromotionSelection', byShop(shopId));
-  await erase('usageReservation', byShop(shopId));
-  await erase('promotionalCreditGrant', byShop(shopId));
-  await erase('promotionCampaignEvent', {
+  await erase("merchantPromotionSelection", byShop(shopId));
+  await erase("usageReservation", byShop(shopId));
+  await erase("promotionalCreditGrant", byShop(shopId));
+  await erase("promotionCampaignEvent", {
     where: { campaign: { is: { targetShopId: shopId } } },
   });
-  await erase('promotionCampaign', { where: { targetShopId: shopId } });
-  await erase('recoveryCreditRefund', byShop(shopId));
-  await erase('recoveryCreditPurchase', byShop(shopId));
-  await erase('billingPeriod', byShop(shopId));
-  await erase('whatsAppTemplatePublicationTarget', byShop(shopId));
-  await erase('customer', byShop(shopId));
+  await erase("promotionCampaign", { where: { targetShopId: shopId } });
+  await erase("recoveryCreditRefund", byShop(shopId));
+  await erase("recoveryCreditPurchase", byShop(shopId));
+  await erase("billingPeriod", byShop(shopId));
+  await erase("whatsAppTemplatePublicationTarget", byShop(shopId));
+  await erase("customer", byShop(shopId));
 
   // The database enforces remaining CASCADE / SET NULL / RESTRICT relations.
   // On any unhandled restriction, Prisma rolls the WHOLE transaction back.
   await tx.shop.delete({ where: { id: shopId } });
   removed.shop = 1;
-  await erase('session', { where: { shop: shop.domain } });
+  await erase("session", { where: { shop: shop.domain } });
   return removed;
 }

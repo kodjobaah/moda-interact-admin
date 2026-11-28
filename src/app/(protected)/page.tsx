@@ -67,7 +67,9 @@ export default async function Home({ searchParams }: PageProps) {
   const rawTab = firstParam(rawParams.tab);
   const canEditCommercePolicy = canEditLiveCommerceBudget(principal.role);
   const tab =
-    rawTab === "recovery" || rawTab === "logs" || rawTab === "billing" ||
+    rawTab === "recovery" ||
+    rawTab === "logs" ||
+    rawTab === "billing" ||
     (rawTab === "commerce" && canEditCommercePolicy)
       ? rawTab
       : "admin";
@@ -100,22 +102,29 @@ export default async function Home({ searchParams }: PageProps) {
     search,
   });
 
-
   const selectedTenant = tenantId ? await getTenantDetail(tenantId) : null;
-  const humanMessaging = selectedTenant && tab === "admin" && principal.role === "SUPER_ADMIN"
-    ? await getHumanMessagingDashboard(
-        selectedTenant.id,
-        positiveInt(rawParams.humanHistoryPage),
-        positiveInt(rawParams.humanIncidentPage),
-      )
-    : null;
-  const commerceShopHistoryPage = positiveInt(rawParams.commerceShopHistoryPage);
-  const shopPolicyScope = selectedTenant && tab === "commerce" && canEditCommercePolicy
-    ? issueLiveShopPolicyScope(selectedTenant.id, principal.id)
-    : null;
-  const shopPolicyDashboard = selectedTenant && tab === "commerce" && canEditCommercePolicy
-    ? await getLiveShopPolicyDashboard(selectedTenant.id, commerceShopHistoryPage - 1)
-    : null;
+  const humanMessaging =
+    selectedTenant && tab === "admin" && principal.role === "SUPER_ADMIN"
+      ? await getHumanMessagingDashboard(
+          selectedTenant.id,
+          positiveInt(rawParams.humanHistoryPage),
+          positiveInt(rawParams.humanIncidentPage),
+        )
+      : null;
+  const commerceShopHistoryPage = positiveInt(
+    rawParams.commerceShopHistoryPage,
+  );
+  const shopPolicyScope =
+    selectedTenant && tab === "commerce" && canEditCommercePolicy
+      ? issueLiveShopPolicyScope(selectedTenant.id, principal.id)
+      : null;
+  const shopPolicyDashboard =
+    selectedTenant && tab === "commerce" && canEditCommercePolicy
+      ? await getLiveShopPolicyDashboard(
+          selectedTenant.id,
+          commerceShopHistoryPage - 1,
+        )
+      : null;
   const tenantBilling =
     selectedTenant && tab === "billing"
       ? await getTenantBilling(
@@ -246,7 +255,9 @@ export default async function Home({ searchParams }: PageProps) {
             />
             <KpiCard
               label={adminI18n.t("tenant.recoveryConversations")}
-              value={adminI18n.formatNumber(directory.kpis.recoveryConversations)}
+              value={adminI18n.formatNumber(
+                directory.kpis.recoveryConversations,
+              )}
             />
             <KpiCard
               label={adminI18n.t("tenant.recoveryMessages")}
